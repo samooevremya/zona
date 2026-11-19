@@ -515,7 +515,7 @@ function buildBigMini() {
   g.save(); g.scale(K, K);
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     if (map[y * MW + x] !== TR) continue;
-    const n = hash2(x, y), crown = CANOPY[Math.floor(n * CANOPY.length)];
+    const n = hash2(x, y), crown = yardTreeCrown && yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[Math.floor(n * CANOPY.length)];
     const width = (2.8 + n * 0.9) * CAN_PAD;
     g.drawImage(crown, x + 0.5 - width / 2, y + 0.4 - width / 2, width, width);
   }

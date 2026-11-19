@@ -193,6 +193,22 @@ function bigRemap() {
 
 /* ---------- новые места и предметы ---------- */
 function bigLoc(id, l) { l.id = id; LOCATIONS.push(l); LOC[id] = l; }
+// Индексы посаженных в деревне сухих деревьев для кроны в мире и на карте.
+const yardTreeCells = new Set();
+function bigVillageYards() {
+  // Северо-западный двор: машина стоит за обочиной, сбоку от южной двери избы.
+  addObj({ k: 'car', x: 48 * T - 37, y: 164.5 * T - 17, w: 74, h: 34, solid: 1, seed: 0, sprite: 'c1_yard_car' });
+  // Ящики без добычи пользуются обычной коллизией и правилами прыжка.
+  for (const [x, y] of [[46.5, 163.6], [73.5, 163.7], [74.5, 163.8]]) {
+    addObj({ k: 'crate', x: x * T - 14, y: y * T - 12, w: 28, h: 24, solid: 1, sprite: 'c1_yard_crate' });
+  }
+  const drum = C1 ? 'yardDrum' : 'barrel';
+  DECOR.push([drum, 45.8, 164.1, -.15], [drum, 74.9, 164.6, .12]);
+  for (const [x, y] of [[44, 163], [72, 165]]) {
+    setT(x, y, TR);
+    yardTreeCells.add(y * MW + x);
+  }
+}
 function bigNewObjects(R) {
   bigLoc('hutor', { name: 'Хутор', gen: 'хутора', type: 'story', bounds: [24, 125, 44, 141], entrances: [[31, 127], [42, 132]],
     anchors: { clear: [33, 131], sos: [[38, 137]], safe: [32, 127] } });
@@ -225,6 +241,7 @@ function bigNewObjects(R) {
     const bad = () => { for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++) for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) { const t = tAt(x, y); if (t !== GR && t !== BU && !(o.k === 'car' && t === DI)) return true; } return false; };
     for (let i = 0; i < 40 && bad(); i++) { o.x += (i % 2 ? 1 : -1) * T * Math.ceil(i / 4); o.y += (i % 3 === 0 ? T : 0); }
   });
+  bigVillageYards();
 }
 
 /* заборы из декора — настоящие препятствия (перепрыгиваются). Вызывается после переноса координат, когда декор на своих местах */

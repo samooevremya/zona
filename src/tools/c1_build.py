@@ -174,6 +174,15 @@ with Image.open(find('cordon_traces')) as traces:
     ]:
         add('c1_trace_' + name, fit(trim(traces.crop(box)), width * 2), [width, width])
 
+# Прозрачный лист дворового реквизита. Машина шире четверти листа.
+with Image.open(find('village_yard')) as yard:
+    for name, box, size, logical in [
+        ('tree', (0, 0, 640, 646), 256, [110, 110]),
+        ('drum', (680, 50, 1160, 560), 64, [20, 24]),
+        ('crate', (0, 736, 506, 1200), 96, [29, 25]),
+        ('car', (506, 732, 1254, 1180), 200, [78, 38]),
+    ]:
+        add('c1_yard_' + name, fit(trim(yard.crop(box)), size), logical)
 add('c1_bus', fit(trim(key_green(find('bus_wreck'))), 512), [384, 96])
 cars = sheet('car_wrecks', 4, 6)
 for i, im in enumerate(cars[:3]): add('c1_car%d' % i, fit(im, 256), [160, 96])
@@ -223,13 +232,15 @@ def webp_uri(im, q=86):
 man = {'version': 'c1-1', 'images': {}, 'sprites': {}}
 groups = {
   'c1traces': [k for k in SPR if k.startswith('c1_trace_')],
+  'c1yard': [k for k in SPR if k.startswith('c1_yard_')],
   'c1veg': [k for k in SPR if k.startswith(('c1_pool', 'c1_pine', 'c1_birch', 'c1_dead', 'c1_log', 'c1_bush', 'c1_tuft', 'c1_stump', 'c1_rock'))],
   'c1bld': [k for k in SPR if k.startswith(('c1_roof', 'c1_booth', 'c1_hatch', 'c1_pump', 'c1_tower', 'c1_ford', 'c1_tunnel', 'c1_bridge'))],
 }
 groups['c1prop'] = [k for k in SPR if not any(k in v for v in groups.values())]
 total = 0
 for g, keys in groups.items():
-    atl, pos = pack([(k, SPR[k][0]) for k in keys], 512 if g == 'c1traces' else 2048)
+    width = {'c1traces': 512, 'c1yard': 640}.get(g, 2048)
+    atl, pos = pack([(k, SPR[k][0]) for k in keys], width)
     uri, n = webp_uri(atl); total += n
     man['images'][g] = {'file': uri}
     for k in keys:

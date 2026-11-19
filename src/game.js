@@ -2313,7 +2313,8 @@ function render() {
       const scale = .65 + hash2(x + 73, y + 13) * .52;
       const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
       const width = height * (.77 + .30 * hash2(y + 31, x));
-      drawAutumnCrown(CANOPY[ci], cx + sw, cy, width, height);
+      const crown = yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[ci];
+      drawAutumnCrown(crown, cx + sw, cy, width, height);
     } else {
       const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
       ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;
@@ -3097,6 +3098,9 @@ function artStatic(g, o) { C1SH = o.k !== 'fire'; try { return artStatic0(g, o);
 function artStatic0(g, o) {
   const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
   if (C1 && o.k === 'bus') { const w = o.w * 1.25, s = ART.m.sprites.c1_bus, h = w * s.rect[3] / s.rect[2]; g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - w / 2 + 6, cy - h / 2 + 7, w, h); c1Draw(g, 'c1_bus', cx, cy, w); return true; }
+  if (C1 && o.k === 'car' && o.sprite) {
+    c1Draw(g, o.sprite, cx, cy, o.w + 4, 0, 1, 5); return true;
+  }
   if (C1 && o.k === 'car') {
     const id = o.seed >= 10 ? 'c1_army' + (o.seed % 3) : ['c1_car0', 'c1_car1', 'c1_car2', 'c1_tractor'][o.seed % 4], w = o.seed >= 10 ? 84 : 70, a = o.seed % 2 ? Math.PI : 0;
     g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx + 4, cy + 5, w * 0.48, w * 0.22, 0, 0, 6.28); g.fill(); c1Draw(g, id, cx, cy, w, a); return true;
@@ -3154,7 +3158,7 @@ const DECOR = [
   ['fence', 38.5, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
   ['fence', 12.6, 75.5, Math.PI / 2], ['fence', 12.6, 77.5, Math.PI / 2], ['fence', 12.6, 89.5, Math.PI / 2]
 ];
-const C1DECOR = { ford: ['c1_ford', 230], logs: ['c1_log1', 46], bench: ['c1_log0', 44], barrel: ['c1_barrel', 22], rubble: ['c1_bricks', 32], fence: ['c1_fence_picket', 66] };
+const C1DECOR = { yardDrum: ['c1_yard_drum', 19], ford: ['c1_ford', 230], logs: ['c1_log1', 46], bench: ['c1_log0', 44], barrel: ['c1_barrel', 22], rubble: ['c1_bricks', 32], fence: ['c1_fence_picket', 66] };
 function artDecor(g) { C1SH = 1; try { artDecor0(g); } finally { C1SH = 0; } }
 function artDecor0(g) {
   DECOR.forEach(d => {
@@ -3199,9 +3203,10 @@ function autumnBirch(id, variant, size) {
   g.putImageData(pixels, 0, 0);
   return c;
 }
+let yardTreeCrown;
 function artCanopy() {
   CAN_PAD = C1 && SHADOWS ? 1.35 : 1;
-  const pick = C1 ? forestCrowns.concat(edgeCrowns)
+  const pick = C1 ? forestCrowns.concat(edgeCrowns, BIG ? ['c1_yard_tree'] : [])
     : ['tree_olive', 'tree_dry', 'tree_olive', 'tree_bare', 'tree_olive', 'tree_dry', 'tree_olive', 'tree_dry'];
   if (C1 && !CANOPY.built) { CAN_SZ = +((location.hash.match(/can-(\d+)/) || [])[1] || 96); CANOPY.built = 1; }
   const S2 = CAN_SZ / 2;
@@ -3216,7 +3221,8 @@ function artCanopy() {
       g.drawImage(autumnBirch(pick[v], v, CAN_SZ * 2), -w / 2, -w / 2, w, w);
     } else ART.draw(g, pick[v], 0, 0, w, w);
     c1Grade(c, 0, 0, c.width, c.height);
-    CANOPY.push(c);
+    if (pick[v] === 'c1_yard_tree') yardTreeCrown = c;
+    else CANOPY.push(c);
   }
 }
 /* цвет C1 под референс: меньше насыщенности (особенно жёлто-зелёной), больше контраста, чуть холоднее синий.
@@ -3320,7 +3326,8 @@ function artRoof(h, idx) {
 }
 function artCrate(o) {
   ctx.save(); spriteShadow(ctx, 5, 2);
-  ART.draw(ctx, C1 ? (o.stash ? 'c1_crate_army' : 'c1_crate') : 'crate', o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, ((o.x + o.y) % 4) * Math.PI / 2);
+  const id = C1 ? (o.sprite || (o.stash ? 'c1_crate_army' : 'c1_crate')) : 'crate';
+  ART.draw(ctx, id, o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, o.sprite ? 0 : ((o.x + o.y) % 4) * Math.PI / 2);
   ctx.restore();
   if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
@@ -4870,6 +4877,22 @@ function bigRemap() {
 
 /* ---------- новые места и предметы ---------- */
 function bigLoc(id, l) { l.id = id; LOCATIONS.push(l); LOC[id] = l; }
+// Индексы посаженных в деревне сухих деревьев для кроны в мире и на карте.
+const yardTreeCells = new Set();
+function bigVillageYards() {
+  // Северо-западный двор: машина стоит за обочиной, сбоку от южной двери избы.
+  addObj({ k: 'car', x: 48 * T - 37, y: 164.5 * T - 17, w: 74, h: 34, solid: 1, seed: 0, sprite: 'c1_yard_car' });
+  // Ящики без добычи пользуются обычной коллизией и правилами прыжка.
+  for (const [x, y] of [[46.5, 163.6], [73.5, 163.7], [74.5, 163.8]]) {
+    addObj({ k: 'crate', x: x * T - 14, y: y * T - 12, w: 28, h: 24, solid: 1, sprite: 'c1_yard_crate' });
+  }
+  const drum = C1 ? 'yardDrum' : 'barrel';
+  DECOR.push([drum, 45.8, 164.1, -.15], [drum, 74.9, 164.6, .12]);
+  for (const [x, y] of [[44, 163], [72, 165]]) {
+    setT(x, y, TR);
+    yardTreeCells.add(y * MW + x);
+  }
+}
 function bigNewObjects(R) {
   bigLoc('hutor', { name: 'Хутор', gen: 'хутора', type: 'story', bounds: [24, 125, 44, 141], entrances: [[31, 127], [42, 132]],
     anchors: { clear: [33, 131], sos: [[38, 137]], safe: [32, 127] } });
@@ -4902,6 +4925,7 @@ function bigNewObjects(R) {
     const bad = () => { for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++) for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) { const t = tAt(x, y); if (t !== GR && t !== BU && !(o.k === 'car' && t === DI)) return true; } return false; };
     for (let i = 0; i < 40 && bad(); i++) { o.x += (i % 2 ? 1 : -1) * T * Math.ceil(i / 4); o.y += (i % 3 === 0 ? T : 0); }
   });
+  bigVillageYards();
 }
 
 /* заборы из декора — настоящие препятствия (перепрыгиваются). Вызывается после переноса координат, когда декор на своих местах */
@@ -5980,7 +6004,7 @@ function buildBigMini() {
   g.save(); g.scale(K, K);
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     if (map[y * MW + x] !== TR) continue;
-    const n = hash2(x, y), crown = CANOPY[Math.floor(n * CANOPY.length)];
+    const n = hash2(x, y), crown = yardTreeCrown && yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[Math.floor(n * CANOPY.length)];
     const width = (2.8 + n * 0.9) * CAN_PAD;
     g.drawImage(crown, x + 0.5 - width / 2, y + 0.4 - width / 2, width, width);
   }
