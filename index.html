@@ -648,6 +648,12 @@ img.b1ic.tall{width:62%;height:86%}
   </defs>
 </svg>
 <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true"><symbol id="z-health" viewBox="0 0 24 24"><path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7Z"/></symbol><symbol id="z-food" viewBox="0 0 24 24"><path d="M3 2h2v7h2V2h2v7h2V2h2v9l-4 3v8H6v-8l-3-3Zm15 0h3v20h-3v-8h-3V6Z"/></symbol><symbol id="z-radiation" viewBox="0 0 24 24"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 4l5 5a5 5 0 0 0-1 4H0A12 12 0 0 1 3 4Zm18 0a12 12 0 0 1 3 9h-7a5 5 0 0 0-1-4ZM9 17a5 5 0 0 0 6 0l4 6H5Z"/></symbol><symbol id="z-stamina" viewBox="0 0 24 24"><path d="M14 1l-9 12h6l-2 10 11-14h-7Z"/></symbol><symbol id="z-bolt" viewBox="0 0 24 24"><path d="M15 1l7 7-4 4-2-2L6 20l-4 2 2-4L14 8l-3-3Zm-3 12 2 2-1 1-2-2Zm-3 3 2 2-1 1-2-2Z"/></symbol><symbol id="z-reload" viewBox="0 0 24 24"><path d="M21 2v8h-8l3-3a7 7 0 1 0 2 8l3 1A10 10 0 1 1 18 5Z"/></symbol><symbol id="z-crouch" viewBox="0 0 24 24"><path d="M16 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM11 8h5l-2 6 6 3v5h-3v-3l-8-3-4 3H1v-3h3l4-4 1-3-4 3-2-2Z"/></symbol><symbol id="z-aim" viewBox="0 0 24 24"><path d="M11 0h2v4a8 8 0 0 1 7 7h4v2h-4a8 8 0 0 1-7 7v4h-2v-4a8 8 0 0 1-7-7H0v-2h4a8 8 0 0 1 7-7Zm0 6a6 6 0 0 0-5 5h3v2H6a6 6 0 0 0 5 5v-3h2v3a6 6 0 0 0 5-5h-3v-2h3a6 6 0 0 0-5-5v3h-2Z"/></symbol><symbol id="z-bleed" viewBox="0 0 24 24"><path d="M12 1S3 12 3 16a9 9 0 0 0 18 0C21 12 12 1 12 1Z"/></symbol><symbol id="z-cache" viewBox="0 0 24 24"><path d="M2 6h20v16H2Zm3-5h14l3 4H2Zm6 7v5h2V8Z"/></symbol><symbol id="z-detector" viewBox="0 0 24 24"><path d="M5 1h14v22H5Zm2 3v7h10V4Zm2 11v5h2v-5Zm4-2v7h2v-7Z"/></symbol><symbol id="z-jam" viewBox="0 0 24 24"><path d="M2 4h14v4H9v4H5v8H1l2-12H2Zm17 6h3v7h-3Zm0 9h3v3h-3Z"/></symbol></svg>
+<div id="bootlog" style="position:fixed;left:50%;bottom:18%;transform:translateX(-50%);z-index:9999;color:#cfc7ad;font:600 14px Arial;background:rgba(0,0,0,.6);padding:8px 14px;border-radius:8px;pointer-events:none">Загрузка…</div>
+<script>/* ошибки на экране — для проверки на телефоне без компьютера */
+(function(){function show(t){var d=document.getElementById('errbox');if(!d){d=document.createElement('div');d.id='errbox';d.style.cssText='position:fixed;left:8px;right:8px;top:40px;z-index:10000;background:#5a140c;color:#fff;font:12px/1.35 monospace;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:60vh;overflow:auto';document.body.appendChild(d);}d.textContent+=(d.textContent?'\n':'')+t+'  [шаг: '+(window.__bootStep||'-')+']';}
+addEventListener('error',function(e){show('Ошибка: '+e.message+' @'+(e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno);});
+addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошибка: '+(r&&r.message||r)+'\n'+(r&&r.stack||'').split('\n').slice(0,4).join('\n'));});})();
+</script>
 <canvas id="cv" aria-label="Игровое поле"></canvas>
 <div class="hud zh">
   <div class="zh-map rust"><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
@@ -7295,13 +7301,22 @@ function frame(now) {
   render();
   hud(dt);
 }
+/* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
+function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  gen(); bigWorld(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  await loadArt(); bigFences();
-  buildCanopy(); paintGround(); buildRoofs(); buildMini();
-  applyState(loadSave() || freshS());
+  bootStep('графика'); await loadArt(); bigFences();
+  bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); buildMini();
+  bootStep('сохранение');
+  let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {
+    console.error(e); try { localStorage.setItem('zona-broken-save', localStorage.getItem(KEY) || ''); } catch (e2) {}
+    sv = null; window.__bootWarn = 'Сохранение не загрузилось (' + (e && e.message) + '). Копия отложена, начата новая игра.';
+  }
+  if (!sv) applyState(freshS());
+  const bl = document.getElementById('bootlog'); if (bl) bl.remove();
+  if (window.__bootWarn) setTimeout(() => msg(window.__bootWarn, 'bad'), 500);
   addEventListener('resize', resize);
   showTitle();
   requestAnimationFrame(frame);
