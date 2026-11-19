@@ -732,7 +732,8 @@ function render() {
     lctx.fillStyle = 'rgba(4,7,12,' + dk + ')'; lctx.fillRect(0, 0, LW, LH);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, a) => { const s = toS(x, y), rr = r * Z / 2; if (s[0] < -rr || s[1] < -rr || s[0] > LW + rr || s[1] > LH + rr) return; const g = lctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], rr); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.beginPath(); lctx.arc(s[0], s[1], rr, 0, 6.28); lctx.fill(); };
-    if (P.alive) {
+    if (P.alive && S.torch === false) hole(P.x, P.y, 60, 0.45);   // без фонаря: только тусклый круг
+    else if (P.alive) {
       hole(P.x, P.y, 95, 0.75);
       const s = toS(P.x, P.y), L = 330 * Z / 2;
       const g = lctx.createRadialGradient(s[0], s[1], 4, s[0], s[1], L);

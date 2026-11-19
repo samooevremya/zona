@@ -668,10 +668,10 @@ img.b1ic.tall{width:62%;height:86%}
   </div>
   <div class="quest zh-q rust" id="quest"></div>
   <div class="wpn zh-w rust" id="wpnbox" title="Сменить оружие"><span id="wico"></span><div class="zh-wi"><div class="wn" id="wn">Нож</div><div class="am" id="am">∞</div><div class="cnd"><span id="wcn">Состояние: 100%</span><div class="cb"><i id="wcb"></i></div></div></div></div>
-  <div class="zh-det rust" id="det"><svg viewBox="0 0 24 24" class="zi"><rect x="7" y="2" width="10" height="20" rx="2"/><rect x="9" y="5" width="6" height="6" rx="1" fill="#0c1416"/><circle cx="12" cy="15.5" r="1.6" fill="#0c1416"/></svg><span class="sig" id="sig"><i></i><i></i><i></i><i></i><i></i></span></div>
+  <div class="zh-det rust" id="det" role="button" aria-label="Фонарик" title="Фонарик (L)"><svg viewBox="0 0 24 24" class="zi torch"><path d="M4 9.5h8.5l5-3.5h2.5v12h-2.5l-5-3.5H4z"/><rect x="2" y="9.5" width="2.5" height="5" rx="1"/><path class="beam" d="M21.5 8.5l1.8-1.2M21.8 12h2M21.5 15.5l1.8 1.2" stroke="currentColor" stroke-width="1.3" fill="none"/></svg><span class="sig" id="sig"><i></i><i></i><i></i><i></i><i></i></span></div>
   <div class="msgs" id="msgs" aria-live="polite"></div>
   <button type="button" class="prompt zh-p rust" id="prompt"></button>
-  <div class="keys">E действие · C присесть · R перезарядка · F болт · G граната · Q аптечка · I рюкзак · M КПК</div>
+  <div class="keys">E действие · C присесть · V прыжок · L фонарик · R перезарядка · F болт · G граната · Q аптечка · I рюкзак · M КПК</div>
 </div>
 <div class="touch zt">
   <div class="joy" id="joy" aria-hidden="true"><i class="ar u"></i><i class="ar d"></i><i class="ar l"></i><i class="ar r"></i><b id="joyk"></b></div>
@@ -680,7 +680,7 @@ img.b1ic.tall{width:62%;height:86%}
   <button type="button" class="rb c2" id="b-med" aria-label="Аптечка"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M10.5 9h3v2.5H16v3h-2.5V17h-3v-2.5H8v-3h2.5z" fill="#1a1612"/><rect x="9" y="3.5" width="6" height="3" rx="1"/></svg></button>
   <button type="button" class="rb c3" id="b-bolt" aria-label="Болт"><svg viewBox="0 0 24 24"><path d="M14.6 2.6l6.8 6.8-2.8 2.8-1.4-1.4L8.4 19.6 6 20.8l-2.8-2.8 1.2-2.4 8.8-8.8-1.4-1.4z"/></svg></button>
   <button type="button" class="rb c4" id="b-crouch" aria-label="Присесть"><svg viewBox="0 0 24 24"><circle cx="11" cy="4.2" r="2.6"/><path d="M8 8.5h5.5l2.5 4.5 3.5 1v2l-4.6-1.2-1.4-2.3-1 3 3 2.5V22h-2.2v-3.3l-3.5-2.5L9 21H6.8l1.6-6.4z"/></svg></button>
-  <button type="button" class="rb c5" id="b-nade" aria-label="Граната"><svg viewBox="0 0 24 24"><path d="M10 3h4v2.5h-4z"/><path d="M15 3.5l4 2-1 1.6-3.4-1.7z"/><ellipse cx="12" cy="14" rx="6.5" ry="7.5"/><path d="M6 12h12M6 16h12M9.5 7.5v13M14.5 7.5v13" stroke="#1a1612" stroke-width="1.1"/></svg></button>
+  <button type="button" class="rb c5" id="b-jump" aria-label="Прыжок"><svg viewBox="0 0 24 24"><circle cx="13" cy="3.6" r="2.4"/><path d="M9.5 7.5l5 .5 2.6 3.4 3.4.6-.4 2-4.4-.9-1.4-1.7-1.2 3 3.2 3.4-1.6 1.4-3.8-3.8-2.6 4.6-1.9-1 3-6.2-1.7.6-1.4 3-1.8-.8 2-4.5z"/><path d="M3 22h18" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 2"/></svg></button>
   <button type="button" class="rb w" id="b-wpn" aria-label="Сменить оружие" hidden></button>
 </div>
 <div class="rotate" id="rotate"><div><div class="phone"></div><p>Поверни телефон горизонтально: так видно больше Зоны и удобнее стрелять.</p><button type="button" class="alt" id="rot-skip">Играть вертикально</button></div></div>
@@ -1084,9 +1084,10 @@ const WP = {
   knife: { n: 'Нож', melee: 1, dmg: 34, rate: 0.5, range: 26, pref: 0 },
   w_pm: { n: 'ПМ', ammo: 'a9', mag: 8, dmg: 22, rate: 0.24, spread: 0.04, range: 520, reload: 1.4, snd: 'p', pref: 200 },
   w_obrez: { n: 'Обрез', ammo: 'a12', mag: 2, dmg: 13, pellets: 7, rate: 0.55, spread: 0.2, range: 300, reload: 1.9, snd: 's', pref: 110 },
-  w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 }
+  w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
+  grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu'];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade'];
 const STOCK = [
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
@@ -1631,7 +1632,8 @@ function pushOut(e, rx, ry, rw, rh) {
 function collide(e) {
   const x0 = Math.floor((e.x - e.r) / T), x1 = Math.floor((e.x + e.r) / T), y0 = Math.floor((e.y - e.r) / T), y1 = Math.floor((e.y + e.r) / T);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!inb(x, y) || SOLID[map[y * MW + x]]) pushOut(e, x * T, y * T, T, T);
-  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
+  const hop = e.jumpT > 0;   // в прыжке низкие препятствия не держат
+  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && LOW_K.has(o.k)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
   e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r);
 }
 function moveE(e, dx, dy) { e.x += dx; e.y += dy; collide(e); collide(e); }
@@ -2202,6 +2204,7 @@ let noAmmoT = 0;
 function playerFire() {
   const W = WP[S.weapon];
   if (P.cool > 0 || P.reload > 0) return;
+  if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; msg('Гранаты кончились. В руках: Нож'); } }, 300); return; }
   if (W.melee) { P.cool = W.rate; melee(P, W); return; }
   if (P.jam) { if (noAmmoT <= 0) { noAmmoT = 1; play('click'); } return; }
   const m = S.mag[S.weapon] || 0;
@@ -2223,9 +2226,9 @@ function cycleWeapon(dir) {
   let i = own.indexOf(S.weapon);
   S.weapon = own[(i + (dir || 1) + own.length) % own.length];
   P.reload = 0; P.cool = 0.25; P.jam = 0;
-  msg('В руках: ' + WP[S.weapon].n);
+  msg('В руках: ' + WP[S.weapon].n + (WP[S.weapon].toss ? '. «Огонь» — бросок' : ''));
 }
-function setWeapon(w) { if (w === 'knife' || has(w)) { S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
+function setWeapon(w) { if (w === 'knife' || has(w)) { if (WP[w] && WP[w].toss) msg('В руках: Граната. «Огонь» — бросок.'); S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
 function useItem(id) {
   const it = ITEMS[id];
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
@@ -2250,6 +2253,18 @@ function throwBolt() {
   for (let t = 10; t <= L; t += 6) { const x = P.x + Math.cos(a) * t, y = P.y + Math.sin(a) * t; if (solidPx(x, y)) break; ex = x; ey = y; }
   bolts.push({ x0: P.x, y0: P.y, x1: ex, y1: ey, t: 0, dur: 0.45, hit: null });
 }
+/* фонарик: ночью светит конусом; выключенный — почти темнота вокруг, зато тебя хуже видно издалека */
+function toggleTorch() { S.torch = S.torch === false; play('click'); msg(S.torch ? 'Фонарик включён.' : 'Фонарик выключен.' + (darkness() > 0.3 ? ' В темноте тебя хуже видно, но и ты видишь мало.' : '')); }
+/* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
+const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier']);
+function startJump() {
+  if (P.jumpT > 0 || (P.jumpCD || 0) > 0 || P.sit) return;
+  if (P.st < 15) { msg('Нет сил прыгать: отдышись.'); return; }
+  if (swampAt(P.x, P.y)) { msg('В болоте не прыгнешь.'); return; }
+  const ml = Math.hypot(IN.moveX, IN.moveY), a = ml > 0.2 ? Math.atan2(IN.moveY, IN.moveX) : P.ang;
+  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= 15; P.jumpA = a; play('step');
+}
+const JUMP_T = 0.42, JUMP_V = 250;
 function solidPx(x, y) {
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
   if (!inb(tx, ty) || SOLID[map[ty * MW + tx]]) return true;
@@ -2392,7 +2407,9 @@ function updatePlayer(dt) {
   if (sprint) P.crouch = 0;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * dt); else P.st = Math.min(100, P.st + 14 * dt);
-  if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
+  P.jumpCD = (P.jumpCD || 0) - dt;
+  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
+  else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
   // прицел
   // захват цели: видимый враг ближе всего к направлению прицела, с удержанием
   P.lockT = (P.lockT || 0) - dt; P.combatT = Math.max(0, (P.combatT || 0) - dt);
@@ -3311,7 +3328,8 @@ function render() {
     lctx.fillStyle = 'rgba(4,7,12,' + dk + ')'; lctx.fillRect(0, 0, LW, LH);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, a) => { const s = toS(x, y), rr = r * Z / 2; if (s[0] < -rr || s[1] < -rr || s[0] > LW + rr || s[1] > LH + rr) return; const g = lctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], rr); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.beginPath(); lctx.arc(s[0], s[1], rr, 0, 6.28); lctx.fill(); };
-    if (P.alive) {
+    if (P.alive && S.torch === false) hole(P.x, P.y, 60, 0.45);   // без фонаря: только тусклый круг
+    else if (P.alive) {
       hole(P.x, P.y, 95, 0.75);
       const s = toS(P.x, P.y), L = 330 * Z / 2;
       const g = lctx.createRadialGradient(s[0], s[1], 4, s[0], s[1], L);
@@ -5408,7 +5426,7 @@ function wolfRC1Opts() {
 }
 /* верстак после генератора: ремонт до 70%, оплата за каждый процент */
 function benchOpts() {
-  const worn = WORDER.filter(w => w !== 'knife' && has(w) && (S.cond[w] == null ? 80 : S.cond[w]) < 70);
+  const worn = WORDER.filter(w => w !== 'knife' && !WP[w].toss && has(w) && (S.cond[w] == null ? 80 : S.cond[w]) < 70);
   const cost = worn.reduce((s, w) => s + Math.ceil((70 - (S.cond[w] == null ? 80 : S.cond[w])) * 6), 0);
   return worn.length ? [{ t: 'Подлатать оружие до 70% · ' + cost + ' RU', k: 'key', d: S.money < cost, fn: () => { S.money -= cost; worn.forEach(w => S.cond[w] = 70); sys('Оружие подлатано до 70%. Полный ремонт — у Сидоровича.'); } }]
     : [{ t: 'Оружие в порядке (выше 70%) — верстаку делать нечего', d: true, fn: () => {} }];
@@ -5864,7 +5882,8 @@ function g3Draw(e, extra, target = ctx) {
   const man = G3.pack.manifest, g3Base = window.__g7tap ? target.getTransform() : null;
   if (e.kind !== 'human' && g7Mutant(e, a)) return true;
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
-  const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
+  const jh = e.jumpT > 0 ? Math.sin(Math.PI * (1 - e.jumpT / JUMP_T)) : 0;
+  const sw0 = e.kind === 'human' && a.moving ? gaitSway(e) : null, sw = jh ? Object.assign({ dx: 0, dy: 0, k: 1 }, sw0, { k: (sw0 ? sw0.k : 1) * (1 + 0.2 * jh), dy: (sw0 ? sw0.dy : 0) - 5 * jh }) : sw0;
   if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
   const sh = e.kind === 'human' && BIG && window.CORDON_G8_ON;   // контраст с землёй: мягкая тень-обводка вправо-вниз, как у остальных объектов
   if (sh) { const k = Math.abs(target.getTransform().a); target.save(); target.shadowColor = 'rgba(8,8,4,0.6)'; target.shadowBlur = 2.6 * k; target.shadowOffsetX = 1.6 * k; target.shadowOffsetY = 2.2 * k; }
@@ -5994,14 +6013,20 @@ body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:172px;height:58px;padding:3px 8px 3px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:190px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.zh-wi{overflow:hidden}.zh-w .cnd span{overflow:hidden;text-overflow:ellipsis}.hud.zh .zh-w .wn{font-size:11px}
 .hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am,.hud.zh .zh-w .am small{font-size:16px}.zh-w .cnd span{font-size:10px}
-.hud.zh .zh-det{top:calc(68px + var(--sat));height:26px;width:66px}
+.hud.zh .zh-det{top:calc(68px + var(--sat));height:30px;width:66px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .rb svg{width:21px;height:21px}
-body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 112px - var(--sat) - var(--sab)) / 5))}
-body.is-touch .touch.zt .c1{top:calc(104px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(104px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(104px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(104px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(104px + var(--sat) + var(--st) * 4)}
+body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 122px - var(--sat) - var(--sab)) / 5))}
+body.is-touch .touch.zt .c1{top:calc(114px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(114px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(114px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(114px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(114px + var(--sat) + var(--st) * 4)}
 body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar))}body.is-touch .touch.zt .fire svg{width:50px;height:50px}
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
 }
+/* фонарик (блок над детектором) и ровная панель оружия */
+.hud.zh .zh-det{cursor:pointer;pointer-events:auto}.hud.zh .zh-det::after{content:'';position:absolute;inset:-3px -4px -11px}
+.hud.zh .zh-det .torch{color:#6f7a7c;fill:currentColor;width:18px;height:18px}.hud.zh .zh-det.on .torch{color:#62b6ff;filter:drop-shadow(0 0 4px rgba(80,170,255,.7))}.hud.zh .zh-det:not(.on) .beam{display:none}
+.zh-w #wico{flex:0 0 76px!important;width:76px!important;height:44px!important;overflow:hidden}.zh-w #wico img{width:76px!important;height:44px!important;object-fit:contain!important}
+.hud.zh .zh-w .wn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.zh-w.mel .cnd{display:none}
+body.is-touch .touch.zt .rb.on{background:rgba(70,62,40,.6)!important;border-color:rgba(246,190,90,.7)!important}
 /* круглые кнопки и джойстик — тёмные полупрозрачные, белые значки (референс); ржавчина остаётся на верхних панелях */
 body.is-touch .touch.zt .rb,body.is-touch .touch.zt .fire{border-image:none!important;border:1.5px solid rgba(236,229,206,.3)!important;background:rgba(14,14,11,.5)!important;border-radius:50%!important;box-shadow:0 2px 6px rgba(0,0,0,.35)!important}
 body.is-touch .touch.zt .rb svg,body.is-touch .touch.zt .fire svg{color:#ece6d3;stroke:#ece6d3;filter:none}
@@ -6592,7 +6617,7 @@ function traderOpts() {
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
-  const worn = WORDER.filter(w => w !== 'knife' && has(w) && cond(w) < 95);
+  const worn = WORDER.filter(w => w !== 'knife' && !WP[w].toss && has(w) && cond(w) < 95);
   if (worn.length) { const cost = worn.reduce((a, w) => a + Math.ceil((100 - cond(w)) * ITEMS[w].price / 400 / 10) * 10, 0);
     o.push({ t: 'Починить оружие · ' + cost + ' RU', d: S.money < cost, fn: () => { S.money -= cost; worn.forEach(w => S.cond[w] = 100); P.jam = 0; say('Почистил, смазал, пружины поменял. Стреляет как новый.'); sys('Оружие починено.'); } }); }
   { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
@@ -6670,7 +6695,7 @@ function drawInv() {
   const d = el('div', 'detail');
   d.appendChild(el('div', 'nm', it.n + (cnt(id) > 1 ? ' ×' + cnt(id) : '')));
   let desc = it.d || '';
-  if (WP[id]) { const W = WP[id]; desc = W.melee ? 'Урон ' + W.dmg + ', только вплотную' : 'Урон ' + W.dmg + (W.pellets ? '×' + W.pellets : '') + ', магазин ' + W.mag + ', дальность ' + W.range + '. Состояние ' + Math.round(cond(id)) + '%' + (cond(id) < 65 ? ', может заклинить. Почини у Сидоровича' : ''); }
+  if (WP[id]) { const W = WP[id]; desc = W.toss ? 'Взрыв по площади, урон до ' + W.dmg + '. Выбери в ячейке оружия и жми «Огонь»' : W.melee ? 'Урон ' + W.dmg + ', только вплотную' : 'Урон ' + W.dmg + (W.pellets ? '×' + W.pellets : '') + ', магазин ' + W.mag + ', дальность ' + W.range + '. Состояние ' + Math.round(cond(id)) + '%' + (cond(id) < 65 ? ', может заклинить. Почини у Сидоровича' : ''); }
   if (FOOD[id]) desc += ', сытость +' + FOOD[id];
   if (it.armor) desc = 'Защита ' + Math.round(it.armor * 100) + '%';
   if (ARTFX[id]) desc += '. ' + ARTFX[id];
@@ -6980,7 +7005,7 @@ function hud(dt) {
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
   const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.crouch ? 'присел' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
-  $('b-crouch').classList.toggle('on', !!P.crouch);
+  $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
   hudT -= dt;
   if (hudT > 0) return;
@@ -6993,8 +7018,10 @@ function hud(dt) {
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
-  H.wcn.textContent = W.melee ? 'Холодное оружие' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
-  if (W.melee) H.am.textContent = '∞';
+  $('wpnbox').classList.toggle('mel', !!W.melee);   // нож и граната: без полосы состояния, одна подпись
+  H.wcn.textContent = W.melee ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
+  if (W.toss) H.am.textContent = '× ' + cnt('grenade');
+  else if (W.melee) H.am.textContent = '∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
   const q = trackedTarget();
   H.quest.textContent = '';
@@ -7049,6 +7076,9 @@ addEventListener('keydown', e => {
   if (k === 'KeyF') throwBolt();
   if (k === 'KeyG') throwNade();
   if (k === 'KeyQ' || k === 'KeyH') quickHeal();
+  if (k === 'KeyV') startJump();
+  if (k === 'KeyL') toggleTorch();
+  if (k === 'Digit5') setWeapon('grenade');
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
@@ -7106,7 +7136,7 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': quickHeal, 'b-nade': throwNade, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': quickHeal, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });

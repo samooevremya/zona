@@ -305,7 +305,7 @@ function traderOpts() {
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
-  const worn = WORDER.filter(w => w !== 'knife' && has(w) && cond(w) < 95);
+  const worn = WORDER.filter(w => w !== 'knife' && !WP[w].toss && has(w) && cond(w) < 95);
   if (worn.length) { const cost = worn.reduce((a, w) => a + Math.ceil((100 - cond(w)) * ITEMS[w].price / 400 / 10) * 10, 0);
     o.push({ t: 'Починить оружие · ' + cost + ' RU', d: S.money < cost, fn: () => { S.money -= cost; worn.forEach(w => S.cond[w] = 100); P.jam = 0; say('Почистил, смазал, пружины поменял. Стреляет как новый.'); sys('Оружие починено.'); } }); }
   { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
@@ -383,7 +383,7 @@ function drawInv() {
   const d = el('div', 'detail');
   d.appendChild(el('div', 'nm', it.n + (cnt(id) > 1 ? ' ×' + cnt(id) : '')));
   let desc = it.d || '';
-  if (WP[id]) { const W = WP[id]; desc = W.melee ? 'Урон ' + W.dmg + ', только вплотную' : 'Урон ' + W.dmg + (W.pellets ? '×' + W.pellets : '') + ', магазин ' + W.mag + ', дальность ' + W.range + '. Состояние ' + Math.round(cond(id)) + '%' + (cond(id) < 65 ? ', может заклинить. Почини у Сидоровича' : ''); }
+  if (WP[id]) { const W = WP[id]; desc = W.toss ? 'Взрыв по площади, урон до ' + W.dmg + '. Выбери в ячейке оружия и жми «Огонь»' : W.melee ? 'Урон ' + W.dmg + ', только вплотную' : 'Урон ' + W.dmg + (W.pellets ? '×' + W.pellets : '') + ', магазин ' + W.mag + ', дальность ' + W.range + '. Состояние ' + Math.round(cond(id)) + '%' + (cond(id) < 65 ? ', может заклинить. Почини у Сидоровича' : ''); }
   if (FOOD[id]) desc += ', сытость +' + FOOD[id];
   if (it.armor) desc = 'Защита ' + Math.round(it.armor * 100) + '%';
   if (ARTFX[id]) desc += '. ' + ARTFX[id];
@@ -693,7 +693,7 @@ function hud(dt) {
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
   const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.crouch ? 'присел' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
-  $('b-crouch').classList.toggle('on', !!P.crouch);
+  $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
   hudT -= dt;
   if (hudT > 0) return;
@@ -706,8 +706,10 @@ function hud(dt) {
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
-  H.wcn.textContent = W.melee ? 'Холодное оружие' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
-  if (W.melee) H.am.textContent = '∞';
+  $('wpnbox').classList.toggle('mel', !!W.melee);   // нож и граната: без полосы состояния, одна подпись
+  H.wcn.textContent = W.melee ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
+  if (W.toss) H.am.textContent = '× ' + cnt('grenade');
+  else if (W.melee) H.am.textContent = '∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
   const q = trackedTarget();
   H.quest.textContent = '';
@@ -762,6 +764,9 @@ addEventListener('keydown', e => {
   if (k === 'KeyF') throwBolt();
   if (k === 'KeyG') throwNade();
   if (k === 'KeyQ' || k === 'KeyH') quickHeal();
+  if (k === 'KeyV') startJump();
+  if (k === 'KeyL') toggleTorch();
+  if (k === 'Digit5') setWeapon('grenade');
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
@@ -819,7 +824,7 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': quickHeal, 'b-nade': throwNade, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': quickHeal, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
