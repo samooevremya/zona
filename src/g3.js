@@ -78,10 +78,9 @@ function medButton() {
   if (!m && !b) { msg('Нечем лечиться. Аптечки и бинты продаёт Сидорович.'); return; }
   if (!m || !b) { healWith(m ? 'medkit' : 'bandage'); return; }
   const mp = document.getElementById('medpick'); if (!mp.hidden) { hideMedPick(); return; }
-  mp.hidden = false; medPickT = 3.5;
+  mp.hidden = false;   // висит, пока не выберешь или не нажмёшь кнопку ещё раз
 }
-let medPickT = 0;
-function hideMedPick() { const mp = document.getElementById('medpick'); if (mp) mp.hidden = true; medPickT = 0; }
+function hideMedPick() { const mp = document.getElementById('medpick'); if (mp) mp.hidden = true; }
 function quickHeal() {
   if (P.medT > 0) return;
   P.medT = 1;
