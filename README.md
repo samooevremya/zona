@@ -4,4 +4,4 @@
 
 Играть: https://samooevremya.github.io/zona/
 
-Исходники и инструкция: [src/README.md](src/README.md). Журнал изменений: [CHANGELOG.md](CHANGELOG.md). Правила для участников: [AGENTS.md](AGENTS.md). Исходные картинки GPT: `gpt_originals/`.
+Исходники и инструкция: [src/README.md](src/README.md). Журнал изменений: [CHANGELOG.md](CHANGELOG.md). Правила для участников: [AGENTS.md](AGENTS.md). Что осталось сделать: [ROADMAP.md](ROADMAP.md). Исходные картинки GPT: `gpt_originals/`.
