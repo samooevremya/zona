@@ -358,13 +358,36 @@ function artDecor0(g) {
     ART.draw(g, d[0], x, y, undefined, undefined, d[3]);
   });
 }
-/* кроны: 8 вариантов из трёх спрайтов поворотом, зеркалом и масштабом; холст 144×144, в мире 72×72 */
+/* Кроны готовятся вместе с тенями при загрузке и смене качества. */
 const SHADOWS = !/shadow-off/.test(location.hash);
-let CAN_PAD = 1;   // поле холста кроны под запечённую тень
+let CAN_PAD = 1;
+const forestCrowns = ['c1_pine0', 'c1_birch0', 'c1_pine1', 'c1_birch3', 'c1_birch1', 'c1_pine3', 'c1_birch2', 'c1_pine2'];
+const edgeCrowns = ['c1_dead0', 'c1_birch2', 'c1_dead1', 'c1_birch1', 'c1_birch3', 'c1_dead2', 'c1_birch0', 'c1_dead3'];
+
+// Разрежаем отдельные скопления листьев, сохраняя серые ветви и пустоты исходного спрайта.
+function autumnBirch(id, variant, size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), half = size / 2;
+  ART.draw(g, id, half, half, size, size);
+  const pixels = g.getImageData(0, 0, size, size), rgba = pixels.data;
+  const tone = [-.16, .06, .42, .82][variant % 4], thin = .12 + .38 * hash2(variant, 79);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = (y * size + x) * 4, r = rgba[i], green = rgba[i + 1], blue = rgba[i + 2];
+    if (!rgba[i + 3] || Math.min(r, green) - blue < 10) continue;
+    // Нормированные координаты сохраняют те же просветы при автоснижении качества.
+    const patch = vnoise(x / size * 12 + variant * 17, y / size * 12, 1);
+    rgba[i + 3] *= clamp((patch - thin) * 5, 0, 1);
+    const light = .68 + patch * .28;
+    rgba[i] = (r * (.98 + tone * .39) + green * .07) * light;
+    rgba[i + 1] = green * (1.01 - tone * .30) * light;
+    rgba[i + 2] = blue * light + r * .08;
+  }
+  g.putImageData(pixels, 0, 0);
+  return c;
+}
 function artCanopy() {
   CAN_PAD = C1 && SHADOWS ? 1.35 : 1;
-  // C1: 0–5 деревья леса, 6–11 одиночные (сухие и берёзы в жёлтой листве), как на референсе
-  const pick = C1 ? ['c1_pine0', 'c1_birch0', 'c1_pine1', 'c1_pine2', 'c1_birch1', 'c1_pine3', 'c1_dead0', 'c1_dead1', 'c1_birch3', 'c1_dead2', 'c1_dead3', 'c1_birch2']
+  const pick = C1 ? forestCrowns.concat(edgeCrowns)
     : ['tree_olive', 'tree_dry', 'tree_olive', 'tree_bare', 'tree_olive', 'tree_dry', 'tree_olive', 'tree_dry'];
   if (C1 && !CANOPY.built) { CAN_SZ = +((location.hash.match(/can-(\d+)/) || [])[1] || 96); CANOPY.built = 1; }
   const S2 = CAN_SZ / 2;
@@ -374,7 +397,10 @@ function artCanopy() {
     g.translate(S2 * CAN_PAD, S2 * CAN_PAD); if (v % 2) g.scale(-1, 1); g.rotate(v * 0.9);
     const s = 0.9 + (v % 3) * 0.06;
     if (CAN_PAD > 1) { g.shadowColor = 'rgba(8,10,4,0.5)'; g.shadowBlur = CAN_SZ * 0.1; g.shadowOffsetX = CAN_SZ * 0.2 * SUN_DX; g.shadowOffsetY = CAN_SZ * 0.2 * SUN_DY; }   // тень кроны вправо-вниз, как у домов и машин
-    ART.draw(g, pick[v], 0, 0, CAN_SZ * s, CAN_SZ * s);
+    const w = CAN_SZ * s;
+    if (pick[v].startsWith('c1_birch')) {
+      g.drawImage(autumnBirch(pick[v], v, CAN_SZ * 2), -w / 2, -w / 2, w, w);
+    } else ART.draw(g, pick[v], 0, 0, w, w);
     c1Grade(c, 0, 0, c.width, c.height);
     CANOPY.push(c);
   }
