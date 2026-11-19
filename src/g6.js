@@ -144,7 +144,7 @@ function blowout(dt) {
       if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
       HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
-      if (best) { e.sit = 0; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
+      if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
     });
     const caller = ents.find(e => e.alive && e.fac === 'loner' && dE(e, P) < 500 && !e.captive);
     if (caller) sayLine(caller, 'Выброс! Все в укрытие!');

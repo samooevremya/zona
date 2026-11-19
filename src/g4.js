@@ -60,8 +60,8 @@ const figureC = document.createElement('canvas');
 figureC.width = figureC.height = 192;   // 96 мировых пикселей при двукратной детализации
 const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
-  const low = e.sit || e.crouch || e.wounded;
-  groundShadow(ctx, e.x, e.y, low ? 14 : 17, 9, Math.atan2(SUN_DY, SUN_DX), low ? 4 : 8);
+  const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
+  groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
   let fire = FIRE;
   if (Math.abs(e.x - fire.x) >= FIRE_REACH || Math.abs(e.y - fire.y) >= FIRE_REACH) fire = FIRE2;
   const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);

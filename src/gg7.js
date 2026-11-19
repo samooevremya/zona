@@ -129,6 +129,30 @@ function g7Human(e, extra, target) {
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
     if (f) { drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K, target); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K, target); return true; }
   }
+  if (window.CORDON_G8_ON && (e.sit || e.campRise != null) && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
+    const sheet = packImage('assets/g8/camp_rise.webp');
+    if (sheet) {
+      // 17 кадров с готовым смешиванием в premultiplied alpha: силуэт сохраняет плотность.
+      const rise = e.campRise || 0, frame = Math.round(rise * 16);
+      const sw = sheet.naturalWidth / 17, sh = sheet.naturalHeight;
+      target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
+      const alpha = target.globalAlpha * opacity;
+      target.globalAlpha = alpha;
+      target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
+      if (e.flash > 0) {
+        target.save();
+        target.globalCompositeOperation = 'lighter';
+        target.globalAlpha = alpha * Math.min(0.5, e.flash * 4);
+        target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
+        target.restore();
+      }
+      if (rise > 0.75 && !e.sit) {
+        target.globalAlpha = alpha * (rise * 4 - 3);
+        drawWeaponLocal(target, weaponLocal(e));
+      }
+      target.restore(); return true;
+    }
+  }
   const r = rigActive(e); if (!r) return false;
   const w = weaponLocal(e), base = window.__g7tap ? target.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
     deadImage: G7.img[CORDON_RIG.dead[r.skin]], drawEquipment: c2 => { if (base) window.__g7tap(e, base, c2.getTransform(), w); drawWeaponLocal(c2, w); } };

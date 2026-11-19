@@ -815,6 +815,16 @@ function aiHuman(e, dt) {
   e.inCover = 0; e.crouch = 0; e.role = null; e.cover = null;
   e.tgt = null;
   e.react = 0.5;
+  if (e.campRise != null) {
+    const target = e.sit ? 0 : 1;
+    e.campRise = clamp(e.campRise + (e.sit ? -dt : dt) / 0.68, 0, 1);
+    if (e.sit) {
+      const towardFire = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
+      e.ang += angD(e.ang, towardFire) * Math.min(1, dt * 5);
+    }
+    if (e.campRise === target) e.campRise = null;
+    return;
+  }
   if (e.mem > 0 && e.lastSeen) {
     e.mem -= dt;
     e.crouch = 0; if (goTo(e, e.lastSeen.x, e.lastSeen.y, 68, dt) < 20) e.mem = 0;
@@ -867,7 +877,7 @@ function npcGrenade(e, x, y) {
   if (dst(x, y, P.x, P.y) < 300) msg('Граната! Уходи с места!', 'bad');
 }
 function combatHuman(e, t, W, dt) {
-  e.sit = 0; e.trip = null;
+  e.sit = 0; e.campRise = null; e.trip = null;
   const d = dE(e, t), see = los(e.x, e.y, t.x, t.y);
   if (see) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
@@ -931,6 +941,13 @@ function combatHuman(e, t, W, dt) {
     if (e.mag <= 0) { e.reload = W.reload * 1.2; e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
   }
 }
+// 0 — сидит у огня, 1 — полностью встал. При смене намерения продолжаем с текущей позы.
+function setCampSeat(e, sitting) {
+  if (!!e.sit === sitting) return;
+  if (e.fac === 'loner' && e.fireRef && window.CORDON_G8_ON && G3_READY() && e.campRise == null)
+    e.campRise = e.sit ? 0 : 1;
+  e.sit = sitting ? 1 : 0;
+}
 function idleHuman(e, dt) {
   if (followTick(e, dt)) return;
   if (e.guard) {
@@ -940,14 +957,14 @@ function idleHuman(e, dt) {
   }
   if (e.sit) {
     e.ang += angD(e.ang, Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x)) * dt * 2;
-    if (e.fac === 'loner' && !e.named && e.fireRef === FIRE && chance(dt * 0.004)) { e.sit = 0; startTrip(e); }
+    if (e.fac === 'loner' && !e.named && e.fireRef === FIRE && chance(dt * 0.004)) { setCampSeat(e, false); startTrip(e); }
     return;
   }
   if (e.trip) {
     const tr = e.trip;
     if (tr.stage === 0) { if (goTo(e, tr.x, tr.y, 72, dt) < 30) { tr.stage = 1; tr.wait = rnd(10, 30); } }
     else if (tr.stage === 1) { tr.wait -= dt; e.idleT -= dt; if (e.idleT <= 0) { e.idleT = rnd(2, 5); e.ang += rnd(-1.5, 1.5); } if (tr.wait <= 0) tr.stage = 2; }
-    else if (goTo(e, e.home.x, e.home.y, 72, dt) < 24) { e.trip = null; if (e.seat) e.sit = 1; }
+    else if (goTo(e, e.home.x, e.home.y, 72, dt) < 24) { e.trip = null; if (e.seat) setCampSeat(e, true); }
     return;
   }
   const dh = dE(e, e.home);
@@ -1553,8 +1570,8 @@ const figureC = document.createElement('canvas');
 figureC.width = figureC.height = 192;   // 96 мировых пикселей при двукратной детализации
 const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
-  const low = e.sit || e.crouch || e.wounded;
-  groundShadow(ctx, e.x, e.y, low ? 14 : 17, 9, Math.atan2(SUN_DY, SUN_DX), low ? 4 : 8);
+  const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
+  groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
   let fire = FIRE;
   if (Math.abs(e.x - fire.x) >= FIRE_REACH || Math.abs(e.y - fire.y) >= FIRE_REACH) fire = FIRE2;
   const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
@@ -2426,7 +2443,7 @@ function blowout(dt) {
       if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
       HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
-      if (best) { e.sit = 0; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
+      if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
     });
     const caller = ents.find(e => e.alive && e.fac === 'loner' && dE(e, P) < 500 && !e.captive);
     if (caller) sayLine(caller, 'Выброс! Все в укрытие!');
@@ -3285,7 +3302,7 @@ function hireOpts(e) {
   } else if (!ents.some(x => x.alive && x.follow)) {
     const price = 350 + (e.rank || 0) * 200;
     o.push({ t: 'Пойдёшь со мной? · ' + price + ' RU на сутки', k: 'key', d: S.money < price || S.rep < 0, fn: () => {
-      S.money -= price; e.follow = 1; e.wait = 0; e.hireEnd = S.min + 1440; e.hirePaid = price; e.sit = 0; e.trip = null; if (!e.uid) e.uid = dynId();
+      S.money -= price; e.follow = 1; e.wait = 0; e.hireEnd = S.min + 1440; e.hirePaid = price; setCampSeat(e, false); e.trip = null; if (!e.uid) e.uid = dynId();
       say(['Деньги вперёд, это правильно. Веди, только под пули зря не подставляй.', 'Сутки мои. Спину прикрою, но в аномалии за тобой не полезу.', 'Договорились. Скажешь ждать — буду ждать.'][e.seed % 3]);
       sys(e.name + ' идёт с тобой до ' + clockStr(e.hireEnd) + '.'); news('Нанят напарник: ' + e.name + '.');
     } });
@@ -4711,7 +4728,15 @@ function g3Draw(e, extra, target = ctx) {
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
   const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
   if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
-  const ok = CordonG3.draw(target, man, G3.images, a, e.kind === 'human' ? (c2 => { const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
+  const ok = CordonG3.draw(target, man, G3.images, a, e.kind === 'human' ? (c2 => {
+    if (e === P && window.CORDON_G8_ON) {
+      const roll = packImage('assets/g8/player_bedroll.webp');
+      if (roll) {
+        const top = (skin === 'bandit' ? -12 : -15) - (e.crouch ? 1 : 0);
+        c2.drawImage(roll, -10.5, top, 21, 6);
+      }
+    }
+    const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
   if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(target, man, G3.images, Object.assign({}, a, { shadow: false }), null); target.restore(); }
   if (sw) target.restore();
   return ok;
@@ -4971,6 +4996,30 @@ function g7Human(e, extra, target) {
   if (e.captive && !e.wounded && G7.poseOn) {   // связанный пленник: цельный кадр, без модульных рук/ствола
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
     if (f) { drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K, target); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K, target); return true; }
+  }
+  if (window.CORDON_G8_ON && (e.sit || e.campRise != null) && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
+    const sheet = packImage('assets/g8/camp_rise.webp');
+    if (sheet) {
+      // 17 кадров с готовым смешиванием в premultiplied alpha: силуэт сохраняет плотность.
+      const rise = e.campRise || 0, frame = Math.round(rise * 16);
+      const sw = sheet.naturalWidth / 17, sh = sheet.naturalHeight;
+      target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
+      const alpha = target.globalAlpha * opacity;
+      target.globalAlpha = alpha;
+      target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
+      if (e.flash > 0) {
+        target.save();
+        target.globalCompositeOperation = 'lighter';
+        target.globalAlpha = alpha * Math.min(0.5, e.flash * 4);
+        target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
+        target.restore();
+      }
+      if (rise > 0.75 && !e.sit) {
+        target.globalAlpha = alpha * (rise * 4 - 3);
+        drawWeaponLocal(target, weaponLocal(e));
+      }
+      target.restore(); return true;
+    }
   }
   const r = rigActive(e); if (!r) return false;
   const w = weaponLocal(e), base = window.__g7tap ? target.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
