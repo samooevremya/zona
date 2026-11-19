@@ -507,7 +507,7 @@ function c1RoofId(h, idx, old) {
   if (h.mat === 'conc') return big >= 110 ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (long > 2.1 && big > 40) return 'c1_roof_barn';
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
-  return old === 'roof_slate' ? 'c1_roof_house0' : old === 'roof_patch' ? 'c1_roof_house1' : old === 'roof_rust' ? 'c1_roof_house2' : 'c1_roof_house' + (idx % 3);
+  return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
 }
 function artRoof(h, idx) {
   let id = ROOF_AT[h.ok || (h.x + ',' + h.y)] || (h.ruin ? 'roof_broken' : h.mat === 'conc' ? null : ['roof_slate', 'roof_rust', 'roof_patch'][idx % 3]);
@@ -543,8 +543,10 @@ function artRoof(h, idx) {
     }
     const tw = along ? RW : RH, th = along ? RH : RW, r = sp.rect, ka = tw / th;
     let sw = r[2], sh = r[3]; if (sw / sh > ka) sw = sh * ka; else sh = sw / ka;
-    const sx = r[0] + (r[2] - sw) / 2, sy = r[1] + (r[3] - sh) / 2;
-    g.save(); g.translate(RW / 2, RH / 2); if (!along) g.rotate(Math.PI / 2);
+    const sx = r[0] + (r[2] - sw) * (sp.cropFocusX ?? 0.5), sy = r[1] + (r[3] - sh) / 2;
+    g.save(); g.translate(RW / 2, RH / 2);
+    // На новом листе свет уже нарисован сверху. При повороте он должен оказаться на западном скате.
+    if (!along) g.rotate(id === 'c1_roof_slate' || id === 'c1_roof_plank' ? -Math.PI / 2 : Math.PI / 2);
     g.drawImage(ART.images[sp.atlas], sx, sy, sw, sh, -tw / 2, -th / 2, tw, th); g.restore();
     if (!flat) {   // скаты: свет с северо-запада, верхний скат светлее, нижний темнее, кромка свеса
       g.shadowColor = 'transparent';

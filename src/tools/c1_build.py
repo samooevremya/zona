@@ -144,7 +144,12 @@ for i, im in enumerate(st[:3]): add('c1_stump%d' % i, fit(im, 96), [28, 28])
 for i, im in enumerate(st[3:]): add('c1_rock%d' % i, fit(im, 96), [30, 30])
 
 print('постройки')
-for i, im in enumerate(sheet('house_village_roof', 3, 6)): add('c1_roof_house%d' % i, fit(im, 640), [256, 192])
+# Вырезаем прямоугольники внутри кромок свеса, без розового фона листа.
+# При подгонке к почти квадратной избе удерживаем трубу на скате.
+with Image.open(find('house_gables')) as roofs:
+    for material, rect, chimney in [('slate', (20, 74, 1234, 603), 0.78),
+                                    ('plank', (20, 658, 1234, 1189), 0.22)]:
+        add('c1_roof_' + material, fit(roofs.crop(rect), 640), [256, 192], cropFocusX=chimney)
 for i, im in enumerate(sheet('shed_roof', 2, 6)): add('c1_roof_shed%d' % i, fit(im, 320), [128, 128])
 add('c1_roof_barn', fit(trim(key_green(find('farm_barn_roof'))), 900), [512, 256])
 add('c1_roof_hangar', fit(trim(key_green(find('atp_hangar_roof'))), 900), [640, 384])
@@ -219,7 +224,7 @@ for g, keys in groups.items():
         im, logical, kw = SPR[k]
         # логический размер: вписать картинку в заданный бокс без искажения
         w, h = im.size; s = min(logical[0] / w, logical[1] / h)
-        man['sprites'][k] = {'kind': 'sprite', 'atlas': g, 'rect': list(pos[k]), 'logicalSize': [round(w * s), round(h * s)], 'pivot': [0.5, 0.5]}
+        man['sprites'][k] = {'kind': 'sprite', 'atlas': g, 'rect': list(pos[k]), 'logicalSize': [round(w * s), round(h * s)], 'pivot': [0.5, 0.5], **kw}
     print(g, atl.size, n // 1024, 'KB')
 # материалы: каждый отдельной картинкой, период в игровых px
 for k, (im, size) in MAT.items():
