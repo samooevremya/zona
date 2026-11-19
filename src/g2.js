@@ -37,6 +37,13 @@ function freshS() {
 }
 
 /* ===================== жители Кордона ===================== */
+// Места заданы в координатах исходной деревни. Жители и декор вместе переносятся в большой Кордон.
+const YARD_SEATS = [
+  { sid: 'l1', x: 29.00, y: 83.38, wpn: 'w_pm', log: ['logs', -0.28, -0.32, -0.73] },
+  { sid: 'l2', x: 31.05, y: 82.60, wpn: 'w_obrez', log: ['bench', 0.16, -0.36, 0.24] },
+  { sid: 'l3', x: 32.15, y: 84.45, wpn: 'w_pm' },
+  { sid: 'l4', x: 29.82, y: 86.33, wpn: 'w_pm', log: ['logs', -0.15, 0.35, 0.43] }
+];
 const NPCDEF = [
   { sid: 'sid', fac: 'trader', name: 'Сидорович', x: 126.5, y: 4.6, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
   { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
@@ -55,8 +62,7 @@ const NPCDEF = [
   { sid: 'a3', fac: 'army', name: 'Прапорщик', x: 63.5, y: 34.2, wpn: 'w_aksu', guard: 'bridge', rank: 1 },
   { sid: 'a4', fac: 'army', name: 'Часовой', x: 60.5, y: 102.6, wpn: 'w_aksu', guard: 'south' },
   { sid: 'a5', fac: 'army', name: 'Часовой', x: 68.5, y: 102.6, wpn: 'w_aksu', guard: 'south' },
-  { sid: 'l1', fac: 'loner', x: 28.2, y: 83.3, wpn: 'w_pm', sit: 1 }, { sid: 'l2', fac: 'loner', x: 31.8, y: 82.7, wpn: 'w_obrez', sit: 1 },
-  { sid: 'l3', fac: 'loner', x: 32.6, y: 85.6, wpn: 'w_pm', sit: 1 }, { sid: 'l4', fac: 'loner', x: 28.6, y: 86.4, wpn: 'w_pm', sit: 1 },
+  ...YARD_SEATS.map(({ sid, x, y, wpn }) => ({ sid, x, y, wpn, fac: 'loner', sit: 1 })),
   { sid: 'l5', fac: 'loner', x: 46, y: 90, wpn: 'w_pm' }, { sid: 'l6', fac: 'loner', x: 52, y: 74, wpn: 'w_obrez' },
   { sid: 'l7', fac: 'loner', x: 45, y: 20.6, wpn: 'w_obrez', sit: 1, fire: 2 }, { sid: 'l8', fac: 'loner', x: 48, y: 22.4, wpn: 'w_pm', sit: 1, fire: 2 }
 ];
@@ -592,7 +598,13 @@ function idleHuman(e, dt) {
     const tr = e.trip;
     if (tr.stage === 0) { if (goTo(e, tr.x, tr.y, 72, dt) < 30) { tr.stage = 1; tr.wait = rnd(10, 30); } }
     else if (tr.stage === 1) { tr.wait -= dt; e.idleT -= dt; if (e.idleT <= 0) { e.idleT = rnd(2, 5); e.ang += rnd(-1.5, 1.5); } if (tr.wait <= 0) tr.stage = 2; }
-    else if (goTo(e, e.home.x, e.home.y, 72, dt) < 24) { e.trip = null; if (e.seat) setCampSeat(e, true); }
+    else {
+      const arrival = e.seat && e.fireRef === FIRE ? 7 : 24;
+      if (goTo(e, e.home.x, e.home.y, 72, dt) < arrival) {
+        e.trip = null;
+        if (e.seat) setCampSeat(e, true);
+      }
+    }
     return;
   }
   const dh = dE(e, e.home);

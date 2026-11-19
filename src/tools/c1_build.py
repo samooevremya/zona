@@ -226,6 +226,17 @@ for k, (im, size) in MAT.items():
     uri, n = webp_uri(im, 84); total += n
     man['images']['c1m_' + k] = {'file': uri}
     man['sprites'][k] = {'kind': 'material', 'atlas': 'c1m_' + k, 'rect': [0, 0, im.width, im.height], 'logicalSize': [size or im.width, size or im.height], 'pivot': [0.5, 0.5], 'seamless': True}
+# Деревенский очаг: отдельный участок земли и кольцо камней из атласа реквизита.
+with open(os.path.join(OUT, 'src', 'camp_yard.webp'), 'rb') as f:
+    yard = f.read()
+with Image.open(io.BytesIO(yard)) as im:
+    man['images']['camp_yard'] = {'file': 'data:image/webp;base64,' + base64.b64encode(yard).decode()}
+    man['sprites']['camp_yard'] = {'kind': 'sprite', 'atlas': 'camp_yard', 'rect': [0, 0, im.width, im.height],
+                                   'logicalSize': [518, 518], 'pivot': [0.5, 0.5]}
+total += len(yard)
+ring = man['sprites']['c1_campfire']
+x, y = ring['rect'][:2]
+man['sprites']['camp_ring'] = dict(ring, rect=[x + 38, y + 18, 78, 78], logicalSize=[40, 40])
 print('итого', total // 1024, 'KB,', len(man['sprites']), 'элементов')
 open(os.path.join(OUT, 'c1.inline.js'), 'w').write('window.C1_MANIFEST=' + json.dumps(man, ensure_ascii=False) + ';\n')
 json.dump({k: v for k, v in man['sprites'].items()}, open(os.path.join(OUT, 'sprites.json'), 'w'), ensure_ascii=False, indent=1)

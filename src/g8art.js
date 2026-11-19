@@ -174,7 +174,14 @@ function* artGround(g, R) {
     yield;
   }
   yield;
-  if (C1) { c1ForestFloor(g); yield; c1Scatter(g); yield; }
+  if (C1) {
+    c1ForestFloor(g); yield;
+    c1Scatter(g); yield;
+    const [w, h] = ART.m.sprites.camp_yard.logicalSize;
+    if (Math.abs(FIRE.x - (GWP.x0 + GWP.x1) / 2) < (w + GWP.x1 - GWP.x0) / 2 &&
+        Math.abs(FIRE.y - (GWP.y0 + GWP.y1) / 2) < (h + GWP.y1 - GWP.y0) / 2)
+      ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h);
+  }
   // 4. Растительность группами: у стен, заборов, деревьев и насыпи; середина проходов свободна
   const RT = mulberry32(4242 + GW.x0 * 97 + GW.y0 * 13);
   const solidish = t => t === BR || t === CO || t === TR || t === RA;
@@ -307,9 +314,10 @@ function artStatic0(g, o) {
   }
   if (C1 && o.k === 'hatch') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 2, cy + 3, 22, 0, 6.28); g.fill(); c1Draw(g, 'c1_hatch', cx, cy, 46); return true; }
   if (C1 && o.k === 'fire') {
-    // Оба ближних бревна уже входят в прозрачный спрайт очага.
+    // У деревенского костра брёвна расставлены у посадочных мест.
     g.save(); spriteShadow(g, 2.6, 1.8);
-    c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
+    if (cx === FIRE.x && cy === FIRE.y) c1Draw(g, 'camp_ring', cx, cy, 40);
+    else c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
     g.restore(); return true;
   }
   if (C1 && o.k === 'pylon') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 3, cy + 4, 9, 0, 6.28); g.fill(); c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
@@ -331,7 +339,11 @@ function artStatic0(g, o) {
 }
 /* декор деревни: без коллизии, вне дорожек и дверей */
 const DECOR = [
-  ['logs', 27.3, 84.9, 1.45], ['bench', 30.5, 87.5, 0], ['logs', 33.8, 84.3, 1.7], ['bench', 30.4, 81.5, 3.14], ['logs', 46.6, 23.4, -0.3],
+  ...YARD_SEATS.filter(s => s.log).map(s => {
+    const [kind, dx, dy, angle] = s.log;
+    return [kind, s.x + dx, s.y + dy, angle];
+  }),
+  ['logs', 46.6, 23.4, -0.3],
   ['bench', 16.7, 76.3, 0], ['barrel', 21.6, 75.2, 0], ['barrel', 31.3, 72.4, 0.5], ['bench', 30.8, 74.8, 0], ['barrel', 43.3, 77.1, 0], ['rubble', 40.5, 76.6, 0.8],
   ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['barrel', 44.1, 91.2, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
