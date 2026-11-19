@@ -36,6 +36,8 @@ function g3Draw(e, extra, target = ctx) {
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
   const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
   if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
+  const sh = e.kind === 'human' && BIG && window.CORDON_G8_ON;   // контраст с землёй: мягкая тень-обводка вправо-вниз, как у остальных объектов
+  if (sh) { const k = Math.abs(target.getTransform().a); target.save(); target.shadowColor = 'rgba(8,8,4,0.6)'; target.shadowBlur = 2.6 * k; target.shadowOffsetX = 1.6 * k; target.shadowOffsetY = 2.2 * k; }
   const ok = CordonG3.draw(target, man, G3.images, a, e.kind === 'human' ? (c2 => {
     if (e === P && window.CORDON_G8_ON) {
       const roll = packImage('assets/g8/player_bedroll.webp');
@@ -45,6 +47,7 @@ function g3Draw(e, extra, target = ctx) {
       }
     }
     const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
+  if (sh) target.restore();
   if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(target, man, G3.images, Object.assign({}, a, { shadow: false }), null); target.restore(); }
   if (sw) target.restore();
   return ok;
@@ -168,7 +171,14 @@ body.is-touch .touch.zt .c1{top:calc(104px + var(--sat))}body.is-touch .touch.zt
 body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar))}body.is-touch .touch.zt .fire svg{width:50px;height:50px}
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
-}` : '')
+}
+/* круглые кнопки и джойстик — тёмные полупрозрачные, белые значки (референс); ржавчина остаётся на верхних панелях */
+body.is-touch .touch.zt .rb,body.is-touch .touch.zt .fire{border-image:none!important;border:1.5px solid rgba(236,229,206,.3)!important;background:rgba(14,14,11,.5)!important;border-radius:50%!important;box-shadow:0 2px 6px rgba(0,0,0,.35)!important}
+body.is-touch .touch.zt .rb svg,body.is-touch .touch.zt .fire svg{color:#ece6d3;stroke:#ece6d3;filter:none}
+body.is-touch .touch.zt .fire{border-width:2px!important;background:rgba(14,14,11,.42)!important}
+body.is-touch .joy{background:radial-gradient(circle,rgba(14,14,11,.2) 0,rgba(14,14,11,.5) 72%)!important;border:1.5px solid rgba(236,229,206,.3)!important;opacity:1}
+.joy b{background:radial-gradient(circle at 40% 35%,rgba(200,196,182,.62),rgba(120,117,106,.5))!important;box-shadow:0 2px 6px rgba(0,0,0,.5)!important}
+body.is-touch .joy .ar{display:block;opacity:.6}` : '')
   + (U.bar_hp && I[U.bar_hp.file] ? `
 .zh-bar.hp .bar i{background:${url('bar_hp')} left/auto 100% repeat-x,#b8261a}.zh-bar.fd .bar i{background:${url('bar_fd')} left/auto 100% repeat-x,#c99620}` : '');
   const st = document.createElement('style'); st.id = 'g3-ui'; st.textContent = css; document.head.appendChild(st);
