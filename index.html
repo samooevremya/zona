@@ -2531,6 +2531,59 @@ const CANOPY = [], LONE_K = +((location.hash.match(/lone-([0-9.]+)/) || [])[1] |
 /* цветовой фильтр, зерно и виньетка настраиваются; #grade-none отключает фильтр для сравнения */
 const GRADE = /grade-none/.test(location.hash) ? { mul: null, grain: 9, vig: 0.45 } : /grade-old/.test(location.hash) ? { mul: 'rgb(236,228,196)', grain: 13, vig: 0.62 } : { mul: 'rgb(248,245,236)', grain: 9, vig: 0.45 };
 const fireFlick = () => { const t = performance.now() / 1000; return 0.82 + 0.1 * Math.sin(t * 11.3) + 0.08 * Math.sin(t * 23.7 + 1.3); };
+// Проекция солнечной тени в координатах мира. Длина зависит от высоты предмета.
+const SUN_DX = 0.8, SUN_DY = 1;
+const shadowStamp = document.createElement('canvas');
+shadowStamp.width = shadowStamp.height = 64;
+{
+  const g = shadowStamp.getContext('2d');
+  const shade = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  shade.addColorStop(0, 'rgba(14,12,10,.57)');
+  shade.addColorStop(.64, 'rgba(14,12,10,.40)');
+  shade.addColorStop(1, 'rgba(14,12,10,0)');
+  g.fillStyle = shade; g.fillRect(0, 0, 64, 64);
+}
+function groundShadow(g, x, y, rx, ry, angle, length) {
+  if (!SHADOWS) return;
+  g.save(); g.translate(x + SUN_DX * length, y + SUN_DY * length); g.rotate(angle);
+  g.drawImage(shadowStamp, -rx, -ry, rx * 2, ry * 2); g.restore();
+}
+const FIRE_REACH = 105;
+const figureC = document.createElement('canvas');
+figureC.width = figureC.height = 192;   // 96 мировых пикселей при двукратной детализации
+const figureCtx = figureC.getContext('2d');
+function drawLitHuman(e) {
+  const low = e.sit || e.crouch || e.wounded;
+  groundShadow(ctx, e.x, e.y, low ? 14 : 17, 9, Math.atan2(SUN_DY, SUN_DX), low ? 4 : 8);
+  let fire = FIRE;
+  if (Math.abs(e.x - fire.x) >= FIRE_REACH || Math.abs(e.y - fire.y) >= FIRE_REACH) fire = FIRE2;
+  const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
+  if (distance >= FIRE_REACH) { drawHuman(e, ctx); return; }
+
+  // Маска — альфа текущей позы. Градиент ориентирован в мире, даже когда герой поворачивается.
+  const g = figureCtx;
+  g.setTransform(2, 0, 0, 2, 96, 96);
+  g.clearRect(-48, -48, 96, 96);
+  g.save(); g.translate(-e.x, -e.y); drawHuman(e, g); g.restore();
+  const k = 12 / Math.max(1, distance);
+  const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
+  tint.addColorStop(0, 'rgba(255,150,65,0)');
+  tint.addColorStop(.48, 'rgba(255,150,65,0)');
+  tint.addColorStop(1, 'rgb(255,166,83)');
+  g.save(); g.globalCompositeOperation = 'source-atop';
+  g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
+  g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+  ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
+}
+function fireGroundLight(fire) {
+  const r = FIRE_REACH;
+  const glow = ctx.createRadialGradient(fire.x, fire.y, 5, fire.x, fire.y, r);
+  glow.addColorStop(0, 'rgba(255,159,72,.34)');
+  glow.addColorStop(.42, 'rgba(236,133,48,.16)');
+  glow.addColorStop(1, 'rgba(224,115,40,0)');
+  ctx.save(); ctx.globalAlpha = fireFlick(); ctx.fillStyle = glow;
+  ctx.fillRect(fire.x - r, fire.y - r, r * 2, r * 2); ctx.restore();
+}
 /* костёр: вытянутые колеблющиеся языки с ярким центром поверх основания из камней */
 function drawFlames(F) {
   const t = performance.now() / 1000;
@@ -2854,8 +2907,8 @@ function roofHidden(h) {
 }
 function crateDraw(o) {
   if (ART) return artCrate(o);
-  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(o.x + 4, o.y + 5, o.w, o.h);
-  ctx.fillStyle = o.stash ? '#5d4a2a' : '#4f4430'; ctx.fillRect(o.x, o.y, o.w, o.h);
+  ctx.save(); spriteShadow(ctx, 5, 2);
+  ctx.fillStyle = o.stash ? '#5d4a2a' : '#4f4430'; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.restore();
   ctx.strokeStyle = '#2a2316'; ctx.lineWidth = 2; ctx.strokeRect(o.x + 1, o.y + 1, o.w - 2, o.h - 2);
   ctx.beginPath(); ctx.moveTo(o.x + 2, o.y + 2); ctx.lineTo(o.x + o.w - 2, o.y + o.h - 2); ctx.stroke(); ctx.lineWidth = 1;
   if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
@@ -2895,49 +2948,48 @@ function lookOf(e) {
   const L = LOOKS[e.fac] || LOOKS.loner;
   return L[(e.seed || e.id) % L.length];
 }
-function drawHuman(e) {
-  if (g3Draw(e)) return;
-  if (b1Human(e)) return;
+function drawHuman(e, g) {
+  if (g3Draw(e, { shadow: false }, g)) return;
+  if (b1Human(e, g)) return;
   const lk = lookOf(e);
-  ctx.save(); ctx.translate(e.x, e.y);
-  ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(3, 4, 12, 9, 0, 0, 6.28); ctx.fill();
-  ctx.rotate(e.ang);
+  g.save(); g.translate(e.x, e.y);
+  g.rotate(e.ang);
   const W = WP[e === P ? S.weapon : e.wpn] || WP.knife;
-  if (e.crouch) ctx.scale(0.86, 0.86);
+  if (e.crouch) g.scale(0.86, 0.86);
   const bob = Math.sin(e.step * 0.25) * 1.5;
   if (e.wounded) {
-    ctx.rotate(1.3);
-    ctx.fillStyle = 'rgba(90,12,8,0.5)'; ctx.beginPath(); ctx.ellipse(2, 3, 13, 9, 0, 0, 6.28); ctx.fill();
-    ctx.fillStyle = lk.coat; ctx.beginPath(); ctx.ellipse(0, 0, 7, 12, 0, 0, 6.28); ctx.fill();
-    ctx.fillStyle = '#e8e2d0'; ctx.fillRect(-7, 4, 14, 3);
-    ctx.fillStyle = lk.hood || '#b48d68'; ctx.beginPath(); ctx.arc(0, -12, 5.2, 0, 6.28); ctx.fill();
-    ctx.restore(); return;
+    g.rotate(1.3);
+    g.fillStyle = 'rgba(90,12,8,0.5)'; g.beginPath(); g.ellipse(2, 3, 13, 9, 0, 0, 6.28); g.fill();
+    g.fillStyle = lk.coat; g.beginPath(); g.ellipse(0, 0, 7, 12, 0, 0, 6.28); g.fill();
+    g.fillStyle = '#e8e2d0'; g.fillRect(-7, 4, 14, 3);
+    g.fillStyle = lk.hood || '#b48d68'; g.beginPath(); g.arc(0, -12, 5.2, 0, 6.28); g.fill();
+    g.restore(); return;
   }
   if (e.captive) {
-    ctx.fillStyle = lk.coat; ctx.beginPath(); ctx.ellipse(0, 0, 8, 10, 0, 0, 6.28); ctx.fill();
-    ctx.fillStyle = '#b8946f'; ctx.beginPath(); ctx.arc(2, 0, 5, 0, 6.28); ctx.fill();
-    ctx.strokeStyle = '#8a7a50'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-8, 6); ctx.stroke(); ctx.lineWidth = 1;
-    ctx.restore(); return;
+    g.fillStyle = lk.coat; g.beginPath(); g.ellipse(0, 0, 8, 10, 0, 0, 6.28); g.fill();
+    g.fillStyle = '#b8946f'; g.beginPath(); g.arc(2, 0, 5, 0, 6.28); g.fill();
+    g.strokeStyle = '#8a7a50'; g.lineWidth = 2; g.beginPath(); g.moveTo(-8, -6); g.lineTo(-8, 6); g.stroke(); g.lineWidth = 1;
+    g.restore(); return;
   }
-  if (!e.sit && (e.mv || 0) > 15) { const st = Math.sin(e.step * 0.22) * 6; ctx.fillStyle = '#1f1d18'; ctx.beginPath(); ctx.ellipse(st, -5, 4, 2.6, 0, 0, 6.28); ctx.fill(); ctx.beginPath(); ctx.ellipse(-st, 5, 4, 2.6, 0, 0, 6.28); ctx.fill(); }
-  if (lk.pack) { ctx.fillStyle = lk.pack; ctx.fillRect(-12, -6, 6, 12); }
+  if (!e.sit && (e.mv || 0) > 15) { const st = Math.sin(e.step * 0.22) * 6; g.fillStyle = '#1f1d18'; g.beginPath(); g.ellipse(st, -5, 4, 2.6, 0, 0, 6.28); g.fill(); g.beginPath(); g.ellipse(-st, 5, 4, 2.6, 0, 0, 6.28); g.fill(); }
+  if (lk.pack) { g.fillStyle = lk.pack; g.fillRect(-12, -6, 6, 12); }
   // оружие и руки
   if (!e.sit) {
-    if (W.melee) { ctx.fillStyle = '#9a9a92'; ctx.fillRect(10, 4, 9, 2); }
-    else { const len = W.auto ? 20 : W.pellets ? 17 : 11; ctx.fillStyle = '#1e1e1c'; ctx.fillRect(6, -1.5, len, 3.5); if (W.auto) ctx.fillRect(10, 1, 3, 5); }
-    ctx.fillStyle = shade(lk.coat, 0.85);
-    ctx.beginPath(); ctx.arc(8 + bob * 0.3, 4, 3.2, 0, 6.28); ctx.fill();
-    ctx.beginPath(); ctx.arc(6 - bob * 0.3, -4, 3.2, 0, 6.28); ctx.fill();
-  } else { ctx.fillStyle = '#1e1e1c'; ctx.fillRect(-2, 8, 14, 3); }
+    if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
+    else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
+    g.fillStyle = shade(lk.coat, 0.85);
+    g.beginPath(); g.arc(8 + bob * 0.3, 4, 3.2, 0, 6.28); g.fill();
+    g.beginPath(); g.arc(6 - bob * 0.3, -4, 3.2, 0, 6.28); g.fill();
+  } else { g.fillStyle = '#1e1e1c'; g.fillRect(-2, 8, 14, 3); }
   // корпус
-  ctx.fillStyle = e.flash > 0 ? '#e9e2c8' : lk.coat;
-  ctx.beginPath(); ctx.ellipse(0, 0, 8, 11.5, 0, 0, 6.28); ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
+  g.fillStyle = e.flash > 0 ? '#e9e2c8' : lk.coat;
+  g.beginPath(); g.ellipse(0, 0, 8, 11.5, 0, 0, 6.28); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.stroke();
   // голова
-  if (lk.hood) { ctx.fillStyle = lk.hood; ctx.beginPath(); ctx.arc(0, 0, 6.6, 0, 6.28); ctx.fill(); ctx.fillStyle = '#1b1a14'; ctx.beginPath(); ctx.arc(3.2, 0, 3, -1.2, 1.2); ctx.fill(); }
-  else if (lk.helmet) { ctx.fillStyle = lk.helmet; ctx.beginPath(); ctx.arc(0, 0, 6.4, 0, 6.28); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.stroke(); }
-  else { ctx.fillStyle = '#b48d68'; ctx.beginPath(); ctx.arc(0, 0, 5.6, 0, 6.28); ctx.fill(); if (lk.cap) { ctx.fillStyle = lk.cap; ctx.beginPath(); ctx.arc(-1, 0, 5.4, 1.57, 4.71); ctx.fill(); } }
-  ctx.restore();
+  if (lk.hood) { g.fillStyle = lk.hood; g.beginPath(); g.arc(0, 0, 6.6, 0, 6.28); g.fill(); g.fillStyle = '#1b1a14'; g.beginPath(); g.arc(3.2, 0, 3, -1.2, 1.2); g.fill(); }
+  else if (lk.helmet) { g.fillStyle = lk.helmet; g.beginPath(); g.arc(0, 0, 6.4, 0, 6.28); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.4)'; g.stroke(); }
+  else { g.fillStyle = '#b48d68'; g.beginPath(); g.arc(0, 0, 5.6, 0, 6.28); g.fill(); if (lk.cap) { g.fillStyle = lk.cap; g.beginPath(); g.arc(-1, 0, 5.4, 1.57, 4.71); g.fill(); } }
+  g.restore();
 }
 function drawDog(e) {
   if (g3Draw(e)) return;
@@ -3054,7 +3106,7 @@ function render() {
       ctx.beginPath(); ctx.arc(d.x - Math.cos(q * 5) * d.r * 1.2, d.y - Math.sin(q * 5) * d.r * 1.1, d.r * 0.14, 0, 6.28); ctx.fill(); }
   }
   // костёр
-  for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, 40)) drawFlames(F);
+  for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
     if (o.k === 'crate' && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
@@ -3077,7 +3129,7 @@ function render() {
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
-    if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawHuman(e);
+    if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -3192,7 +3244,6 @@ function render() {
       lg.addColorStop(0, 'rgba(255,214,140,' + (0.32 * dk) + ')'); lg.addColorStop(0.15, 'rgba(255,200,120,' + (0.16 * dk) + ')'); lg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, VW, VH);
       ctx.fillStyle = 'rgba(255,240,200,' + (0.9 * dk) + ')'; ctx.beginPath(); ctx.arc(s2[0] * 2, s2[1] * 2, 3 * Z, 0, 6.28); ctx.fill(); });
   }
-  if (dk < 0.05 && P && !inBunker(P.x, P.y)) { const fs2 = toS(FIRE.x, FIRE.y); const dg = ctx.createRadialGradient(fs2[0] * 2, fs2[1] * 2, 0, fs2[0] * 2, fs2[1] * 2, 70 * Z); dg.addColorStop(0, 'rgba(255,160,70,' + (0.07 * fireFlick()) + ')'); dg.addColorStop(1, 'rgba(255,160,70,0)'); ctx.fillStyle = dg; ctx.fillRect(0, 0, VW, VH); }
   for (const f of flashes) if (f.big) { const s = toS(f.x, f.y); const g = ctx.createRadialGradient(s[0] * 2, s[1] * 2, 0, s[0] * 2, s[1] * 2, 140 * Z); g.addColorStop(0, f.blue ? 'rgba(180,220,255,0.6)' : 'rgba(255,200,120,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
   drawWeatherScreen();
   // откуда стреляют: красные дуги по краю экрана
@@ -3777,7 +3828,10 @@ function c1Scatter(g) {
     else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
     else if (h < 0.018) { id = 'c1_rock' + Math.floor(h2 * 3); w = hh = 28 + h2 * 10; }
     else { id = 'c1_decal' + [0, 1, 3, 4][Math.floor(h2 * 4)]; w = hh = 90 + h2 * 50; al = 0.7; }
-    if (id.startsWith('c1_decal')) ART.draw(g, id, cx, cy, w, hh, a, al);
+    if (id.startsWith('c1_log')) {
+      groundShadow(g, cx, cy, w * .48, hh * .26, a, 3);
+      ART.draw(g, id, cx, cy, w, hh, a);
+    } else if (id.startsWith('c1_decal')) ART.draw(g, id, cx, cy, w, hh, a, al);
     else { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(cx + 3, cy + 4, w * 0.45, hh * 0.35, a, 0, 6.28); g.fill(); ART.draw(g, id, cx, cy, w, hh, a); }
   }
 }
@@ -3841,7 +3895,12 @@ function artStatic0(g, o) {
     g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx + 4, cy + 5, w * 0.48, w * 0.22, 0, 0, 6.28); g.fill(); c1Draw(g, id, cx, cy, w, a); return true;
   }
   if (C1 && o.k === 'hatch') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 2, cy + 3, 22, 0, 6.28); g.fill(); c1Draw(g, 'c1_hatch', cx, cy, 46); return true; }
-  if (C1 && o.k === 'fire') { c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72); return true; }
+  if (C1 && o.k === 'fire') {
+    // Оба ближних бревна уже входят в прозрачный спрайт очага.
+    g.save(); spriteShadow(g, 2.6, 1.8);
+    c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
+    g.restore(); return true;
+  }
   if (C1 && o.k === 'pylon') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 3, cy + 4, 9, 0, 6.28); g.fill(); c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
   if (o.k === 'bus') {
     const s = Math.min(o.w / 292, o.h / 133), bw = 292 * s, bh = 133 * s;
@@ -3876,7 +3935,14 @@ function artDecor0(g) {
   DECOR.forEach(d => {
     const x = d[1] * T, y = d[2] * T;
     if (!C1 && !ART.m.sprites[d[0]]) return;
-    if (C1 && C1DECOR[d[0]]) { if (d[0] !== 'fence') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill(); } const c = C1DECOR[d[0]]; c1Draw(g, d[0] === 'fence' ? c[0] : c[0], x, y, c[1], d[3] + (d[0] === 'barrel' ? 0 : 0)); return; }
+    if (C1 && C1DECOR[d[0]]) {
+      const [id, width] = C1DECOR[d[0]], log = d[0] === 'logs' || d[0] === 'bench';
+      if (log) groundShadow(g, x, y, width * .48, width * .11, d[3], 1);
+      else if (d[0] !== 'fence') {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill();
+      }
+      c1Draw(g, id, x, y, width, d[3], 1, log ? 3 : 9); return;
+    }
     if (d[0] !== 'fence') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill(); }
     ART.draw(g, d[0], x, y, undefined, undefined, d[3]);
   });
@@ -3896,7 +3962,7 @@ function artCanopy() {
     const g = c.getContext('2d'); g.scale(2, 2);
     g.translate(S2 * CAN_PAD, S2 * CAN_PAD); if (v % 2) g.scale(-1, 1); g.rotate(v * 0.9);
     const s = 0.9 + (v % 3) * 0.06;
-    if (CAN_PAD > 1) { g.shadowColor = 'rgba(8,10,4,0.5)'; g.shadowBlur = CAN_SZ * 0.1; g.shadowOffsetX = CAN_SZ * 0.16; g.shadowOffsetY = CAN_SZ * 0.2; }   // тень кроны вправо-вниз, как у домов и машин
+    if (CAN_PAD > 1) { g.shadowColor = 'rgba(8,10,4,0.5)'; g.shadowBlur = CAN_SZ * 0.1; g.shadowOffsetX = CAN_SZ * 0.2 * SUN_DX; g.shadowOffsetY = CAN_SZ * 0.2 * SUN_DY; }   // тень кроны вправо-вниз, как у домов и машин
     ART.draw(g, pick[v], 0, 0, CAN_SZ * s, CAN_SZ * s);
     c1Grade(c, 0, 0, c.width, c.height);
     CANOPY.push(c);
@@ -3924,9 +3990,15 @@ function c1Grade(c, x, y, w, h) {
 }
 /* спрайт C1 по ширине с сохранением пропорций */
 let C1SH = 0;   // тень силуэта для объектов, запекаемых в землю (машины, автобус, люк, столбы, декор)
-function c1Draw(g, id, x, y, w, a, al) {
+function spriteShadow(g, length, blur) {
+  if (!SHADOWS) return;
+  const k = g.getTransform().a;
+  g.shadowColor = 'rgba(15,13,10,.52)'; g.shadowBlur = blur * k;
+  g.shadowOffsetX = SUN_DX * length * k; g.shadowOffsetY = SUN_DY * length * k;
+}
+function c1Draw(g, id, x, y, w, a, al, shadowLength = 9) {
   const s = ART.m.sprites[id];
-  if (C1SH && C1 && SHADOWS) { const k = g.getTransform().a; g.shadowColor = 'rgba(6,8,4,0.55)'; g.shadowBlur = 4 * k; g.shadowOffsetX = 7 * k; g.shadowOffsetY = 9 * k; }
+  if (C1SH && C1) spriteShadow(g, shadowLength, shadowLength * .45);
   ART.draw(g, id, x, y, w, w * s.rect[3] / s.rect[2], a || 0, al === undefined ? 1 : al);
   if (C1SH) { g.shadowColor = 'rgba(0,0,0,0)'; g.shadowBlur = g.shadowOffsetX = g.shadowOffsetY = 0; }
 }
@@ -3985,8 +4057,9 @@ function artRoof(h, idx) {
   return c;
 }
 function artCrate(o) {
-  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(o.x + 4, o.y + 5, o.w, o.h);
+  ctx.save(); spriteShadow(ctx, 5, 2);
   ART.draw(ctx, C1 ? (o.stash ? 'c1_crate_army' : 'c1_crate') : 'crate', o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, ((o.x + o.y) % 4) * Math.PI / 2);
+  ctx.restore();
   if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
 function artCache(o) {
@@ -5064,18 +5137,17 @@ function b1HumanId(e) {
 }
 /* тень: одно направление света для всех (свет сверху-слева, тень вправо-вниз), отдельно от спрайта */
 function b1Shadow(x, y, rx, ry) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 4, rx, ry, 0, 0, 6.28); ctx.fill(); }
-function b1Flash(e, id, w) {   // попадание: подсветка по форме спрайта, без прямоугольника
+function b1Flash(e, id, w, target = ctx) {   // попадание: подсветка по форме спрайта, без прямоугольника
   if (!(e.flash > 0)) return;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.55, e.flash * 4);
-  B1.gfx.drawWorld(ctx, id, e.x, e.y, e.ang, w); ctx.restore();
+  target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.55, e.flash * 4);
+  B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w); target.restore();
 }
-function b1Human(e) {
+function b1Human(e, target) {
   if (!B1_READY() || e.captive) return false;
   const id = b1HumanId(e); if (!id || !b1Drawn(e, id)) return false;
   const w = e === P ? S.weapon : e.wpn;
-  b1Shadow(e.x, e.y, 11, 8);
-  if (!B1.gfx.drawWorld(ctx, id, e.x, e.y, e.ang, w)) return false;
-  b1Flash(e, id, w);
+  if (!B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w)) return false;
+  b1Flash(e, id, w, target);
   return true;
 }
 function b1Dog(e) {
@@ -5593,23 +5665,23 @@ const G3W = { w_pm: { len: 11, w: 3.2 }, w_obrez: { len: 17, w: 3.6 }, w_aksu: {
 const G3_GRIP = [1.5, 8];   // точка хвата в кадре (уточнена по рукам idle/walk/crouch; см. отчёт)
 /* дуло для выстрела/вспышки — та же геометрия, что и у слоя оружия (gg7.js: weaponLocal → localToWorld) */
 function g3Muzzle(e, ang) { return g7Muzzle(e, ang); }
-function g3Draw(e, extra) {
+function g3Draw(e, extra, target = ctx) {
   if (!G3_READY()) return false;
-  if (e.kind === 'human' && g7Human(e, extra)) return true;
+  if (e.kind === 'human' && g7Human(e, extra, target)) return true;
   const skin = g3Skin(e), g = g3Gait(e);
   const attack = e.kind === 'dog' ? !!(e.tgt && e.tgt.alive && dE(e, e.tgt) < e.r + e.tgt.r + 10)
     : e.kind === 'boar' ? (e.state === 'wind' || e.state === 'charge') : e.kind === 'sucker' ? e.state === 'strike' : false;
   const a = Object.assign({ skin: skin, x: e.x, y: e.y, angle: e.ang, wounded: !!e.wounded, captive: !!e.captive, seated: !!e.sit, crouch: !!e.crouch,
     attack: attack, moving: g.moving && !e.sit, time: (g.phase + 0.5) / 7, weapon: e.kind === 'human' ? (e === P ? S.weapon : e.wpn) : null }, extra || {});
   if (e.kind !== 'human' && a.moving) { const ph = g.phase, A = G3.pack.manifest.actors[skin] || {}; a.moving = false; a.poseOverride = ph === 0 ? 'walk_left' : ph === 2 ? 'walk_right' : ph === 1 && A.walk_pass_left ? 'walk_pass_left' : ph === 3 && A.walk_pass_right ? 'walk_pass_right' : 'idle'; }   // G8: 4 фазы бега, если есть
-  const man = G3.pack.manifest, g3Base = window.__g7tap ? ctx.getTransform() : null;
+  const man = G3.pack.manifest, g3Base = window.__g7tap ? target.getTransform() : null;
   if (e.kind !== 'human' && g7Mutant(e, a)) return true;
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
   const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
-  if (sw) { ctx.save(); ctx.translate(e.x + sw.dx, e.y + sw.dy); ctx.scale(sw.k, sw.k); ctx.translate(-e.x, -e.y); }
-  const ok = CordonG3.draw(ctx, man, G3.images, a, e.kind === 'human' ? (c2 => { const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
-  if (ok && e.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(ctx, man, G3.images, Object.assign({}, a, { shadow: false }), null); ctx.restore(); }
-  if (sw) ctx.restore();
+  if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
+  const ok = CordonG3.draw(target, man, G3.images, a, e.kind === 'human' ? (c2 => { const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
+  if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(target, man, G3.images, Object.assign({}, a, { shadow: false }), null); target.restore(); }
+  if (sw) target.restore();
   return ok;
 }
 /* шаг: корпус качается из стороны в сторону (период — два шага) и чуть «подпрыгивает» к камере на каждом шаге */
@@ -5856,32 +5928,31 @@ function drawWeaponLocal(c2, w) {
 
 /* ---------- отрисовка людей ---------- */
 function shadowAt(e, rx) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(e.x + 2, e.y + 3, rx || 10, 7, 0, 0, 6.28); ctx.fill(); }
-function g7Human(e, extra) {
+function g7Human(e, extra, target) {
   if (!G3_READY()) return false;
   const opacity = extra && extra.opacity != null ? extra.opacity : 1;
   if (e.sid === 'sid') {   // Сидорович G4: idle/seated/relaxed, табурет уже в кадре, оружие не рисуется
     const give = typeof panel !== 'undefined' && panel && panel.kind === 'trade' && g7PoseFrame('sid', 'give');   // G8: торговля — протягивает свёрток
     const f = give || g7PoseFrame('sid', window.CORDON_G8_ON && e.talkT > 0 ? 'idle' : e.sit ? 'seated' : e.talkT > 0 ? 'idle' : 'relaxed') || g7PoseFrame('sid', 'idle'); if (!f) return false;
-    shadowAt(e, 11); drawFrameAt(e.x, e.y, e.ang, f, opacity); if (e.flash > 0) flashFrame(e, f); return true;
+    drawFrameAt(e.x, e.y, e.ang, f, opacity, 1, target); if (e.flash > 0) flashFrame(e, f, 1, target); return true;
   }
   if (e.captive && !e.wounded && G7.poseOn) {   // связанный пленник: цельный кадр, без модульных рук/ствола
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
-    if (f) { shadowAt(e); drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K); return true; }
+    if (f) { drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K, target); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K, target); return true; }
   }
   const r = rigActive(e); if (!r) return false;
-  const w = weaponLocal(e), base = window.__g7tap ? ctx.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
+  const w = weaponLocal(e), base = window.__g7tap ? target.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
     deadImage: G7.img[CORDON_RIG.dead[r.skin]], drawEquipment: c2 => { if (base) window.__g7tap(e, base, c2.getTransform(), w); drawWeaponLocal(c2, w); } };
-  shadowAt(e);
-  const ok = CordonRig.draw(ctx, G7.img, CORDON_RIG.manifest, r.rig, o);
-  if (ok && e.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); CordonRig.draw(ctx, G7.img, CORDON_RIG.manifest, r.rig, Object.assign({}, o, { drawEquipment: null })); ctx.restore(); }
+  const ok = CordonRig.draw(target, G7.img, CORDON_RIG.manifest, r.rig, o);
+  if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonRig.draw(target, G7.img, CORDON_RIG.manifest, r.rig, Object.assign({}, o, { drawEquipment: null })); target.restore(); }
   return ok;
 }
 const CAPTIVE_K = 0.86;   // кадр 64×72: голова/плечи сверены с соседним idle (48×56) — без этого пленник крупнее стоящих
-function drawFrameAt(x, y, ang, f, opacity, k) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate((ang || 0) - Math.PI / 2); ctx.globalAlpha *= opacity == null ? 1 : opacity; if (k) ctx.scale(k, k);
-  ctx.drawImage(G3.images[f.file], -f.width * f.pivot[0], -f.height * f.pivot[1], f.width, f.height); ctx.restore();
+function drawFrameAt(x, y, ang, f, opacity, k, target = ctx) {
+  target.save(); target.translate(x, y); target.rotate((ang || 0) - Math.PI / 2); target.globalAlpha *= opacity == null ? 1 : opacity; if (k) target.scale(k, k);
+  target.drawImage(G3.images[f.file], -f.width * f.pivot[0], -f.height * f.pivot[1], f.width, f.height); target.restore();
 }
-function flashFrame(e, f, k) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); drawFrameAt(e.x, e.y, e.ang, f, 1, k); ctx.restore(); }
+function flashFrame(e, f, k, target) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); drawFrameAt(e.x, e.y, e.ang, f, 1, k, target); target.restore(); }
 
 /* ---------- мутанты: подготовка только в существующем wind кабана, отдача — на событие попадания ---------- */
 function g7Mutant(e, a) {

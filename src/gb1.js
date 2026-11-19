@@ -44,18 +44,17 @@ function b1HumanId(e) {
 }
 /* тень: одно направление света для всех (свет сверху-слева, тень вправо-вниз), отдельно от спрайта */
 function b1Shadow(x, y, rx, ry) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 4, rx, ry, 0, 0, 6.28); ctx.fill(); }
-function b1Flash(e, id, w) {   // попадание: подсветка по форме спрайта, без прямоугольника
+function b1Flash(e, id, w, target = ctx) {   // попадание: подсветка по форме спрайта, без прямоугольника
   if (!(e.flash > 0)) return;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.55, e.flash * 4);
-  B1.gfx.drawWorld(ctx, id, e.x, e.y, e.ang, w); ctx.restore();
+  target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.55, e.flash * 4);
+  B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w); target.restore();
 }
-function b1Human(e) {
+function b1Human(e, target) {
   if (!B1_READY() || e.captive) return false;
   const id = b1HumanId(e); if (!id || !b1Drawn(e, id)) return false;
   const w = e === P ? S.weapon : e.wpn;
-  b1Shadow(e.x, e.y, 11, 8);
-  if (!B1.gfx.drawWorld(ctx, id, e.x, e.y, e.ang, w)) return false;
-  b1Flash(e, id, w);
+  if (!B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w)) return false;
+  b1Flash(e, id, w, target);
   return true;
 }
 function b1Dog(e) {
