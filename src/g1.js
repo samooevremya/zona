@@ -111,7 +111,31 @@ function house(x, y, w, h, doors, wall, broken, roof) {
   }
   doors.forEach(d => setT(x + d[0], y + d[1], wall === CO ? CF : FL));
   reserve(x - 1, y - 1, x + w, y + h);
-  if (roof !== 'none') HOUSES.push({ x: x, y: y, w: w, h: h, mat: roof || (wall === CO ? 'conc' : 'slate'), ruin: broken > 0.2, a: 1 });
+  if (roof !== 'none') HOUSES.push({ x: x, y: y, w: w, h: h, doors, mat: roof || (wall === CO ? 'conc' : 'slate'), ruin: broken > 0.2, a: 1 });
+}
+
+// doors хранит клетки относительно дома. После переноса штампов объединяем
+// соседние клетки на одной стене и сверяем проход с окончательной картой.
+function buildEntrances(h) {
+  h.entrances = [];
+  for (const [nx, ny] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    const edge = nx > 0 ? h.w - 1 : ny > 0 ? h.h - 1 : 0;
+    const offsets = h.doors.filter(([x, y]) =>
+      (nx ? x : y) === edge && isFloor(tAt(h.x + x, h.y + y)) &&
+      !SOLID[tAt(h.x + x + nx, h.y + y + ny)]
+    ).map(([x, y]) => nx ? y : x).sort((a, b) => a - b);
+    for (let i = 0; i < offsets.length;) {
+      const start = offsets[i++];
+      let end = start;
+      while (i < offsets.length && offsets[i] === end + 1) end = offsets[i++];
+      const mid = (start + end + 1) * T / 2;
+      h.entrances.push({
+        x: nx ? (nx > 0 ? h.w * T : 0) : mid,
+        y: ny ? (ny > 0 ? h.h * T : 0) : mid,
+        nx, ny, width: (end - start + 1) * T - 4
+      });
+    }
+  }
 }
 
 const objs = [];
