@@ -912,7 +912,7 @@ async function boot() {
     sv = null; window.__bootWarn = 'Сохранение не загрузилось (' + (e && e.message) + '). Копия отложена, начата новая игра.';
   }
   if (!sv) applyState(freshS());
-  const bl = document.getElementById('bootlog'); if (bl) bl.remove();
+  const bl = document.getElementById('bootlog'); if (bl) bl.remove(); bootStep('игра');
   if (window.__bootWarn) setTimeout(() => msg(window.__bootWarn, 'bad'), 500);
   addEventListener('resize', resize);
   showTitle();
