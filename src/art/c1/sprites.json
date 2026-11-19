@@ -611,65 +611,49 @@
    0.5
   ]
  },
- "c1_roof_house0": {
-  "kind": "sprite",
-  "atlas": "c1bld",
-  "rect": [
-   902,
-   1010,
-   534,
-   342
-  ],
-  "logicalSize": [
-   256,
-   164
-  ],
-  "pivot": [
-   0.5,
-   0.5
-  ]
- },
- "c1_roof_house1": {
+ "c1_roof_slate": {
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
    0,
    1406,
-   535,
-   341
+   640,
+   279
   ],
   "logicalSize": [
    256,
-   163
+   112
   ],
   "pivot": [
    0.5,
    0.5
-  ]
+  ],
+  "cropFocusX": 0.78
  },
- "c1_roof_house2": {
+ "c1_roof_plank": {
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   1438,
+   1273,
    1010,
-   538,
-   342
+   640,
+   280
   ],
   "logicalSize": [
    256,
-   163
+   112
   ],
   "pivot": [
    0.5,
    0.5
-  ]
+  ],
+  "cropFocusX": 0.22
  },
  "c1_roof_shed0": {
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   908,
+   642,
    1406,
    257,
    255
@@ -687,7 +671,7 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   1167,
+   901,
    1406,
    257,
    255
@@ -759,7 +743,7 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   1838,
+   1572,
    1406,
    179,
    192
@@ -777,8 +761,8 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   0,
-   1749,
+   1753,
+   1406,
    166,
    192
   ],
@@ -795,8 +779,8 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   168,
-   1749,
+   0,
+   1687,
    190,
    190
   ],
@@ -813,7 +797,7 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   1426,
+   1160,
    1406,
    236,
    240
@@ -831,8 +815,8 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   537,
-   1406,
+   902,
+   1010,
    369,
    282
   ],
@@ -849,7 +833,7 @@
   "kind": "sprite",
   "atlas": "c1bld",
   "rect": [
-   1664,
+   1398,
    1406,
    172,
    229
