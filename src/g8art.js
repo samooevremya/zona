@@ -354,6 +354,9 @@ function artStatic(g, o) { C1SH = o.k !== 'fire'; try { return artStatic0(g, o);
 function artStatic0(g, o) {
   const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
   if (C1 && o.k === 'bus') { const w = o.w * 1.25, s = ART.m.sprites.c1_bus, h = w * s.rect[3] / s.rect[2]; g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - w / 2 + 6, cy - h / 2 + 7, w, h); c1Draw(g, 'c1_bus', cx, cy, w); return true; }
+  if (C1 && o.k === 'car' && o.sprite) {
+    c1Draw(g, o.sprite, cx, cy, o.w + 4, 0, 1, 5); return true;
+  }
   if (C1 && o.k === 'car') {
     const id = o.seed >= 10 ? 'c1_army' + (o.seed % 3) : ['c1_car0', 'c1_car1', 'c1_car2', 'c1_tractor'][o.seed % 4], w = o.seed >= 10 ? 84 : 70, a = o.seed % 2 ? Math.PI : 0;
     g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx + 4, cy + 5, w * 0.48, w * 0.22, 0, 0, 6.28); g.fill(); c1Draw(g, id, cx, cy, w, a); return true;
@@ -398,7 +401,7 @@ const DECOR = [
   ['fence', 38.5, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
   ['fence', 12.6, 75.5, Math.PI / 2], ['fence', 12.6, 77.5, Math.PI / 2], ['fence', 12.6, 89.5, Math.PI / 2]
 ];
-const C1DECOR = { ford: ['c1_ford', 230], logs: ['c1_log1', 46], bench: ['c1_log0', 44], barrel: ['c1_barrel', 22], rubble: ['c1_bricks', 32], fence: ['c1_fence_picket', 66] };
+const C1DECOR = { yardDrum: ['c1_yard_drum', 19], ford: ['c1_ford', 230], logs: ['c1_log1', 46], bench: ['c1_log0', 44], barrel: ['c1_barrel', 22], rubble: ['c1_bricks', 32], fence: ['c1_fence_picket', 66] };
 function artDecor(g) { C1SH = 1; try { artDecor0(g); } finally { C1SH = 0; } }
 function artDecor0(g) {
   DECOR.forEach(d => {
@@ -443,9 +446,10 @@ function autumnBirch(id, variant, size) {
   g.putImageData(pixels, 0, 0);
   return c;
 }
+let yardTreeCrown;
 function artCanopy() {
   CAN_PAD = C1 && SHADOWS ? 1.35 : 1;
-  const pick = C1 ? forestCrowns.concat(edgeCrowns)
+  const pick = C1 ? forestCrowns.concat(edgeCrowns, BIG ? ['c1_yard_tree'] : [])
     : ['tree_olive', 'tree_dry', 'tree_olive', 'tree_bare', 'tree_olive', 'tree_dry', 'tree_olive', 'tree_dry'];
   if (C1 && !CANOPY.built) { CAN_SZ = +((location.hash.match(/can-(\d+)/) || [])[1] || 96); CANOPY.built = 1; }
   const S2 = CAN_SZ / 2;
@@ -460,7 +464,8 @@ function artCanopy() {
       g.drawImage(autumnBirch(pick[v], v, CAN_SZ * 2), -w / 2, -w / 2, w, w);
     } else ART.draw(g, pick[v], 0, 0, w, w);
     c1Grade(c, 0, 0, c.width, c.height);
-    CANOPY.push(c);
+    if (pick[v] === 'c1_yard_tree') yardTreeCrown = c;
+    else CANOPY.push(c);
   }
 }
 /* цвет C1 под референс: меньше насыщенности (особенно жёлто-зелёной), больше контраста, чуть холоднее синий.
@@ -564,7 +569,8 @@ function artRoof(h, idx) {
 }
 function artCrate(o) {
   ctx.save(); spriteShadow(ctx, 5, 2);
-  ART.draw(ctx, C1 ? (o.stash ? 'c1_crate_army' : 'c1_crate') : 'crate', o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, ((o.x + o.y) % 4) * Math.PI / 2);
+  const id = C1 ? (o.sprite || (o.stash ? 'c1_crate_army' : 'c1_crate')) : 'crate';
+  ART.draw(ctx, id, o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, o.sprite ? 0 : ((o.x + o.y) % 4) * Math.PI / 2);
   ctx.restore();
   if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }

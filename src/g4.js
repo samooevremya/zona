@@ -687,7 +687,8 @@ function render() {
       const scale = .65 + hash2(x + 73, y + 13) * .52;
       const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
       const width = height * (.77 + .30 * hash2(y + 31, x));
-      drawAutumnCrown(CANOPY[ci], cx + sw, cy, width, height);
+      const crown = yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[ci];
+      drawAutumnCrown(crown, cx + sw, cy, width, height);
     } else {
       const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
       ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;
