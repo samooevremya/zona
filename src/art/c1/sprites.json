@@ -1720,5 +1720,167 @@
    0.5,
    0.5
   ]
+ },
+ "c1_trace_pipes": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   190,
+   0,
+   116,
+   115
+  ],
+  "logicalSize": [
+   58,
+   58
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_sleepers": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   308,
+   0,
+   132,
+   110
+  ],
+  "logicalSize": [
+   66,
+   55
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_reel": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   108,
+   155,
+   72,
+   72
+  ],
+  "logicalSize": [
+   36,
+   36
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_apples": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   244,
+   155,
+   61,
+   62
+  ],
+  "logicalSize": [
+   30,
+   31
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_boat": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   0,
+   0,
+   188,
+   153
+  ],
+  "logicalSize": [
+   94,
+   76
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_wheel": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   307,
+   155,
+   58,
+   60
+  ],
+  "logicalSize": [
+   29,
+   30
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_churn": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   367,
+   155,
+   48,
+   52
+  ],
+  "logicalSize": [
+   24,
+   26
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_stump": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   0,
+   155,
+   106,
+   104
+  ],
+  "logicalSize": [
+   53,
+   52
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_trace_kettle": {
+  "kind": "sprite",
+  "atlas": "c1traces",
+  "rect": [
+   182,
+   155,
+   60,
+   64
+  ],
+  "logicalSize": [
+   30,
+   32
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
  }
 }
