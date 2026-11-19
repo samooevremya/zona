@@ -1,0 +1,988 @@
+{
+  "version": "G3.1",
+  "scale": 2,
+  "facing": "south",
+  "angleCorrection": -1.5707963267948966,
+  "actors": {
+    "loner": {
+      "idle": {
+        "file": "assets/actors/loner_idle.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/loner_walk_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/loner_walk_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "seated": {
+        "file": "assets/actors/loner_seated.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "crouch": {
+        "file": "assets/actors/loner_crouch.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "wounded": {
+        "file": "assets/actors/loner_wounded.png",
+        "width": 60,
+        "height": 64,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/loner_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_left": {
+        "file": "assets/actors/loner_walk_pass_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_right": {
+        "file": "assets/actors/loner_walk_pass_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    },
+    "zarya": {
+      "idle": {
+        "file": "assets/actors/zarya_idle.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/zarya_walk_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/zarya_walk_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "seated": {
+        "file": "assets/actors/zarya_seated.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "crouch": {
+        "file": "assets/actors/zarya_crouch.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "wounded": {
+        "file": "assets/actors/zarya_wounded.png",
+        "width": 60,
+        "height": 64,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/zarya_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_left": {
+        "file": "assets/actors/zarya_walk_pass_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_right": {
+        "file": "assets/actors/zarya_walk_pass_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    },
+    "bandit": {
+      "idle": {
+        "file": "assets/actors/bandit_idle.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/bandit_walk_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/bandit_walk_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "seated": {
+        "file": "assets/actors/bandit_seated.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "crouch": {
+        "file": "assets/actors/bandit_crouch.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "wounded": {
+        "file": "assets/actors/bandit_wounded.png",
+        "width": 60,
+        "height": 64,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/bandit_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_left": {
+        "file": "assets/actors/bandit_walk_pass_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_right": {
+        "file": "assets/actors/bandit_walk_pass_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    },
+    "army": {
+      "idle": {
+        "file": "assets/actors/army_idle.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/army_walk_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/army_walk_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "seated": {
+        "file": "assets/actors/army_seated.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "crouch": {
+        "file": "assets/actors/army_crouch.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "wounded": {
+        "file": "assets/actors/army_wounded.png",
+        "width": 60,
+        "height": 64,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/army_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_left": {
+        "file": "assets/actors/army_walk_pass_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_pass_right": {
+        "file": "assets/actors/army_walk_pass_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    },
+    "dog": {
+      "idle": {
+        "file": "assets/actors/dog_idle.png",
+        "width": 40,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/dog_walk_left.png",
+        "width": 40,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/dog_walk_right.png",
+        "width": 40,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "attack": {
+        "file": "assets/actors/dog_attack.png",
+        "width": 40,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/dog_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    },
+    "boar": {
+      "idle": {
+        "file": "assets/actors/boar_idle.png",
+        "width": 52,
+        "height": 60,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/boar_walk_left.png",
+        "width": 52,
+        "height": 60,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/boar_walk_right.png",
+        "width": 52,
+        "height": 60,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "attack": {
+        "file": "assets/actors/boar_attack.png",
+        "width": 52,
+        "height": 60,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/boar_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    },
+    "sucker": {
+      "idle": {
+        "file": "assets/actors/sucker_idle.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_left": {
+        "file": "assets/actors/sucker_walk_left.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "walk_right": {
+        "file": "assets/actors/sucker_walk_right.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "attack": {
+        "file": "assets/actors/sucker_attack.png",
+        "width": 48,
+        "height": 56,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      },
+      "dead": {
+        "file": "assets/actors/sucker_dead.png",
+        "width": 64,
+        "height": 72,
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "equipmentSocket": [
+          0,
+          7
+        ],
+        "fit": "center-height; review in motion"
+      }
+    }
+  },
+  "portraits": {
+    "marked": {
+      "file": "assets/portraits/marked.png",
+      "width": 64,
+      "height": 64
+    },
+    "wolf": {
+      "file": "assets/portraits/wolf.png",
+      "width": 64,
+      "height": 64
+    },
+    "sid": {
+      "file": "assets/portraits/sid.png",
+      "width": 64,
+      "height": 64
+    },
+    "petr": {
+      "file": "assets/portraits/petr.png",
+      "width": 64,
+      "height": 64
+    },
+    "petr2": {
+      "file": "assets/portraits/petr2.png",
+      "width": 64,
+      "height": 64
+    },
+    "shust": {
+      "file": "assets/portraits/shust.png",
+      "width": 64,
+      "height": 64
+    },
+    "tolik": {
+      "file": "assets/portraits/tolik.png",
+      "width": 64,
+      "height": 64
+    },
+    "fox": {
+      "file": "assets/portraits/fox.png",
+      "width": 64,
+      "height": 64
+    },
+    "boss": {
+      "file": "assets/portraits/boss.png",
+      "width": 64,
+      "height": 64
+    },
+    "a3": {
+      "file": "assets/portraits/a3.png",
+      "width": 64,
+      "height": 64
+    },
+    "loner_01": {
+      "file": "assets/portraits/loner_01.png",
+      "width": 64,
+      "height": 64
+    },
+    "loner_02": {
+      "file": "assets/portraits/loner_02.png",
+      "width": 64,
+      "height": 64
+    },
+    "loner_03": {
+      "file": "assets/portraits/loner_03.png",
+      "width": 64,
+      "height": 64
+    },
+    "bandit_01": {
+      "file": "assets/portraits/bandit_01.png",
+      "width": 64,
+      "height": 64
+    },
+    "bandit_02": {
+      "file": "assets/portraits/bandit_02.png",
+      "width": 64,
+      "height": 64
+    },
+    "army_01": {
+      "file": "assets/portraits/army_01.png",
+      "width": 64,
+      "height": 64
+    }
+  },
+  "ui": {
+    "panel": {
+      "file": "assets/ui/panel.png",
+      "width": 128,
+      "height": 128,
+      "borderImageSlice": 32
+    },
+    "pda": {
+      "file": "assets/ui/pda.png",
+      "width": 192,
+      "height": 192,
+      "borderImageSlice": 64
+    },
+    "slot": {
+      "file": "assets/ui/slot.png",
+      "width": 64,
+      "height": 64,
+      "borderImageSlice": 10
+    },
+    "button": {
+      "file": "assets/ui/button.png",
+      "width": 192,
+      "height": 80,
+      "borderImageSlice": 20
+    },
+    "round": {
+      "file": "assets/ui/round.png",
+      "width": 96,
+      "height": 96,
+      "borderImageSlice": 0
+    },
+    "selected": {
+      "file": "assets/ui/selected.png",
+      "width": 192,
+      "height": 80,
+      "borderImageSlice": 20
+    }
+  },
+  "items": {
+    "antirad": {
+      "file": "assets/items/antirad.png",
+      "source": "B1/B2 unchanged"
+    },
+    "ar_bandit": {
+      "file": "assets/items/ar_bandit.png",
+      "width": 64,
+      "height": 80,
+      "source": "G3.1 unified upper garment"
+    },
+    "ar_jacket": {
+      "file": "assets/items/ar_jacket.png",
+      "width": 64,
+      "height": 80,
+      "source": "G3.1 unified upper garment"
+    },
+    "ar_zarya": {
+      "file": "assets/items/ar_zarya.png",
+      "width": 64,
+      "height": 80,
+      "source": "G3.1 unified upper garment"
+    },
+    "art_bengal": {
+      "file": "assets/items/art_bengal.png",
+      "source": "B1/B2 unchanged"
+    },
+    "art_blood": {
+      "file": "assets/items/art_blood.png",
+      "source": "B1/B2 unchanged"
+    },
+    "art_medusa": {
+      "file": "assets/items/art_medusa.png",
+      "source": "B1/B2 unchanged"
+    },
+    "bandage": {
+      "file": "assets/items/bandage.png",
+      "source": "B1/B2 unchanged"
+    },
+    "bread": {
+      "file": "assets/items/bread.png",
+      "source": "B1/B2 unchanged"
+    },
+    "cans": {
+      "file": "assets/items/cans.png",
+      "source": "B1/B2 unchanged"
+    },
+    "flash": {
+      "file": "assets/items/flash.png",
+      "source": "B1/B2 unchanged"
+    },
+    "grenade": {
+      "file": "assets/items/grenade.png",
+      "source": "B1/B2 unchanged"
+    },
+    "hoof": {
+      "file": "assets/items/hoof.png",
+      "source": "B1/B2 unchanged"
+    },
+    "medkit": {
+      "file": "assets/items/medkit.png",
+      "source": "B1/B2 unchanged"
+    },
+    "sausage": {
+      "file": "assets/items/sausage.png",
+      "source": "B1/B2 unchanged"
+    },
+    "tail": {
+      "file": "assets/items/tail.png",
+      "source": "B1/B2 unchanged"
+    },
+    "tentacle": {
+      "file": "assets/items/tentacle.png",
+      "source": "B1/B2 unchanged"
+    },
+    "vodka": {
+      "file": "assets/items/vodka.png",
+      "source": "B1/B2 unchanged"
+    },
+    "w_pm": {
+      "file": "assets/items/w_pm.png",
+      "source": "B1/B2 unchanged"
+    },
+    "knife": {
+      "file": "assets/items/knife.svg",
+      "width": 64,
+      "height": 64,
+      "source": "Existing game SVG unchanged geometry",
+      "status": "temporary",
+      "sharedGlyph": null
+    },
+    "w_obrez": {
+      "file": "assets/items/w_obrez.svg",
+      "width": 64,
+      "height": 64,
+      "source": "Existing game SVG unchanged geometry",
+      "status": "temporary",
+      "sharedGlyph": null
+    },
+    "w_aksu": {
+      "file": "assets/items/w_aksu.svg",
+      "width": 64,
+      "height": 64,
+      "source": "Existing game SVG unchanged geometry",
+      "status": "temporary",
+      "sharedGlyph": null
+    },
+    "a9": {
+      "file": "assets/items/a9.svg",
+      "width": 64,
+      "height": 64,
+      "source": "Existing game SVG unchanged geometry",
+      "status": "temporary",
+      "sharedGlyph": "i-ammo"
+    },
+    "a12": {
+      "file": "assets/items/a12.svg",
+      "width": 64,
+      "height": 64,
+      "source": "Existing game SVG unchanged geometry",
+      "status": "temporary",
+      "sharedGlyph": "i-ammo"
+    },
+    "a545": {
+      "file": "assets/items/a545.svg",
+      "width": 64,
+      "height": 64,
+      "source": "Existing game SVG unchanged geometry",
+      "status": "temporary",
+      "sharedGlyph": "i-ammo"
+    }
+  }
+}

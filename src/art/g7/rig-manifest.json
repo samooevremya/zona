@@ -1,0 +1,51 @@
+{
+  "version": "rig1",
+  "skins": {
+    "loner": {
+      "core": "assets/rig/loner_core.png",
+      "arm_l_upper": "assets/rig/loner_arm_l_upper.png",
+      "arm_l_lower": "assets/rig/loner_arm_l_lower.png",
+      "arm_l_hand": "assets/rig/loner_arm_l_hand.png",
+      "arm_r_upper": "assets/rig/loner_arm_r_upper.png",
+      "arm_r_lower": "assets/rig/loner_arm_r_lower.png",
+      "arm_r_hand": "assets/rig/loner_arm_r_hand.png",
+      "leg_l": "assets/rig/loner_leg_l.png",
+      "leg_r": "assets/rig/loner_leg_r.png"
+    },
+    "zarya": {
+      "core": "assets/rig/zarya_core.png",
+      "arm_l_upper": "assets/rig/zarya_arm_l_upper.png",
+      "arm_l_lower": "assets/rig/zarya_arm_l_lower.png",
+      "arm_l_hand": "assets/rig/zarya_arm_l_hand.png",
+      "arm_r_upper": "assets/rig/zarya_arm_r_upper.png",
+      "arm_r_lower": "assets/rig/zarya_arm_r_lower.png",
+      "arm_r_hand": "assets/rig/zarya_arm_r_hand.png",
+      "leg_l": "assets/rig/zarya_leg_l.png",
+      "leg_r": "assets/rig/zarya_leg_r.png"
+    },
+    "bandit": {
+      "core": "assets/rig/bandit_core.png",
+      "arm_l_upper": "assets/rig/bandit_arm_l_upper.png",
+      "arm_l_lower": "assets/rig/bandit_arm_l_lower.png",
+      "arm_l_hand": "assets/rig/bandit_arm_l_hand.png",
+      "arm_r_upper": "assets/rig/bandit_arm_r_upper.png",
+      "arm_r_lower": "assets/rig/bandit_arm_r_lower.png",
+      "arm_r_hand": "assets/rig/bandit_arm_r_hand.png",
+      "leg_l": "assets/rig/bandit_leg_l.png",
+      "leg_r": "assets/rig/bandit_leg_r.png"
+    },
+    "army": {
+      "core": "assets/rig/army_core.png",
+      "arm_l_upper": "assets/rig/army_arm_l_upper.png",
+      "arm_l_lower": "assets/rig/army_arm_l_lower.png",
+      "arm_l_hand": "assets/rig/army_arm_l_hand.png",
+      "arm_r_upper": "assets/rig/army_arm_r_upper.png",
+      "arm_r_lower": "assets/rig/army_arm_r_lower.png",
+      "arm_r_hand": "assets/rig/army_arm_r_hand.png",
+      "leg_l": "assets/rig/army_leg_l.png",
+      "leg_r": "assets/rig/army_leg_r.png"
+    }
+  },
+  "source": "south",
+  "pixelScale": 2
+}

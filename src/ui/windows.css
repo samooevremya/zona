@@ -1,0 +1,190 @@
+/* ===== окна этапа B: B/2 ===== */
+#ov .pda{display:flex;flex-direction:column}
+#ov .screen{flex:1;min-height:0;display:flex;flex-direction:column}
+#ov .body{flex:1;min-height:0;overflow:auto}
+.ov .pda{border:2px solid #3a332b;background:linear-gradient(180deg,#1e1b17,#12100d);box-shadow:inset 0 0 0 1px #5d4c3b,0 8px 30px #000a}
+.pda-h h2{font:700 15px "Arial Narrow",Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e8b04a}
+.x{background:linear-gradient(#2e2a25,#1a1714);border:1px solid #050403;box-shadow:inset 0 0 0 1px #5d4c3b;color:#e9e1cc;border-radius:4px}
+.chip{min-height:36px;padding:0 12px;border-radius:3px;background:#1c2024;border:1px solid #3c444a;color:#cfc6b0;font:600 12px Arial;position:relative}
+.chip::after{content:"";position:absolute;inset:-4px -2px}
+.chip.on{background:#3a3226;border-color:#b48a3a;color:#f0c060}
+.icell{position:relative;width:100%;aspect-ratio:1;min-height:48px;border:1px solid #2b3238;background:linear-gradient(135deg,#1a2229,#0d1318);border-radius:2px;display:grid;place-items:center;padding:0;color:#d8d0bc;cursor:pointer}
+.icell svg.ic{width:58%;height:58%}
+.icell.sel{box-shadow:inset 0 0 0 2px #e3b45c}.icell.on{box-shadow:inset 0 0 0 1px #8aa772}.icell.sel.on{box-shadow:inset 0 0 0 2px #e3b45c}
+.icell.dim{opacity:.35}.icell.empty{cursor:default;background:#0e1316;border-style:dashed;border-color:#232a2f}
+.icell .bd{position:absolute;right:3px;top:2px;font:700 10px Arial;color:#fff;text-shadow:0 1px 2px #000}
+.icell .pr{position:absolute;left:3px;bottom:5px;font:700 10px Arial;color:#f0c060;text-shadow:0 1px 2px #000}
+.icell .cnd{position:absolute;left:3px;bottom:2px;height:3px;background:#d9902a;max-width:calc(100% - 6px)}.icell .cnd.mid{background:#c9a020}.icell .cnd.bad{background:#d0402a}
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:3px;align-content:start}
+/* диалог */
+.dlg{display:grid;grid-template-columns:132px 1fr;gap:12px;height:100%;min-height:0}
+.dlg-who{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:8px;background:#151a1f;border:1px solid #2c343a;border-radius:3px;align-self:start}
+.dlg-who .ava{width:64px;height:64px}
+.dlg-who .pn{color:#e8b04a;font:700 14px Arial;margin-top:4px}.dlg-who .pm,.dlg-who .pa{font-size:11px;color:#a9a594}.dlg-who .pa.foe{color:#e06a50}.dlg-who .pa.pal{color:#8fc070}
+.dlg-main{display:flex;flex-direction:column;min-height:0;gap:8px}
+.dlg-lines{overflow:auto;max-height:42vh;padding:2px 4px;border-left:2px solid #c9902e}
+.dlg-lines p{margin:0 0 6px;font:14px/1.4 Arial;color:#e4dccb}.dlg-lines p.me{color:#9fb1bb}.dlg-lines p.sys{color:#f0c060;font-size:13px}
+.dlg-opts{display:flex;flex-direction:column;gap:4px}
+.dlg-opts .opt{min-height:44px;text-align:left;padding:6px 12px;font:14px Arial;background:#161b20;border:1px solid #2f373d;border-radius:3px;color:#e6dfcd}
+.dlg-opts .opt.key{border-color:#8a6a2a;color:#f4cf7a}.dlg-opts .opt.bad{color:#e88a70}.dlg-opts .opt:disabled{opacity:.45}
+/* КПК */
+#ov[data-kind=pda] .pda{max-width:1180px}
+.kpk{display:grid;grid-template-columns:65fr 35fr;gap:10px;height:100%;min-height:0}
+.kpk-map{display:flex;flex-direction:column;gap:6px;min-height:0}
+.kpk-bar{display:flex;gap:6px;flex-wrap:wrap}
+.kpk-wrap{flex:1;min-height:0;overflow:hidden;display:grid;place-items:center;border:1px solid #3e4a4e;background:#0b1216}
+.kpk-wrap #bigmap{width:100%;height:100%;max-height:none;object-fit:contain}
+.kpk-wrap.zoom{overflow:auto;display:block}.kpk-wrap.zoom #bigmap{width:auto;height:auto;max-width:none}
+.kpk .legend{display:flex;flex-wrap:wrap;gap:4px 10px;font:11px Arial;color:#b9b5a6}.kpk .legend i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px}
+.kpk-q{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto}
+.kpk-list{display:flex;flex-direction:column;gap:3px}
+.qrow{display:flex;gap:8px;align-items:center;min-height:44px;padding:4px 10px;text-align:left;background:#141a1e;border:1px solid #2a3338;border-radius:3px;color:#ddd5c2;font:13px Arial}
+.qrow .qm{color:#c9902e;width:12px}.qrow.sel{background:#2a2519;border-color:#b48a3a}.qrow.trk .qm{color:#ffb347}.qrow.sos{border-color:#8a3a2a}.qrow.sos .qm{color:#e0573a}
+.kpk-done summary{cursor:pointer;font:12px Arial;color:#9b9785;padding:8px 4px;min-height:32px}.qdone{font:12px Arial;color:#8f8b7c;padding:3px 10px}.qdone.fail{color:#b36a5a}
+.kpk-detail{padding:10px;background:#12181c;border:1px solid #2c3439;border-radius:3px;display:flex;flex-direction:column;gap:6px}
+.kpk-detail .nm{font:700 15px Arial;color:#f0c060}.kpk-detail .ds{font:13px/1.45 Arial;color:#d6cfbd}.kpk-detail .lite{color:#9faab0}
+.kpk-detail .go{min-height:44px}.kpk-detail .go.on{opacity:.7}
+/* рюкзак */
+.inv3{display:grid;grid-template-columns:170px 1fr 220px;gap:10px;height:100%;min-height:0}
+.inv-eq{display:flex;flex-direction:column;gap:8px}
+.slot{display:flex;flex-direction:column;gap:3px}.slot .sl{font:11px Arial;color:#9b9785;text-transform:uppercase;letter-spacing:.06em}
+.slot>.icell{width:64px}.beltrow{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+.inv-stats .ds{font:12px Arial;color:#cfc8b6;margin:2px 0}
+.wbar{height:6px;background:#0b0e10;border:1px solid #2a3135;margin:2px 0 4px}.wbar i{display:block;height:100%;background:linear-gradient(#a7b48a,#6f7c55)}.wbar.over i{background:#c0442e}
+.inv-grid{overflow:auto;min-height:0}
+.inv-detail{display:flex;flex-direction:column;gap:6px;padding:10px;background:#12181c;border:1px solid #2c3439;border-radius:3px;overflow:auto}
+.inv-detail .nm{font:700 15px Arial;color:#f0c060}.inv-detail .lite{color:#9faab0;font:12px/1.4 Arial}
+.cmp .cr{display:flex;gap:6px;font:13px Arial;color:#d6cfbd;padding:2px 0;border-bottom:1px solid #20282c}.cmp .ck{flex:1;color:#a8a492}.cmp .cd{font-weight:700}.cmp .cd.up{color:#8fc070}.cmp .cd.dn{color:#e06a50}
+.inv-detail .btnrow{display:flex;flex-wrap:wrap;gap:4px}.inv-detail .btnrow button{min-height:44px;flex:1 1 45%}
+/* торговля */
+.trade2{display:grid;grid-template-columns:1fr 230px 1fr;grid-template-rows:auto 1fr;gap:8px;height:100%;min-height:0}
+.tr-head{grid-column:1/4;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tr-who{display:flex;align-items:center;gap:8px}.tr-who .ava{width:40px;height:40px}.tr-who .pn{font:700 13px Arial;color:#e8b04a}.tr-who .price{font:12px Arial;color:#cfc8b6}.tr-who.r{text-align:right}
+.tr-switch{display:none;gap:4px}
+.tr-col{display:flex;flex-direction:column;gap:6px;min-height:0;overflow:auto}
+.tr-col .h3{margin:0;font:700 12px Arial;letter-spacing:.06em;text-transform:uppercase}
+.tr-cart{display:flex;flex-direction:column;gap:6px;min-height:0;padding:8px;background:#12171b;border:1px solid #2e363b;border-radius:3px;overflow:hidden}
+.clines{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.cside .ch{font:700 11px Arial;color:#9b9785;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.cside .ce{color:#555f64;font:12px Arial}
+.cline{display:flex;align-items:center;gap:6px;width:100%;min-height:36px;padding:2px 6px;margin-bottom:2px;background:#1a2025;border:1px solid #2c3439;border-radius:2px;color:#ddd5c2;font:12px Arial;text-align:left}
+.cline svg.ic{width:18px;height:18px;flex:none}.cline .cn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cline.sell .cp{color:#8fc070}.cline.buy .cp{color:#e8a050}
+.tr-total{flex:none;display:flex;flex-direction:column;gap:3px;border-top:1px solid #2c3439;padding-top:6px}
+.tr-total .tsum{font:12px Arial;color:#a8a492}.tr-total .tnet{font:700 15px Arial}.tr-total .tnet.plus{color:#8fc070}.tr-total .tnet.minus{color:#f0b060}
+.tr-total .twt{font:12px Arial;color:#a8a492}.tr-total .twt.over{color:#e06a50}
+.tr-acts{display:flex;gap:6px}.tr-total .tsum,.tr-total .twt{display:inline}.tr-acts .deal{flex:1;min-height:44px}.tr-acts .chip{min-height:44px}
+.terr{font:12px Arial;color:#e06a50}
+/* узкие экраны */
+@media (max-width:700px){
+ .dlg{grid-template-columns:1fr}.dlg-who{flex-direction:row;align-items:center;flex-wrap:wrap}.dlg-who .ava{width:48px;height:48px}
+ .kpk{grid-template-columns:1fr;grid-template-rows:minmax(220px,48vh) auto}
+ .inv3{grid-template-columns:1fr}.inv-eq{flex-direction:row;flex-wrap:wrap}
+ .trade2{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+ .tr-head{grid-column:1}.tr-switch{display:flex}
+ .trade2.show-mine .tr-col.their,.trade2.show-their .tr-col.mine{display:none}
+ .tr-cart{max-height:34vh}
+}
+
+/* компактный ландшафт телефона */
+@media (max-height:430px) and (orientation:landscape){
+ .ov .pda{padding:5px}.pda-h{padding-bottom:3px}.pda-h h2{font-size:13px}.x{min-height:44px}
+ #ov .body{padding:6px}
+ .igrid{grid-template-columns:repeat(auto-fill,minmax(46px,1fr))}
+ .icell{min-height:44px}
+ .tr-who .ava{width:30px;height:30px}.tr-head{gap:4px}.tr-who .pn{font-size:12px}
+ .trade2{grid-template-columns:1fr 210px 1fr;gap:6px}
+ .cline{min-height:30px}.tr-total .tnet{font-size:14px}.tr-acts .deal,.tr-acts .chip{min-height:44px}
+ .tr-total .tsum::after{content:" · "}
+ .kpk-detail{padding:7px}.kpk-detail .ds{font-size:12px}.qrow{min-height:44px}
+ .dlg-lines{max-height:30vh}.dlg-opts .opt{min-height:44px;padding:4px 10px}
+ .inv3{grid-template-columns:150px 1fr 200px}
+}
+.kpk-wrap{position:relative;display:block}
+.kpk-wrap:not(.zoom) #bigmap{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.tr-acts .deal{min-width:0;padding:0 8px;font-size:13px;letter-spacing:0;white-space:nowrap}
+.tr-acts .chip{flex:none}
+#ov[data-kind=dialog] .pda,#ov[data-kind=trader] .pda{height:auto;max-height:100%;max-width:900px}
+#ov[data-kind=dialog] .body,#ov[data-kind=trader] .body{flex:none}
+.beltslot .sl{position:static}
+.beltrow{grid-template-columns:repeat(3,52px)}
+.trade2,.tr-col,.tr-cart{min-width:0}
+@media (max-width:700px){
+ .tr-head{flex-wrap:wrap}.tr-who.r .ava{display:none}.tr-who.r{margin-left:auto}
+ .tr-switch{order:3;width:100%}.tr-switch .chip{flex:1;min-height:44px}
+ .trade2{grid-template-rows:auto auto auto;align-content:start}
+ .tr-cart{max-height:none}.clines{max-height:24vh}
+ .inv-eq .slot>.icell{width:56px}
+}
+/* иконки набора B1: реальная прозрачность, пропорции сохраняются */
+img.b1ic{width:74%;height:74%;object-fit:contain;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+img.b1ic.tall{width:62%;height:86%}
+.cline img.b1ic{width:22px;height:22px;flex:none}
+.zh-w #wico img.b1ic{width:96px;height:56px}
+.tr-acts .deal{text-transform:none;font-size:14px}
+/* ===== торговля v2: две широкие сетки сверху, компактная корзина снизу (ландшафт) ===== */
+#ov[data-kind=trade] .body{overflow:hidden}
+.trade2{grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"head head" "mine their" "cart cart";height:100%}
+.tr-head{grid-area:head}.tr-col.mine{grid-area:mine}.tr-col.their{grid-area:their}.tr-cart{grid-area:cart}
+.tr-col{overflow:auto;padding-right:2px}
+.tr-cart{flex-direction:row;align-items:stretch;gap:8px;padding:6px;max-height:132px}
+.tr-cart .clines{flex-direction:row;gap:8px;flex:1;min-width:0}
+.tr-cart .cside{flex:1;min-width:0;overflow:auto}
+.tr-cart .tr-total{flex:none;width:230px;border-top:0;border-left:1px solid #2c3439;padding:0 0 0 8px;justify-content:center}
+.cline{min-height:30px}
+@media (max-height:430px) and (orientation:landscape){.trade2{grid-template-columns:1fr 1fr}.tr-cart{max-height:126px}.tr-cart .tr-total{width:210px}}
+/* вертикаль: переключатель сеток, корзина ограничена и прокручивается, итог закреплён */
+@media (max-width:700px){
+ .trade2{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"head" "grid" "cart";height:100%}
+ .tr-col.mine,.tr-col.their{grid-area:grid}
+ .tr-cart{flex-direction:column;max-height:44vh}
+ .tr-cart .clines{flex-direction:column;flex:1;min-height:0;max-height:26vh;overflow:auto}
+ .tr-cart .cside{overflow:visible;flex:none}
+ .tr-cart .tr-total{width:auto;border-left:0;border-top:1px solid #2c3439;padding:6px 0 0}
+}
+/* КПК: прокручиваемая карта с масштабом */
+.kpk-wrap,.kpk-wrap:not(.zoom){overflow:auto;display:block;position:relative;-webkit-overflow-scrolling:touch}
+.kpk-wrap #bigmap,.kpk-wrap:not(.zoom) #bigmap{position:static;inset:auto;max-width:none;max-height:none;object-fit:fill;display:block;margin:auto}
+.kpk-bar .zb{min-width:44px;font-size:18px;padding:0}.kpk-bar .zl{align-self:center;font:700 12px Arial;color:#cfc6b0;min-width:24px;text-align:center}
+.kpk-bar{gap:4px}.kpk-bar .chip{min-height:44px}.kpk-bar .chip::after{display:none}
+.tr-switch .chip,.chip{min-height:44px}
+.cline,.tr-cart .cline{min-height:44px;margin-bottom:3px}
+.kpk{grid-template-columns:minmax(0,65fr) minmax(0,35fr)}.kpk-map,.kpk-q{min-width:0}.kpk-wrap{min-width:0;width:100%;flex:1 1 0}
+@media (max-width:700px){.kpk{grid-template-columns:minmax(0,1fr)}}
+/* ===== RC1: облегчённые рамки (область нажатия прежняя), видимая прокрутка ===== */
+.rust{--rv:rgba(156,132,104,.55);box-shadow:inset 0 0 0 1px rgba(93,76,59,.75),inset 0 1px 6px rgba(0,0,0,.45),0 1px 4px rgba(0,0,0,.55)}
+.ov .pda{box-shadow:inset 0 0 0 1px rgba(93,76,59,.6),0 6px 24px #0009}
+.inv-eq{overflow:auto;min-height:0}
+.scrollcue{position:relative}
+.scrollcue.more::after{content:"▼ ещё";position:sticky;display:block;bottom:0;margin-top:-22px;height:22px;line-height:22px;text-align:center;font:700 11px Arial;color:#f0c060;
+ background:linear-gradient(rgba(13,17,20,0),rgba(13,17,20,.95) 60%);pointer-events:none}
+
+/* ===== G7: правки по скриншотам (торговля, диалог, КПК) ===== */
+/* недоступные вещи: видно, что это и почему недоступно; не чёрное пятно */
+.icell.dim,.icell:disabled{opacity:1;filter:none}
+.icell.dim img,.icell.dim svg.ic{opacity:.6;filter:grayscale(.55)}
+.icell .why{position:absolute;left:2px;top:2px;max-width:calc(100% - 4px);padding:0 3px;border-radius:2px;background:rgba(10,12,14,.82);color:#e8c27a;font:700 9px/13px Arial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+/* признак прокрутки — компактная плашка в правом нижнем углу: не закрывает количество (верх справа) и цену (низ слева) */
+.scrollcue.more::after{content:"▼ ещё";position:sticky;display:block;bottom:2px;margin:-18px 2px 0 auto;width:max-content;height:16px;line-height:16px;padding:0 6px;border-radius:8px;font:700 10px Arial;color:#f0c060;background:rgba(10,13,16,.9);box-shadow:0 0 0 1px #6b5a3a;pointer-events:none;z-index:2}
+.tr-cart .scrollcue.more::after,.clines.scrollcue.more::after{content:"";height:3px;width:auto;margin:-3px 0 0;padding:0;border-radius:0;background:linear-gradient(90deg,transparent,#f0c060,transparent);box-shadow:none}
+.tr-cart .scrollcue.more,.clines.scrollcue.more{box-shadow:inset 0 -12px 10px -10px rgba(240,192,96,.55)}
+/* кнопки итога: «Подтвердить» помещается в рамку целиком */
+.tr-acts{gap:6px}.tr-acts .deal{flex:1 0 auto;min-width:max-content;padding:0 12px;border-width:5px !important}.tr-acts .chip{flex:none;padding:0 10px;border-width:5px !important}
+.tr-cart .tr-total{width:250px}
+/* диалог: фактура только по краю, спокойный центр */
+@media (max-height:430px) and (orientation:landscape){
+ .ov .pda-h{padding:0 0 2px;min-height:44px;align-items:center}
+ .ov .pda-h .x{min-height:44px;height:44px;padding:0 14px;border-width:5px !important}
+ .tr-head{min-height:0}.tr-who img.g3-portrait,.tr-who .ava{width:28px !important;height:28px !important}.tr-who .pn{font-size:12px;line-height:14px}.tr-who .price{font-size:11px;line-height:13px}
+ .trade2{gap:4px 8px}.tr-col{gap:2px}.tr-col .h3{font-size:11px;line-height:14px}
+ .tr-cart{max-height:104px;padding:4px 6px}.tr-cart .ch{font-size:10px;line-height:12px;margin:0}.cline,.tr-cart .cline{min-height:44px;margin-bottom:2px}
+ .tr-total{gap:2px}.tr-total .tnet{font-size:14px}
+ .dlg-who{padding:6px}.dlg-lines{max-height:24vh}.dlg-opts{gap:3px}
+}
+
+.scrollcue-x.more-x::after{content:"▶";position:sticky;right:0;flex:none;align-self:stretch;display:flex;align-items:center;padding:0 4px 0 14px;margin-left:-18px;color:#f0c060;font:700 12px Arial;background:linear-gradient(90deg,rgba(15,20,22,0),rgba(15,20,22,.95) 55%);pointer-events:none}
+@media (max-height:430px) and (orientation:landscape){
+ #ov[data-kind=pda] .pda{border-width:9px !important;padding:4px 8px !important}
+ #ov[data-kind=pda] .pda-h{padding:0;min-height:44px}
+ #ov[data-kind=pda] .body{padding:6px}
+ .kpk{gap:6px}.kpk-map{gap:3px}
+ .kpk .legend{flex-wrap:nowrap;overflow:hidden;gap:8px;font-size:10px;line-height:12px;white-space:nowrap}
+}

@@ -1,0 +1,25 @@
+/* Cordon modular rig. Coordinates are game units, forward is +Y (south).
+   Host supplies equipment art and effects. Does not alter physics or game saves. */
+(function(g){'use strict';
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),smooth=t=>t*t*(3-2*t),mix=(a,b,t)=>a+(b-a)*t;
+const POSES={idle:{height:1,spread:0,lean:0,sit:0,dead:0},walk:{height:1,spread:0,lean:0,sit:0,dead:0},crouch:{height:.82,spread:2,lean:0,sit:0,dead:0},crouch_walk:{height:.82,spread:2,lean:0,sit:0,dead:0},seated:{height:.78,spread:3,lean:0,sit:1,dead:0},captive:{height:.78,spread:3,lean:0,sit:1,dead:0},wounded:{height:.78,spread:3,lean:.32,sit:.7,dead:0},dead:{height:.85,spread:3,lean:1.05,sit:.5,dead:1}};
+const DURATION={idle:.16,walk:.16,crouch:.22,crouch_walk:.22,seated:.3,captive:.3,wounded:.28,dead:.55};
+function create(state='idle'){state=POSES[state]?state:'idle';return{state,from:{...POSES[state]},pose:{...POSES[state]},elapsed:1,duration:0,phase:0,step:0,x:null,y:null};}
+function update(r,input,dt){dt=clamp(Number(dt)||0,0,.1);const state=POSES[input.state]?input.state:'idle';if(state!==r.state){r.from={...r.pose};r.state=state;r.elapsed=0;r.duration=DURATION[state];}r.elapsed+=dt;const t=smooth(clamp(r.elapsed/(r.duration||1),0,1));for(const k of Object.keys(POSES.idle))r.pose[k]=mix(r.from[k],POSES[state][k],t);const moving=state==='walk'||state==='crouch_walk';const distance=input.teleported?0:Math.max(0,Number(input.distance)||0);if(moving)r.phase=(r.phase+distance/(state==='walk'?44:32)*Math.PI*2)%(Math.PI*2);r.step=mix(r.step,moving?1:0,1-Math.exp(-dt*16));return r;}
+// Visual sockets only. No ballistic origin is chosen by this module.
+function sockets(p,grip='none'){const y=8*p.height;return{main:[1.5,y+2],support:[1.5,y+10],hasEquipment:grip!=='none'&&p.sit<.4&&p.dead<.1};}
+function worldPoint(x,y,angle,pt,lean=0){const r=angle+lean-Math.PI/2;return{x:x+pt[0]*Math.cos(r)-pt[1]*Math.sin(r),y:y+pt[0]*Math.sin(r)+pt[1]*Math.cos(r)};}
+function ik(a,b,bend){const dx=b[0]-a[0],dy=b[1]-a[1],d=Math.max(.001,Math.hypot(dx,dy)),len=Math.max(8,d*.52),h=Math.sqrt(Math.max(0,len*len-d*d/4));return[(a[0]+b[0])/2-dy/d*h*bend,(a[1]+b[1])/2+dx/d*h*bend];}
+function segment(ctx,im,a,b,width){if(!im)return;const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy);ctx.save();ctx.translate(...a);ctx.rotate(-Math.atan2(dx,dy));ctx.drawImage(im,-width/2,-1,width,length+2);ctx.restore();}
+function draw(ctx,assets,manifest,r,o={}){const files=manifest.skins[o.skin],p=r.pose;if(!files||Object.values(files).some(f=>!assets[f]))return false;const image=n=>assets[files[n]],step=Math.sin(r.phase)*r.step,ss=sockets(p,o.grip),weight=1-p.dead,deathBlend=smooth(clamp((p.dead-.65)/.35,0,1));ss.hasEquipment=ss.hasEquipment&&!['seated','captive','wounded','dead'].includes(r.state);ctx.save();try{ctx.translate(o.x||0,o.y||0);ctx.rotate((o.angle??Math.PI/2)-Math.PI/2);ctx.globalAlpha*=o.opacity??1;ctx.save();ctx.globalAlpha*=1-deathBlend;ctx.rotate(p.lean);
+for(const [side,sgn]of [['l',-1],['r',1]]){const shift=step*sgn*3.4*weight;const hip=[sgn*4.5,7*p.height],foot=[sgn*(5+p.spread),p.sit>0?mix(24*p.height+shift,18,p.sit):24*p.height+shift];segment(ctx,image('leg_'+side),hip,foot,6.5);}
+const leftShoulder=[-9,-2],rightShoulder=[9,-2];let leftHand=[-11,12*p.height-step],rightHand=[11,12*p.height+step];if(ss.hasEquipment){rightHand=ss.main;if(o.grip==='two')leftHand=ss.support;}else if(p.sit>.4){leftHand=[-5,11];rightHand=[5,11];}
+const elbows=[];for(const [side,a,b,sgn]of [['l',leftShoulder,leftHand,-1],['r',rightShoulder,rightHand,1]]){const el=ik(a,b,sgn);segment(ctx,image('arm_'+side+'_upper'),a,el,6.5);segment(ctx,image('arm_'+side+'_lower'),el,b,5.3);elbows.push([side,b,el]);}
+ctx.drawImage(image('core'),-12,-14,24,27); // fixed dimensions: no per-frame torso resizing
+if(ss.hasEquipment&&o.drawEquipment)o.drawEquipment(ctx,{...ss,grip:o.grip});
+for(const [side,b,el]of elbows){const hand=image('arm_'+side+'_hand');ctx.save();ctx.translate(...b);ctx.rotate(-Math.atan2(b[0]-el[0],b[1]-el[1]));ctx.drawImage(hand,-2.6,-2,5.2,5.2);ctx.restore();}
+ctx.restore();if(deathBlend>0){ctx.globalAlpha*=deathBlend;if(o.deadImage){ctx.drawImage(o.deadImage,-32,-36,64,72);}else{ctx.save();ctx.rotate(p.lean);ctx.drawImage(image('core'),-12,-14,24,27);for(const side of ['l','r']){const s=side==='l'?-1:1;segment(ctx,image('leg_'+side),[s*4,7],[s*8,25],6.5);}ctx.restore();}}return true;}finally{ctx.restore();}}
+function muzzleLocal(r,grip,length){const s=sockets(r.pose,grip);return s.hasEquipment&&!['seated','captive','wounded','dead'].includes(r.state)?[s.main[0],s.main[1]+length]:null;}
+async function load(pack){const images={};await Promise.all(Object.entries(pack.images).map(([f,url])=>new Promise(resolve=>{const im=new Image();im.onload=()=>{images[f]=im;resolve();};im.onerror=resolve;im.src=url;})));return images;}
+const api={create,update,draw,sockets,worldPoint,muzzleLocal,load,POSES};g.CordonRig=api;if(typeof module!=='undefined')module.exports=api;
+})(globalThis);

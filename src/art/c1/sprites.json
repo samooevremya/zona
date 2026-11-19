@@ -1,0 +1,1704 @@
+{
+ "c1_pine0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   0,
+   0,
+   248,
+   256
+  ],
+  "logicalSize": [
+   101,
+   104
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pine1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   250,
+   0,
+   256,
+   254
+  ],
+  "logicalSize": [
+   104,
+   103
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pine2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   508,
+   0,
+   256,
+   251
+  ],
+  "logicalSize": [
+   104,
+   102
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pine3": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   766,
+   0,
+   256,
+   249
+  ],
+  "logicalSize": [
+   104,
+   101
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_birch0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1024,
+   0,
+   239,
+   240
+  ],
+  "logicalSize": [
+   96,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_birch1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1505,
+   0,
+   240,
+   237
+  ],
+  "logicalSize": [
+   96,
+   95
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_birch2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   484,
+   258,
+   240,
+   225
+  ],
+  "logicalSize": [
+   96,
+   90
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_birch3": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1265,
+   0,
+   238,
+   240
+  ],
+  "logicalSize": [
+   95,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_dead0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   242,
+   258,
+   240,
+   228
+  ],
+  "logicalSize": [
+   92,
+   87
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_dead1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1747,
+   0,
+   240,
+   232
+  ],
+  "logicalSize": [
+   92,
+   89
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_dead2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   0,
+   258,
+   240,
+   230
+  ],
+  "logicalSize": [
+   92,
+   88
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_dead3": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   726,
+   258,
+   240,
+   220
+  ],
+  "logicalSize": [
+   92,
+   84
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_log0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   516,
+   490,
+   256,
+   103
+  ],
+  "logicalSize": [
+   99,
+   40
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_log1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   0,
+   490,
+   256,
+   113
+  ],
+  "logicalSize": [
+   91,
+   40
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_log2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   258,
+   490,
+   256,
+   110
+  ],
+  "logicalSize": [
+   93,
+   40
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bush0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1454,
+   258,
+   128,
+   127
+  ],
+  "logicalSize": [
+   40,
+   40
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bush1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1584,
+   258,
+   128,
+   124
+  ],
+  "logicalSize": [
+   40,
+   39
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bush2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1714,
+   258,
+   128,
+   120
+  ],
+  "logicalSize": [
+   40,
+   38
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bush3": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1844,
+   258,
+   128,
+   118
+  ],
+  "logicalSize": [
+   40,
+   37
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tuft0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1851,
+   490,
+   96,
+   83
+  ],
+  "logicalSize": [
+   26,
+   22
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tuft1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1263,
+   490,
+   96,
+   90
+  ],
+  "logicalSize": [
+   26,
+   24
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tuft2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1361,
+   490,
+   96,
+   90
+  ],
+  "logicalSize": [
+   26,
+   24
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tuft3": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1459,
+   490,
+   96,
+   90
+  ],
+  "logicalSize": [
+   26,
+   24
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tuft4": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1165,
+   490,
+   96,
+   91
+  ],
+  "logicalSize": [
+   26,
+   25
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tuft5": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1557,
+   490,
+   96,
+   90
+  ],
+  "logicalSize": [
+   26,
+   24
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_stump0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   871,
+   490,
+   96,
+   95
+  ],
+  "logicalSize": [
+   28,
+   28
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_stump1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   774,
+   490,
+   95,
+   96
+  ],
+  "logicalSize": [
+   28,
+   28
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_stump2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1067,
+   490,
+   96,
+   92
+  ],
+  "logicalSize": [
+   28,
+   27
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_rock0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1655,
+   490,
+   96,
+   90
+  ],
+  "logicalSize": [
+   30,
+   28
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_rock1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1753,
+   490,
+   96,
+   88
+  ],
+  "logicalSize": [
+   30,
+   28
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_rock2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   969,
+   490,
+   96,
+   93
+  ],
+  "logicalSize": [
+   30,
+   29
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pool0": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   968,
+   258,
+   160,
+   160
+  ],
+  "logicalSize": [
+   96,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pool1": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1130,
+   258,
+   160,
+   160
+  ],
+  "logicalSize": [
+   96,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pool2": {
+  "kind": "sprite",
+  "atlas": "c1veg",
+  "rect": [
+   1292,
+   258,
+   160,
+   160
+  ],
+  "logicalSize": [
+   96,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_house0": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   902,
+   1010,
+   534,
+   342
+  ],
+  "logicalSize": [
+   256,
+   164
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_house1": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   0,
+   1406,
+   535,
+   341
+  ],
+  "logicalSize": [
+   256,
+   163
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_house2": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   1438,
+   1010,
+   538,
+   342
+  ],
+  "logicalSize": [
+   256,
+   163
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_shed0": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   908,
+   1406,
+   257,
+   255
+  ],
+  "logicalSize": [
+   128,
+   127
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_shed1": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   1167,
+   1406,
+   257,
+   255
+  ],
+  "logicalSize": [
+   128,
+   127
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_barn": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   0,
+   1010,
+   900,
+   394
+  ],
+  "logicalSize": [
+   512,
+   224
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_hangar": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   0,
+   514,
+   900,
+   494
+  ],
+  "logicalSize": [
+   640,
+   351
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_roof_office": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   877,
+   0,
+   628,
+   500
+  ],
+  "logicalSize": [
+   320,
+   255
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_booth0": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   1838,
+   1406,
+   179,
+   192
+  ],
+  "logicalSize": [
+   90,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_booth1": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   0,
+   1749,
+   166,
+   192
+  ],
+  "logicalSize": [
+   83,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_booth2": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   168,
+   1749,
+   190,
+   190
+  ],
+  "logicalSize": [
+   96,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_hatch": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   1426,
+   1406,
+   236,
+   240
+  ],
+  "logicalSize": [
+   47,
+   48
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pump": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   537,
+   1406,
+   369,
+   282
+  ],
+  "logicalSize": [
+   192,
+   147
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tower": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   1664,
+   1406,
+   172,
+   229
+  ],
+  "logicalSize": [
+   96,
+   128
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_ford": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   371,
+   0,
+   504,
+   502
+  ],
+  "logicalSize": [
+   256,
+   255
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tunnel": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   0,
+   0,
+   369,
+   512
+  ],
+  "logicalSize": [
+   320,
+   444
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bridge": {
+  "kind": "sprite",
+  "atlas": "c1bld",
+  "rect": [
+   902,
+   514,
+   900,
+   399
+  ],
+  "logicalSize": [
+   704,
+   312
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bus": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   648,
+   336,
+   512,
+   110
+  ],
+  "logicalSize": [
+   384,
+   82
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_car0": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1389,
+   190,
+   256,
+   128
+  ],
+  "logicalSize": [
+   160,
+   80
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_car1": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   644,
+   190,
+   256,
+   129
+  ],
+  "logicalSize": [
+   160,
+   81
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_car2": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   0,
+   336,
+   256,
+   127
+  ],
+  "logicalSize": [
+   160,
+   79
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tractor": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1486,
+   0,
+   256,
+   157
+  ],
+  "logicalSize": [
+   157,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_army0": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   0,
+   190,
+   320,
+   144
+  ],
+  "logicalSize": [
+   192,
+   86
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_army1": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   322,
+   190,
+   320,
+   134
+  ],
+  "logicalSize": [
+   192,
+   80
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_army2": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   970,
+   0,
+   320,
+   174
+  ],
+  "logicalSize": [
+   177,
+   96
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fence_picket": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   514,
+   518,
+   512,
+   18
+  ],
+  "logicalSize": [
+   256,
+   9
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fence_picket_br": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   514,
+   465,
+   512,
+   48
+  ],
+  "logicalSize": [
+   256,
+   24
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fence_concrete": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   0,
+   518,
+   512,
+   26
+  ],
+  "logicalSize": [
+   256,
+   13
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fence_concrete_br": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   0,
+   465,
+   512,
+   51
+  ],
+  "logicalSize": [
+   256,
+   26
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fence_mesh": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1028,
+   518,
+   512,
+   16
+  ],
+  "logicalSize": [
+   256,
+   8
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fence_mesh_br": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1158,
+   465,
+   512,
+   30
+  ],
+  "logicalSize": [
+   256,
+   15
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_crate": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1647,
+   190,
+   122,
+   128
+  ],
+  "logicalSize": [
+   61,
+   64
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_crate_army": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1319,
+   336,
+   128,
+   100
+  ],
+  "logicalSize": [
+   64,
+   50
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_barrel": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1771,
+   190,
+   115,
+   128
+  ],
+  "logicalSize": [
+   58,
+   64
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_tires": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   518,
+   336,
+   128,
+   121
+  ],
+  "logicalSize": [
+   64,
+   60
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_sandbags": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1449,
+   336,
+   128,
+   88
+  ],
+  "logicalSize": [
+   64,
+   44
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_bricks": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   258,
+   336,
+   128,
+   123
+  ],
+  "logicalSize": [
+   64,
+   62
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_fridge": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1579,
+   336,
+   128,
+   80
+  ],
+  "logicalSize": [
+   64,
+   40
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_junk": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   388,
+   336,
+   128,
+   123
+  ],
+  "logicalSize": [
+   64,
+   62
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_campfire": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1162,
+   336,
+   155,
+   106
+  ],
+  "logicalSize": [
+   96,
+   66
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pole_wood": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1839,
+   336,
+   128,
+   61
+  ],
+  "logicalSize": [
+   64,
+   30
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_pole_conc": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1709,
+   336,
+   128,
+   66
+  ],
+  "logicalSize": [
+   64,
+   33
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_lamp": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1028,
+   465,
+   128,
+   40
+  ],
+  "logicalSize": [
+   64,
+   20
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_checkpoint": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   902,
+   190,
+   485,
+   129
+  ],
+  "logicalSize": [
+   256,
+   68
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_decal0": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   1292,
+   0,
+   192,
+   170
+  ],
+  "logicalSize": [
+   128,
+   113
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_decal1": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   776,
+   0,
+   192,
+   179
+  ],
+  "logicalSize": [
+   128,
+   119
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_decal2": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   0,
+   0,
+   192,
+   188
+  ],
+  "logicalSize": [
+   128,
+   125
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_decal3": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   194,
+   0,
+   192,
+   187
+  ],
+  "logicalSize": [
+   128,
+   125
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_decal4": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   582,
+   0,
+   192,
+   185
+  ],
+  "logicalSize": [
+   128,
+   123
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "c1_decal5": {
+  "kind": "sprite",
+  "atlas": "c1prop",
+  "rect": [
+   388,
+   0,
+   192,
+   187
+  ],
+  "logicalSize": [
+   128,
+   125
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ]
+ },
+ "grass": {
+  "kind": "material",
+  "atlas": "c1m_grass",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   512,
+   512
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "grass_dry": {
+  "kind": "material",
+  "atlas": "c1m_grass_dry",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   512,
+   512
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "dirt": {
+  "kind": "material",
+  "atlas": "c1m_dirt",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   448,
+   448
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "forest": {
+  "kind": "material",
+  "atlas": "c1m_forest",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   512,
+   512
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "swamp": {
+  "kind": "material",
+  "atlas": "c1m_swamp",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   448,
+   448
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "water": {
+  "kind": "material",
+  "atlas": "c1m_water",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   384,
+   384
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "floor_concrete": {
+  "kind": "material",
+  "atlas": "c1m_floor_concrete",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   384,
+   384
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "asphalt": {
+  "kind": "material",
+  "atlas": "c1m_asphalt",
+  "rect": [
+   0,
+   0,
+   512,
+   512
+  ],
+  "logicalSize": [
+   320,
+   320
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "rail": {
+  "kind": "material",
+  "atlas": "c1m_rail",
+  "rect": [
+   0,
+   0,
+   768,
+   322
+  ],
+  "logicalSize": [
+   768,
+   322
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ },
+ "road": {
+  "kind": "material",
+  "atlas": "c1m_road",
+  "rect": [
+   0,
+   0,
+   288,
+   512
+  ],
+  "logicalSize": [
+   288,
+   512
+  ],
+  "pivot": [
+   0.5,
+   0.5
+  ],
+  "seamless": true
+ }
+}

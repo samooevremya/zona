@@ -1,0 +1,281 @@
+{
+  "version": "B2-items-1",
+  "scale": 2,
+  "atlas": "atlas.png",
+  "items": {
+    "bread": {
+      "file": "png/bread.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        0,
+        0,
+        128,
+        128
+      ]
+    },
+    "sausage": {
+      "file": "png/sausage.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        128,
+        0,
+        128,
+        128
+      ]
+    },
+    "vodka": {
+      "file": "png/vodka.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        256,
+        0,
+        128,
+        128
+      ]
+    },
+    "medkit": {
+      "file": "png/medkit.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        384,
+        0,
+        128,
+        128
+      ]
+    },
+    "antirad": {
+      "file": "png/antirad.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        512,
+        0,
+        128,
+        128
+      ]
+    },
+    "grenade": {
+      "file": "png/grenade.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        0,
+        192,
+        128,
+        128
+      ]
+    },
+    "ar_jacket": {
+      "file": "png/ar_jacket.png",
+      "logicalSize": [
+        64,
+        96
+      ],
+      "new": true,
+      "rect": [
+        128,
+        192,
+        128,
+        192
+      ]
+    },
+    "ar_bandit": {
+      "file": "png/ar_bandit.png",
+      "logicalSize": [
+        64,
+        96
+      ],
+      "new": true,
+      "rect": [
+        256,
+        192,
+        128,
+        192
+      ]
+    },
+    "flash": {
+      "file": "png/flash.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        384,
+        192,
+        128,
+        128
+      ]
+    },
+    "art_medusa": {
+      "file": "png/art_medusa.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        512,
+        192,
+        128,
+        128
+      ]
+    },
+    "art_bengal": {
+      "file": "png/art_bengal.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        0,
+        384,
+        128,
+        128
+      ]
+    },
+    "art_blood": {
+      "file": "png/art_blood.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        128,
+        384,
+        128,
+        128
+      ]
+    },
+    "tail": {
+      "file": "png/tail.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        256,
+        384,
+        128,
+        128
+      ]
+    },
+    "hoof": {
+      "file": "png/hoof.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        384,
+        384,
+        128,
+        128
+      ]
+    },
+    "tentacle": {
+      "file": "png/tentacle.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": true,
+      "rect": [
+        512,
+        384,
+        128,
+        128
+      ]
+    },
+    "w_pm": {
+      "file": "png/w_pm.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": false,
+      "rect": [
+        0,
+        576,
+        128,
+        128
+      ]
+    },
+    "bandage": {
+      "file": "png/bandage.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": false,
+      "rect": [
+        128,
+        576,
+        128,
+        128
+      ]
+    },
+    "cans": {
+      "file": "png/cans.png",
+      "logicalSize": [
+        64,
+        64
+      ],
+      "new": false,
+      "rect": [
+        256,
+        576,
+        128,
+        128
+      ]
+    },
+    "ar_zarya": {
+      "file": "png/ar_zarya.png",
+      "logicalSize": [
+        64,
+        96
+      ],
+      "new": false,
+      "rect": [
+        384,
+        576,
+        128,
+        192
+      ]
+    }
+  },
+  "missing": [
+    "knife",
+    "w_obrez",
+    "w_aksu",
+    "a9",
+    "a12",
+    "a545"
+  ]
+}

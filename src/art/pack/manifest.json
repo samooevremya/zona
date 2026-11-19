@@ -1,0 +1,541 @@
+{
+  "version": "1.0",
+  "baseGame": "zona-kordon-2d 0.4",
+  "tileSize": 32,
+  "images": {
+    "terrain": {
+      "file": "assets/terrain.png",
+      "width": 1254,
+      "height": 1254,
+      "alpha": false,
+      "sha256": "3f6cdb017ccc54629687877ed9478ec6dd1acb61aee834346b118da6d62f0053"
+    },
+    "props": {
+      "file": "assets/props.png",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "sha256": "beb38ba8b36801a5e1c5bd51ceb54f49aab6a2a25983591d1356d8dd395f4eb8"
+    },
+    "roofs": {
+      "file": "assets/roofs.png",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "sha256": "56d44bbb6fdb4fb18a3a644b614c75dbd96ac839eb7ca9478ac19a7e73a0ae99"
+    },
+    "materials": {
+      "file": "assets/materials.png",
+      "width": 1254,
+      "height": 1254,
+      "alpha": false,
+      "sha256": "a9fa760dd4afdf76802542be009e1029cca8a06d9512d142a5985f91293770f8"
+    }
+  },
+  "sprites": {
+    "grass": {
+      "atlas": "terrain",
+      "rect": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "dirt": {
+      "atlas": "terrain",
+      "rect": [
+        627,
+        0,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "grass_dry": {
+      "atlas": "terrain",
+      "rect": [
+        0,
+        627,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "asphalt": {
+      "atlas": "terrain",
+      "rect": [
+        627,
+        627,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "tree_olive": {
+      "atlas": "props",
+      "rect": [
+        11,
+        25,
+        283,
+        273
+      ],
+      "logicalSize": [
+        72,
+        72
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "tree_dry": {
+      "atlas": "props",
+      "rect": [
+        332,
+        17,
+        279,
+        283
+      ],
+      "logicalSize": [
+        72,
+        72
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "tree_bare": {
+      "atlas": "props",
+      "rect": [
+        644,
+        14,
+        281,
+        287
+      ],
+      "logicalSize": [
+        72,
+        72
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "bush": {
+      "atlas": "props",
+      "rect": [
+        966,
+        41,
+        268,
+        242
+      ],
+      "logicalSize": [
+        36,
+        36
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "tuft": {
+      "atlas": "props",
+      "rect": [
+        27,
+        349,
+        256,
+        248
+      ],
+      "logicalSize": [
+        24,
+        24
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "fence": {
+      "atlas": "props",
+      "rect": [
+        323,
+        442,
+        294,
+        65
+      ],
+      "logicalSize": [
+        64,
+        12
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "barrel": {
+      "atlas": "props",
+      "rect": [
+        678,
+        362,
+        207,
+        220
+      ],
+      "logicalSize": [
+        20,
+        20
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "crate": {
+      "atlas": "props",
+      "rect": [
+        997,
+        368,
+        206,
+        209
+      ],
+      "logicalSize": [
+        26,
+        26
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "car": {
+      "atlas": "props",
+      "rect": [
+        15,
+        708,
+        282,
+        156
+      ],
+      "logicalSize": [
+        64,
+        24
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "bus": {
+      "atlas": "props",
+      "rect": [
+        322,
+        719,
+        292,
+        133
+      ],
+      "logicalSize": [
+        128,
+        64
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "fire_base": {
+      "atlas": "props",
+      "rect": [
+        661,
+        673,
+        240,
+        231
+      ],
+      "logicalSize": [
+        28,
+        28
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "hatch": {
+      "atlas": "props",
+      "rect": [
+        986,
+        673,
+        223,
+        230
+      ],
+      "logicalSize": [
+        32,
+        32
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "logs": {
+      "atlas": "props",
+      "rect": [
+        12,
+        1035,
+        286,
+        148
+      ],
+      "logicalSize": [
+        44,
+        22
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "rubble": {
+      "atlas": "props",
+      "rect": [
+        335,
+        998,
+        263,
+        208
+      ],
+      "logicalSize": [
+        30,
+        26
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "stash": {
+      "atlas": "props",
+      "rect": [
+        656,
+        1026,
+        252,
+        159
+      ],
+      "logicalSize": [
+        16,
+        14
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "bench": {
+      "atlas": "props",
+      "rect": [
+        955,
+        1036,
+        282,
+        138
+      ],
+      "logicalSize": [
+        44,
+        18
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "roof_slate": {
+      "atlas": "roofs",
+      "rect": [
+        16,
+        130,
+        594,
+        392
+      ],
+      "logicalSize": [
+        266,
+        202
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "roof_rust": {
+      "atlas": "roofs",
+      "rect": [
+        643,
+        130,
+        594,
+        390
+      ],
+      "logicalSize": [
+        266,
+        202
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "roof_patch": {
+      "atlas": "roofs",
+      "rect": [
+        16,
+        758,
+        594,
+        388
+      ],
+      "logicalSize": [
+        266,
+        202
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "roof_broken": {
+      "atlas": "roofs",
+      "rect": [
+        643,
+        759,
+        595,
+        388
+      ],
+      "logicalSize": [
+        266,
+        202
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "sprite"
+    },
+    "floor_wood": {
+      "atlas": "materials",
+      "rect": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "floor_concrete": {
+      "atlas": "materials",
+      "rect": [
+        627,
+        0,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "wall_brick": {
+      "atlas": "materials",
+      "rect": [
+        0,
+        627,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    },
+    "wall_concrete": {
+      "atlas": "materials",
+      "rect": [
+        627,
+        627,
+        627,
+        627
+      ],
+      "logicalSize": [
+        256,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "kind": "material"
+    }
+  }
+}

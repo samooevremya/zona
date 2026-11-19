@@ -1,0 +1,209 @@
+window.CordonSpritesB1 = {
+  "version": 1,
+  "stage": "static-integration-trial",
+  "atlas": "atlas.png",
+  "source": "source/master.png",
+  "scale": 2,
+  "sprites": {
+    "loner": {
+      "file": "png/loner.png",
+      "rect": [
+        0,
+        0,
+        96,
+        96
+      ],
+      "logicalSize": [
+        48,
+        48
+      ],
+      "pivot": [
+        0.5,
+        0.43
+      ],
+      "facingRadians": 1.5707963267948966,
+      "sourceRect": [
+        0,
+        4,
+        443,
+        440
+      ],
+      "bakedWeapon": "w_pm"
+    },
+    "bandit": {
+      "file": "png/bandit.png",
+      "rect": [
+        128,
+        0,
+        96,
+        96
+      ],
+      "logicalSize": [
+        48,
+        48
+      ],
+      "pivot": [
+        0.5,
+        0.43
+      ],
+      "facingRadians": 1.5707963267948966,
+      "sourceRect": [
+        443,
+        21,
+        444,
+        423
+      ],
+      "bakedWeapon": "w_obrez"
+    },
+    "army": {
+      "file": "png/army.png",
+      "rect": [
+        256,
+        0,
+        96,
+        96
+      ],
+      "logicalSize": [
+        48,
+        48
+      ],
+      "pivot": [
+        0.5,
+        0.43
+      ],
+      "facingRadians": 1.5707963267948966,
+      "sourceRect": [
+        888,
+        19,
+        442,
+        417
+      ],
+      "bakedWeapon": "w_aksu"
+    },
+    "dog": {
+      "file": "png/dog.png",
+      "rect": [
+        384,
+        0,
+        96,
+        96
+      ],
+      "logicalSize": [
+        48,
+        48
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "facingRadians": 1.5707963267948966,
+      "sourceRect": [
+        1330,
+        1,
+        438,
+        439
+      ],
+      "bakedWeapon": null
+    },
+    "w_pm": {
+      "file": "png/w_pm.png",
+      "rect": [
+        0,
+        192,
+        128,
+        128
+      ],
+      "logicalSize": [
+        64,
+        64
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "facingRadians": null,
+      "sourceRect": [
+        45,
+        451,
+        395,
+        436
+      ],
+      "bakedWeapon": null
+    },
+    "bandage": {
+      "file": "png/bandage.png",
+      "rect": [
+        128,
+        192,
+        128,
+        128
+      ],
+      "logicalSize": [
+        64,
+        64
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "facingRadians": null,
+      "sourceRect": [
+        444,
+        444,
+        443,
+        424
+      ],
+      "bakedWeapon": null
+    },
+    "cans": {
+      "file": "png/cans.png",
+      "rect": [
+        256,
+        192,
+        128,
+        128
+      ],
+      "logicalSize": [
+        64,
+        64
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "facingRadians": null,
+      "sourceRect": [
+        888,
+        444,
+        442,
+        403
+      ],
+      "bakedWeapon": null
+    },
+    "ar_zarya": {
+      "file": "png/ar_zarya.png",
+      "rect": [
+        384,
+        192,
+        128,
+        192
+      ],
+      "logicalSize": [
+        64,
+        96
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "facingRadians": null,
+      "sourceRect": [
+        1330,
+        450,
+        425,
+        421
+      ],
+      "bakedWeapon": null
+    }
+  }
+};

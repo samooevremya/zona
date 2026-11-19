@@ -1,0 +1,43 @@
+<canvas id="cv" aria-label="Игровое поле"></canvas>
+<div class="hud zh">
+  <div class="zh-map rust"><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
+  <div class="zh-clock rust"><span id="clock">07:00</span></div>
+  <div class="zh-bars">
+    <div class="zh-bar rust hp"><svg viewBox="0 0 24 24" class="zi"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><div class="bar"><i id="hpb"></i></div><b id="hpv">100</b></div>
+    <div class="zh-bar rust st"><svg viewBox="0 0 24 24" class="zi"><circle cx="14.5" cy="4" r="2.3"/><path d="M13 7.2l-4 1.6-2 4 1.8.8 1.5-2.9 1.6-.5-1.6 5.3-3.8 4.4 1.6 1.4 4.2-4.6 2.1 2.2V23h2.2v-5.8l-2.6-2.9.9-3.2 1.3 2.1H20v-2h-2.6l-2.2-3.6c-.6-.8-1.3-.9-2.2-.4z"/></svg><div class="bar"><i id="stb"></i></div><b id="stv">100</b></div>
+    <div class="zh-bar rust fd"><svg viewBox="0 0 24 24" class="zi"><path d="M6 2h1.5v6H9V2h1.5v6H12V2h1.5v7.5c0 1.6-1.1 2.8-2.5 3.2V22H8.5v-9.3C7.1 12.3 6 11.1 6 9.5zM17 2c1.8 0 3 2.5 3 6.5 0 2.3-.9 3.6-2 4V22h-2.5V2z"/></svg><div class="bar"><i id="fdb"></i></div><b id="fdv">100</b></div>
+    <span class="zh-st bl" id="s-bleed" title="Кровотечение"><svg viewBox="0 0 24 24"><path d="M12 2.5S5.5 10 5.5 14.5a6.5 6.5 0 0013 0C18.5 10 12 2.5 12 2.5z"/></svg><em id="s-bleedn"></em></span>
+    <span class="zh-st rd" id="s-rad" title="Радиация"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M12 9.2L9 4a9 9 0 016 0zM14.4 13.4l6 .1a9 9 0 01-3 5.2zM9.6 13.4l-3 5.3a9 9 0 01-3-5.2z"/></svg><em id="radv"></em></span>
+    <div class="zh-sub"><b id="money">0 RU</b><span class="belt" id="belt"></span></div>
+    <div class="zh-status" id="status"></div>
+  </div>
+  <div class="topbtns zh-top">
+    <button type="button" class="rust" id="t-pda">КПК</button>
+    <button type="button" class="rust" id="t-inv">Рюкзак</button>
+    <button type="button" class="rust" id="t-menu">Меню</button>
+  </div>
+  <div class="quest zh-q rust" id="quest"></div>
+  <div class="wpn zh-w rust" id="wpnbox" title="Сменить оружие"><span id="wico"></span><div class="zh-wi"><div class="wn" id="wn">Нож</div><div class="am" id="am">∞</div><div class="cnd"><span id="wcn">Состояние: 100%</span><div class="cb"><i id="wcb"></i></div></div></div></div>
+  <div class="zh-det rust" id="det"><svg viewBox="0 0 24 24" class="zi"><rect x="7" y="2" width="10" height="20" rx="2"/><rect x="9" y="5" width="6" height="6" rx="1" fill="#0c1416"/><circle cx="12" cy="15.5" r="1.6" fill="#0c1416"/></svg><span class="sig" id="sig"><i></i><i></i><i></i><i></i><i></i></span></div>
+  <div class="msgs" id="msgs" aria-live="polite"></div>
+  <button type="button" class="prompt zh-p rust" id="prompt"></button>
+  <div class="keys">E действие · C присесть · R перезарядка · F болт · G граната · Q аптечка · I рюкзак · M КПК</div>
+</div>
+<div class="touch zt">
+  <div class="joy" id="joy" aria-hidden="true"><i class="ar u"></i><i class="ar d"></i><i class="ar l"></i><i class="ar r"></i><b id="joyk"></b></div>
+  <button type="button" class="fire" id="b-fire" aria-label="Огонь"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="12" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M24 4v12M24 32v12M4 24h12M32 24h12" stroke="currentColor" stroke-width="2.6"/><circle cx="24" cy="24" r="2.4" fill="currentColor"/></svg></button>
+  <button type="button" class="rb c1" id="b-rel" aria-label="Перезарядка"><svg viewBox="0 0 24 24"><path d="M19.5 9A8 8 0 006 6.3L4 4.5V10h5.5L7.7 8.1A5.5 5.5 0 0117 9.6zM4.5 15A8 8 0 0018 17.7l2 1.8V14h-5.5l1.8 1.9A5.5 5.5 0 017 14.4z"/></svg></button>
+  <button type="button" class="rb c2" id="b-med" aria-label="Аптечка"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M10.5 9h3v2.5H16v3h-2.5V17h-3v-2.5H8v-3h2.5z" fill="#1a1612"/><rect x="9" y="3.5" width="6" height="3" rx="1"/></svg></button>
+  <button type="button" class="rb c3" id="b-bolt" aria-label="Болт"><svg viewBox="0 0 24 24"><path d="M14.6 2.6l6.8 6.8-2.8 2.8-1.4-1.4L8.4 19.6 6 20.8l-2.8-2.8 1.2-2.4 8.8-8.8-1.4-1.4z"/></svg></button>
+  <button type="button" class="rb c4" id="b-crouch" aria-label="Присесть"><svg viewBox="0 0 24 24"><circle cx="11" cy="4.2" r="2.6"/><path d="M8 8.5h5.5l2.5 4.5 3.5 1v2l-4.6-1.2-1.4-2.3-1 3 3 2.5V22h-2.2v-3.3l-3.5-2.5L9 21H6.8l1.6-6.4z"/></svg></button>
+  <button type="button" class="rb c5" id="b-nade" aria-label="Граната"><svg viewBox="0 0 24 24"><path d="M10 3h4v2.5h-4z"/><path d="M15 3.5l4 2-1 1.6-3.4-1.7z"/><ellipse cx="12" cy="14" rx="6.5" ry="7.5"/><path d="M6 12h12M6 16h12M9.5 7.5v13M14.5 7.5v13" stroke="#1a1612" stroke-width="1.1"/></svg></button>
+  <button type="button" class="rb w" id="b-wpn" aria-label="Сменить оружие" hidden></button>
+</div>
+<div class="rotate" id="rotate"><div><div class="phone"></div><p>Поверни телефон горизонтально: так видно больше Зоны и удобнее стрелять.</p><button type="button" class="alt" id="rot-skip">Играть вертикально</button></div></div>
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="ptitle">
+  <div class="pda">
+    <div class="pda-h"><h2><span class="led"></span><span id="ptitle">КПК</span></h2><button type="button" class="x" id="pclose">Закрыть</button></div>
+    <div class="screen"><div class="tabs" id="ptabs" role="tablist"></div><div class="body" id="pbody"></div></div>
+  </div>
+</div>
+<div class="title open" id="title"><div class="tcard" id="tcard"></div></div>
