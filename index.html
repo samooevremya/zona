@@ -6482,11 +6482,11 @@ function buildBigMini() {
   const base = document.createElement('canvas');
   base.width = PW; base.height = MH;
   const bg = base.getContext('2d'), terrain = bg.createImageData(PW, MH), roads = bg.createImageData(PW, MH);
-  const palette = [0x666345, 0x666345, 0x666345, 0x465855, 0x908b79, 0x4b5038,
-    0x695941, 0x806352, 0x54573c, 0x716957, 0x817d70, 0x10130e];
+  const palette = [0x514738, 0x514738, 0x514738, 0x3f4843, 0x746e63, 0x3a392c,
+    0x584a3b, 0x695348, 0x464432, 0x60584b, 0x68655a, 0x10130e];
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     const t = map[y * MW + x], c = palette[t], i = (y * PW + x) * 4;
-    const k = 0.88 + vnoise(x, y, 5) * 0.24;
+    const k = 0.65 + vnoise(x, y, 5) * 0.42 + hash2(x, y) * 0.26;
     terrain.data[i] = (c >> 16) * k;
     terrain.data[i + 1] = ((c >> 8) & 255) * k;
     terrain.data[i + 2] = (c & 255) * k;
@@ -6502,24 +6502,33 @@ function buildBigMini() {
   g.save(); g.scale(K, K);
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     if (map[y * MW + x] !== TR) continue;
-    const n = hash2(x, y), r = 0.8 + n * 0.45;
-    g.fillStyle = '#363e30'; g.beginPath(); g.arc(x + 0.55, y + 0.55, r, 0, 2 * Math.PI); g.fill();
-    g.fillStyle = n < 0.65 ? '#484f37' : '#57583b';
-    g.beginPath(); g.arc(x + 0.4, y + 0.36, r * 0.8, 0, 2 * Math.PI); g.fill();
+    const n = hash2(x, y), crown = CANOPY[Math.floor(n * CANOPY.length)];
+    const width = (2.8 + n * 0.9) * CAN_PAD;
+    g.drawImage(crown, x + 0.5 - width / 2, y + 0.4 - width / 2, width, width);
   }
   g.restore();
   // Порог убирает размытие внутри полотна, мягкая кромка соединяет диагональные клетки.
   for (let i = 0; i < mask.data.length; i += 4) {
-    const coverage = mask.data[i], asphalt = clamp((mask.data[i + 1] - 80) / 80, 0, 1);
-    mask.data[i] = 177 - asphalt * 76;
-    mask.data[i + 1] = 146 - asphalt * 38;
-    mask.data[i + 2] = 102 + asphalt * 8;
-    mask.data[i + 3] = clamp((coverage - 49) * 3, 0, 255);
+    const coverage = mask.data[i];
+    if (!coverage) { mask.data[i + 3] = 0; continue; }
+    const asphalt = clamp((mask.data[i + 1] - 80) / 80, 0, 1);
+    const pixel = i / 4, x = pixel % miniC.width, y = Math.floor(pixel / miniC.width);
+    const grain = (hash2(x, y) - 0.5) * 13 + (vnoise(x, y, 7) - 0.5) * 22;
+    mask.data[i] = 128 - asphalt * 26 + grain;
+    mask.data[i + 1] = 105 - asphalt * 4 + grain;
+    mask.data[i + 2] = 84 + asphalt * 14 + grain;
+    mask.data[i + 3] = clamp((coverage - 35 + grain) * 1.45, 0, 238);
   }
   // putImageData не смешивает прозрачность. Переиспользуем временный холст для наложения.
   base.width = miniC.width; base.height = miniC.height;
   bg.putImageData(mask, 0, 0); g.drawImage(base, 0, 0);
-  g.scale(K, K);
+  if (ART) {
+    // Фактура сухой травы смягчает переход между грунтом и обочиной в масштабе HUD.
+    g.save(); g.scale(0.4, 0.4); g.globalCompositeOperation = 'soft-light';
+    artFill(g, 'grass_dry', 0, 0, miniC.width / 0.4, miniC.height / 0.4);
+    g.restore();
+  }
+  g.scale(K, K); g.imageSmoothingQuality = 'high';
   HOUSES.forEach((h, i) => {
     if (h.x >= PW) return;
     g.fillStyle = '#36372e'; g.fillRect(h.x - 0.2, h.y - 0.2, h.w + 0.5, h.h + 0.6);
@@ -6623,7 +6632,14 @@ function drawMini() {
   mctx.strokeStyle = '#29291f'; mctx.lineWidth = 2;
   mctx.fillStyle = '#7fb0c4'; mctx.fillRect(HATCH.x / T * s - 5, HATCH.y / T * s - 5, 10, 10);
   objs.forEach(o => { if (o.k === 'cache' && S.caches[o.cacheId] === 1) { mctx.fillStyle = '#e8c070'; mctx.fillRect(o.x / T * s - 5, o.y / T * s - 5, 10, 10); } });
-  ents.forEach(e => { if (!e.alive || e === P || dE(e, P) > 520 || inBunker(e.x, e.y)) return; mctx.fillStyle = entColor(e); mctx.beginPath(); mctx.arc(e.x / T * s, e.y / T * s, 4.5, 0, 6.28); mctx.fill(); mctx.stroke(); });
+  ents.forEach(e => {
+    if (!e.alive || e === P || dE(e, P) > 520 || inBunker(e.x, e.y) || e.cloak > 0.7) return;
+    mctx.fillStyle = '#20251d';
+    mctx.strokeStyle = hostile(e, P) || e.fac === 'mutant' ? '#ea6854' : '#99be65';
+    mctx.lineWidth = 2.2;
+    mctx.beginPath(); mctx.arc(e.x / T * s, e.y / T * s, 3.8, 0, 2 * Math.PI);
+    mctx.fill(); mctx.stroke();
+  });
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   const tq = trackedTarget();
   qTargets().forEach(q => {
@@ -6631,10 +6647,13 @@ function drawMini() {
     let x = size / 2 + (q.x - P.x) / T * s, y = size / 2 + (q.y - P.y) / T * s;
     const edge = x < 10 || y < 10 || x > size - 10 || y > size - 10;
     if (edge) { const a = Math.atan2(y - size / 2, x - size / 2); x = size / 2 + Math.cos(a) * (size / 2 - 12); y = size / 2 + Math.sin(a) * (size / 2 - 12); }
-    mctx.fillStyle = q.qid === 'sos' ? '#e0573a' : '#dc9330'; mctx.beginPath(); mctx.moveTo(x, y - 9); mctx.lineTo(x + 9, y); mctx.lineTo(x, y + 9); mctx.lineTo(x - 9, y); mctx.closePath(); mctx.fill(); mctx.stroke();
+    const color = q.qid === 'sos' ? '#ef7657' : '#5ac4cf';
+    mctx.beginPath(); mctx.arc(x, y, 8, 0, 2 * Math.PI);
+    mctx.fillStyle = '#1c2a29'; mctx.fill(); mctx.strokeStyle = color; mctx.lineWidth = 1.8; mctx.stroke();
+    mctx.beginPath(); mctx.arc(x, y, 4.5, 0, 2 * Math.PI); mctx.fillStyle = color; mctx.fill();
   });
   mctx.globalAlpha = 1;
-  mctx.save(); mctx.translate(size / 2, size / 2); mctx.rotate(P.ang); mctx.fillStyle = '#f2ead0'; mctx.strokeStyle = '#000'; mctx.lineWidth = 2;
+  mctx.save(); mctx.translate(size / 2, size / 2); mctx.rotate(P.ang); mctx.fillStyle = '#5bbdc9'; mctx.strokeStyle = '#000'; mctx.lineWidth = 2;
   mctx.beginPath(); mctx.moveTo(12, 0); mctx.lineTo(-7, -8); mctx.lineTo(-3, 0); mctx.lineTo(-7, 8); mctx.closePath(); mctx.fill(); mctx.stroke(); mctx.restore();
 }
 
