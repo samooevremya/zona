@@ -239,7 +239,10 @@ function c1Scatter(g) {
     else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
     else if (h < 0.018) { id = 'c1_rock' + Math.floor(h2 * 3); w = hh = 28 + h2 * 10; }
     else { id = 'c1_decal' + [0, 1, 3, 4][Math.floor(h2 * 4)]; w = hh = 90 + h2 * 50; al = 0.7; }
-    if (id.startsWith('c1_decal')) ART.draw(g, id, cx, cy, w, hh, a, al);
+    if (id.startsWith('c1_log')) {
+      groundShadow(g, cx, cy, w * .48, hh * .26, a, 3);
+      ART.draw(g, id, cx, cy, w, hh, a);
+    } else if (id.startsWith('c1_decal')) ART.draw(g, id, cx, cy, w, hh, a, al);
     else { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(cx + 3, cy + 4, w * 0.45, hh * 0.35, a, 0, 6.28); g.fill(); ART.draw(g, id, cx, cy, w, hh, a); }
   }
 }
@@ -303,7 +306,12 @@ function artStatic0(g, o) {
     g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx + 4, cy + 5, w * 0.48, w * 0.22, 0, 0, 6.28); g.fill(); c1Draw(g, id, cx, cy, w, a); return true;
   }
   if (C1 && o.k === 'hatch') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 2, cy + 3, 22, 0, 6.28); g.fill(); c1Draw(g, 'c1_hatch', cx, cy, 46); return true; }
-  if (C1 && o.k === 'fire') { c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72); return true; }
+  if (C1 && o.k === 'fire') {
+    // Оба ближних бревна уже входят в прозрачный спрайт очага.
+    g.save(); spriteShadow(g, 2.6, 1.8);
+    c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
+    g.restore(); return true;
+  }
   if (C1 && o.k === 'pylon') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 3, cy + 4, 9, 0, 6.28); g.fill(); c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
   if (o.k === 'bus') {
     const s = Math.min(o.w / 292, o.h / 133), bw = 292 * s, bh = 133 * s;
@@ -338,7 +346,14 @@ function artDecor0(g) {
   DECOR.forEach(d => {
     const x = d[1] * T, y = d[2] * T;
     if (!C1 && !ART.m.sprites[d[0]]) return;
-    if (C1 && C1DECOR[d[0]]) { if (d[0] !== 'fence') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill(); } const c = C1DECOR[d[0]]; c1Draw(g, d[0] === 'fence' ? c[0] : c[0], x, y, c[1], d[3] + (d[0] === 'barrel' ? 0 : 0)); return; }
+    if (C1 && C1DECOR[d[0]]) {
+      const [id, width] = C1DECOR[d[0]], log = d[0] === 'logs' || d[0] === 'bench';
+      if (log) groundShadow(g, x, y, width * .48, width * .11, d[3], 1);
+      else if (d[0] !== 'fence') {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill();
+      }
+      c1Draw(g, id, x, y, width, d[3], 1, log ? 3 : 9); return;
+    }
     if (d[0] !== 'fence') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill(); }
     ART.draw(g, d[0], x, y, undefined, undefined, d[3]);
   });
@@ -358,7 +373,7 @@ function artCanopy() {
     const g = c.getContext('2d'); g.scale(2, 2);
     g.translate(S2 * CAN_PAD, S2 * CAN_PAD); if (v % 2) g.scale(-1, 1); g.rotate(v * 0.9);
     const s = 0.9 + (v % 3) * 0.06;
-    if (CAN_PAD > 1) { g.shadowColor = 'rgba(8,10,4,0.5)'; g.shadowBlur = CAN_SZ * 0.1; g.shadowOffsetX = CAN_SZ * 0.16; g.shadowOffsetY = CAN_SZ * 0.2; }   // тень кроны вправо-вниз, как у домов и машин
+    if (CAN_PAD > 1) { g.shadowColor = 'rgba(8,10,4,0.5)'; g.shadowBlur = CAN_SZ * 0.1; g.shadowOffsetX = CAN_SZ * 0.2 * SUN_DX; g.shadowOffsetY = CAN_SZ * 0.2 * SUN_DY; }   // тень кроны вправо-вниз, как у домов и машин
     ART.draw(g, pick[v], 0, 0, CAN_SZ * s, CAN_SZ * s);
     c1Grade(c, 0, 0, c.width, c.height);
     CANOPY.push(c);
@@ -386,9 +401,15 @@ function c1Grade(c, x, y, w, h) {
 }
 /* спрайт C1 по ширине с сохранением пропорций */
 let C1SH = 0;   // тень силуэта для объектов, запекаемых в землю (машины, автобус, люк, столбы, декор)
-function c1Draw(g, id, x, y, w, a, al) {
+function spriteShadow(g, length, blur) {
+  if (!SHADOWS) return;
+  const k = g.getTransform().a;
+  g.shadowColor = 'rgba(15,13,10,.52)'; g.shadowBlur = blur * k;
+  g.shadowOffsetX = SUN_DX * length * k; g.shadowOffsetY = SUN_DY * length * k;
+}
+function c1Draw(g, id, x, y, w, a, al, shadowLength = 9) {
   const s = ART.m.sprites[id];
-  if (C1SH && C1 && SHADOWS) { const k = g.getTransform().a; g.shadowColor = 'rgba(6,8,4,0.55)'; g.shadowBlur = 4 * k; g.shadowOffsetX = 7 * k; g.shadowOffsetY = 9 * k; }
+  if (C1SH && C1) spriteShadow(g, shadowLength, shadowLength * .45);
   ART.draw(g, id, x, y, w, w * s.rect[3] / s.rect[2], a || 0, al === undefined ? 1 : al);
   if (C1SH) { g.shadowColor = 'rgba(0,0,0,0)'; g.shadowBlur = g.shadowOffsetX = g.shadowOffsetY = 0; }
 }
@@ -447,8 +468,9 @@ function artRoof(h, idx) {
   return c;
 }
 function artCrate(o) {
-  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(o.x + 4, o.y + 5, o.w, o.h);
+  ctx.save(); spriteShadow(ctx, 5, 2);
   ART.draw(ctx, C1 ? (o.stash ? 'c1_crate_army' : 'c1_crate') : 'crate', o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, ((o.x + o.y) % 4) * Math.PI / 2);
+  ctx.restore();
   if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
 function artCache(o) {
