@@ -898,13 +898,22 @@ function frame(now) {
   render();
   hud(dt);
 }
+/* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
+function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  gen(); bigWorld(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  await loadArt(); bigFences();
-  buildCanopy(); paintGround(); buildRoofs(); buildMini();
-  applyState(loadSave() || freshS());
+  bootStep('графика'); await loadArt(); bigFences();
+  bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); buildMini();
+  bootStep('сохранение');
+  let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {
+    console.error(e); try { localStorage.setItem('zona-broken-save', localStorage.getItem(KEY) || ''); } catch (e2) {}
+    sv = null; window.__bootWarn = 'Сохранение не загрузилось (' + (e && e.message) + '). Копия отложена, начата новая игра.';
+  }
+  if (!sv) applyState(freshS());
+  const bl = document.getElementById('bootlog'); if (bl) bl.remove();
+  if (window.__bootWarn) setTimeout(() => msg(window.__bootWarn, 'bad'), 500);
   addEventListener('resize', resize);
   showTitle();
   requestAnimationFrame(frame);

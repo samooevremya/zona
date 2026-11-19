@@ -1,3 +1,9 @@
+<div id="bootlog" style="position:fixed;left:50%;bottom:18%;transform:translateX(-50%);z-index:9999;color:#cfc7ad;font:600 14px Arial;background:rgba(0,0,0,.6);padding:8px 14px;border-radius:8px;pointer-events:none">Загрузка…</div>
+<script>/* ошибки на экране — для проверки на телефоне без компьютера */
+(function(){function show(t){var d=document.getElementById('errbox');if(!d){d=document.createElement('div');d.id='errbox';d.style.cssText='position:fixed;left:8px;right:8px;top:40px;z-index:10000;background:#5a140c;color:#fff;font:12px/1.35 monospace;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:60vh;overflow:auto';document.body.appendChild(d);}d.textContent+=(d.textContent?'\n':'')+t+'  [шаг: '+(window.__bootStep||'-')+']';}
+addEventListener('error',function(e){show('Ошибка: '+e.message+' @'+(e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno);});
+addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошибка: '+(r&&r.message||r)+'\n'+(r&&r.stack||'').split('\n').slice(0,4).join('\n'));});})();
+</script>
 <canvas id="cv" aria-label="Игровое поле"></canvas>
 <div class="hud zh">
   <div class="zh-map rust"><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
