@@ -1,7 +1,7 @@
 /* ===================== отрисовка ===================== */
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 let VW = 800, VH = 600, DPR = 1, Z = 1;
-const ZNEAR = 1.45; let HUDZ = 1;
+const ZNEAR = 1.25; let HUDZ = 1;   // камера как в референсе: дом ≈ четверть ширины экрана
 const cam = { x: 0, y: 0 };
 const groundC = document.createElement('canvas');
 const lightC = document.createElement('canvas'), lctx = lightC.getContext('2d');
@@ -36,7 +36,7 @@ function drawAutumnCrown(sprite, x, y, w, h) {
 }
 
 /* цветовой фильтр, зерно и виньетка настраиваются; #grade-none отключает фильтр для сравнения */
-const GRADE = /grade-none/.test(location.hash) ? { mul: null, grain: 9, vig: 0.45 } : /grade-old/.test(location.hash) ? { mul: 'rgb(236,228,196)', grain: 13, vig: 0.62 } : { mul: 'rgb(248,245,236)', grain: 9, vig: 0.45 };
+const GRADE = /grade-none/.test(location.hash) ? { mul: null, grain: 9, vig: 0.45 } : /grade-old/.test(location.hash) ? { mul: 'rgb(236,228,196)', grain: 13, vig: 0.62 } : BIG ? { mul: 'rgb(255,240,214)', grain: 9, vig: 0.62 } : { mul: 'rgb(248,245,236)', grain: 9, vig: 0.45 };   // большой Кордон: теплее, края темнее (референс)
 const fireFlick = () => { const t = performance.now() / 1000; return 0.82 + 0.1 * Math.sin(t * 11.3) + 0.08 * Math.sin(t * 23.7 + 1.3); };
 // Проекция солнечной тени в координатах мира. Длина зависит от высоты предмета.
 const SUN_DX = 0.8, SUN_DY = 1;
@@ -55,7 +55,7 @@ function groundShadow(g, x, y, rx, ry, angle, length) {
   g.save(); g.translate(x + SUN_DX * length, y + SUN_DY * length); g.rotate(angle);
   g.drawImage(shadowStamp, -rx, -ry, rx * 2, ry * 2); g.restore();
 }
-const FIRE_REACH = 105;
+const FIRE_REACH = BIG ? 72 : 105;   // днём костёр светит пятном поменьше, как в референсе
 const figureC = document.createElement('canvas');
 figureC.width = figureC.height = 192;   // 96 мировых пикселей при двукратной детализации
 const figureCtx = figureC.getContext('2d');
@@ -85,8 +85,8 @@ function drawLitHuman(e) {
 function fireGroundLight(fire) {
   const r = FIRE_REACH;
   const glow = ctx.createRadialGradient(fire.x, fire.y, 5, fire.x, fire.y, r);
-  glow.addColorStop(0, 'rgba(255,159,72,.34)');
-  glow.addColorStop(.42, 'rgba(236,133,48,.16)');
+  glow.addColorStop(0, 'rgba(255,159,72,' + (BIG ? .24 : .34) + ')');
+  glow.addColorStop(.42, 'rgba(236,133,48,' + (BIG ? .09 : .16) + ')');
   glow.addColorStop(1, 'rgba(224,115,40,0)');
   ctx.save(); ctx.globalAlpha = fireFlick(); ctx.fillStyle = glow;
   ctx.fillRect(fire.x - r, fire.y - r, r * 2, r * 2); ctx.restore();
@@ -129,7 +129,7 @@ function resize() {
   { const zq = /[#&]z=([\d.]+)/.exec(location.hash); if (zq) Z = clamp(+zq[1], 0.6, 2.5); }   // проверка масштаба камеры: #z=1.6
   lightC.width = Math.ceil(VW / 2); lightC.height = Math.ceil(VH / 2);
   vignetteC = document.createElement('canvas'); vignetteC.width = 256; vignetteC.height = 256;
-  const v = vignetteC.getContext('2d'), g = v.createRadialGradient(128, 128, 60, 128, 128, 182);
+  const v = vignetteC.getContext('2d'), g = v.createRadialGradient(128, 128, BIG ? 70 : 60, 128, 128, 182);
   g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(6,8,4,' + GRADE.vig + ')');
   v.fillStyle = g; v.fillRect(0, 0, 256, 256);
 }
@@ -702,6 +702,7 @@ function render() {
   // имена дружественных рядом
   ctx.font = '600 ' + (BIG ? 7 : 9) + 'px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
   for (const e of vis) {
+    if (BIG && !/names/.test(location.hash)) break;   // как в референсе: имя только в кнопке «Говорить»
     if (e === P || e.kind !== 'human' || hostile(e, P)) continue;
     const d = dE(e, P); if (d > 130) continue;
     if (HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) continue;
