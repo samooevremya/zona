@@ -889,7 +889,9 @@ function frame(now) {
   hud(dt);
 }
 async function boot() {
-  gen(); bigWorld(); buildGrids(); resize();
+  gen(); bigWorld(); buildGrids();
+  HOUSES.forEach(buildEntrances);
+  resize();
   await loadArt();
   buildCanopy(); paintGround(); buildRoofs(); buildMini();
   applyState(loadSave() || freshS());

@@ -274,26 +274,72 @@ function artWall(g, x, y) {
   g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1;
   rects.forEach(r => g.strokeRect(r[0] + 0.5, r[1] + 0.5, r[2] - 1, r[3] - 1));
 }
-/* пороги и косяки у проёмов жилых домов */
-function artThresholds(g) {
-  HOUSES.forEach(h => {
-    if (h.ruin || h.x > GW.x1 || h.x + h.w < GW.x0 || h.y > GW.y1 || h.y + h.h < GW.y0) return;
-    for (let yy = h.y; yy < h.y + h.h; yy++) for (let xx = h.x; xx < h.x + h.w; xx++) {
-      const edge = xx === h.x || yy === h.y || xx === h.x + h.w - 1 || yy === h.y + h.h - 1;
-      if (!edge || isWall(tAt(xx, yy))) continue;
-      const px = xx * T, py = yy * T, horiz = yy === h.y || yy === h.y + h.h - 1;
-      g.fillStyle = 'rgba(0,0,0,0.25)'; horiz ? g.fillRect(px, py + 9, T, 15) : g.fillRect(px + 9, py, 15, T);
-      g.fillStyle = '#5b4128'; horiz ? g.fillRect(px, py + 11, T, 10) : g.fillRect(px + 11, py, 10, T);
-      g.fillStyle = 'rgba(255,230,190,0.18)'; horiz ? g.fillRect(px, py + 11, T, 1.5) : g.fillRect(px + 11, py, 1.5, T);
-      g.strokeStyle = 'rgba(20,12,6,0.6)'; horiz ? (g.beginPath(), g.moveTo(px + 11, py + 11), g.lineTo(px + 11, py + 21), g.moveTo(px + 22, py + 11), g.lineTo(px + 22, py + 21), g.stroke()) : 0;
-      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(d => {
-        if (!isWall(tAt(xx + d[0], yy + d[1]))) return;
-        g.fillStyle = '#2e2218';
-        if (d[0] === -1) g.fillRect(px, py + 8, 4, 16); if (d[0] === 1) g.fillRect(px + T - 4, py + 8, 4, 16);
-        if (d[1] === -1) g.fillRect(px + 8, py, 16, 4); if (d[1] === 1) g.fillRect(px + 8, py + T - 4, 16, 4);
-      });
+// Плотная сухая земля у стены постепенно переходит в траву. Рисунок
+// зависит от координат двери и сохраняется при перестроении соседних кусков.
+function wornEntrance(width, seed) {
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(width + 16); c.height = 43;
+  const g = c.getContext('2d');
+  g.fillStyle = '#a18461'; g.fillRect(0, 0, c.width, c.height);
+  if (ART) {
+    g.globalAlpha = .46;
+    artFill(g, C1 ? 'bare_soil' : 'dirt', 0, 0, c.width, c.height);
+  }
+  const image = g.getImageData(0, 0, c.width, c.height), data = image.data;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const depth = y / c.height;
+    const center = c.width / 2 + Math.sin(depth * 3 + seed) * 3;
+    const lateral = (x - center) / (width * (.53 - .16 * depth));
+    const rim = Math.hypot(lateral, (y - 5) / 32);
+    const tuft = vnoise(x + seed, y, 5) - .5;
+    const grit = hash2(x + seed, y) - .5, i = (y * c.width + x) * 4;
+    data[i + 3] = 235 * clamp((1 - rim + tuft * .32 + grit * .10) * 3.8, 0, 1);
+    for (let k = 0; k < 3; k++) data[i + k] += tuft * 16 + grit * 22;
+  }
+  g.putImageData(image, 0, 0);
+  return c;
+}
+
+// В локальных координатах ось Y направлена из дома наружу.
+// Ступени выступают за свес даже у дальней стены. Вся площадка запекается в землю.
+function drawThresholds(g) {
+  for (const h of HOUSES) {
+    if (h.x > GW.x1 + 1 || h.y > GW.y1 + 1 || h.x + h.w < GW.x0 - 1 || h.y + h.h < GW.y0 - 1) continue;
+    const concrete = h.mat === 'conc';
+    for (const door of h.entrances) {
+      const w = door.width, left = -w / 2;
+      g.save(); g.translate(h.x * T + door.x, h.y * T + door.y);
+      g.rotate(Math.atan2(-door.nx, door.ny));
+      const style = hash2((h.x + door.x / T) * 2, (h.y + door.y / T) * 2);
+      if (!concrete && (h.ruin || style < .40)) {
+        if (!door.soil) door.soil = wornEntrance(w, Math.floor(style * 4096));
+        g.drawImage(door.soil, -door.soil.width / 2, -3);
+      } else {
+        g.fillStyle = 'rgba(39,30,21,.23)';
+        g.beginPath(); g.ellipse(0, 14, w * .60, 14, 0, 0, 2 * Math.PI); g.fill();
+        g.fillStyle = concrete ? '#59574d' : '#4b3b2c';
+        g.fillRect(left, -T / 2 - 4, w, T / 2 + 26);
+        for (let row = 0; row < 3; row++) {
+          const y = row * 7, inset = row * 1.3, x = left + inset, width = w - inset * 2;
+          g.fillStyle = concrete ? '#9b998b' : '#a38a66'; g.fillRect(x, y, width, 6);
+          if (ART) {
+            g.globalAlpha = .55;
+            artFill(g, concrete ? 'floor_concrete' : 'floor_wood', x, y, width, 6);
+            g.globalAlpha = 1;
+          }
+          g.fillStyle = concrete ? '#b4b0a0' : '#b49a77'; g.fillRect(x, y + 5, width, 1);
+          if (!concrete) {
+            g.fillStyle = '#524635'; g.fillRect(x + 3, y + 2, 1.4, 1.4);
+            g.fillRect(x + width - 4, y + 2, 1.4, 1.4);
+          }
+        }
+      }
+      // Косяки остаются видны изнутри при прозрачной крыше.
+      g.fillStyle = concrete ? '#69695f' : '#68503a';
+      g.fillRect(left - 2, -T / 2 - 5, 3, 10); g.fillRect(-left - 1, -T / 2 - 5, 3, 10);
+      g.restore();
     }
-  });
+  }
 }
 function artBush(g, x, y) { const h = hash2(x, y); ART.draw(g, C1 ? (tAt(x, y + 1) === SW || tAt(x, y - 1) === SW ? 'c1_bush3' : 'c1_bush' + Math.floor(hash2(y, x + 7) * 3)) : 'bush', x * T + 16 + (h - 0.5) * 6, y * T + 16 + (hash2(y, x) - 0.5) * 6, 36 * (0.85 + h * 0.3), 36 * (0.85 + h * 0.3), h * 6.28); }
 /* объекты на земле: центр = левый верх + половина размера */
@@ -463,7 +509,7 @@ function artRoof(h, idx) {
   if (C1 && id.startsWith('c1_')) {   // крыша C1: вырезать середину под пропорции дома, не растягивать
     // объём: снизу видна полоса передней стены, крыша над ней чуть короче и бросает тень на стену
     const flat = id === 'c1_tower' || id.startsWith('c1_booth');
-    const wallH = flat ? 0 : Math.min(12, 6 + h.h * 0.8), RW = W - 6, RH = Hh - 6 - wallH;
+    const wallH = flat ? 6 : Math.min(20, 10 + h.h * 1.4), RW = W - 6, RH = Hh - 6 - wallH;
     if (wallH) {
       g.shadowColor = 'transparent';
       const wy = RH - 2, wood = h.mat !== 'conc';
@@ -472,6 +518,15 @@ function artRoof(h, idx) {
       if (wood) { g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; for (let x = 6; x < RW - 4; x += 7) { g.beginPath(); g.moveTo(x, wy); g.lineTo(x, wy + wallH + 2); g.stroke(); } }
       const gr = g.createLinearGradient(0, wy, 0, wy + wallH + 2); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.15)'); gr.addColorStop(1, 'rgba(0,0,0,0.35)');
       g.fillStyle = gr; g.fillRect(2, wy, RW - 4, wallH + 2);
+      // У южной стены с улицы видна ниша под карнизом. Смещение +3
+      // компенсирует начало холста крыши в трёх пикселях левее дома.
+      for (const door of h.entrances) {
+        if (door.ny !== 1) continue;
+        const left = door.x + 3 - door.width / 2;
+        g.fillStyle = wood ? '#4b392b' : '#66655c'; g.fillRect(left, wy, door.width, wallH + 2);
+        g.fillStyle = '#292720'; g.fillRect(left + 3, wy, door.width - 6, wallH + 1);
+        g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(left + 3, wy, door.width - 6, 5);
+      }
       g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 6; g.shadowOffsetX = 2; g.shadowOffsetY = 4;
     }
     const tw = along ? RW : RH, th = along ? RH : RW, r = sp.rect, ka = tw / th;
