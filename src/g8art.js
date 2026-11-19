@@ -386,6 +386,19 @@ function artStatic0(g, o) {
   if (o.k === 'fire') { ART.draw(g, 'fire_base', cx, cy, 28, 28); return true; }
   return false;
 }
+// Низкие предметы запекаются в землю до кустов и крупных объектов.
+function drawCordonDetails(g) {
+  if (!BIG || !C1 || !ART) return;
+  g.save();
+  spriteShadow(g, 2.5, 1.5);
+  for (const [id, tx, ty, width, angle] of CORDON_DETAILS) {
+    const x = tx * T, y = ty * T;
+    // Захватываем и соседний кусок, если повёрнутый рисунок пересекает границу.
+    if (x + width < GWP.x0 || x - width > GWP.x1 || y + width < GWP.y0 || y - width > GWP.y1) continue;
+    c1Draw(g, id, x, y, width, angle);
+  }
+  g.restore();
+}
 /* декор деревни: без коллизии, вне дорожек и дверей */
 const DECOR = [
   ...YARD_SEATS.filter(s => s.log).map(s => {
