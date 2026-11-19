@@ -56,9 +56,10 @@ const WP = {
   knife: { n: 'Нож', melee: 1, dmg: 34, rate: 0.5, range: 26, pref: 0 },
   w_pm: { n: 'ПМ', ammo: 'a9', mag: 8, dmg: 22, rate: 0.24, spread: 0.04, range: 520, reload: 1.4, snd: 'p', pref: 200 },
   w_obrez: { n: 'Обрез', ammo: 'a12', mag: 2, dmg: 13, pellets: 7, rate: 0.55, spread: 0.2, range: 300, reload: 1.9, snd: 's', pref: 110 },
-  w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 }
+  w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
+  grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu'];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade'];
 const STOCK = [
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },

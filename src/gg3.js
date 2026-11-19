@@ -34,7 +34,8 @@ function g3Draw(e, extra, target = ctx) {
   const man = G3.pack.manifest, g3Base = window.__g7tap ? target.getTransform() : null;
   if (e.kind !== 'human' && g7Mutant(e, a)) return true;
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
-  const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
+  const jh = e.jumpT > 0 ? Math.sin(Math.PI * (1 - e.jumpT / JUMP_T)) : 0;
+  const sw0 = e.kind === 'human' && a.moving ? gaitSway(e) : null, sw = jh ? Object.assign({ dx: 0, dy: 0, k: 1 }, sw0, { k: (sw0 ? sw0.k : 1) * (1 + 0.2 * jh), dy: (sw0 ? sw0.dy : 0) - 5 * jh }) : sw0;
   if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
   const sh = e.kind === 'human' && BIG && window.CORDON_G8_ON;   // контраст с землёй: мягкая тень-обводка вправо-вниз, как у остальных объектов
   if (sh) { const k = Math.abs(target.getTransform().a); target.save(); target.shadowColor = 'rgba(8,8,4,0.6)'; target.shadowBlur = 2.6 * k; target.shadowOffsetX = 1.6 * k; target.shadowOffsetY = 2.2 * k; }
@@ -164,14 +165,20 @@ body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:172px;height:58px;padding:3px 8px 3px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:190px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.zh-wi{overflow:hidden}.zh-w .cnd span{overflow:hidden;text-overflow:ellipsis}.hud.zh .zh-w .wn{font-size:11px}
 .hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am,.hud.zh .zh-w .am small{font-size:16px}.zh-w .cnd span{font-size:10px}
-.hud.zh .zh-det{top:calc(68px + var(--sat));height:26px;width:66px}
+.hud.zh .zh-det{top:calc(68px + var(--sat));height:30px;width:66px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .rb svg{width:21px;height:21px}
-body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 112px - var(--sat) - var(--sab)) / 5))}
-body.is-touch .touch.zt .c1{top:calc(104px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(104px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(104px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(104px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(104px + var(--sat) + var(--st) * 4)}
+body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 122px - var(--sat) - var(--sab)) / 5))}
+body.is-touch .touch.zt .c1{top:calc(114px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(114px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(114px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(114px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(114px + var(--sat) + var(--st) * 4)}
 body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar))}body.is-touch .touch.zt .fire svg{width:50px;height:50px}
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
 }
+/* фонарик (блок над детектором) и ровная панель оружия */
+.hud.zh .zh-det{cursor:pointer;pointer-events:auto}.hud.zh .zh-det::after{content:'';position:absolute;inset:-3px -4px -11px}
+.hud.zh .zh-det .torch{color:#6f7a7c;fill:currentColor;width:18px;height:18px}.hud.zh .zh-det.on .torch{color:#62b6ff;filter:drop-shadow(0 0 4px rgba(80,170,255,.7))}.hud.zh .zh-det:not(.on) .beam{display:none}
+.zh-w #wico{flex:0 0 76px!important;width:76px!important;height:44px!important;overflow:hidden}.zh-w #wico img{width:76px!important;height:44px!important;object-fit:contain!important}
+.hud.zh .zh-w .wn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.zh-w.mel .cnd{display:none}
+body.is-touch .touch.zt .rb.on{background:rgba(70,62,40,.6)!important;border-color:rgba(246,190,90,.7)!important}
 /* круглые кнопки и джойстик — тёмные полупрозрачные, белые значки (референс); ржавчина остаётся на верхних панелях */
 body.is-touch .touch.zt .rb,body.is-touch .touch.zt .fire{border-image:none!important;border:1.5px solid rgba(236,229,206,.3)!important;background:rgba(14,14,11,.5)!important;border-radius:50%!important;box-shadow:0 2px 6px rgba(0,0,0,.35)!important}
 body.is-touch .touch.zt .rb svg,body.is-touch .touch.zt .fire svg{color:#ece6d3;stroke:#ece6d3;filter:none}
