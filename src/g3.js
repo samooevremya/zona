@@ -130,10 +130,17 @@ function update(dt) {
     a.flash = Math.max(0, a.flash - dt);
     for (let j = i + 1; j < ents.length; j++) {
       const b = ents[j]; if (!b.alive) continue;
-      const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const other = a === P ? b : b === P ? a : null;
+      const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
+      const rr = atSeat ? 40 : a.r + b.r;
       if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy);
-      if (d < rr && d > 0.01) {
+      if (atSeat && d < rr) {
+        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
+        const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
+        moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
+      } else if (d < rr && d > 0.01) {
         const push = (rr - d) / 2, ux = dx / d, uy = dy / d;
         if (!a.captive) { a.x -= ux * push; a.y -= uy * push; }
         if (!b.captive) { b.x += ux * push; b.y += uy * push; }

@@ -433,6 +433,13 @@ function freshS() {
 }
 
 /* ===================== жители Кордона ===================== */
+// Места заданы в координатах исходной деревни. Жители и декор вместе переносятся в большой Кордон.
+const YARD_SEATS = [
+  { sid: 'l1', x: 29.00, y: 83.38, wpn: 'w_pm', log: ['logs', -0.28, -0.32, -0.73] },
+  { sid: 'l2', x: 31.05, y: 82.60, wpn: 'w_obrez', log: ['bench', 0.16, -0.36, 0.24] },
+  { sid: 'l3', x: 32.15, y: 84.45, wpn: 'w_pm' },
+  { sid: 'l4', x: 29.82, y: 86.33, wpn: 'w_pm', log: ['logs', -0.15, 0.35, 0.43] }
+];
 const NPCDEF = [
   { sid: 'sid', fac: 'trader', name: 'Сидорович', x: 126.5, y: 4.6, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
   { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
@@ -451,8 +458,7 @@ const NPCDEF = [
   { sid: 'a3', fac: 'army', name: 'Прапорщик', x: 63.5, y: 34.2, wpn: 'w_aksu', guard: 'bridge', rank: 1 },
   { sid: 'a4', fac: 'army', name: 'Часовой', x: 60.5, y: 102.6, wpn: 'w_aksu', guard: 'south' },
   { sid: 'a5', fac: 'army', name: 'Часовой', x: 68.5, y: 102.6, wpn: 'w_aksu', guard: 'south' },
-  { sid: 'l1', fac: 'loner', x: 28.2, y: 83.3, wpn: 'w_pm', sit: 1 }, { sid: 'l2', fac: 'loner', x: 31.8, y: 82.7, wpn: 'w_obrez', sit: 1 },
-  { sid: 'l3', fac: 'loner', x: 32.6, y: 85.6, wpn: 'w_pm', sit: 1 }, { sid: 'l4', fac: 'loner', x: 28.6, y: 86.4, wpn: 'w_pm', sit: 1 },
+  ...YARD_SEATS.map(({ sid, x, y, wpn }) => ({ sid, x, y, wpn, fac: 'loner', sit: 1 })),
   { sid: 'l5', fac: 'loner', x: 46, y: 90, wpn: 'w_pm' }, { sid: 'l6', fac: 'loner', x: 52, y: 74, wpn: 'w_obrez' },
   { sid: 'l7', fac: 'loner', x: 45, y: 20.6, wpn: 'w_obrez', sit: 1, fire: 2 }, { sid: 'l8', fac: 'loner', x: 48, y: 22.4, wpn: 'w_pm', sit: 1, fire: 2 }
 ];
@@ -988,7 +994,13 @@ function idleHuman(e, dt) {
     const tr = e.trip;
     if (tr.stage === 0) { if (goTo(e, tr.x, tr.y, 72, dt) < 30) { tr.stage = 1; tr.wait = rnd(10, 30); } }
     else if (tr.stage === 1) { tr.wait -= dt; e.idleT -= dt; if (e.idleT <= 0) { e.idleT = rnd(2, 5); e.ang += rnd(-1.5, 1.5); } if (tr.wait <= 0) tr.stage = 2; }
-    else if (goTo(e, e.home.x, e.home.y, 72, dt) < 24) { e.trip = null; if (e.seat) setCampSeat(e, true); }
+    else {
+      const arrival = e.seat && e.fireRef === FIRE ? 7 : 24;
+      if (goTo(e, e.home.x, e.home.y, 72, dt) < arrival) {
+        e.trip = null;
+        if (e.seat) setCampSeat(e, true);
+      }
+    }
     return;
   }
   const dh = dE(e, e.home);
@@ -1263,10 +1275,17 @@ function update(dt) {
     a.flash = Math.max(0, a.flash - dt);
     for (let j = i + 1; j < ents.length; j++) {
       const b = ents[j]; if (!b.alive) continue;
-      const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const other = a === P ? b : b === P ? a : null;
+      const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
+      const rr = atSeat ? 40 : a.r + b.r;
       if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy);
-      if (d < rr && d > 0.01) {
+      if (atSeat && d < rr) {
+        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
+        const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
+        moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
+      } else if (d < rr && d > 0.01) {
         const push = (rr - d) / 2, ux = dx / d, uy = dy / d;
         if (!a.captive) { a.x -= ux * push; a.y -= uy * push; }
         if (!b.captive) { b.x += ux * push; b.y += uy * push; }
@@ -2811,7 +2830,14 @@ function* artGround(g, R) {
     yield;
   }
   yield;
-  if (C1) { c1ForestFloor(g); yield; c1Scatter(g); yield; }
+  if (C1) {
+    c1ForestFloor(g); yield;
+    c1Scatter(g); yield;
+    const [w, h] = ART.m.sprites.camp_yard.logicalSize;
+    if (Math.abs(FIRE.x - (GWP.x0 + GWP.x1) / 2) < (w + GWP.x1 - GWP.x0) / 2 &&
+        Math.abs(FIRE.y - (GWP.y0 + GWP.y1) / 2) < (h + GWP.y1 - GWP.y0) / 2)
+      ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h);
+  }
   // 4. Растительность группами: у стен, заборов, деревьев и насыпи; середина проходов свободна
   const RT = mulberry32(4242 + GW.x0 * 97 + GW.y0 * 13);
   const solidish = t => t === BR || t === CO || t === TR || t === RA;
@@ -2990,9 +3016,10 @@ function artStatic0(g, o) {
   }
   if (C1 && o.k === 'hatch') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 2, cy + 3, 22, 0, 6.28); g.fill(); c1Draw(g, 'c1_hatch', cx, cy, 46); return true; }
   if (C1 && o.k === 'fire') {
-    // Оба ближних бревна уже входят в прозрачный спрайт очага.
+    // У деревенского костра брёвна расставлены у посадочных мест.
     g.save(); spriteShadow(g, 2.6, 1.8);
-    c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
+    if (cx === FIRE.x && cy === FIRE.y) c1Draw(g, 'camp_ring', cx, cy, 40);
+    else c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
     g.restore(); return true;
   }
   if (C1 && o.k === 'pylon') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 3, cy + 4, 9, 0, 6.28); g.fill(); c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
@@ -3014,7 +3041,11 @@ function artStatic0(g, o) {
 }
 /* декор деревни: без коллизии, вне дорожек и дверей */
 const DECOR = [
-  ['logs', 27.3, 84.9, 1.45], ['bench', 30.5, 87.5, 0], ['logs', 33.8, 84.3, 1.7], ['bench', 30.4, 81.5, 3.14], ['logs', 46.6, 23.4, -0.3],
+  ...YARD_SEATS.filter(s => s.log).map(s => {
+    const [kind, dx, dy, angle] = s.log;
+    return [kind, s.x + dx, s.y + dy, angle];
+  }),
+  ['logs', 46.6, 23.4, -0.3],
   ['bench', 16.7, 76.3, 0], ['barrel', 21.6, 75.2, 0], ['barrel', 31.3, 72.4, 0.5], ['bench', 30.8, 74.8, 0], ['barrel', 43.3, 77.1, 0], ['rubble', 40.5, 76.6, 0.8],
   ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['barrel', 44.1, 91.2, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
