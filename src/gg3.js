@@ -36,7 +36,15 @@ function g3Draw(e, extra) {
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
   const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
   if (sw) { ctx.save(); ctx.translate(e.x + sw.dx, e.y + sw.dy); ctx.scale(sw.k, sw.k); ctx.translate(-e.x, -e.y); }
-  const ok = CordonG3.draw(ctx, man, G3.images, a, e.kind === 'human' ? (c2 => { const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
+  const ok = CordonG3.draw(ctx, man, G3.images, a, e.kind === 'human' ? (c2 => {
+    if (e === P && window.CORDON_G8_ON) {
+      const roll = packImage('assets/g8/player_bedroll.webp');
+      if (roll) {
+        const top = (skin === 'bandit' ? -12 : -15) - (e.crouch ? 1 : 0);
+        c2.drawImage(roll, -10.5, top, 21, 6);
+      }
+    }
+    const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
   if (ok && e.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(ctx, man, G3.images, Object.assign({}, a, { shadow: false }), null); ctx.restore(); }
   if (sw) ctx.restore();
   return ok;

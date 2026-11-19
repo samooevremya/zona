@@ -4581,7 +4581,15 @@ function g3Draw(e, extra) {
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
   const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
   if (sw) { ctx.save(); ctx.translate(e.x + sw.dx, e.y + sw.dy); ctx.scale(sw.k, sw.k); ctx.translate(-e.x, -e.y); }
-  const ok = CordonG3.draw(ctx, man, G3.images, a, e.kind === 'human' ? (c2 => { const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
+  const ok = CordonG3.draw(ctx, man, G3.images, a, e.kind === 'human' ? (c2 => {
+    if (e === P && window.CORDON_G8_ON) {
+      const roll = packImage('assets/g8/player_bedroll.webp');
+      if (roll) {
+        const top = (skin === 'bandit' ? -12 : -15) - (e.crouch ? 1 : 0);
+        c2.drawImage(roll, -10.5, top, 21, 6);
+      }
+    }
+    const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
   if (ok && e.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(ctx, man, G3.images, Object.assign({}, a, { shadow: false }), null); ctx.restore(); }
   if (sw) ctx.restore();
   return ok;
@@ -4841,6 +4849,24 @@ function g7Human(e, extra) {
   if (e.captive && !e.wounded && G7.poseOn) {   // связанный пленник: цельный кадр, без модульных рук/ствола
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
     if (f) { shadowAt(e); drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K); return true; }
+  }
+  if (window.CORDON_G8_ON && e.sit && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
+    const seated = packImage('assets/g8/camp_loner.webp');
+    if (seated) {
+      shadowAt(e, 12);
+      ctx.save();
+      ctx.translate(e.x, e.y); ctx.rotate(e.ang - Math.PI / 2);
+      ctx.globalAlpha *= opacity;
+      // Опорная точка под тазом. Свободный ботинок выступает вперёд, к костру.
+      const width = 33, height = width * seated.naturalHeight / seated.naturalWidth;
+      ctx.drawImage(seated, -width / 2, -height * 0.44, width, height);
+      if (e.flash > 0) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha *= Math.min(0.5, e.flash * 4);
+        ctx.drawImage(seated, -width / 2, -height * 0.44, width, height);
+      }
+      ctx.restore(); return true;
+    }
   }
   const r = rigActive(e); if (!r) return false;
   const w = weaponLocal(e), base = window.__g7tap ? ctx.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,

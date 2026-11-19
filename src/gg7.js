@@ -129,6 +129,24 @@ function g7Human(e, extra) {
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
     if (f) { shadowAt(e); drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K); return true; }
   }
+  if (window.CORDON_G8_ON && e.sit && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
+    const seated = packImage('assets/g8/camp_loner.webp');
+    if (seated) {
+      shadowAt(e, 12);
+      ctx.save();
+      ctx.translate(e.x, e.y); ctx.rotate(e.ang - Math.PI / 2);
+      ctx.globalAlpha *= opacity;
+      // Опорная точка под тазом. Свободный ботинок выступает вперёд, к костру.
+      const width = 33, height = width * seated.naturalHeight / seated.naturalWidth;
+      ctx.drawImage(seated, -width / 2, -height * 0.44, width, height);
+      if (e.flash > 0) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha *= Math.min(0.5, e.flash * 4);
+        ctx.drawImage(seated, -width / 2, -height * 0.44, width, height);
+      }
+      ctx.restore(); return true;
+    }
+  }
   const r = rigActive(e); if (!r) return false;
   const w = weaponLocal(e), base = window.__g7tap ? ctx.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
     deadImage: G7.img[CORDON_RIG.dead[r.skin]], drawEquipment: c2 => { if (base) window.__g7tap(e, base, c2.getTransform(), w); drawWeaponLocal(c2, w); } };

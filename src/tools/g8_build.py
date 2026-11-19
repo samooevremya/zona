@@ -257,6 +257,11 @@ ui('bar_hp', crop_box((20, 595, 625, 640)).resize((256, 12), Image.LANCZOS), 0, 
 ui('bar_fd', crop_box((20, 660, 625, 705)).resize((256, 12), Image.LANCZOS), 0, 128, 6)
 barf = crop_box((10, 480, 635, 565)); ui('barframe', nine(barf, 14, 256, 28, 10), 5, 128, 14)
 
+# Дополнительные иллюстрации лагеря хранятся готовыми игровыми спрайтами.
+for name in ('camp_loner', 'player_bedroll'):
+    with open(os.path.join(OUT, 'src', name + '.webp'), 'rb') as asset:
+        G3IMG['assets/g8/' + name + '.webp'] = 'data:image/webp;base64,' + base64.b64encode(asset.read()).decode()
+
 pack = {'version': 'g8-1', 'images': G3IMG, 'actors': G3ACT, 'rig': RIGIMG, 'items': ITEMS, 'ui': UI, 'hand': HAND}
 js = '/* G8: персонажи, мутанты, Сидорович, оружие, HUD (GPT, блоки 5–7). Сборка: tools/g8_build.py */\n' \
      'globalThis.CORDON_G8=' + json.dumps(pack, ensure_ascii=False, separators=(',', ':')) + ';\n' + \
