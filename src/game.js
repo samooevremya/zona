@@ -2557,15 +2557,54 @@ function c1Rail(g, x, y) {
 /* дёшево сравнить, относится ли клетка к земле, на которой лежит текстура */
 const GROUNDISH = t => t === GR || t === TR || t === BU;
 
+// Короткий отпечаток из исходной фотографии грунта. Мягкая граница
+// оставляет видимой фактуру обочины между проездами.
+function wheelPrint() {
+  if (ARTM.tread) return ARTM.tread;
+  const c = document.createElement('canvas');
+  c.width = 112; c.height = 20;
+  const g = c.getContext('2d'), dirt = ART.m.sprites.dirt;
+  g.translate(56, 10); g.rotate(0.44);
+  g.drawImage(ART.images[dirt.atlas], ...dirt.rect, -255, -357, 512, 512);
+  g.setTransform(56, 0, 0, 10, 56, 10);
+  const edge = g.createRadialGradient(0, 0, 0.35, 0, 0, 1);
+  edge.addColorStop(0, '#000'); edge.addColorStop(1, 'transparent');
+  g.globalCompositeOperation = 'destination-in'; g.fillStyle = edge;
+  g.fillRect(-1, -1, 2, 2);
+  return ARTM.tread = c;
+}
+
+function drawWheelTracks(g, x, y, w, h) {
+  const stamp = wheelPrint();
+  for (const route of VEHICLE_ROUTES) for (let i = 1; i < route.length; i++) {
+    const [ax, ay] = route[i - 1], [bx, by] = route[i];
+    const x0 = (ax + 0.5) * T, y0 = (Math.round(ay) + 0.5) * T;
+    const dx = (bx - ax) * T, dy = (Math.round(by) - Math.round(ay)) * T;
+    const length = Math.hypot(dx, dy), angle = Math.atan2(dy, dx);
+    if (Math.max(x0, x0 + dx) < x - 32 || Math.min(x0, x0 + dx) > x + w + 32 ||
+        Math.max(y0, y0 + dy) < y - 32 || Math.min(y0, y0 + dy) > y + h + 32) continue;
+    g.save(); g.translate(x0, y0); g.rotate(angle);
+    for (let d = 0; d < length; d += 21) {
+      const drift = 4 * Math.sin((d + x0) / 103);
+      for (const side of [-1, 1]) {
+        g.globalAlpha = 0.38 + 0.50 * vnoise(x0 + d, y0 + side * 71, 29);
+        g.drawImage(stamp, d - 15, drift + side * 9 - 4, 36, 8);
+      }
+    }
+    g.restore();
+  }
+}
+
 function* artGround(g, R) {
+  const shoulders = BIG && C1;
   // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
   for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
     const t = map[y * MW + x], px = x * T, py = y * T;
-    let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? 'asphalt' : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
+    let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
     if (C1 && t === SW) id = BIG && x >= 224 ? 'water' : 'swamp';
     if (id) artFill(g, id, px, py, T, T);
     if (C1 && t === RA) c1Rail(g, x, y);
-    if (t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
+    if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
     if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
   }
   yield;
@@ -2597,11 +2636,14 @@ function* artGround(g, R) {
   } if (BIG) yield; }
   yield;
   // 3. Мягкие края грунта и асфальта: маска 4 точки на клетку, размытая и с шумом, только поверх травы
-  for (const [tt, id] of [[DI, 'dirt'], [AS, 'asphalt']]) {
+  const surfaces = [[DI, shoulders ? 'bare_soil' : 'dirt'], [AS, 'asphalt']];
+  for (const [tt, id] of surfaces) {
+    // Гравий заходит под полотно и выступает за его края.
+    const coverage = t => t === tt || (shoulders && tt === DI && t === AS);
     const K = 4, mw = PW * K, mh = MH * K;
     if (!ARTM[id]) {
     const a = new Float32Array(mw * mh), b2 = new Float32Array(mw * mh);
-    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) a[y * mw + x] = map[(y / K | 0) * MW + (x / K | 0)] === tt ? 1 : 0;
+    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) a[y * mw + x] = coverage(map[(y / K | 0) * MW + (x / K | 0)]) ? 1 : 0;
     for (let pass = 0; pass < 2; pass++) {
       for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < mw) { s += a[y * mw + xx]; n++; } } b2[y * mw + x] = s / n; }
       for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < mh) { s += b2[yy * mw + x]; n++; } } a[y * mw + x] = s / n; }
@@ -2610,9 +2652,10 @@ function* artGround(g, R) {
     const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
     for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
       const t = map[(y / K | 0) * MW + (x / K | 0)];
-      if (!GROUNDISH(t) && !(tt === DI && t === DI)) continue;
+      if (!GROUNDISH(t) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
       const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
-      id2.data[(y * mw + x) * 4 + 3] = Math.round(clamp((v - 0.12) * 2.6, 0, 1) * 235);
+      const alpha = shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
+      id2.data[(y * mw + x) * 4 + 3] = Math.round(alpha);
     }
     mg2.putImageData(id2, 0, 0); ARTM[id] = mk;
     }
@@ -2621,13 +2664,20 @@ function* artGround(g, R) {
     // только прямоугольник вокруг клеток этого покрытия (края расплываются на 3 клетки): кусок без дороги пропускается
     let bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1;
     for (let y = Math.max(0, GW.y0 - 3); y <= Math.min(MH - 1, GW.y1 + 3); y++) for (let x = Math.max(0, GW.x0 - 3); x <= Math.min(PW - 1, GW.x1 + 3); x++)
-      if (map[y * MW + x] === tt) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
+      if (coverage(map[y * MW + x])) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
     if (bx1 >= 0 && (bx1 + 4) * T > GWP.x0 && (bx0 - 3) * T < GWP.x1 && (by1 + 4) * T > GWP.y0 && (by0 - 3) * T < GWP.y1) {
       const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(GWP.x1, (bx1 + 4) * T), ry1 = Math.min(GWP.y1, (by1 + 4) * T);
       for (let cy = ry0; cy < ry1; cy += CH) for (let cx = rx0; cx < rx1; cx += CH) {
         const w = Math.min(CH, rx1 - cx), h = Math.min(CH, ry1 - cy);
         cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
-        cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS); artFill(cg, id, cx, cy, w, h); cg.setTransform(1, 0, 0, 1, 0, 0);
+        cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS); artFill(cg, id, cx, cy, w, h);
+        if (shoulders && tt === DI) drawWheelTracks(cg, cx, cy, w, h);
+        if (shoulders && tt === AS) {
+          cg.fillStyle = 'rgba(200,190,150,0.16)';
+          for (let row = Math.max(9, Math.floor(cy / (3 * T)) * 3); row * T < cy + h; row += 3)
+            cg.fillRect(roadX[row] * T + 14, row * T + 4, 4, 18);
+        }
+        cg.setTransform(1, 0, 0, 1, 0, 0);
         cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
         cg.drawImage(mk, cx * sc, cy * sc, w * sc, h * sc, 0, 0, w * GS, h * GS);
         g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
@@ -2923,6 +2973,7 @@ const C1 = !!(window.C1_MANIFEST && !/c1-off/.test(location.hash));
 function c1Merge() {
   if (!C1) return;
   const M = window.VILLAGE_MANIFEST, C = window.C1_MANIFEST;
+  M.sprites.bare_soil = M.sprites.dirt; // мелкий гравий без отпечатка шин
   Object.assign(M.images, C.images); Object.assign(M.sprites, C.sprites);
 }
 const c1 = id => C1 && ART && ART.m.sprites[id];
@@ -4319,6 +4370,10 @@ function RMp(px, py, hint) { const r = RMt(px / T, py / T, hint); return [r[0] *
 const RMo = (o, hint) => { const r = RMp(o.x, o.y, hint); o.x = r[0]; o.y = r[1]; return o; };
 
 /* ---------- новая местность ---------- */
+const VEHICLE_ROUTES = [
+  [[84, 166.5], [125, 166.5]],
+  [[127, 142.5], [160, 142.5], [183, 142.5]]
+];
 function bigPath(pts, rad, tile) {
   tile = tile === undefined ? DI : tile;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -4384,11 +4439,11 @@ function bigWorld() {
   bigRemap();
   // грунтовки между местами (новые клетки)
   const P2 = (a, b) => bigPath(a, b);
-  P2([[84, 166.5], [125, 166.5]], 0.8);                                // деревня → шоссе
+  P2(VEHICLE_ROUTES[0], 0.8);                                // деревня → шоссе
   P2([[73, 129], [68, 141], [63, 153]], 0.7);                          // водокачка → деревня
   P2([[80, 123.5], [100, 122], [125, 121]], 0.7);                      // водокачка → шоссе
   P2([[69, 123], [52, 125.5], [36, 127.5], [18, 121.5], [0, 118]], 0.8); // на Залесье
-  P2([[127, 142.5], [160, 142.5], [183, 142.5]], 0.8);                 // шоссе → АТП
+  P2(VEHICLE_ROUTES[1], 0.8);                 // шоссе → АТП
   P2([[197.5, 128], [200, 110], [206, 92], [206.5, 74]], 0.7);         // АТП → релейная будка
   P2([[206, 90], [220, 92], [239, 92]], 0.8);                          // на Затон через брод
   P2([[201.5, 157], [197, 167], [194, 178]], 0.6);                     // пролом АТП → сады
