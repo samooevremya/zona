@@ -9,6 +9,32 @@ const grainC = document.createElement('canvas');
 let vignetteC = null;
 const CANOPY = [], LONE_K = +((location.hash.match(/lone-([0-9.]+)/) || [])[1] || 1.3);
 
+// Локальный просвет вокруг героя. Используем один рабочий холст только для
+// перекрывающих его крон; остальная часть каждой кроны остаётся плотной.
+const canopyWindow = document.createElement('canvas');
+canopyWindow.width = canopyWindow.height = 64;
+{
+  const g = canopyWindow.getContext('2d');
+  const fade = g.createRadialGradient(32, 32, 8, 32, 32, 32);
+  fade.addColorStop(0, 'rgba(0,0,0,.98)'); fade.addColorStop(.45, 'rgba(0,0,0,.87)');
+  fade.addColorStop(1, 'transparent');
+  g.fillStyle = fade; g.fillRect(0, 0, 64, 64);
+}
+const nearCrown = document.createElement('canvas'), nearCtx = nearCrown.getContext('2d');
+function drawAutumnCrown(sprite, x, y, w, h) {
+  if (w <= 0 || h <= 0) return;
+  const left = x - w / 2, top = y - h / 2, radius = 30;
+  if (!P || Math.abs(x - P.x) > w / 2 + radius || Math.abs(y - P.y) > h / 2 + radius) {
+    ctx.drawImage(sprite, left, top, w, h); return;
+  }
+  if (nearCrown.width !== sprite.width) nearCrown.width = nearCrown.height = sprite.width;
+  nearCtx.globalCompositeOperation = 'copy'; nearCtx.drawImage(sprite, 0, 0);
+  nearCtx.globalCompositeOperation = 'destination-out';
+  const kx = sprite.width / w, ky = sprite.height / h;
+  nearCtx.drawImage(canopyWindow, (P.x - radius - left) * kx, (P.y - radius - top) * ky, radius * 2 * kx, radius * 2 * ky);
+  ctx.drawImage(nearCrown, left, top, w, h);
+}
+
 /* цветовой фильтр, зерно и виньетка настраиваются; #grade-none отключает фильтр для сравнения */
 const GRADE = /grade-none/.test(location.hash) ? { mul: null, grain: 9, vig: 0.45 } : /grade-old/.test(location.hash) ? { mul: 'rgb(236,228,196)', grain: 13, vig: 0.62 } : { mul: 'rgb(248,245,236)', grain: 9, vig: 0.45 };
 const fireFlick = () => { const t = performance.now() / 1000; return 0.82 + 0.1 * Math.sin(t * 11.3) + 0.08 * Math.sin(t * 23.7 + 1.3); };
@@ -644,22 +670,28 @@ function render() {
   for (let i = 0; i + 1 < py0.length; i++) { const a = py0[i], b = py0[i + 1]; if (!inView(a.x, a.y, 600) && !inView(b.x, b.y, 600)) continue; [-6, 0, 6].forEach(o => { ctx.beginPath(); ctx.moveTo(a.x + 10 + o, a.y + 10 - o); ctx.quadraticCurveTo((a.x + b.x) / 2 + 10 + o, (a.y + b.y) / 2 + 30, b.x + 10 + o, b.y + 10 - o); ctx.stroke(); }); }
   drawCloudShadows();
   // кроны
-  const tx0 = Math.max(0, Math.floor(vx / T) - 1), tx1 = Math.min(MW - 1, Math.ceil((vx + vw) / T) + 1);
-  const ty0 = Math.max(0, Math.floor(vy / T) - 1), ty1 = Math.min(MH - 1, Math.ceil((vy + vh) / T) + 1);
+  const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
+  const tx0 = Math.max(0, Math.floor(vx / T) - margin), tx1 = Math.min(MW - 1, Math.ceil((vx + vw) / T) + margin);
+  const ty0 = Math.max(0, Math.floor(vy / T) - margin), ty1 = Math.min(MH - 1, Math.ceil((vy + vh) / T) + margin);
   for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
     if (map[y * MW + x] !== TR) continue;
     // в глубине леса каждая вторая крона всё равно закрыта соседями: не рисуем её (меньше перерисовки на телефоне)
     if (CAN_SZ > 72 && (x + y) & 1 && map[y * MW + x - 1] === TR && map[y * MW + x + 1] === TR && map[(y - 1) * MW + x] === TR && map[(y + 1) * MW + x] === TR) continue;
     const h = hash2(x, y), cx = x * T + 16 + (h - 0.5) * 8, cy = y * T + 12 + (hash2(y, x) - 0.5) * 8;
-    const under = P && dst(cx, cy, P.x, P.y) < 30;
-    ctx.globalAlpha = under ? 0.45 : 1;
     const sw = Math.sin(S.min * 0.8 + x * 0.7 + y) * 1.2;
-    let s = (0.85 + h * 0.4) * CAN_SZ / 2, ci = Math.floor(h * 8);
-    if (CANOPY.length === 12) {   // C1: одиночное дерево (мало соседей) сухое или жёлтое и крупнее, в лесу сосны и берёзы
+    if (C1 && ART) {
       const nb = (map[y * MW + x - 1] === TR) + (map[y * MW + x + 1] === TR) + (map[(y - 1) * MW + x] === TR) + (map[(y + 1) * MW + x] === TR);
-      if (nb <= 1) { ci = 6 + Math.floor(h * 6); s *= LONE_K; } else ci = Math.floor(h * 6);
+      const edge = nb <= 1;
+      const ci = edge ? forestCrowns.length + Math.floor(h * edgeCrowns.length) : Math.floor(h * forestCrowns.length);
+      const scale = .65 + hash2(x + 73, y + 13) * .52;
+      const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
+      const width = height * (.77 + .30 * hash2(y + 31, x));
+      drawAutumnCrown(CANOPY[ci], cx + sw, cy, width, height);
+    } else {
+      const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
+      ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;
+      ctx.drawImage(CANOPY[Math.floor(h * 8)], cx - sp + sw, cy - sp, 2 * sp, 2 * sp);
     }
-    const sp = s * CAN_PAD; ctx.drawImage(CANOPY[ci], cx - sp + sw, cy - sp, 2 * sp, 2 * sp);
   }
   ctx.globalAlpha = 1;
   for (const c of crows) {
