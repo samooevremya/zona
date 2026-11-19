@@ -443,6 +443,16 @@ function aiHuman(e, dt) {
   e.inCover = 0; e.crouch = 0; e.role = null; e.cover = null;
   e.tgt = null;
   e.react = 0.5;
+  if (e.campRise != null) {
+    const target = e.sit ? 0 : 1;
+    e.campRise = clamp(e.campRise + (e.sit ? -dt : dt) / 0.68, 0, 1);
+    if (e.sit) {
+      const towardFire = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
+      e.ang += angD(e.ang, towardFire) * Math.min(1, dt * 5);
+    }
+    if (e.campRise === target) e.campRise = null;
+    return;
+  }
   if (e.mem > 0 && e.lastSeen) {
     e.mem -= dt;
     e.crouch = 0; if (goTo(e, e.lastSeen.x, e.lastSeen.y, 68, dt) < 20) e.mem = 0;
@@ -495,7 +505,7 @@ function npcGrenade(e, x, y) {
   if (dst(x, y, P.x, P.y) < 300) msg('Граната! Уходи с места!', 'bad');
 }
 function combatHuman(e, t, W, dt) {
-  e.sit = 0; e.trip = null;
+  e.sit = 0; e.campRise = null; e.trip = null;
   const d = dE(e, t), see = los(e.x, e.y, t.x, t.y);
   if (see) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
@@ -559,6 +569,13 @@ function combatHuman(e, t, W, dt) {
     if (e.mag <= 0) { e.reload = W.reload * 1.2; e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
   }
 }
+// 0 — сидит у огня, 1 — полностью встал. При смене намерения продолжаем с текущей позы.
+function setCampSeat(e, sitting) {
+  if (!!e.sit === sitting) return;
+  if (e.fac === 'loner' && e.fireRef && window.CORDON_G8_ON && G3_READY() && e.campRise == null)
+    e.campRise = e.sit ? 0 : 1;
+  e.sit = sitting ? 1 : 0;
+}
 function idleHuman(e, dt) {
   if (followTick(e, dt)) return;
   if (e.guard) {
@@ -568,14 +585,14 @@ function idleHuman(e, dt) {
   }
   if (e.sit) {
     e.ang += angD(e.ang, Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x)) * dt * 2;
-    if (e.fac === 'loner' && !e.named && e.fireRef === FIRE && chance(dt * 0.004)) { e.sit = 0; startTrip(e); }
+    if (e.fac === 'loner' && !e.named && e.fireRef === FIRE && chance(dt * 0.004)) { setCampSeat(e, false); startTrip(e); }
     return;
   }
   if (e.trip) {
     const tr = e.trip;
     if (tr.stage === 0) { if (goTo(e, tr.x, tr.y, 72, dt) < 30) { tr.stage = 1; tr.wait = rnd(10, 30); } }
     else if (tr.stage === 1) { tr.wait -= dt; e.idleT -= dt; if (e.idleT <= 0) { e.idleT = rnd(2, 5); e.ang += rnd(-1.5, 1.5); } if (tr.wait <= 0) tr.stage = 2; }
-    else if (goTo(e, e.home.x, e.home.y, 72, dt) < 24) { e.trip = null; if (e.seat) e.sit = 1; }
+    else if (goTo(e, e.home.x, e.home.y, 72, dt) < 24) { e.trip = null; if (e.seat) setCampSeat(e, true); }
     return;
   }
   const dh = dE(e, e.home);

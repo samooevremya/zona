@@ -117,50 +117,55 @@ function drawWeaponLocal(c2, w) {
 
 /* ---------- отрисовка людей ---------- */
 function shadowAt(e, rx) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(e.x + 2, e.y + 3, rx || 10, 7, 0, 0, 6.28); ctx.fill(); }
-function g7Human(e, extra) {
+function g7Human(e, extra, target) {
   if (!G3_READY()) return false;
   const opacity = extra && extra.opacity != null ? extra.opacity : 1;
   if (e.sid === 'sid') {   // Сидорович G4: idle/seated/relaxed, табурет уже в кадре, оружие не рисуется
     const give = typeof panel !== 'undefined' && panel && panel.kind === 'trade' && g7PoseFrame('sid', 'give');   // G8: торговля — протягивает свёрток
     const f = give || g7PoseFrame('sid', window.CORDON_G8_ON && e.talkT > 0 ? 'idle' : e.sit ? 'seated' : e.talkT > 0 ? 'idle' : 'relaxed') || g7PoseFrame('sid', 'idle'); if (!f) return false;
-    shadowAt(e, 11); drawFrameAt(e.x, e.y, e.ang, f, opacity); if (e.flash > 0) flashFrame(e, f); return true;
+    drawFrameAt(e.x, e.y, e.ang, f, opacity, 1, target); if (e.flash > 0) flashFrame(e, f, 1, target); return true;
   }
   if (e.captive && !e.wounded && G7.poseOn) {   // связанный пленник: цельный кадр, без модульных рук/ствола
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
-    if (f) { shadowAt(e); drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K); return true; }
+    if (f) { drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K, target); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K, target); return true; }
   }
-  if (window.CORDON_G8_ON && e.sit && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
-    const seated = packImage('assets/g8/camp_loner.webp');
-    if (seated) {
-      shadowAt(e, 12);
-      ctx.save();
-      ctx.translate(e.x, e.y); ctx.rotate(e.ang - Math.PI / 2);
-      ctx.globalAlpha *= opacity;
-      // Опорная точка под тазом. Свободный ботинок выступает вперёд, к костру.
-      const width = 33, height = width * seated.naturalHeight / seated.naturalWidth;
-      ctx.drawImage(seated, -width / 2, -height * 0.44, width, height);
+  if (window.CORDON_G8_ON && (e.sit || e.campRise != null) && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
+    const sheet = packImage('assets/g8/camp_rise.webp');
+    if (sheet) {
+      // 17 кадров с готовым смешиванием в premultiplied alpha: силуэт сохраняет плотность.
+      const rise = e.campRise || 0, frame = Math.round(rise * 16);
+      const sw = sheet.naturalWidth / 17, sh = sheet.naturalHeight;
+      target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
+      const alpha = target.globalAlpha * opacity;
+      target.globalAlpha = alpha;
+      target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
       if (e.flash > 0) {
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha *= Math.min(0.5, e.flash * 4);
-        ctx.drawImage(seated, -width / 2, -height * 0.44, width, height);
+        target.save();
+        target.globalCompositeOperation = 'lighter';
+        target.globalAlpha = alpha * Math.min(0.5, e.flash * 4);
+        target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
+        target.restore();
       }
-      ctx.restore(); return true;
+      if (rise > 0.75 && !e.sit) {
+        target.globalAlpha = alpha * (rise * 4 - 3);
+        drawWeaponLocal(target, weaponLocal(e));
+      }
+      target.restore(); return true;
     }
   }
   const r = rigActive(e); if (!r) return false;
-  const w = weaponLocal(e), base = window.__g7tap ? ctx.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
+  const w = weaponLocal(e), base = window.__g7tap ? target.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
     deadImage: G7.img[CORDON_RIG.dead[r.skin]], drawEquipment: c2 => { if (base) window.__g7tap(e, base, c2.getTransform(), w); drawWeaponLocal(c2, w); } };
-  shadowAt(e);
-  const ok = CordonRig.draw(ctx, G7.img, CORDON_RIG.manifest, r.rig, o);
-  if (ok && e.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); CordonRig.draw(ctx, G7.img, CORDON_RIG.manifest, r.rig, Object.assign({}, o, { drawEquipment: null })); ctx.restore(); }
+  const ok = CordonRig.draw(target, G7.img, CORDON_RIG.manifest, r.rig, o);
+  if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonRig.draw(target, G7.img, CORDON_RIG.manifest, r.rig, Object.assign({}, o, { drawEquipment: null })); target.restore(); }
   return ok;
 }
 const CAPTIVE_K = 0.86;   // кадр 64×72: голова/плечи сверены с соседним idle (48×56) — без этого пленник крупнее стоящих
-function drawFrameAt(x, y, ang, f, opacity, k) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate((ang || 0) - Math.PI / 2); ctx.globalAlpha *= opacity == null ? 1 : opacity; if (k) ctx.scale(k, k);
-  ctx.drawImage(G3.images[f.file], -f.width * f.pivot[0], -f.height * f.pivot[1], f.width, f.height); ctx.restore();
+function drawFrameAt(x, y, ang, f, opacity, k, target = ctx) {
+  target.save(); target.translate(x, y); target.rotate((ang || 0) - Math.PI / 2); target.globalAlpha *= opacity == null ? 1 : opacity; if (k) target.scale(k, k);
+  target.drawImage(G3.images[f.file], -f.width * f.pivot[0], -f.height * f.pivot[1], f.width, f.height); target.restore();
 }
-function flashFrame(e, f, k) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); drawFrameAt(e.x, e.y, e.ang, f, 1, k); ctx.restore(); }
+function flashFrame(e, f, k, target) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); drawFrameAt(e.x, e.y, e.ang, f, 1, k, target); target.restore(); }
 
 /* ---------- мутанты: подготовка только в существующем wind кабана, отдача — на событие попадания ---------- */
 function g7Mutant(e, a) {

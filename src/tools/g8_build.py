@@ -258,7 +258,7 @@ ui('bar_fd', crop_box((20, 660, 625, 705)).resize((256, 12), Image.LANCZOS), 0, 
 barf = crop_box((10, 480, 635, 565)); ui('barframe', nine(barf, 14, 256, 28, 10), 5, 128, 14)
 
 # Дополнительные иллюстрации лагеря хранятся готовыми игровыми спрайтами.
-for name in ('camp_loner', 'player_bedroll'):
+for name in ('camp_loner', 'player_bedroll', 'camp_rise'):
     with open(os.path.join(OUT, 'src', name + '.webp'), 'rb') as asset:
         G3IMG['assets/g8/' + name + '.webp'] = 'data:image/webp;base64,' + base64.b64encode(asset.read()).decode()
 

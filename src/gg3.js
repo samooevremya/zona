@@ -22,21 +22,21 @@ const G3W = { w_pm: { len: 11, w: 3.2 }, w_obrez: { len: 17, w: 3.6 }, w_aksu: {
 const G3_GRIP = [1.5, 8];   // точка хвата в кадре (уточнена по рукам idle/walk/crouch; см. отчёт)
 /* дуло для выстрела/вспышки — та же геометрия, что и у слоя оружия (gg7.js: weaponLocal → localToWorld) */
 function g3Muzzle(e, ang) { return g7Muzzle(e, ang); }
-function g3Draw(e, extra) {
+function g3Draw(e, extra, target = ctx) {
   if (!G3_READY()) return false;
-  if (e.kind === 'human' && g7Human(e, extra)) return true;
+  if (e.kind === 'human' && g7Human(e, extra, target)) return true;
   const skin = g3Skin(e), g = g3Gait(e);
   const attack = e.kind === 'dog' ? !!(e.tgt && e.tgt.alive && dE(e, e.tgt) < e.r + e.tgt.r + 10)
     : e.kind === 'boar' ? (e.state === 'wind' || e.state === 'charge') : e.kind === 'sucker' ? e.state === 'strike' : false;
   const a = Object.assign({ skin: skin, x: e.x, y: e.y, angle: e.ang, wounded: !!e.wounded, captive: !!e.captive, seated: !!e.sit, crouch: !!e.crouch,
     attack: attack, moving: g.moving && !e.sit, time: (g.phase + 0.5) / 7, weapon: e.kind === 'human' ? (e === P ? S.weapon : e.wpn) : null }, extra || {});
   if (e.kind !== 'human' && a.moving) { const ph = g.phase, A = G3.pack.manifest.actors[skin] || {}; a.moving = false; a.poseOverride = ph === 0 ? 'walk_left' : ph === 2 ? 'walk_right' : ph === 1 && A.walk_pass_left ? 'walk_pass_left' : ph === 3 && A.walk_pass_right ? 'walk_pass_right' : 'idle'; }   // G8: 4 фазы бега, если есть
-  const man = G3.pack.manifest, g3Base = window.__g7tap ? ctx.getTransform() : null;
+  const man = G3.pack.manifest, g3Base = window.__g7tap ? target.getTransform() : null;
   if (e.kind !== 'human' && g7Mutant(e, a)) return true;
   if (a.poseOverride && !a.attack) { const f = man.actors[skin][a.poseOverride]; if (f && G3.images[f.file]) return g3DrawFrame(e, a, f); }
   const sw = e.kind === 'human' && a.moving ? gaitSway(e) : null;
-  if (sw) { ctx.save(); ctx.translate(e.x + sw.dx, e.y + sw.dy); ctx.scale(sw.k, sw.k); ctx.translate(-e.x, -e.y); }
-  const ok = CordonG3.draw(ctx, man, G3.images, a, e.kind === 'human' ? (c2 => {
+  if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
+  const ok = CordonG3.draw(target, man, G3.images, a, e.kind === 'human' ? (c2 => {
     if (e === P && window.CORDON_G8_ON) {
       const roll = packImage('assets/g8/player_bedroll.webp');
       if (roll) {
@@ -45,8 +45,8 @@ function g3Draw(e, extra) {
       }
     }
     const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
-  if (ok && e.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(ctx, man, G3.images, Object.assign({}, a, { shadow: false }), null); ctx.restore(); }
-  if (sw) ctx.restore();
+  if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(target, man, G3.images, Object.assign({}, a, { shadow: false }), null); target.restore(); }
+  if (sw) target.restore();
   return ok;
 }
 /* шаг: корпус качается из стороны в сторону (период — два шага) и чуть «подпрыгивает» к камере на каждом шаге */
