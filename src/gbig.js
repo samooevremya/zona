@@ -212,6 +212,7 @@ function bigNewObjects(R) {
   ANOM0.push({ x: 125.5 * T, y: 26.5 * T, r: 26, k: 'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
   rads.push({ x: 123 * T, y: 24 * T, r: 110, p: 2.2 });
   DECOR.push(['ford', 230.5, 92, 0]);
+
   // брод: аномалия на середине, тайник у берега
   ANOM0.push({ x: 231.5 * T, y: 95.5 * T, r: 22, k: 'e' });
   CACHES.push({ x: 225.5, y: 99.5, loot: { antirad: 2, a12: 12, money: 160 } });
@@ -224,4 +225,11 @@ function bigNewObjects(R) {
     const bad = () => { for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++) for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) { const t = tAt(x, y); if (t !== GR && t !== BU && !(o.k === 'car' && t === DI)) return true; } return false; };
     for (let i = 0; i < 40 && bad(); i++) { o.x += (i % 2 ? 1 : -1) * T * Math.ceil(i / 4); o.y += (i % 3 === 0 ? T : 0); }
   });
+}
+
+/* заборы из декора — настоящие препятствия (перепрыгиваются). Вызывается после переноса координат, когда декор на своих местах */
+function bigFences() {
+  if (!BIG || !C1 || objs.some(o => o.k === 'fence')) return;
+  DECOR.forEach(d => { if (d[0] !== 'fence') return; const len = 64, th = 9, hor = Math.abs(Math.cos(d[3])) > 0.7, w = hor ? len : th, h = hor ? th : len;
+    objs.push({ k: 'fence', x: d[1] * T - w / 2, y: d[2] * T - h / 2, w: w, h: h, solid: 1, static: 1 }); });
 }
