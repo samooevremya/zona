@@ -700,7 +700,19 @@ function render() {
     const w = Math.sin(c.ph) * 5; ctx.strokeStyle = '#141412'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x - 7, c.y - w); ctx.lineTo(c.x, c.y); ctx.lineTo(c.x + 7, c.y - w); ctx.stroke(); ctx.lineWidth = 1;
   }
   // имена дружественных рядом
-  ctx.font = '600 ' + (BIG ? 7 : 9) + 'px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+  ctx.textAlign = 'center';
+  for (const e of vis) {   // стелс: «?» — враг насторожился, «!» — заметил
+    if (e === P || !e.alive || !hostile(e, P) || e.kind !== 'human' && e.kind !== 'dog') continue;
+    const aw = e.tgt === P ? (e.alertT = (e.alertT == null ? 1.5 : e.alertT)) && 1 : (e.alertT = null, e.aw || 0);
+    if (e.tgt === P) { e.alertT -= 1 / 60; if (e.alertT <= 0) continue; }
+    else if (aw < 0.25) continue;
+    const red = e.tgt === P, y = e.y - 24;
+    ctx.font = '800 11px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.fillStyle = red ? '#ff4a32' : 'rgba(246,196,70,' + clamp(0.35 + aw, 0, 1) + ')';
+    ctx.strokeText(red ? '!' : '?', e.x, y); ctx.fillText(red ? '!' : '?', e.x, y);
+    if (!red) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(e.x - 7, y + 3, 14, 2.5); ctx.fillStyle = '#f6c446'; ctx.fillRect(e.x - 7, y + 3, 14 * aw, 2.5); }
+  }
+  ctx.font = '600 ' + (BIG ? 7 : 9) + 'px "IBM Plex Mono", monospace';
   for (const e of vis) {
     if (BIG && !/names/.test(location.hash)) break;   // как в референсе: имя только в кнопке «Говорить»
     if (e === P || e.kind !== 'human' || hostile(e, P)) continue;

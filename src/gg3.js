@@ -173,6 +173,15 @@ body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
 }
+/* стелс-кнопка, счётчики аптечек, выбор бинт/аптечка */
+.hud.zh .zh-p.kill{border-color:#a8321f;box-shadow:0 0 12px rgba(200,40,20,.55);color:#ffd9cf}.hud.zh .zh-p.kill .pi{background:#b3271a;border-radius:50%;width:10px;height:10px;display:inline-block;margin-right:8px}
+.touch.zt #b-med{overflow:visible}.touch.zt .mb{position:absolute;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:8px;font:700 10px/15px Arial;font-style:normal;text-align:center;pointer-events:none}
+.touch.zt .mb:empty{display:none}.touch.zt .mb.m{right:-5px;top:-5px;background:#b3271a;color:#fff}.touch.zt .mb.b{right:-5px;bottom:-5px;background:#e8e2d0;color:#1a1612}
+.touch.zt #b-med.empty{opacity:.45}
+body.is-touch .touch.zt .medpick{position:absolute;right:calc(70px + var(--sar));top:calc(108px + var(--sat) + var(--st, 50px));display:flex;gap:8px;z-index:5;pointer-events:auto}
+body.is-touch .touch.zt .medpick[hidden]{display:none}
+body.is-touch .touch.zt .medpick button{position:static!important;inset:auto!important;transform:none!important;width:auto!important;height:auto!important;text-transform:none;letter-spacing:0;pointer-events:auto;min-width:96px!important;min-height:46px!important;padding:4px 10px!important;border-radius:10px!important;border:1.5px solid rgba(236,229,206,.35)!important;background:rgba(14,14,11,.85)!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important;color:#ece6d3!important;font:700 12px Arial!important;filter:none!important;display:grid;grid-template-columns:auto auto;align-items:center;column-gap:6px;text-align:left}
+.touch.zt .medpick em{font-style:normal;font-size:16px!important;color:#f6c446;justify-self:end}.touch.zt .medpick small{grid-column:1/3;font-size:10px!important;font-weight:400;color:#bfb69c}
 /* фонарик (блок над детектором) и ровная панель оружия */
 .hud.zh .zh-det{cursor:pointer;pointer-events:auto}.hud.zh .zh-det::after{content:'';position:absolute;inset:-3px -4px -11px}
 .hud.zh .zh-det .torch{color:#6f7a7c;fill:currentColor;width:18px;height:18px}.hud.zh .zh-det.on .torch{color:#62b6ff;filter:drop-shadow(0 0 4px rgba(80,170,255,.7))}.hud.zh .zh-det:not(.on) .beam{display:none}

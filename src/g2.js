@@ -317,7 +317,7 @@ function fire(sh, ang, W, spread) {
   ents.forEach(e => {
     if (e === sh || !e.alive || e === P || e.captive) return;
     const d = dE(e, sh);
-    if (d < 620 && hostile(e, sh)) { e.lastSeen = { x: sh.x, y: sh.y }; e.mem = Math.max(e.mem || 0, 5); }
+    if (d < 620 && hostile(e, sh)) { e.lastSeen = { x: sh.x, y: sh.y }; e.mem = Math.max(e.mem || 0, 5); if (sh === P) e.aw = Math.max(e.aw || 0, d < 320 ? 1 : 0.75); }
   });
 }
 /* бой рядом: есть враг игрока ближе 650 px, который его видит или видим им */
@@ -349,7 +349,8 @@ function melee(sh, W) {
     if (d < W.range + e.r + sh.r && Math.abs(angD(sh.ang, Math.atan2(e.y - sh.y, e.x - sh.x))) < 0.9 && d < bd) { hit = e; bd = d; }
   });
   play('knife', sh.x, sh.y);
-  if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1), sh, sh.ang);
+  const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
+  if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang) {
   if (!e.alive) return;
@@ -415,6 +416,33 @@ function dropBody(e) {
 }
 
 /* ===================== ИИ ===================== */
+/* стелс: насколько игрока видно (1 — обычно) и на каком расстоянии слышно его шаги */
+function pVis() {
+  let v = 1;
+  const moving = Math.hypot(IN.moveX, IN.moveY) > 0.1 || P.jumpT > 0;
+  if (P.crouch) v *= 0.55;
+  if (!moving) v *= 0.75; else if (P.sprinting) v *= 1.25;
+  if (darkness() > 0.3) v *= S.torch === false ? 0.6 : 1.1;   // ночью фонарь выдаёт, без него замечают на 40% позже
+  return v;
+}
+function pNoise() {
+  if (P.jumpT > 0) return 150;
+  const m = Math.hypot(IN.moveX, IN.moveY); if (m < 0.1) return 0;
+  return P.crouch ? 34 : P.sprinting ? 175 : 95;
+}
+/* враг ещё не в бою с игроком: копит подозрение (0..1). Видит только перед собой (~115°), сзади — только на слух */
+function stealthTick(e, dt) {
+  if (!P.alive || !hostile(e, P) || e.tgt === P || P.cloak > 0.7) { if (e.tgt === P) e.aw = 1; return; }
+  const d = dE(e, P), aP = Math.atan2(P.y - e.y, P.x - e.x), range = sight(e) * pVis();
+  let gain = 0;
+  if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && los(e.x, e.y, P.x, P.y)) gain = 0.45 + 2.4 * (1 - d / range);
+  const nz = pNoise(); if (nz && d < nz) gain = Math.max(gain, 0.5 + 1.5 * (1 - d / nz));
+  const was = e.aw || 0;
+  e.aw = gain ? Math.min(1, was + gain * dt) : Math.max(0, was - 0.25 * dt);
+  if (e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
+  if (e.aw > 0.4 && was <= 0.4 && chance(0.7)) sayLine(e, e.fac === 'army' ? 'Стой, кто там?' : e.fac === 'bandit' ? 'Э, кто там шуршит?' : 'Кто здесь?');
+  if (e.aw >= 1 && was < 1) ents.forEach(o => { if (o !== e && o.alive && o.fac === e.fac && o.tgt !== P && dE(o, e) < 220) o.aw = Math.max(o.aw || 0, 0.7); });   // поднял своих
+}
 function sight(e) { return ((night() ? 240 : 400) + (e.fac === 'army' ? 40 : 0)) * (1 - WX.fog * 0.45 - WX.rain * 0.12); }
 function findTarget(e) {
   let best = null, bd = 1e9;
@@ -422,7 +450,8 @@ function findTarget(e) {
   for (const o of ents) {
     if (!o.alive || o === e || !hostile(e, o) || o.cloak > 0.7) continue;
     const d = dE(e, o);
-    if (d > (o === P && P.crouch ? sr * 0.55 : sr) || d >= bd) continue;
+    if (o === P && e.kind === 'human' && e.tgt !== P) { if ((e.aw || 0) < 1 || d > sr * 1.2 || d >= bd) continue; }   // игрока сначала надо заметить
+    else if (d > sr || d >= bd) continue;
     if (!los(e.x, e.y, o.x, o.y)) continue;
     best = o; bd = d;
   }
@@ -430,7 +459,7 @@ function findTarget(e) {
 }
 function aiHuman(e, dt) {
   if (e.captive) return;
-  e.cool -= dt; e.think -= dt;
+  e.cool -= dt; e.think -= dt; stealthTick(e, dt);
   const W = WP[e.wpn];
   if (e.reload > 0) { e.reload -= dt; if (e.reload <= 0) e.mag = W.mag; }
   if (e.think <= 0) {
@@ -638,7 +667,8 @@ function aiDog(e, dt) {
     for (const o of ents) {
       if (!o.alive || o.fac === 'mutant' || o.captive) continue;
       const d = dE(e, o);
-      if (d < (night() ? 320 : 280) && d < bd && (d < 150 || los(e.x, e.y, o.x, o.y))) { best = o; bd = d; }
+      const k = o === P ? clamp(pVis() * 1.1, 0.5, 1.2) : 1;
+      if (d < (night() ? 320 : 280) * k && d < bd && (d < 150 * k || los(e.x, e.y, o.x, o.y))) { best = o; bd = d; }
     }
     if (best && !e.tgt) { ents.forEach(o => { if (o.kind === 'dog' && o.alive && o.pack === e.pack && !o.tgt && dE(o, e) < 220) o.tgt = best; }); }
     if (best) e.tgt = best;

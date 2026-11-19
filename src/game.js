@@ -714,7 +714,7 @@ function fire(sh, ang, W, spread) {
   ents.forEach(e => {
     if (e === sh || !e.alive || e === P || e.captive) return;
     const d = dE(e, sh);
-    if (d < 620 && hostile(e, sh)) { e.lastSeen = { x: sh.x, y: sh.y }; e.mem = Math.max(e.mem || 0, 5); }
+    if (d < 620 && hostile(e, sh)) { e.lastSeen = { x: sh.x, y: sh.y }; e.mem = Math.max(e.mem || 0, 5); if (sh === P) e.aw = Math.max(e.aw || 0, d < 320 ? 1 : 0.75); }
   });
 }
 /* бой рядом: есть враг игрока ближе 650 px, который его видит или видим им */
@@ -746,7 +746,8 @@ function melee(sh, W) {
     if (d < W.range + e.r + sh.r && Math.abs(angD(sh.ang, Math.atan2(e.y - sh.y, e.x - sh.x))) < 0.9 && d < bd) { hit = e; bd = d; }
   });
   play('knife', sh.x, sh.y);
-  if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1), sh, sh.ang);
+  const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
+  if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang) {
   if (!e.alive) return;
@@ -812,6 +813,33 @@ function dropBody(e) {
 }
 
 /* ===================== ИИ ===================== */
+/* стелс: насколько игрока видно (1 — обычно) и на каком расстоянии слышно его шаги */
+function pVis() {
+  let v = 1;
+  const moving = Math.hypot(IN.moveX, IN.moveY) > 0.1 || P.jumpT > 0;
+  if (P.crouch) v *= 0.55;
+  if (!moving) v *= 0.75; else if (P.sprinting) v *= 1.25;
+  if (darkness() > 0.3) v *= S.torch === false ? 0.6 : 1.1;   // ночью фонарь выдаёт, без него замечают на 40% позже
+  return v;
+}
+function pNoise() {
+  if (P.jumpT > 0) return 150;
+  const m = Math.hypot(IN.moveX, IN.moveY); if (m < 0.1) return 0;
+  return P.crouch ? 34 : P.sprinting ? 175 : 95;
+}
+/* враг ещё не в бою с игроком: копит подозрение (0..1). Видит только перед собой (~115°), сзади — только на слух */
+function stealthTick(e, dt) {
+  if (!P.alive || !hostile(e, P) || e.tgt === P || P.cloak > 0.7) { if (e.tgt === P) e.aw = 1; return; }
+  const d = dE(e, P), aP = Math.atan2(P.y - e.y, P.x - e.x), range = sight(e) * pVis();
+  let gain = 0;
+  if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && los(e.x, e.y, P.x, P.y)) gain = 0.45 + 2.4 * (1 - d / range);
+  const nz = pNoise(); if (nz && d < nz) gain = Math.max(gain, 0.5 + 1.5 * (1 - d / nz));
+  const was = e.aw || 0;
+  e.aw = gain ? Math.min(1, was + gain * dt) : Math.max(0, was - 0.25 * dt);
+  if (e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
+  if (e.aw > 0.4 && was <= 0.4 && chance(0.7)) sayLine(e, e.fac === 'army' ? 'Стой, кто там?' : e.fac === 'bandit' ? 'Э, кто там шуршит?' : 'Кто здесь?');
+  if (e.aw >= 1 && was < 1) ents.forEach(o => { if (o !== e && o.alive && o.fac === e.fac && o.tgt !== P && dE(o, e) < 220) o.aw = Math.max(o.aw || 0, 0.7); });   // поднял своих
+}
 function sight(e) { return ((night() ? 240 : 400) + (e.fac === 'army' ? 40 : 0)) * (1 - WX.fog * 0.45 - WX.rain * 0.12); }
 function findTarget(e) {
   let best = null, bd = 1e9;
@@ -819,7 +847,8 @@ function findTarget(e) {
   for (const o of ents) {
     if (!o.alive || o === e || !hostile(e, o) || o.cloak > 0.7) continue;
     const d = dE(e, o);
-    if (d > (o === P && P.crouch ? sr * 0.55 : sr) || d >= bd) continue;
+    if (o === P && e.kind === 'human' && e.tgt !== P) { if ((e.aw || 0) < 1 || d > sr * 1.2 || d >= bd) continue; }   // игрока сначала надо заметить
+    else if (d > sr || d >= bd) continue;
     if (!los(e.x, e.y, o.x, o.y)) continue;
     best = o; bd = d;
   }
@@ -827,7 +856,7 @@ function findTarget(e) {
 }
 function aiHuman(e, dt) {
   if (e.captive) return;
-  e.cool -= dt; e.think -= dt;
+  e.cool -= dt; e.think -= dt; stealthTick(e, dt);
   const W = WP[e.wpn];
   if (e.reload > 0) { e.reload -= dt; if (e.reload <= 0) e.mag = W.mag; }
   if (e.think <= 0) {
@@ -1035,7 +1064,8 @@ function aiDog(e, dt) {
     for (const o of ents) {
       if (!o.alive || o.fac === 'mutant' || o.captive) continue;
       const d = dE(e, o);
-      if (d < (night() ? 320 : 280) && d < bd && (d < 150 || los(e.x, e.y, o.x, o.y))) { best = o; bd = d; }
+      const k = o === P ? clamp(pVis() * 1.1, 0.5, 1.2) : 1;
+      if (d < (night() ? 320 : 280) * k && d < bd && (d < 150 * k || los(e.x, e.y, o.x, o.y))) { best = o; bd = d; }
     }
     if (best && !e.tgt) { ents.forEach(o => { if (o.kind === 'dog' && o.alive && o.pack === e.pack && !o.tgt && dE(o, e) < 220) o.tgt = best; }); }
     if (best) e.tgt = best;
@@ -1214,6 +1244,21 @@ function useItem(id) {
   msg(it.n + ': здоровье ' + Math.round(P.hp) + (FOOD[id] ? ', сытость ' + Math.round(S.food) : ', радиация ' + Math.round(S.rad)) + (id === 'bandage' || id === 'medkit' ? (S.bleed ? ', кровь ещё идёт' : ', кровь остановлена') : ''), 'good');
   return true;
 }
+function healWith(id) {
+  if (P.medT > 0) return; hideMedPick();
+  if (!has(id)) { msg(id === 'medkit' ? 'Аптечек нет.' : 'Бинтов нет.'); return; }
+  P.medT = 1; useItem(id);
+}
+/* кнопка аптечки: есть и бинты, и аптечки — даёт выбрать; есть что-то одно — сразу лечит */
+function medButton() {
+  const m = cnt('medkit'), b = cnt('bandage');
+  if (!m && !b) { msg('Нечем лечиться. Аптечки и бинты продаёт Сидорович.'); return; }
+  if (!m || !b) { healWith(m ? 'medkit' : 'bandage'); return; }
+  const mp = document.getElementById('medpick'); if (!mp.hidden) { hideMedPick(); return; }
+  mp.hidden = false; medPickT = 3.5;
+}
+let medPickT = 0;
+function hideMedPick() { const mp = document.getElementById('medpick'); if (mp) mp.hidden = true; medPickT = 0; }
 function quickHeal() {
   if (P.medT > 0) return;
   P.medT = 1;
@@ -1230,7 +1275,7 @@ function throwBolt() {
 /* фонарик: ночью светит конусом; выключенный — почти темнота вокруг, зато тебя хуже видно издалека */
 function toggleTorch() { S.torch = S.torch === false; play('click'); msg(S.torch ? 'Фонарик включён.' : 'Фонарик выключен.' + (darkness() > 0.3 ? ' В темноте тебя хуже видно, но и ты видишь мало.' : '')); }
 /* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
-const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier']);
+const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier', 'fence']);
 function startJump() {
   if (P.jumpT > 0 || (P.jumpCD || 0) > 0 || P.sit) return;
   if (P.st < 15) { msg('Нет сил прыгать: отдышись.'); return; }
@@ -1239,6 +1284,15 @@ function startJump() {
   P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= 15; P.jumpA = a; play('step');
 }
 const JUMP_T = 0.42, JUMP_V = 250;
+/* тихое убийство: сзади, пока враг не заметил. Лёгкая броня — сразу; армейская держит удар */
+function takedown(e) {
+  if (!e.alive || e.tgt === P || (e.aw || 0) >= 1) return;
+  const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knife', P.x, P.y);
+  const heavy = e.fac === 'army' || e.sid === 'boss';
+  if (!heavy) { e.quiet = 1; hurt(e, e.hp + 5, P, a); msg('Тихо снял: ' + e.name + '.', 'good'); }
+  else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
+  ents.forEach(o => { if (o !== e && o.alive && hostile(o, P) && o.tgt !== P && dE(o, e) < 150 && los(o.x, o.y, e.x, e.y)) o.aw = Math.max(o.aw || 0, 0.75); });   // кто рядом и видел — насторожился
+}
 function solidPx(x, y) {
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
   if (!inb(tx, ty) || SOLID[map[ty * MW + tx]]) return true;
@@ -1377,8 +1431,8 @@ function updatePlayer(dt) {
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const over = weight() > MAXW;
-  const sprint = (IN.sprint || ml > 0.95 && IN.touch) && P.st > 5 && !over && ml > 0.1;
-  if (sprint) P.crouch = 0;
+  const sprint = (IN.sprint || ml > 0.95 && IN.touch && !P.crouch) && P.st > 5 && !over && ml > 0.1;
+  if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * dt); else P.st = Math.min(100, P.st + 14 * dt);
   P.jumpCD = (P.jumpCD || 0) - dt;
@@ -1470,6 +1524,8 @@ function findInteract() {
   let best = null, bd = 1e9;
   const cand = (d, o) => { if (d < bd) { bd = d; best = o; } };
   for (const e of ents) {
+    if (e.alive && e.kind === 'human' && hostile(e, P) && !e.captive && e.tgt !== P && (e.aw || 0) < 1 && dE(e, P) < 42 &&
+      (Math.abs(angD(e.ang, Math.atan2(P.y - e.y, P.x - e.x))) > 1.9 || e.sit)) { cand(dE(e, P) - 200, { k: 'kill', e: e, label: 'Убить ножом: ' + e.name }); continue; }   // сзади и незаметно
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
@@ -2270,7 +2326,19 @@ function render() {
     const w = Math.sin(c.ph) * 5; ctx.strokeStyle = '#141412'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x - 7, c.y - w); ctx.lineTo(c.x, c.y); ctx.lineTo(c.x + 7, c.y - w); ctx.stroke(); ctx.lineWidth = 1;
   }
   // имена дружественных рядом
-  ctx.font = '600 ' + (BIG ? 7 : 9) + 'px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+  ctx.textAlign = 'center';
+  for (const e of vis) {   // стелс: «?» — враг насторожился, «!» — заметил
+    if (e === P || !e.alive || !hostile(e, P) || e.kind !== 'human' && e.kind !== 'dog') continue;
+    const aw = e.tgt === P ? (e.alertT = (e.alertT == null ? 1.5 : e.alertT)) && 1 : (e.alertT = null, e.aw || 0);
+    if (e.tgt === P) { e.alertT -= 1 / 60; if (e.alertT <= 0) continue; }
+    else if (aw < 0.25) continue;
+    const red = e.tgt === P, y = e.y - 24;
+    ctx.font = '800 11px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.fillStyle = red ? '#ff4a32' : 'rgba(246,196,70,' + clamp(0.35 + aw, 0, 1) + ')';
+    ctx.strokeText(red ? '!' : '?', e.x, y); ctx.fillText(red ? '!' : '?', e.x, y);
+    if (!red) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(e.x - 7, y + 3, 14, 2.5); ctx.fillStyle = '#f6c446'; ctx.fillRect(e.x - 7, y + 3, 14 * aw, 2.5); }
+  }
+  ctx.font = '600 ' + (BIG ? 7 : 9) + 'px "IBM Plex Mono", monospace';
   for (const e of vis) {
     if (BIG && !/names/.test(location.hash)) break;   // как в референсе: имя только в кнопке «Говорить»
     if (e === P || e.kind !== 'human' || hostile(e, P)) continue;
@@ -4806,6 +4874,7 @@ function bigNewObjects(R) {
   ANOM0.push({ x: 125.5 * T, y: 26.5 * T, r: 26, k: 'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
   rads.push({ x: 123 * T, y: 24 * T, r: 110, p: 2.2 });
   DECOR.push(['ford', 230.5, 92, 0]);
+
   // брод: аномалия на середине, тайник у берега
   ANOM0.push({ x: 231.5 * T, y: 95.5 * T, r: 22, k: 'e' });
   CACHES.push({ x: 225.5, y: 99.5, loot: { antirad: 2, a12: 12, money: 160 } });
@@ -4818,6 +4887,13 @@ function bigNewObjects(R) {
     const bad = () => { for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++) for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) { const t = tAt(x, y); if (t !== GR && t !== BU && !(o.k === 'car' && t === DI)) return true; } return false; };
     for (let i = 0; i < 40 && bad(); i++) { o.x += (i % 2 ? 1 : -1) * T * Math.ceil(i / 4); o.y += (i % 3 === 0 ? T : 0); }
   });
+}
+
+/* заборы из декора — настоящие препятствия (перепрыгиваются). Вызывается после переноса координат, когда декор на своих местах */
+function bigFences() {
+  if (!BIG || !C1 || objs.some(o => o.k === 'fence')) return;
+  DECOR.forEach(d => { if (d[0] !== 'fence') return; const len = 64, th = 9, hor = Math.abs(Math.cos(d[3])) > 0.7, w = hor ? len : th, h = hor ? th : len;
+    objs.push({ k: 'fence', x: d[1] * T - w / 2, y: d[2] * T - h / 2, w: w, h: h, solid: 1, static: 1 }); });
 }
 
 /* ===================== графический пакет G3.1: тела, мутанты, портреты, иконки, UI =====================
@@ -4995,6 +5071,15 @@ body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
 }
+/* стелс-кнопка, счётчики аптечек, выбор бинт/аптечка */
+.hud.zh .zh-p.kill{border-color:#a8321f;box-shadow:0 0 12px rgba(200,40,20,.55);color:#ffd9cf}.hud.zh .zh-p.kill .pi{background:#b3271a;border-radius:50%;width:10px;height:10px;display:inline-block;margin-right:8px}
+.touch.zt #b-med{overflow:visible}.touch.zt .mb{position:absolute;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:8px;font:700 10px/15px Arial;font-style:normal;text-align:center;pointer-events:none}
+.touch.zt .mb:empty{display:none}.touch.zt .mb.m{right:-5px;top:-5px;background:#b3271a;color:#fff}.touch.zt .mb.b{right:-5px;bottom:-5px;background:#e8e2d0;color:#1a1612}
+.touch.zt #b-med.empty{opacity:.45}
+body.is-touch .touch.zt .medpick{position:absolute;right:calc(70px + var(--sar));top:calc(108px + var(--sat) + var(--st, 50px));display:flex;gap:8px;z-index:5;pointer-events:auto}
+body.is-touch .touch.zt .medpick[hidden]{display:none}
+body.is-touch .touch.zt .medpick button{position:static!important;inset:auto!important;transform:none!important;width:auto!important;height:auto!important;text-transform:none;letter-spacing:0;pointer-events:auto;min-width:96px!important;min-height:46px!important;padding:4px 10px!important;border-radius:10px!important;border:1.5px solid rgba(236,229,206,.35)!important;background:rgba(14,14,11,.85)!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important;color:#ece6d3!important;font:700 12px Arial!important;filter:none!important;display:grid;grid-template-columns:auto auto;align-items:center;column-gap:6px;text-align:left}
+.touch.zt .medpick em{font-style:normal;font-size:16px!important;color:#f6c446;justify-self:end}.touch.zt .medpick small{grid-column:1/3;font-size:10px!important;font-weight:400;color:#bfb69c}
 /* фонарик (блок над детектором) и ровная панель оружия */
 .hud.zh .zh-det{cursor:pointer;pointer-events:auto}.hud.zh .zh-det::after{content:'';position:absolute;inset:-3px -4px -11px}
 .hud.zh .zh-det .torch{color:#6f7a7c;fill:currentColor;width:18px;height:18px}.hud.zh .zh-det.on .torch{color:#62b6ff;filter:drop-shadow(0 0 4px rgba(80,170,255,.7))}.hud.zh .zh-det:not(.on) .beam{display:none}
@@ -5979,6 +6064,7 @@ function hud(dt) {
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
   const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.crouch ? 'присел' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); if (medPickT > 0 && (medPickT -= 0.15) <= 0) hideMedPick(); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
   hudT -= dt;
@@ -6007,7 +6093,7 @@ function hud(dt) {
   H.msgs.textContent = '';
   MSGS.forEach(m => { const p = el('p', m.k, m.t); p.style.opacity = clamp(m.life / 1.5, 0, 1); H.msgs.appendChild(p); });
   const n = G.near;
-  H.prompt.textContent = '';
+  H.prompt.textContent = ''; H.prompt.classList.toggle('kill', !!(n && n.k === 'kill'));
   if (n && P.alive && !panel) { const ic = el('span', 'pi ' + n.k); H.prompt.appendChild(ic); if (!IN.touch) H.prompt.appendChild(el('kbd', '', 'E')); H.prompt.appendChild(document.createTextNode(n.label.replace(/^Поговорить: /, 'Говорить: ') + '.')); }
   drawMini();
 }
@@ -6023,6 +6109,7 @@ function interact() {
     const e = n.e;
     if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
   }
+  else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);
@@ -6049,7 +6136,9 @@ addEventListener('keydown', e => {
   if (k === 'KeyR') startReload();
   if (k === 'KeyF') throwBolt();
   if (k === 'KeyG') throwNade();
-  if (k === 'KeyQ' || k === 'KeyH') quickHeal();
+  if (k === 'KeyQ') healWith('medkit');
+  if (k === 'KeyB') healWith('bandage');
+  if (k === 'KeyH') quickHeal();
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
@@ -6110,7 +6199,7 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': quickHeal, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
@@ -6118,6 +6207,7 @@ fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) ret
 $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); if (!panel) interact(); });
 $('rot-skip').addEventListener('click', () => document.body.classList.add('portrait-ok'));
 Object.keys(TB).forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); if (P.alive && !panel) TB[id](); }));
+['mp-bandage', 'mp-medkit'].forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (P.alive && !panel) healWith(id === 'mp-medkit' ? 'medkit' : 'bandage'); }));
 $('wpnbox').addEventListener('click', () => { if (P.alive && !panel) cycleWeapon(1); });
 $('t-inv').addEventListener('click', () => { if (!panel && P.alive) { openPanel('inv', 'Рюкзак'); refresh(); } });
 $('t-pda').addEventListener('click', () => { if (!panel && P.alive) { openPanel('pda', 'КПК', PDA_TABS2); refresh(); } });
@@ -6183,7 +6273,7 @@ async function boot() {
   gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  await loadArt();
+  await loadArt(); bigFences();
   buildCanopy(); paintGround(); buildRoofs(); buildMini();
   applyState(loadSave() || freshS());
   addEventListener('resize', resize);

@@ -67,6 +67,21 @@ function useItem(id) {
   msg(it.n + ': здоровье ' + Math.round(P.hp) + (FOOD[id] ? ', сытость ' + Math.round(S.food) : ', радиация ' + Math.round(S.rad)) + (id === 'bandage' || id === 'medkit' ? (S.bleed ? ', кровь ещё идёт' : ', кровь остановлена') : ''), 'good');
   return true;
 }
+function healWith(id) {
+  if (P.medT > 0) return; hideMedPick();
+  if (!has(id)) { msg(id === 'medkit' ? 'Аптечек нет.' : 'Бинтов нет.'); return; }
+  P.medT = 1; useItem(id);
+}
+/* кнопка аптечки: есть и бинты, и аптечки — даёт выбрать; есть что-то одно — сразу лечит */
+function medButton() {
+  const m = cnt('medkit'), b = cnt('bandage');
+  if (!m && !b) { msg('Нечем лечиться. Аптечки и бинты продаёт Сидорович.'); return; }
+  if (!m || !b) { healWith(m ? 'medkit' : 'bandage'); return; }
+  const mp = document.getElementById('medpick'); if (!mp.hidden) { hideMedPick(); return; }
+  mp.hidden = false; medPickT = 3.5;
+}
+let medPickT = 0;
+function hideMedPick() { const mp = document.getElementById('medpick'); if (mp) mp.hidden = true; medPickT = 0; }
 function quickHeal() {
   if (P.medT > 0) return;
   P.medT = 1;
@@ -83,7 +98,7 @@ function throwBolt() {
 /* фонарик: ночью светит конусом; выключенный — почти темнота вокруг, зато тебя хуже видно издалека */
 function toggleTorch() { S.torch = S.torch === false; play('click'); msg(S.torch ? 'Фонарик включён.' : 'Фонарик выключен.' + (darkness() > 0.3 ? ' В темноте тебя хуже видно, но и ты видишь мало.' : '')); }
 /* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
-const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier']);
+const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier', 'fence']);
 function startJump() {
   if (P.jumpT > 0 || (P.jumpCD || 0) > 0 || P.sit) return;
   if (P.st < 15) { msg('Нет сил прыгать: отдышись.'); return; }
@@ -92,6 +107,15 @@ function startJump() {
   P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= 15; P.jumpA = a; play('step');
 }
 const JUMP_T = 0.42, JUMP_V = 250;
+/* тихое убийство: сзади, пока враг не заметил. Лёгкая броня — сразу; армейская держит удар */
+function takedown(e) {
+  if (!e.alive || e.tgt === P || (e.aw || 0) >= 1) return;
+  const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knife', P.x, P.y);
+  const heavy = e.fac === 'army' || e.sid === 'boss';
+  if (!heavy) { e.quiet = 1; hurt(e, e.hp + 5, P, a); msg('Тихо снял: ' + e.name + '.', 'good'); }
+  else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
+  ents.forEach(o => { if (o !== e && o.alive && hostile(o, P) && o.tgt !== P && dE(o, e) < 150 && los(o.x, o.y, e.x, e.y)) o.aw = Math.max(o.aw || 0, 0.75); });   // кто рядом и видел — насторожился
+}
 function solidPx(x, y) {
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
   if (!inb(tx, ty) || SOLID[map[ty * MW + tx]]) return true;
@@ -230,8 +254,8 @@ function updatePlayer(dt) {
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const over = weight() > MAXW;
-  const sprint = (IN.sprint || ml > 0.95 && IN.touch) && P.st > 5 && !over && ml > 0.1;
-  if (sprint) P.crouch = 0;
+  const sprint = (IN.sprint || ml > 0.95 && IN.touch && !P.crouch) && P.st > 5 && !over && ml > 0.1;
+  if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * dt); else P.st = Math.min(100, P.st + 14 * dt);
   P.jumpCD = (P.jumpCD || 0) - dt;
@@ -323,6 +347,8 @@ function findInteract() {
   let best = null, bd = 1e9;
   const cand = (d, o) => { if (d < bd) { bd = d; best = o; } };
   for (const e of ents) {
+    if (e.alive && e.kind === 'human' && hostile(e, P) && !e.captive && e.tgt !== P && (e.aw || 0) < 1 && dE(e, P) < 42 &&
+      (Math.abs(angD(e.ang, Math.atan2(P.y - e.y, P.x - e.x))) > 1.9 || e.sit)) { cand(dE(e, P) - 200, { k: 'kill', e: e, label: 'Убить ножом: ' + e.name }); continue; }   // сзади и незаметно
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
