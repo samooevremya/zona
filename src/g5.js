@@ -486,26 +486,69 @@ function drawMenu() {
 /* ===================== карта ===================== */
 const TCOL = ['#3f4628', '#5a4b34', '#3c3c37', '#26332c', '#7a7a6d', '#1f2a17', '#4a3a29', '#6f4a39', '#2f3a22', '#58534a', '#55554d'];
 const miniC = document.createElement('canvas'), fogC = document.createElement('canvas');
+// Четыре пикселя на клетку. Каналы маски хранят покрытие всех дорог и асфальта
+// отдельно: после интерполяции узкая тропа, широкий двор и развилка сохраняют форму.
+function buildBigMini() {
+  const K = 4;
+  miniC.width = PW * K; miniC.height = MH * K;
+  const g = miniC.getContext('2d');
+  const base = document.createElement('canvas');
+  base.width = PW; base.height = MH;
+  const bg = base.getContext('2d'), terrain = bg.createImageData(PW, MH), roads = bg.createImageData(PW, MH);
+  const palette = [0x666345, 0x666345, 0x666345, 0x465855, 0x908b79, 0x4b5038,
+    0x695941, 0x806352, 0x54573c, 0x716957, 0x817d70, 0x10130e];
+  for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
+    const t = map[y * MW + x], c = palette[t], i = (y * PW + x) * 4;
+    const k = 0.88 + vnoise(x, y, 5) * 0.24;
+    terrain.data[i] = (c >> 16) * k;
+    terrain.data[i + 1] = ((c >> 8) & 255) * k;
+    terrain.data[i + 2] = (c & 255) * k;
+    terrain.data[i + 3] = roads.data[i + 3] = 255;
+    roads.data[i] = t === DI || t === AS ? 255 : 0;
+    roads.data[i + 1] = t === AS ? 255 : 0;
+  }
+  bg.putImageData(roads, 0, 0);
+  g.drawImage(base, 0, 0, miniC.width, miniC.height);
+  const mask = g.getImageData(0, 0, miniC.width, miniC.height);
+  bg.putImageData(terrain, 0, 0);
+  g.drawImage(base, 0, 0, miniC.width, miniC.height);
+  g.save(); g.scale(K, K);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
+    if (map[y * MW + x] !== TR) continue;
+    const n = hash2(x, y), r = 0.8 + n * 0.45;
+    g.fillStyle = '#363e30'; g.beginPath(); g.arc(x + 0.55, y + 0.55, r, 0, 2 * Math.PI); g.fill();
+    g.fillStyle = n < 0.65 ? '#484f37' : '#57583b';
+    g.beginPath(); g.arc(x + 0.4, y + 0.36, r * 0.8, 0, 2 * Math.PI); g.fill();
+  }
+  g.restore();
+  // Порог убирает размытие внутри полотна, мягкая кромка соединяет диагональные клетки.
+  for (let i = 0; i < mask.data.length; i += 4) {
+    const coverage = mask.data[i], asphalt = clamp((mask.data[i + 1] - 80) / 80, 0, 1);
+    mask.data[i] = 177 - asphalt * 76;
+    mask.data[i + 1] = 146 - asphalt * 38;
+    mask.data[i + 2] = 102 + asphalt * 8;
+    mask.data[i + 3] = clamp((coverage - 49) * 3, 0, 255);
+  }
+  // putImageData не смешивает прозрачность. Переиспользуем временный холст для наложения.
+  base.width = miniC.width; base.height = miniC.height;
+  bg.putImageData(mask, 0, 0); g.drawImage(base, 0, 0);
+  g.scale(K, K);
+  HOUSES.forEach((h, i) => {
+    if (h.x >= PW) return;
+    g.fillStyle = '#36372e'; g.fillRect(h.x - 0.2, h.y - 0.2, h.w + 0.5, h.h + 0.6);
+    g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
+    if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
+  });
+  objs.forEach(o => {
+    if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
+      g.fillStyle = o.k === 'bus' ? '#8a6a2a' : '#6b6a5e';
+      g.fillRect(o.x / T, o.y / T, Math.max(1, o.w / T), Math.max(1, o.h / T));
+    }
+  });
+}
 function buildMini() {
   fogC.width = PW; fogC.height = MH;
-  if (BIG) {   // большая карта: обзор строится из клеток (вся земля целиком в память телефона не помещается)
-    const base = document.createElement('canvas'); base.width = PW; base.height = MH;
-    const bg = base.getContext('2d'), id = bg.createImageData(PW, MH);
-    const MC = ['#4c5532', '#6b5a3e', '#4a4a44', '#2f3d36', '#7a7a6d', '#2f3d22', '#5a4632', '#6f4a39', '#3a4528', '#5d584d', '#5f5f56', '#060705'];
-    for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
-      const t = map[y * MW + x], c = parseInt(MC[t].slice(1), 16), k = 0.9 + vnoise(x, y, 6) * 0.2, i = (y * PW + x) * 4;
-      id.data[i] = ((c >> 16) & 255) * k; id.data[i + 1] = ((c >> 8) & 255) * k; id.data[i + 2] = (c & 255) * k; id.data[i + 3] = 255;
-    }
-    bg.putImageData(id, 0, 0);
-    const K = 4; miniC.width = PW * K; miniC.height = MH * K;
-    const g = miniC.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-    g.drawImage(base, 0, 0, PW * K, MH * K);
-    for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) { const t = map[y * MW + x]; if (t === AS || t === DI) { g.fillStyle = t === AS ? 'rgba(80,80,74,0.9)' : 'rgba(112,94,64,0.85)'; g.fillRect(x * K, y * K, K, K); } }
-    HOUSES.forEach((h, i) => { if (h.x < PW) { if (ROOFS[i]) g.drawImage(ROOFS[i], (h.x * T - 3) * K / T, (h.y * T - 3) * K / T, (h.w * T + 10) * K / T, (h.h * T + 10) * K / T); else { g.fillStyle = h.mat === 'conc' ? '#5d5e56' : '#6a4f3c'; g.fillRect(h.x * K, h.y * K, h.w * K, h.h * K); } } });
-    for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) if (map[y * MW + x] === TR) { g.fillStyle = 'rgba(28,40,22,0.8)'; g.beginPath(); g.arc(x * K + K / 2, y * K + K / 2, K * 0.9, 0, 6.28); g.fill(); }
-    objs.forEach(o => { if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) { g.fillStyle = o.k === 'bus' ? '#8a6a2a' : '#6b6a5e'; g.fillRect(o.x / T * K, o.y / T * K, Math.max(K, o.w / T * K), Math.max(K, o.h / T * K)); } });
-    return;
-  }
+  if (BIG) { buildBigMini(); return; }
   if (ART) {
     const K = 4; miniC.width = PW * K; miniC.height = MH * K;
     const g = miniC.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
@@ -586,9 +629,14 @@ function drawMini() {
   updateFog();
   mctx.imageSmoothingEnabled = !!ART;
   mctx.drawImage(miniC, 0, 0, PW * s, MH * s); mctx.drawImage(fogC, 0, 0, PW * s, MH * s);
+  if (darkness() > 0.3) {
+    mctx.fillStyle = 'rgba(4,7,12,0.35)';
+    mctx.fillRect(P.x / T * s - size / 2, P.y / T * s - size / 2, size, size);
+  }
+  mctx.strokeStyle = '#29291f'; mctx.lineWidth = 2;
   mctx.fillStyle = '#7fb0c4'; mctx.fillRect(HATCH.x / T * s - 5, HATCH.y / T * s - 5, 10, 10);
   objs.forEach(o => { if (o.k === 'cache' && S.caches[o.cacheId] === 1) { mctx.fillStyle = '#e8c070'; mctx.fillRect(o.x / T * s - 5, o.y / T * s - 5, 10, 10); } });
-  ents.forEach(e => { if (!e.alive || e === P || dE(e, P) > 520 || inBunker(e.x, e.y)) return; mctx.fillStyle = entColor(e); mctx.beginPath(); mctx.arc(e.x / T * s, e.y / T * s, 4.5, 0, 6.28); mctx.fill(); });
+  ents.forEach(e => { if (!e.alive || e === P || dE(e, P) > 520 || inBunker(e.x, e.y)) return; mctx.fillStyle = entColor(e); mctx.beginPath(); mctx.arc(e.x / T * s, e.y / T * s, 4.5, 0, 6.28); mctx.fill(); mctx.stroke(); });
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   const tq = trackedTarget();
   qTargets().forEach(q => {
@@ -596,12 +644,11 @@ function drawMini() {
     let x = size / 2 + (q.x - P.x) / T * s, y = size / 2 + (q.y - P.y) / T * s;
     const edge = x < 10 || y < 10 || x > size - 10 || y > size - 10;
     if (edge) { const a = Math.atan2(y - size / 2, x - size / 2); x = size / 2 + Math.cos(a) * (size / 2 - 12); y = size / 2 + Math.sin(a) * (size / 2 - 12); }
-    mctx.fillStyle = q.qid === 'sos' ? '#e0573a' : '#dc9330'; mctx.beginPath(); mctx.moveTo(x, y - 9); mctx.lineTo(x + 9, y); mctx.lineTo(x, y + 9); mctx.lineTo(x - 9, y); mctx.closePath(); mctx.fill();
+    mctx.fillStyle = q.qid === 'sos' ? '#e0573a' : '#dc9330'; mctx.beginPath(); mctx.moveTo(x, y - 9); mctx.lineTo(x + 9, y); mctx.lineTo(x, y + 9); mctx.lineTo(x - 9, y); mctx.closePath(); mctx.fill(); mctx.stroke();
   });
   mctx.globalAlpha = 1;
   mctx.save(); mctx.translate(size / 2, size / 2); mctx.rotate(P.ang); mctx.fillStyle = '#f2ead0'; mctx.strokeStyle = '#000'; mctx.lineWidth = 2;
   mctx.beginPath(); mctx.moveTo(12, 0); mctx.lineTo(-7, -8); mctx.lineTo(-3, 0); mctx.lineTo(-7, 8); mctx.closePath(); mctx.fill(); mctx.stroke(); mctx.restore();
-  if (darkness() > 0.3) { mctx.fillStyle = 'rgba(4,7,12,0.35)'; mctx.fillRect(0, 0, size, size); }
 }
 
 /* ===================== HUD ===================== */
