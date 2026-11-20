@@ -435,7 +435,7 @@ Tt('K20_bolt_crossing', () => {
       step(20);
     }
     z.IN.moveY=dir;step(61);z.IN.moveY=0;
-    pass.push({dir,side,probe,across:(p.y-gate.y)*dir>78});
+    pass.push({dir,side,probe,across:(p.y-gate.y)*dir>78,alarm:z.ents.some(e=>e.guard==='bridge' && e.angry)});
   }
   reset();P().x=gate.x;P().y=gate.y+100;P().ang=-Math.PI/2;z.IN.touch=true;
   const bolt=()=>document.getElementById('b-bolt').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
@@ -446,7 +446,7 @@ Tt('K20_bolt_crossing', () => {
   const fixed=S().flags.anomalyDischarges?.[gate.id]===until;
   step(160);
   const rearmed=!S().flags.anomalyDischarges?.[gate.id];
-  return {ok:pass.every(v=>v.probe===v.across)&&restored&&fixed&&rearmed,pass,restored,fixed,rearmed};
+  return {ok:pass.every(v=>v.probe===v.across && !v.alarm)&&restored&&fixed&&rearmed,pass,restored,fixed,rearmed};
 });
 Tt('K21_vortex_cache', () => {
   reset();const o=M.objs.find(o=>o.stash==='column_wayman');
@@ -562,6 +562,36 @@ function cordonPlay(quiet,loss=false) {
 Tt('K22_open_channel_and_lost_witnesses',()=>cordonPlay(false));
 Tt('K23_radio_silence_and_old_save',()=>cordonPlay(true));
 Tt('K24_fresh_start_and_emergency_log',()=>cordonPlay(false,true));
+
+Tt('K25_bridge_toll', () => {
+  const guards=()=>z.ents.filter(e=>e.alive && e.guard==='bridge');
+  const gate=M.objs.find(o=>o.key==='bar'), x=gate.x+gate.w/2, y=gate.y+gate.h/2;
+  const enter=(dir,offset=0)=>{
+    Object.assign(P(),{x:x+offset,y:y-dir*34,ang:dir*Math.PI/2});
+    z.IN.moveX=0; z.IN.moveY=dir;
+  };
+  const jump=()=>{window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyV'}));step(14);z.IN.moveY=0;};
+  const shots=()=>guards().reduce((n,e)=>n+e.mag,0);
+  const crossings=[];
+  for(const dir of [-1,1]){
+    reset(); enter(dir); step(12); // Попытка пройти пешком упирается в балку.
+    const stopped=(P().y-y)*dir<0 && guards().every(e=>!e.angry);
+    const rounds=shots();jump();
+    const crossed=(P().y-y)*dir>0, alarm=guards().every(e=>e.angry);
+    step(75);
+    crossings.push(stopped && crossed && alarm && shots()<rounds);
+  }
+  z.save(true);z.applyState(z.loadSave());
+  const local=guards().every(e=>e.angry) && !S().flags.armyAngry && z.ents.filter(e=>e.guard==='south').every(e=>!e.angry);
+  reset(); S().money=700;
+  const post=guards()[0];Object.assign(P(),{x:post.x,y:post.y+24});step(1);z.interact();
+  const pay=[...document.querySelectorAll('#pbody .opt')].find(el=>el.textContent.includes('Пропусти за 500'));
+  if(!pay) throw Error('У моста недоступна оплата');
+  pay.click();z.closePanel();z.save(true);z.applyState(z.loadSave());
+  const paid=S().money===200 && !gate.solid && S().flags.bridgePaid;
+  const safe=[-1,1].every(dir=>{enter(dir);step(23);z.IN.moveY=0;return (P().y-y)*dir>0 && guards().every(e=>!e.angry);});
+  return {ok:crossings.every(Boolean) && local && paid && safe,crossings,local,paid,safe};
+});
 
 return JSON.stringify(R);
 })()
