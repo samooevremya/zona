@@ -429,6 +429,7 @@ function drawPda() {
 /* ---------- меню ---------- */
 function drawMenu() {
   pbody.appendChild(el('p', 'note', 'Зона: Кордон, 2D-прототип RC1 (тестовая карта). Игра сохраняется сама у костра и у Сидоровича. Здесь можно сохраниться вручную, если рядом нет врагов.'));
+  pbody.appendChild(btn('wide', 'Настроить управление', openControlEditor));
   pbody.appendChild(btn('wide', 'Сохранить игру', () => {
     if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 450)) panel.hint = 'Рядом враги, сохраниться нельзя.';
     else { save(true); panel.hint = 'Игра сохранена.'; }
@@ -832,6 +833,7 @@ function interact() {
 }
 const KEYS = {};
 addEventListener('keydown', e => {
+  if (controlEditor.open) return;
   audioInit();
   const k = e.code;
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].indexOf(k) >= 0 && !panel) e.preventDefault();
@@ -890,16 +892,24 @@ cv.addEventListener('pointerdown', e => {
   setTouch(true);
   cv.setPointerCapture(e.pointerId);
   const s = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, a: P.ang };
-  if (e.clientX < VW * 0.5) { IN.left = s; joyAt(e.clientX, e.clientY, s); } else IN.aimStick = s;
+  const jr = JOY.getBoundingClientRect();
+  const custom = !!JOY.dataset.layout;
+  const onStick = custom ? Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2) <= jr.width/2+6 : e.clientX<VW*.5;
+  if (onStick && !IN.left) {
+    IN.left = s;
+    if (custom) { s.ox=jr.x+jr.width/2; s.oy=jr.y+jr.height/2; JOY.classList.add('on'); }
+    else joyAt(e.clientX,e.clientY,s);
+    s.radius = custom ? jr.width/2 : 56;
+  } else if (!onStick && !IN.aimStick) IN.aimStick=s;
 });
 cv.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { IN.mx = e.clientX; IN.my = e.clientY; if (IN.touch) setTouch(false); return; }
   const s = IN.left && IN.left.id === e.pointerId ? IN.left : IN.aimStick && IN.aimStick.id === e.pointerId ? IN.aimStick : null;
   if (!s) return;
-  let dx = (e.clientX - s.ox) / 56, dy = (e.clientY - s.oy) / 56;
+  let dx = (e.clientX - s.ox) / (s.radius || 56), dy = (e.clientY - s.oy) / (s.radius || 56);
   const m = Math.hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
   s.dx = dx; s.dy = dy;
-  if (s === IN.left) { IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * 34) + 'px,' + (dy * 34) + 'px)'; }
+  if (s === IN.left) { IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * Math.min(34,(s.radius || 56)*.6)) + 'px,' + (dy * Math.min(34,(s.radius || 56)*.6)) + 'px)'; }
   else { if (m > 0.2) s.a = Math.atan2(dy, dx); IN.touchFire = m > 0.92; }
 });
 function endPtr(e) {
@@ -953,11 +963,11 @@ $('t-menu').addEventListener('click', () => { if (!panel) { openPanel('menu', '�
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) setTouch(true);
 
 /* ===================== заставка и смерть ===================== */
-const title = { open: true, el: $('title') };
+const title = { open: true, el: $('title'), name: document.querySelector('#tcard .start-name') };
 function showTitle(kind) {
   resetInput();
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
-  const c = $('tcard'); c.textContent = ''; c.classList.toggle('death', kind === 'death');
+  const c = $('tcard'); c.textContent = ''; c.classList.toggle('death', kind === 'death'); title.el.classList.toggle('start', kind !== 'death');
   if (kind === 'death') {
     const h = el('h1', '', 'Зона забрала'); h.appendChild(el('span', '', 'ещё одного')); c.appendChild(h);
     c.appendChild(el('div', 'tape'));
@@ -968,17 +978,17 @@ function showTitle(kind) {
     c.appendChild(b);
     return;
   }
-  const h = el('h1', '', 'Зона: Кордон'); h.appendChild(el('span', '', '2D-прототип')); c.appendChild(h);
-  c.appendChild(el('div', 'tape'));
-  c.appendChild(el('p', '', 'Фанатская игра по мотивам «Теней Чернобыля» с видом сверху. Живые сталкеры, бандиты, слепые псы, аномалии, день и ночь.'));
-  const k = el('div', 'keysel');
-  k.innerHTML = IN.touch ? 'Играй в горизонтальном положении. <b>Левый палец</b> ходит, <b>правый</b> целится. Красная кнопка «Огонь» стреляет и сама наводит на ближайшего врага. Когда рядом есть что взять или с кем поговорить, внизу появляется оранжевая кнопка: жми на неё.'
-    : '<b>WASD</b> ходить · <b>Shift</b> бег · <b>мышь</b> прицел и огонь · <b>R</b> перезарядка · <b>E</b> действие · <b>F</b> болт · <b>G</b> граната · <b>Q</b> аптечка · <b>I</b> рюкзак · <b>M</b> КПК';
-  c.appendChild(k);
-  const b = el('div', 'tbtns'), sv0 = loadSave();
-  if (sv0) b.appendChild(btn('go', 'Продолжить', () => { audioInit(); applyState(sv0); hideTitle(); }));
-  b.appendChild(btn(sv0 ? 'alt' : 'go', 'Новая игра', () => { audioInit(); applyState(freshS()); hideTitle(); intro(); }));
-  c.appendChild(b);
+  const nav = el('nav','start-nav');
+  nav.setAttribute('aria-label','Главное меню');
+  const saved = loadSave();
+  if (saved) nav.appendChild(btn('start-primary','Продолжить',()=>{
+    audioInit(); applyState(saved); hideTitle();
+  }));
+  nav.appendChild(btn(saved?'':'start-primary','Новая игра',()=>{
+    audioInit(); applyState(freshS()); hideTitle(); intro();
+  }));
+  nav.appendChild(btn('','Управление',openControlEditor));
+  c.append(title.name,nav);
 }
 function goFull() {   // на весь экран там, где браузер это умеет (Android, iPad, компьютер); на iPhone — через «На экран Домой»
   try { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; if (IN.touch && f && !document.fullscreenElement && !document.webkitFullscreenElement) { const r = f.call(d, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } } catch (e) {}
@@ -1025,7 +1035,7 @@ async function boot() {
   const bl = document.getElementById('bootlog'); if (bl) bl.remove(); bootStep('игра');
   if (window.__bootWarn) setTimeout(() => msg(window.__bootWarn, 'bad'), 500);
   addEventListener('resize', resize);
-  showTitle();
+  setupControlEditor(); showTitle();
   requestAnimationFrame(frame);
 }
 window.__zRender = render;

@@ -4,12 +4,16 @@ BIGF = MAPFLAG == 'big'
 if BIGF: MAPFLAG = 'rc1'
 h=open('head.html',encoding='utf8').read(); b=open('body.html',encoding='utf8').read(); sp=open('sprite.svg',encoding='utf8').read(); av=open('avatar.js',encoding='utf8').read()
 css=open('ui/ui-theme.css',encoding='utf8').read()+'\n'+open('ui/zona-fixes.css',encoding='utf8').read()+'\n'+open('ui/hud-ref.css',encoding='utf8').read()+'\n'+open('ui/windows.css',encoding='utf8').read(); icons=open('ui/ui-icons.svg',encoding='utf8').read(); bridge=open('ui/ui-bridge.js',encoding='utf8').read()
+import base64
+with open('art/menu/signal-post.webp','rb') as cover:
+    menu_css=open('ui/main-menu.css',encoding='utf8').read().replace('__SIGNAL_POST__',base64.b64encode(cover.read()).decode())
+css += '\n'+menu_css
 h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
 g5=g5[:pos]+bridge+'\n'+g5[pos:]
-js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gstory.js','gmap_rc1.js','gbig.js','ggrips.js','gg3.js','gg7.js','gprops.js'])+"\n"+g5+"\n})();\n"
+js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gstory.js','gmap_rc1.js','gbig.js','ggrips.js','gg3.js','gg7.js','gprops.js','gcontrols.js'])+"\n"+g5+"\n})();\n"
 open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os
