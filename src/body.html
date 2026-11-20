@@ -51,6 +51,7 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
 </div>
 <div class="rotate" id="rotate"><div><div class="phone"></div><p>Поверни телефон горизонтально: так видно больше Зоны и удобнее стрелять.</p><button type="button" class="alt" id="rot-skip">Играть вертикально</button></div></div>
 <div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="ptitle">
+  <div class="menu-card" id="pause-card"></div>
   <div class="pda">
     <div class="pda-h"><h2><span class="led"></span><span id="ptitle">КПК</span></h2><button type="button" class="x" id="pclose">Закрыть</button></div>
     <div class="screen"><div class="tabs" id="ptabs" role="tablist"></div><div class="body" id="pbody"></div></div>
@@ -66,4 +67,4 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
     <div class="layout-actions"><button id="layout-default">Сброс</button><button id="layout-cancel">Отмена</button><button id="layout-save">Сохранить</button></div>
   </div>
 </dialog>
-<div class="title start open" id="title"><div class="tcard" id="tcard"><h1 class="start-name">ЗОНА<span class="start-region">КОРДОН</span></h1><div id="bootlog" role="status">Загрузка…</div></div></div>
+<div class="title start open" id="title"><div class="tcard menu-card" id="tcard"><h1 class="start-name">ЗОНА<span class="start-region">КОРДОН</span></h1><div id="bootlog" role="status">Загрузка…</div></div></div>
