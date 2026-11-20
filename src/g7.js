@@ -15,7 +15,7 @@ function survDefaults() {
 function ensureCaches() {
   CACHES.forEach((c, i) => {
     if (objs.some(o => o.cacheId === i)) return;
-    objs.push({ k: 'cache', cacheId: i, x: c.x * T, y: c.y * T, loot: S.caches[i] === 2 ? {} : Object.assign({}, c.loot), name: 'Тайник' });
+    objs.push({ k: 'cache', cacheId: i, x: c.x * T, y: c.y * T, loot: S.caches[i] === 2 ? {} : Object.assign({}, S.flags['cache_contents_'+i] || c.loot), name: 'Тайник' });
   });
 }
 function revealCache(fromName, idx) {
@@ -60,7 +60,7 @@ function survival(dt) {
 }
 function cacheNear() {
   let best = null, bd = 44;
-  for (const o of objs) if (o.k === 'cache' && S.caches[o.cacheId] === 1 && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < bd) { bd = d; best = o; } }
+  for (const o of objs) if (o.k === 'cache' && S.caches[o.cacheId] === 1 && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < bd && los(P.x,P.y,o.x,o.y)) { bd = d; best = o; } }
   return best;
 }
 function drawCaches() {

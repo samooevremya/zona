@@ -412,8 +412,8 @@ function drawInv() {
 /* ---------- обыск ---------- */
 function openLoot(o) {
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
-  if (o.k === 'cache') { S.caches[o.cacheId] = 2; }
-  openPanel('loot', o.k === 'cache' ? 'Тайник' : o.stash ? 'Ящик' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
+  if (o.k === 'crate') return;
+  openPanel('loot', o.k === 'cache' || o.k === 'hiding' ? 'Тайник' : o.k === 'safe' ? 'Сейф' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
 }
 function drawLoot() {
   const o = panel.o, keys = Object.keys(o.loot).filter(k => k !== '__tip');
@@ -427,7 +427,7 @@ function drawLoot() {
       // правило одного ствола каждого типа: дубликат не берётся, состояние брошенного ствола возвращается при подборе
       if (k === 'money') S.money += o.loot[k]; else { give(k, o.loot[k]); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); }
       delete o.loot[k]; play('pick');
-      if (!Object.keys(o.loot).length && o.stash) { o.looted = true; S.flags['st_' + o.stash] = 1; }
+      recordContents(o);
       refresh();
     }, dupW));
     pbody.appendChild(r);
@@ -813,6 +813,7 @@ function interact() {
     if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
   }
   else if (n.k === 'kill') takedown(n.e);
+  else if (n.k === 'pickupLoot' && n.o.broken) lootAll(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);
@@ -978,7 +979,7 @@ async function boot() {
   bootStep('мир'); gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); bigFences();
+  bootStep('графика'); await loadArt(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {
@@ -996,5 +997,5 @@ window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
 window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 boot();

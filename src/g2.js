@@ -172,7 +172,7 @@ function mkPlayer() {
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
-  objs.forEach(o => { if (o.stash) o.looted = !!S.flags['st_' + o.stash]; });
+  objs.forEach(o => { if (o.stash) restoreContainer(o); });
   armyAngry = !!S.flags.armyAngry;
   const bar = objs.find(o => o.key === 'bar'); if (bar) { bar.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }
   S.q2 = S.q2 || { fox: 0, tolik: 0 };
@@ -190,6 +190,7 @@ function spawnWorld() {
   DOGDEF.forEach(d => { if (!S.dead[d.sid]) ents.push(mkDog(d)); });
   rcSpawnObjs();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
+  for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
   anoms = ANOM0.map(a => Object.assign({}, a, { cd: 0, reveal: 0, fx: 0, arc: 0 }));
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
 }
@@ -252,6 +253,10 @@ function collide(e) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!inb(x, y) || SOLID[map[y * MW + x]]) pushOut(e, x * T, y * T, T, T);
   const hop = e.jumpT > 0;   // в прыжке низкие препятствия не держат
   for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && LOW_K.has(o.k)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    const nearby=propCells.get(y*MW+x);
+    if(nearby) for(const p of nearby) touchesProp(p,e,true);
+  }
   e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r);
 }
 function moveE(e, dx, dy) { e.x += dx; e.y += dy; collide(e); collide(e); }
@@ -320,24 +325,27 @@ function rayCircle(sx, sy, ca, sa, cx, cy, rr) {
 }
 // Высота забора имеет значение в пределах полутора клеток от присевшей фигуры.
 const FENCE_REACH = 1.5 * T;
-function rayFence(x, y, dx, dy, near, far) {
-  let hit = Infinity;
-  for (const f of fences) {
+function rayBox(f,x,y,dx,dy,near,far) {
     // Интервал луча внутри каждой из двух осевых полос прямоугольника.
     let enter = near, exit = far;
     if (Math.abs(dx) < 1e-9) {
-      if (x < f.x || x > f.x + f.w) continue;
+      if (x < f.x || x > f.x + f.w) return Infinity;
     } else {
       const a = (f.x - x) / dx, b = (f.x + f.w - x) / dx;
       enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
     }
     if (Math.abs(dy) < 1e-9) {
-      if (y < f.y || y > f.y + f.h) continue;
+      if (y < f.y || y > f.y + f.h) return Infinity;
     } else {
       const a = (f.y - y) / dy, b = (f.y + f.h - y) / dy;
       enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
     }
-    if (enter <= exit) hit = Math.min(hit, enter);
+    return enter <= exit ? enter : Infinity;
+}
+function rayFence(x, y, dx, dy, near, far) {
+  let hit = Infinity;
+  for (const f of fences) {
+    hit = Math.min(hit,rayBox(f,x,y,dx,dy,near,far));
   }
   return hit;
 }
@@ -368,6 +376,8 @@ function shotTrace(sh, a, W) {   // чистая функция исхода о�
     const fence = rayFence(sh.x, sh.y, ca, sa, Math.max(0, centerT - FENCE_REACH), bt);
     if (fence <= bt) { bt = fence; best = null; }
   }
+  const box=containerOnRay(sh,ca,sa,bt);
+  if(box.o) return {t:box.d,best:null,box:box.o,wall:true,ca,sa};
   return { t: bt, best: best, wall: !best && bt < reach, ca: ca, sa: sa };
 }
 function fire(sh, ang, W, spread) {
@@ -379,6 +389,7 @@ function fire(sh, ang, W, spread) {
     const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
+    if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
     if (best && coverBlocks(best, sh.x, sh.y) && chance(best === P ? 0.6 : 0.5)) {
       const cx = best.x - ca * 22, cy = best.y - sa * 22;
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
@@ -428,6 +439,12 @@ function melee(sh, W) {
     if (d < W.range + e.r + sh.r && Math.abs(angD(sh.ang, Math.atan2(e.y - sh.y, e.x - sh.x))) < 0.9 && d < bd) { hit = e; bd = d; }
   });
   play('knife', sh.x, sh.y);
+  if(sh===P){
+    const ca=Math.cos(sh.ang),sa=Math.sin(sh.ang);
+    const reach=Math.min(W.range+sh.r, hit?Math.max(0,bd-hit.r):Infinity);
+    const box=containerOnRay(sh,ca,sa,shotBarrier(sh,ca,sa,reach));
+    if(box.o){breakCrate(box.o);return;}
+  }
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }

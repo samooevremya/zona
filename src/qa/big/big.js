@@ -173,5 +173,70 @@ Tt('K13_pda_quest_bulletin', () => {
   const order = B.msgs();
   return { ok: shown && sosFirst && /приближается выброс/i.test(order[0]) && order[1]?.startsWith('SOS!') && order.includes(report.x), shown, sosFirst };
 });
+Tt('K14_break_loot_search', () => {
+  reset();
+  const box = M.objs.find(o => o.stash === 'st9');
+  const left = o => {
+    for (const e of z.ents) if (e !== P()) e.alive = false;
+    P().x = o.x + o.w/2 - 34; P().y = o.y + o.h/2;
+    P().ang = 0; z.IN.touch = true; step(1);
+  };
+  const attack = weapon => {
+    S().weapon = weapon; P().ang = 0; P().cool = P().reload = 0;
+    z.IN.fire = true; step(1); z.IN.fire = false;
+  };
+  left(box);
+  const sealed = box.solid && z.near?.o !== box;
+  attack('knife');
+  const knife = box.broken && !box.solid && z.near?.k === 'pickupLoot';
+  z.save(true); z.applyState(z.loadSave()); left(box);
+  const before = S().money, amount = box.loot.money;
+  z.interact(); step(1); z.interact();
+  const takenOnce = S().money === before + amount && box.looted && !Object.keys(box.loot).length;
+  z.save(true); z.applyState(z.loadSave());
+  const emptyOnLoad = box.looted && box.broken && !box.solid;
+  reset(); left(box); S().mag.w_pm = 6; attack('w_pm');
+  const bullet = box.broken && S().mag.w_pm === 5 && box.loot.money === amount;
+  const search = {};
+  for (const kind of ['safe','hiding']) {
+    const o = M.objs.find(o => o.k === kind);
+    left(o); attack('knife'); z.interact();
+    const opens = z.panel?.kind === 'loot' && z.panel.o === o;
+    const take = [...document.querySelectorAll('button')].find(b => b.textContent === 'Взять' && b.offsetWidth);
+    if (opens && take) take.click();
+    z.closePanel();
+    const remaining = JSON.stringify(o.loot);
+    z.save(true); z.applyState(z.loadSave());
+    search[kind] = !!(opens && take && !o.broken && Object.keys(o.loot).length === 1 && JSON.stringify(o.loot) === remaining);
+  }
+  return {ok: sealed && knife && takenOnce && emptyOnLoad && bullet && search.safe && search.hiding, sealed, knife, takenOnce, emptyOnLoad, bullet, search};
+});
+Tt('K15_all_prop_colliders_and_containers', () => {
+  reset();
+  const start = M.LOC.village.anchors.safe.map(v => v*T);
+  const unchecked = [], unreachable = [];
+  for (const p of M.fieldProps) {
+    const n = p.vertices.length;
+    const x = p.vertices.reduce((sum,v) => sum+v[0],0)/n;
+    const y = p.vertices.reduce((sum,v) => sum+v[1],0)/n;
+    const probe = {x,y,r:11};
+    M.collide(probe);
+    if (Math.hypot(probe.x-x,probe.y-y)<.01) unchecked.push(p.id);
+  }
+  for (const o of M.objs.filter(o=>o.stash)) {
+    const cx=o.x+o.w/2, cy=o.y+o.h/2;
+    let reachable=false;
+    for(let i=0;i<16 && !reachable;i++){
+      const x=cx+35*Math.cos(i*Math.PI/8), y=cy+35*Math.sin(i*Math.PI/8);
+      if(!M.nav[Math.floor(y/T)*M.MW+Math.floor(x/T)] || !M.los(x,y,cx,cy)) continue;
+      const probe={x,y,r:11}; M.collide(probe);
+      reachable=Math.hypot(probe.x-x,probe.y-y)<.1 && !!z.findPath(...start,x,y);
+    }
+    if(!reachable) unreachable.push(o.stash);
+  }
+  const count=M.fieldProps.length, kinds=new Set(M.fieldProps.map(p=>p.id));
+  const covered=['c1_trace_pipes','c1_sandbags','c1_barrel','c1_trace_reel'].every(id=>kinds.has(id));
+  return {ok:covered && !unchecked.length && !unreachable.length,count,unchecked,unreachable};
+});
 return JSON.stringify(R);
 })()
