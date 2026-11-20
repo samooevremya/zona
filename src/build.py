@@ -9,7 +9,7 @@ g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
 g5=g5[:pos]+bridge+'\n'+g5[pos:]
-js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gmap_rc1.js','gbig.js','gg3.js','gg7.js','gprops.js'])+"\n"+g5+"\n})();\n"
+js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gmap_rc1.js','gbig.js','ggrips.js','gg3.js','gg7.js','gprops.js'])+"\n"+g5+"\n})();\n"
 open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os
@@ -23,12 +23,15 @@ _b2m=__import__('json').load(open('art/b2/manifest.json',encoding='utf8'))
 art+='\n'+open('art/b2/items.inline.js',encoding='utf8').read()+'\nwindow.CORDON_ITEMS_B2_SIZE='+__import__('json').dumps({k:v['logicalSize'] for k,v in _b2m['items'].items()})+';'
 art+='\n'+'\n'.join(open('art/g7/'+f,encoding='utf8').read() for f in ['assets.inline.js','renderer.js','portraits.js','rig.inline.nodead.js','rig.js','pose-keys.js'])
 art+='\n'+open('art/g8/g8.inline.js',encoding='utf8').read()
-jackets = {}
+equipped_art = {}
 for color in ('white', 'beige', 'brown'):
     file = 'jacket_' + color + '.webp'
     with open('art/g8/src/' + file, 'rb') as sprite:
-        jackets['assets/g8/' + file] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
-art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__('json').dumps(jackets) + ');'
+        equipped_art['assets/g8/' + file] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
+for weapon in ('w_pm', 'w_obrez', 'grenade'):
+    with open('art/g8/held/' + weapon + '.webp', 'rb') as sprite:
+        equipped_art['assets/g8/hand_' + weapon + '.webp'] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
+art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__('json').dumps(equipped_art) + ');'
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
 if BIGF:
     shop = _b64.b64encode(open('art/sid-shop.webp', 'rb').read()).decode()

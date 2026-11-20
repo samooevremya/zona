@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 100" width="28" height="100">
+ <defs>
+  <linearGradient id="steel"><stop stop-color="#1e1e1b"/><stop offset=".22" stop-color="#888176"/><stop offset=".34" stop-color="#55534d"/><stop offset=".72" stop-color="#353632"/><stop offset=".9" stop-color="#69665e"/><stop offset="1" stop-color="#20201e"/></linearGradient>
+  <clipPath id="slide"><path d="M5 14Q14 11 23 14L23 94Q21 99 14 99Q7 99 5 94Z"/></clipPath>
+ </defs>
+ <path d="M6 1Q13 -1 22 2L25 21 23 49 5 49 3 20Z" fill="#593a29" stroke="#231f1a" stroke-width="2"/>
+ <path d="M6 15Q14 10 22 15L25 34 22 95 19 99H9L6 95 4 34Z" fill="url(#steel)" stroke="#262522" stroke-width="1.5"/>
+ <g clip-path="url(#slide)" opacity=".3"><image href="../src/item_w_pm.png" x="-81" y="-103" width="400" height="500"/></g>
+ <path fill="#282826" d="M6 19h16v5H6zM10 43h11v17H10z"/><path fill="#746a59" d="M12 44h8v14h-8z"/>
+ <path d="M7 34v53m13-57v9" stroke="#aaa398" opacity=".65"/><path d="M6 92h16" stroke="#3e403c" stroke-width="2"/>
+ <path d="M13 86h3v9h-3z" fill="#292925"/><path d="M13 86h3" stroke="#b5b0a1"/>
+</svg>

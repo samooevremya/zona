@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 150" width="29" height="150">
+ <defs>
+  <linearGradient id="wood"><stop stop-color="#30261c"/><stop offset=".32" stop-color="#946947"/><stop offset=".67" stop-color="#684530"/><stop offset="1" stop-color="#34271d"/></linearGradient>
+  <linearGradient id="metal"><stop stop-color="#222322"/><stop offset=".23" stop-color="#787974"/><stop offset=".45" stop-color="#555651"/><stop offset=".8" stop-color="#343632"/><stop offset="1" stop-color="#191b19"/></linearGradient>
+  <clipPath id="stock"><path d="M6 1Q14 -1 21 2L18 22 20 45 23 60H6L9 43 10 24Z"/></clipPath>
+ </defs>
+ <path d="M6 1Q14 -1 21 2L18 22 20 45 23 60H6L9 43 10 24Z" fill="url(#wood)" stroke="#33291f" stroke-width="1.5"/>
+ <g clip-path="url(#stock)" opacity=".35"><image href="../src/item_w_pm.png" x="-34" y="-105" width="200" height="235"/></g>
+ <path d="M5 48Q14 43 24 48L26 86 24 101H5L3 86Z" fill="url(#wood)" stroke="#2e2922" stroke-width="1.5"/>
+ <path d="M5 45Q14 42 24 46L25 66 4 66Z" fill="url(#metal)"/>
+ <rect x="3" y="64" width="11.8" height="85" rx="1.5" fill="url(#metal)"/><rect x="14.3" y="64" width="11.8" height="85" rx="1.5" fill="url(#metal)"/>
+ <path d="M14.5 58v89" stroke="#343430" stroke-width="1.7"/><path d="M5 71v36m12 6v22" stroke="#949187" opacity=".46"/>
+ <path d="M4 148h9m3 0h9" stroke="#242422" stroke-width="2"/>
+</svg>
