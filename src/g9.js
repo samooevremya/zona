@@ -298,6 +298,8 @@ const SOS_FIRST = 150, SOS_GAP = [240, 360], SOS_TIME = 150, SOS_HOLD = 50;
    retreat — последний из 3–4 нападающих уходит, событие закрывается. Таймаут — только запасной исход. */
 function finishEncounter(reason) {
   const a = S.sos.act; if (!a) return;
+  const call = radioQueue.findIndex(note => note.k === 'radio');
+  if (call >= 0) radioQueue.splice(call, 1);
   const allies = ents.filter(e => e.alive && e.sos === a.id), foes = ents.filter(e => e.alive && e.sosFoe === a.id);
   const lead = a.names && a.names[0] || (allies[0] && allies[0].name) || 'сталкеров';
   if (reason === 'helped' && !a.rewarded) {
@@ -309,11 +311,11 @@ function finishEncounter(reason) {
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
     msg('Благодарность: ' + pay + ' RU, ' + ITEMS[gift].n + '.', 'good');
-    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.', true);
+    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
     S.sos.saved = (S.sos.saved || []).concat([{ name: lead, t: S.min, where: a.where }]).slice(-10);
-  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.', true);
-  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.', true);
-  else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.', true);
+  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
+  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
+  else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
@@ -373,7 +375,7 @@ function sosTick() {
     e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; e.home = { x: e.ringPt.x, y: e.ringPt.y }; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
   }
   s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: ri(25, 55) * 10, gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
-  news('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»', true);
+  radioNews('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»');
   play('siren', undefined, undefined, 0.25);
 }
 function dirName(x, y) { return locNear(x, y).gen; }
@@ -437,7 +439,7 @@ function remapToMap() {
     else if (MAP_ID === 'rc1' && safe) { S.x = safe.x; S.y = safe.y; } else { S.x = f.x * T; S.y = f.y * T; }
   }
   if (P) { P.x = S.x; P.y = S.y; if (typeof cam !== 'undefined') { cam.x = P.x; cam.y = P.y; } }   // игрок уже создан spawnWorld до миграции
-  news('Карта обновлена (' + from + ' → ' + MAP_VERSION + '). Деньги, вещи и задания сохранены; места заданий пересчитаны' + (big ? '. Кордон стал больше: ты на том же месте, карту КПК придётся открыть заново. Копия старого сохранения оставлена.' : MAP_ID === 'rc1' ? ', тебя перенесли к костру деревни. Копия старого сохранения оставлена.' : '.'), true);
+  news('Карта обновлена (' + from + ' → ' + MAP_VERSION + '). Деньги, вещи и задания сохранены; места заданий пересчитаны' + (big ? '. Кордон стал больше: ты на том же месте, карту КПК придётся открыть заново. Копия старого сохранения оставлена.' : MAP_ID === 'rc1' ? ', тебя перенесли к костру деревни. Копия старого сохранения оставлена.' : '.'));
   S.mapVersion = MAP_VERSION;
 }
 
@@ -610,7 +612,7 @@ function plusKill(e, src) {
   }
   const a = S.sos.act;
   if (a && e.sosFoe === a.id && byMe) a.pk = (a.pk || 0) + 1;
-  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.', true); }
+  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.'); }
   if (e.follow) { msg('Напарник погиб: ' + e.name + '.', 'bad'); news('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {

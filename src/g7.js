@@ -24,7 +24,7 @@ function revealCache(fromName, idx) {
   const i = idx != null && free.includes(idx) ? idx : free[ri(0, free.length - 1)];
   S.caches[i] = 1;
   const c = CACHES[i];
-  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.', true);
+  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
 }
 const cond = id => (S.cond[id] === undefined ? 80 : S.cond[id]);
 function wearAndJam(id) {
@@ -55,7 +55,7 @@ function survival(dt) {
   P.detD = bd;
   // ранг
   const r = rankOf(score());
-  if (r > S.rankSeen) { S.rankSeen = r; msg('Новый ранг: ' + RANKS[r] + '. О тебе заговорили на Кордоне.', 'good'); news('Ранг повышен: ' + RANKS[r] + '.'); play('pda'); }
+  if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }
   // тайники рядом
 }
 function cacheNear() {

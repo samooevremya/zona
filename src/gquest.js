@@ -27,7 +27,7 @@ function pickUp(o) {
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
   play('pick');
   const q = q5();
-  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.', true); }
+  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.'); }
   else if (q.st === 'not_started') news('Нашёл ' + ITEMS[o.pick].n.toLowerCase() + '. Кому-то в деревне это может пригодиться.');
 }
 /* разговор с Волком */
@@ -62,7 +62,7 @@ function gensetUse() {
   take('fuse', 1); take('fuel', 1); q.st = 'completed';
   if (!q.rewarded) { q.rewarded = 1; S.money += 600; S.rep += 10; S.stats.q++; }
   play('reload'); msg('Генератор заработал. Вечером в деревне будет свет.', 'good');
-  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.', true); save(true);
+  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
@@ -93,7 +93,7 @@ function cluesTick() {
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
-  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.', true); save(true); }
+  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
   msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
 }
 function interactRC1(cand) {

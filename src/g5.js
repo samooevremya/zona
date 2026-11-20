@@ -738,7 +738,7 @@ const WSIL = {
   knife: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M44 17l58-4c6 0 10 3 12 7-4 2-8 3-14 3H44z" fill="#b9bcbd"/><path d="M44 17l58-4c6 0 10 3 12 7H44z" fill="#dfe2e2"/><path d="M38 11h6v20h-6z" fill="url(#wm)"/><path d="M12 15h26v11H12c-3 0-5-2-5-5.5S9 15 12 15z" fill="#2a2420"/><path d="M16 15v11M22 15v11M28 15v11" stroke="#3e352e" stroke-width="1.4"/></svg>'
 };
 const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
-  status: $('status'), quest: $('quest'), msgs: $('msgs'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
+  status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
 let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
   if (!P) return;
@@ -778,18 +778,22 @@ function hud(dt) {
     H.quest.appendChild(el('span', 'ex', '!')); H.quest.appendChild(el('span', 'qn', q.n));
     const ar = el('span', 'arr', '➤'); ar.style.transform = 'rotate(' + a + 'rad)'; H.quest.appendChild(ar); H.quest.appendChild(el('span', 'qd', d + ' м'));
   }
-  const message = radioQueue[0] || MSGS[MSGS.length - 1];
+  const message = radioQueue[0];
   if (message !== lastNotice) {
     lastNotice = message;
     H.msgs.replaceChildren();
     if (message) {
       const line = el('p', message.k);
-      if (radioQueue.length) line.append(el('span', 'sender', 'КПК'));
+      line.append(el('span', 'sender', 'КПК'));
       line.append(document.createTextNode(message.t));
       H.msgs.append(line);
     }
   }
   if (message) H.msgs.style.opacity = clamp(message.life / 1.2, 0, 1);
+  const local = !message && MSGS[MSGS.length - 1];
+  const feedback = local ? local.t : '';
+  if (H.feedback.textContent !== feedback) H.feedback.textContent = feedback;
+  if (local) H.feedback.style.opacity = clamp(local.life / 1.2, 0, 1);
   const n = G.near;
   H.prompt.textContent = ''; H.prompt.classList.toggle('kill', !!(n && n.k === 'kill'));
   if (n && P.alive && !panel) { const ic = el('span', 'pi ' + n.k); H.prompt.appendChild(ic); if (!IN.touch) H.prompt.appendChild(el('kbd', '', 'E')); H.prompt.appendChild(document.createTextNode(n.label.replace(/^Поговорить: /, 'Говорить: ') + '.')); }

@@ -143,5 +143,20 @@ Tt('K11_pda_emission_warning', () => {
   const expired = !B.msgs().some(isWarning) && journalCount() === 1;
   return { ok: started && quietWeather && resumed && expired, started, quietWeather, resumed, expired };
 });
+Tt('K12_sos_radio', () => {
+  reset();
+  z.clearMsgs();
+  S().sos.next = S().min;
+  z.plus.sosTick();
+  const sosCount = () => B.msgs().filter(text => text.startsWith('SOS!')).length;
+  const received = !!S().sos.act && sosCount() === 1;
+  S().blow.next = S().min;
+  step(2);
+  const priority = /приближается выброс/i.test(B.msgs()[0]) && sosCount() === 1;
+  z.plus.finishEncounter('timeout');
+  const closed = sosCount() === 0 && !B.msgs().some(text => text.includes('потеряна'));
+  const journal = S().news.some(n => n.x.startsWith('SOS!')) && S().news.some(n => n.x.includes('потеряна'));
+  return { ok: received && priority && closed && journal, received, priority, closed, journal };
+});
 return JSON.stringify(R);
 })()

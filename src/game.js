@@ -443,16 +443,23 @@ let MSGS = [];
 function msg(t, k) { MSGS.push({ t: t, k: k || '', life: 6 }); if (MSGS.length > 5) MSGS.shift(); }
 const radioQueue = [];
 function radioNotice(t, urgent = false) {
-  const note = { t, k: urgent ? 'radio urgent' : 'radio', life: urgent ? 10 : 6 };
+  const k = urgent ? 'radio urgent' : 'radio';
+  const i = radioQueue.findIndex(note => note.k === k);
+  if (i >= 0) {
+    if (radioQueue[i].t === t) return false;
+    radioQueue.splice(i, 1);
+  }
+  const note = { t, k, life: urgent ? 10 : 6 };
   if (urgent) radioQueue.unshift(note);
   else radioQueue.push(note);
-  // Полный текст каждого сообщения остаётся в журнале КПК.
-  if (radioQueue.length > 4) radioQueue.splice(1, 1);
+  return true;
 }
-function news(t, ping, urgent = false) {
+function news(t) {
   S.news.push({ t: S.min, x: t });
   if (S.news.length > 60) S.news.shift();
-  if (ping) { radioNotice(t, urgent); play('pda'); }
+}
+function radioNews(t, urgent = false) {
+  if (radioNotice(t, urgent)) { news(t); play('pda'); }
 }
 
 function freshS() {
@@ -862,9 +869,9 @@ function kill(e, src) {
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
     const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
-    news('Погиб сталкер ' + e.name + '. Причина: ' + why + '.', true);
+    news('Погиб сталкер ' + e.name + '. Причина: ' + why + '.');
   } else if (e.fac === 'bandit' && src && src.fac === 'loner' && dE(e, P) > 380) {
-    news('Одиночки убили бандита по кличке ' + e.name + '.', true);
+    news('Одиночки убили бандита по кличке ' + e.name + '.');
   }
   if (e.sid === 'tolik' && S.q2.tolik !== 2) S.q2.tolik = 3;
   if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; msg('Лис погиб.', 'bad'); }
@@ -1223,7 +1230,7 @@ function checkQuests() {
   if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); news('У дороги лежит раненый сталкер, просит аптечку.'); }
   if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; msg('Стая перебита. Вернись к Волку.', 'good'); news('Стая у леса перебита.'); }
   if (!S.flags.atpClear && ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'boss'].every(s => S.dead[s])) {
-    S.flags.atpClear = 1; msg('АТП очищено от бандитов.', 'good'); news('Бандиты на АТП перебиты.', false);
+    S.flags.atpClear = 1; msg('АТП очищено от бандитов.', 'good'); news('Бандиты на АТП перебиты.');
     ['petr', 'petr2'].forEach(s => { const e = byS(s); if (e) { const p = locPt('atp', s); e.home = { x: p.x, y: p.y }; e.stay = 1; } });
   }
 }
@@ -1248,7 +1255,7 @@ function spawnTick() {
       e.patrol = 1; e.home = { x: (66 + i) * T, y: (91 + i) * T };
       ents.push(e);
     }
-    news('Сводка: на дорогу с востока вышла группа бандитов.', false);
+    news('Сводка: на дорогу с востока вышла группа бандитов.');
   }
   if (S.min - (S.flags.dogT || 0) > 360 && S.q.pack !== 1) {
     S.flags.dogT = S.min;
@@ -2696,7 +2703,7 @@ function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
     B.stage = 1; B.t = 80;
-    news(BLOW_WARNING, true, true);
+    radioNews(BLOW_WARNING, true);
     ents.forEach(e => {
       if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
@@ -2727,7 +2734,7 @@ function blowout(dt) {
         delete S.flags['art_' + a.key];
         arts.push(Object.assign({}, a, { x: a.x + rnd(-10, 10), y: a.y + rnd(-10, 10) })); born++;
       });
-      news('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true, true);
+      radioNews('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true);
     }
   } else WX.red = Math.max(0, WX.red - dt * 0.3);
 }
@@ -2816,7 +2823,7 @@ function revealCache(fromName, idx) {
   const i = idx != null && free.includes(idx) ? idx : free[ri(0, free.length - 1)];
   S.caches[i] = 1;
   const c = CACHES[i];
-  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.', true);
+  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
 }
 const cond = id => (S.cond[id] === undefined ? 80 : S.cond[id]);
 function wearAndJam(id) {
@@ -2847,7 +2854,7 @@ function survival(dt) {
   P.detD = bd;
   // ранг
   const r = rankOf(score());
-  if (r > S.rankSeen) { S.rankSeen = r; msg('Новый ранг: ' + RANKS[r] + '. О тебе заговорили на Кордоне.', 'good'); news('Ранг повышен: ' + RANKS[r] + '.'); play('pda'); }
+  if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }
   // тайники рядом
 }
 function cacheNear() {
@@ -4216,6 +4223,8 @@ const SOS_FIRST = 150, SOS_GAP = [240, 360], SOS_TIME = 150, SOS_HOLD = 50;
    retreat — последний из 3–4 нападающих уходит, событие закрывается. Таймаут — только запасной исход. */
 function finishEncounter(reason) {
   const a = S.sos.act; if (!a) return;
+  const call = radioQueue.findIndex(note => note.k === 'radio');
+  if (call >= 0) radioQueue.splice(call, 1);
   const allies = ents.filter(e => e.alive && e.sos === a.id), foes = ents.filter(e => e.alive && e.sosFoe === a.id);
   const lead = a.names && a.names[0] || (allies[0] && allies[0].name) || 'сталкеров';
   if (reason === 'helped' && !a.rewarded) {
@@ -4227,11 +4236,11 @@ function finishEncounter(reason) {
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
     msg('Благодарность: ' + pay + ' RU, ' + ITEMS[gift].n + '.', 'good');
-    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.', true);
+    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
     S.sos.saved = (S.sos.saved || []).concat([{ name: lead, t: S.min, where: a.where }]).slice(-10);
-  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.', true);
-  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.', true);
-  else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.', true);
+  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
+  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
+  else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
@@ -4291,7 +4300,7 @@ function sosTick() {
     e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; e.home = { x: e.ringPt.x, y: e.ringPt.y }; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
   }
   s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: ri(25, 55) * 10, gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
-  news('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»', true);
+  radioNews('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»');
   play('siren', undefined, undefined, 0.25);
 }
 function dirName(x, y) { return locNear(x, y).gen; }
@@ -4355,7 +4364,7 @@ function remapToMap() {
     else if (MAP_ID === 'rc1' && safe) { S.x = safe.x; S.y = safe.y; } else { S.x = f.x * T; S.y = f.y * T; }
   }
   if (P) { P.x = S.x; P.y = S.y; if (typeof cam !== 'undefined') { cam.x = P.x; cam.y = P.y; } }   // игрок уже создан spawnWorld до миграции
-  news('Карта обновлена (' + from + ' → ' + MAP_VERSION + '). Деньги, вещи и задания сохранены; места заданий пересчитаны' + (big ? '. Кордон стал больше: ты на том же месте, карту КПК придётся открыть заново. Копия старого сохранения оставлена.' : MAP_ID === 'rc1' ? ', тебя перенесли к костру деревни. Копия старого сохранения оставлена.' : '.'), true);
+  news('Карта обновлена (' + from + ' → ' + MAP_VERSION + '). Деньги, вещи и задания сохранены; места заданий пересчитаны' + (big ? '. Кордон стал больше: ты на том же месте, карту КПК придётся открыть заново. Копия старого сохранения оставлена.' : MAP_ID === 'rc1' ? ', тебя перенесли к костру деревни. Копия старого сохранения оставлена.' : '.'));
   S.mapVersion = MAP_VERSION;
 }
 
@@ -4528,7 +4537,7 @@ function plusKill(e, src) {
   }
   const a = S.sos.act;
   if (a && e.sosFoe === a.id && byMe) a.pk = (a.pk || 0) + 1;
-  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.', true); }
+  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.'); }
   if (e.follow) { msg('Напарник погиб: ' + e.name + '.', 'bad'); news('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
@@ -5028,7 +5037,7 @@ function pickUp(o) {
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
   play('pick');
   const q = q5();
-  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.', true); }
+  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.'); }
   else if (q.st === 'not_started') news('Нашёл ' + ITEMS[o.pick].n.toLowerCase() + '. Кому-то в деревне это может пригодиться.');
 }
 /* разговор с Волком */
@@ -5063,7 +5072,7 @@ function gensetUse() {
   take('fuse', 1); take('fuel', 1); q.st = 'completed';
   if (!q.rewarded) { q.rewarded = 1; S.money += 600; S.rep += 10; S.stats.q++; }
   play('reload'); msg('Генератор заработал. Вечером в деревне будет свет.', 'good');
-  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.', true); save(true);
+  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
@@ -5094,7 +5103,7 @@ function cluesTick() {
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
-  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.', true); save(true); }
+  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
   msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
 }
 function interactRC1(cand) {
@@ -6863,7 +6872,7 @@ const WSIL = {
   knife: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M44 17l58-4c6 0 10 3 12 7-4 2-8 3-14 3H44z" fill="#b9bcbd"/><path d="M44 17l58-4c6 0 10 3 12 7H44z" fill="#dfe2e2"/><path d="M38 11h6v20h-6z" fill="url(#wm)"/><path d="M12 15h26v11H12c-3 0-5-2-5-5.5S9 15 12 15z" fill="#2a2420"/><path d="M16 15v11M22 15v11M28 15v11" stroke="#3e352e" stroke-width="1.4"/></svg>'
 };
 const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
-  status: $('status'), quest: $('quest'), msgs: $('msgs'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
+  status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
 let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
   if (!P) return;
@@ -6903,18 +6912,22 @@ function hud(dt) {
     H.quest.appendChild(el('span', 'ex', '!')); H.quest.appendChild(el('span', 'qn', q.n));
     const ar = el('span', 'arr', '➤'); ar.style.transform = 'rotate(' + a + 'rad)'; H.quest.appendChild(ar); H.quest.appendChild(el('span', 'qd', d + ' м'));
   }
-  const message = radioQueue[0] || MSGS[MSGS.length - 1];
+  const message = radioQueue[0];
   if (message !== lastNotice) {
     lastNotice = message;
     H.msgs.replaceChildren();
     if (message) {
       const line = el('p', message.k);
-      if (radioQueue.length) line.append(el('span', 'sender', 'КПК'));
+      line.append(el('span', 'sender', 'КПК'));
       line.append(document.createTextNode(message.t));
       H.msgs.append(line);
     }
   }
   if (message) H.msgs.style.opacity = clamp(message.life / 1.2, 0, 1);
+  const local = !message && MSGS[MSGS.length - 1];
+  const feedback = local ? local.t : '';
+  if (H.feedback.textContent !== feedback) H.feedback.textContent = feedback;
+  if (local) H.feedback.style.opacity = clamp(local.life / 1.2, 0, 1);
   const n = G.near;
   H.prompt.textContent = ''; H.prompt.classList.toggle('kill', !!(n && n.k === 'kill'));
   if (n && P.alive && !panel) { const ic = el('span', 'pi ' + n.k); H.prompt.appendChild(ic); if (!IN.touch) H.prompt.appendChild(el('kbd', '', 'E')); H.prompt.appendChild(document.createTextNode(n.label.replace(/^Поговорить: /, 'Говорить: ') + '.')); }

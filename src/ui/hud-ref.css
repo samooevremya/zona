@@ -133,24 +133,31 @@ body .hud.zh .zh-map .rv.d{right:3px;bottom:3px;border-width:0 1px 1px 0}
 .hud.zh .zh-corner{left:calc(8px + var(--sal));top:calc(8px + var(--sat));display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none}
 .zh-map-group{position:relative}
 .hud.zh .zh-corner :is(.zh-map,.zh-clock,.zh-bars){position:relative;inset:auto}
-.zh-feed{position:absolute;left:calc(100% + 13px);top:0;width:232px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none}
+/* Цель и радиосвязь образуют одну колонку от верхнего края карты. */
+.zh-feed{position:absolute;left:calc(100% + 8px);top:0;width:256px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none}
 .hud.zh .zh-feed :is(.zh-q,.msgs),body.is-touch .hud.zh .zh-feed :is(.zh-q,.msgs){position:static;inset:auto;transform:none;max-width:100%;box-sizing:border-box}
-.hud.zh .zh-feed .zh-q{width:fit-content;display:flex;align-items:center;gap:4px;padding:2px 5px;border-width:2px;white-space:nowrap;font:600 11px/1.2 Arial,sans-serif}
-.zh-q .ex{flex:none;width:12px;height:12px;border:1px solid #cb9d53;border-radius:50%;display:grid;place-items:center;font:700 9px/1 Arial;color:#e0b266}
-.zh-q .qn{color:#e1d9c4;overflow:hidden;text-overflow:ellipsis}.zh-q .arr,.zh-q .qd{flex:none;font-size:10px;color:#c4ac82}
+.hud.zh .zh-feed .zh-q{width:fit-content;display:flex;align-items:center;gap:5px;padding:3px 6px;border-width:2px;font:700 14px/1.15 Arial,sans-serif}
+.zh-q .ex{flex:none;width:15px;height:15px;border:1px solid #cb9d53;border-radius:50%;display:grid;place-items:center;font:700 11px/1 Arial;color:#e0b266}
+.zh-q .qn{min-width:0;white-space:normal;overflow-wrap:anywhere;color:#ece3cf}.zh-q .arr,.zh-q .qd{flex:none;font-size:10px;color:#c4ac82;white-space:nowrap}
 .hud.zh .zh-feed .msgs{width:100%;align-items:flex-start}
-.hud.zh .zh-feed .msgs p{box-sizing:border-box;max-width:100%;margin:0;padding:4px 7px;text-align:left;font:12px/1.3 Arial,sans-serif!important;background:rgba(23,22,17,.92);border:1px solid #625849;border-radius:2px;color:#e0d8c5}
-.hud.zh .zh-feed .msgs p.bad{color:#f1b399}
-.hud.zh .zh-feed .msgs p.radio{border-left:2px solid #82a6a1}
-.hud.zh .zh-feed .msgs p.urgent{border-left-color:#e5a452}
-.msgs .sender{margin-right:5px;font-size:10px;font-weight:700;letter-spacing:.04em;color:#a5c3bc}.msgs .urgent .sender{color:#efb469}
-@media (orientation:landscape) and (max-width:1020px){
- .zh-feed{top:39px;width:min(220px,calc(100vw - 336px - var(--sal) - var(--sar)))}
+.hud.zh .zh-feed .msgs p{box-sizing:border-box;max-width:100%;margin:0;padding:2px 5px;text-align:left;font:11px/1.3 Arial,sans-serif!important;border:0;border-radius:2px;background:rgba(18,17,14,.32);color:#e7e2d4;text-shadow:0 1px 2px #110e09,0 0 3px #18150f}
+.msgs .sender{margin-right:5px;font-size:10px;font-weight:700;color:#b7c7b3}.msgs .urgent .sender{color:#efc687}
+#field-feedback{left:50%;bottom:calc(62px + var(--sab));transform:translateX(-50%);max-width:min(390px,52vw);text-align:center;pointer-events:none;font:12px/1.3 Arial,sans-serif;color:#e7e2d4;text-shadow:0 1px 2px #100d08,0 0 4px #100d08}
+@media (orientation:landscape) and (max-width:1000px){
+ .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{left:auto;right:calc(212px + var(--sar));transform:none}
+ .zh-feed{width:min(250px,calc(100vw - 580px - var(--sal) - var(--sar)))}
+}
+@media (orientation:landscape) and (max-width:760px){
+ .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{right:calc(8px + var(--sar))}
+ .hud.zh .zh-w.rust,body.is-touch .hud.zh .zh-w.rust{top:calc(49px + var(--sat))}
+ .hud.zh .zh-det.rust{top:calc(52px + var(--sat));right:calc(205px + var(--sar))}
+ .zh-feed{width:min(243px,calc(100vw - 405px - var(--sal) - var(--sar)))}
 }
 @media (orientation:portrait){
- .zh-map-group{display:contents}
- .zh-corner .zh-map{order:0}.zh-corner .zh-clock{order:1}
- .zh-corner .zh-feed{position:static;order:2;width:min(210px,calc(100vw - 106px - var(--sal) - var(--sar)))}
- .zh-corner .zh-feed:has(.zh-q:empty):has(.msgs:empty){display:none}
- .zh-corner .zh-bars{order:3}
+ .zh-feed{width:min(255px,calc(100vw - 136px - var(--sal) - var(--sar)))}
+ .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{left:auto;right:calc(8px + var(--sar));top:calc(115px + var(--sat));transform:none}
+ .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:55px;padding-inline:6px}
+ .hud.zh .zh-w.rust,body.is-touch .hud.zh .zh-w.rust{top:calc(161px + var(--sat));width:min(178px,calc(100vw - 178px - var(--sal) - var(--sar)))}
+ .hud.zh .zh-det.rust{top:calc(226px + var(--sat))}
+ #field-feedback{bottom:calc(245px + var(--sab));max-width:78vw}
 }

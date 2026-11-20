@@ -137,7 +137,7 @@ function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
     B.stage = 1; B.t = 80;
-    news(BLOW_WARNING, true, true);
+    radioNews(BLOW_WARNING, true);
     ents.forEach(e => {
       if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
@@ -168,7 +168,7 @@ function blowout(dt) {
         delete S.flags['art_' + a.key];
         arts.push(Object.assign({}, a, { x: a.x + rnd(-10, 10), y: a.y + rnd(-10, 10) })); born++;
       });
-      news('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true, true);
+      radioNews('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true);
     }
   } else WX.red = Math.max(0, WX.red - dt * 0.3);
 }
