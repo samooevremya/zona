@@ -441,7 +441,38 @@ const rankOf = sc => sc < 15 ? 0 : sc < 45 ? 1 : sc < 90 ? 2 : 3;
 
 let MSGS = [];
 function msg(t, k) { MSGS.push({ t: t, k: k || '', life: 6 }); if (MSGS.length > 5) MSGS.shift(); }
-function news(t, ping) { S.news.push({ t: S.min, x: t }); if (S.news.length > 60) S.news.shift(); if (ping) { msg('КПК: ' + t, 'pda'); play('pda'); } }
+const radioQueue = [];
+function radioNotice(t, urgent = false) {
+  const k = urgent ? 'radio urgent' : 'radio';
+  const i = radioQueue.findIndex(note => note.k === k);
+  if (i >= 0) {
+    if (radioQueue[i].t === t) return false;
+    radioQueue.splice(i, 1);
+  }
+  const note = { t, k, life: urgent ? 10 : 6 };
+  const position = !urgent && radioQueue[0]?.k === 'radio urgent' ? 1 : 0;
+  radioQueue.splice(position, 0, note);
+  return true;
+}
+function news(t) {
+  S.news.push({ t: S.min, x: t });
+  if (S.news.length > 60) S.news.shift();
+}
+function bulletin(t) {
+  news(t);
+  const pending = radioQueue.filter(note => note.k === 'radio bulletin');
+  if (pending.some(note => note.t === t)) return;
+  // Короткая серия идёт по одной строке. Большая пачка оставляет одну подсказку о журнале.
+  if (pending.length >= 2) {
+    if (pending.some(note => note.digest)) return;
+    radioQueue.push({ t: 'Другие сводки — в журнале КПК.', k: 'radio bulletin', life: 4, digest: true });
+  } else {
+    radioQueue.push({ t, k: 'radio bulletin', life: 5 });
+  }
+}
+function radioNews(t, urgent = false) {
+  if (radioNotice(t, urgent)) { news(t); play('pda'); }
+}
 
 function freshS() {
   return { v: 1, money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
@@ -850,13 +881,13 @@ function kill(e, src) {
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
     const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
-    news('Погиб сталкер ' + e.name + '. Причина: ' + why + '.', true);
+    bulletin('Погиб сталкер ' + e.name + '. Причина: ' + why + '.');
   } else if (e.fac === 'bandit' && src && src.fac === 'loner' && dE(e, P) > 380) {
-    news('Одиночки убили бандита по кличке ' + e.name + '.', true);
+    bulletin('Одиночки убили бандита по кличке ' + e.name + '.');
   }
   if (e.sid === 'tolik' && S.q2.tolik !== 2) S.q2.tolik = 3;
-  if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; msg('Лис погиб.', 'bad'); }
-  if (e.sid === 'shust' && S.q.flash > 0 && S.q.flash < 3) { S.q.flash = 4; S.flags.flashFail = 1; msg('Шустрый погиб. Флешку уже не вернуть.', 'bad'); news('Задание провалено: Флешка Шустрого.'); }
+  if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; bulletin('Лис погиб. Задание провалено.'); }
+  if (e.sid === 'shust' && S.q.flash > 0 && S.q.flash < 3) { S.q.flash = 4; S.flags.flashFail = 1; bulletin('Шустрый погиб. Задание «Флешка Шустрого» провалено.'); }
   checkQuests(); plusKill(e, src);
 }
 function dropBody(e) {
@@ -1207,11 +1238,11 @@ function qList() {
   return L;
 }
 function checkQuests() {
-  if (S.q2.fox === 2 && !ents.some(e => e.alive && e.pack === 'foxdogs')) { S.q2.fox = 3; msg('Стая отбита. Поговори с Лисом.', 'good'); }
-  if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); news('У дороги лежит раненый сталкер, просит аптечку.'); }
-  if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; msg('Стая перебита. Вернись к Волку.', 'good'); news('Стая у леса перебита.'); }
+  if (S.q2.fox === 2 && !ents.some(e => e.alive && e.pack === 'foxdogs')) { S.q2.fox = 3; bulletin('Стая отбита. Поговори с Лисом.'); }
+  if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); bulletin('У дороги лежит раненый сталкер, просит аптечку.'); }
+  if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; bulletin('Стая у леса перебита. Вернись к Волку.'); }
   if (!S.flags.atpClear && ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'boss'].every(s => S.dead[s])) {
-    S.flags.atpClear = 1; msg('АТП очищено от бандитов.', 'good'); news('Бандиты на АТП перебиты.', false);
+    S.flags.atpClear = 1; bulletin('Бандиты на АТП перебиты.');
     ['petr', 'petr2'].forEach(s => { const e = byS(s); if (e) { const p = locPt('atp', s); e.home = { x: p.x, y: p.y }; e.stay = 1; } });
   }
 }
@@ -1236,7 +1267,7 @@ function spawnTick() {
       e.patrol = 1; e.home = { x: (66 + i) * T, y: (91 + i) * T };
       ents.push(e);
     }
-    news('Сводка: на дорогу с востока вышла группа бандитов.', false);
+    news('Сводка: на дорогу с востока вышла группа бандитов.');
   }
   if (S.min - (S.flags.dogT || 0) > 360 && S.q.pack !== 1) {
     S.flags.dogT = S.min;
@@ -1266,7 +1297,7 @@ let fogDirty = true;
 
 function startReload() {
   const W = WP[S.weapon];
-  if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); msg('Затвор передёрнут.'); return; }
+  if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); return; }
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
   if (m >= W.mag || !cnt(W.ammo)) return;
@@ -1281,7 +1312,7 @@ let noAmmoT = 0;
 function playerFire() {
   const W = WP[S.weapon];
   if (P.cool > 0 || P.reload > 0) return;
-  if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; msg('Гранаты кончились. В руках: Нож'); } }, 300); return; }
+  if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; } }, 300); return; }
   if (W.melee) { P.cool = W.rate; melee(P, W); return; }
   if (P.jam) { if (noAmmoT <= 0) { noAmmoT = 1; play('click'); } return; }
   const m = S.mag[S.weapon] || 0;
@@ -1303,9 +1334,8 @@ function cycleWeapon(dir) {
   let i = own.indexOf(S.weapon);
   S.weapon = own[(i + (dir || 1) + own.length) % own.length];
   P.reload = 0; P.cool = 0.25; P.jam = 0;
-  msg('В руках: ' + WP[S.weapon].n + (WP[S.weapon].toss ? '. «Огонь» — бросок' : ''));
 }
-function setWeapon(w) { if (w === 'knife' || has(w)) { if (WP[w] && WP[w].toss) msg('В руках: Граната. «Огонь» — бросок.'); S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
+function setWeapon(w) { if (w === 'knife' || has(w)) { S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
 function useItem(id) {
   const it = ITEMS[id];
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
@@ -1314,7 +1344,6 @@ function useItem(id) {
   if (it.rad) S.rad = Math.max(0, S.rad - it.rad);
   if (FOOD[id]) { S.food = Math.min(100, S.food + FOOD[id]); play('eat'); } else play('pick');
   if (id === 'medkit') S.bleed = 0; if (id === 'bandage') S.bleed = Math.max(0, S.bleed - 2);
-  msg(it.n + ': здоровье ' + Math.round(P.hp) + (FOOD[id] ? ', сытость ' + Math.round(S.food) : ', радиация ' + Math.round(S.rad)) + (id === 'bandage' || id === 'medkit' ? (S.bleed ? ', кровь ещё идёт' : ', кровь остановлена') : ''), 'good');
   return true;
 }
 function healWith(id) {
@@ -1345,7 +1374,7 @@ function throwBolt() {
   bolts.push({ x0: P.x, y0: P.y, x1: ex, y1: ey, t: 0, dur: 0.45, hit: null });
 }
 /* фонарик: ночью светит конусом; выключенный — почти темнота вокруг, зато тебя хуже видно издалека */
-function toggleTorch() { S.torch = S.torch === false; play('click'); msg(S.torch ? 'Фонарик включён.' : 'Фонарик выключен.' + (darkness() > 0.3 ? ' В темноте тебя хуже видно, но и ты видишь мало.' : '')); }
+function toggleTorch() { S.torch = S.torch === false; play('click'); }
 /* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
 const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier', 'fence']);
 function startJump() {
@@ -1488,6 +1517,7 @@ function update(dt) {
     }
   }
   checkQuests();
+  if (radioQueue.length && (radioQueue[0].life -= dt) <= 0) radioQueue.shift();
   for (const m of MSGS) m.life -= dt;
   MSGS = MSGS.filter(m => m.life > 0);
   hurtFlash = Math.max(0, hurtFlash - dt * 1.2);
@@ -1621,30 +1651,30 @@ function findInteract() {
   return best;
 }
 function lootAll(o) {
-  const parts2 = [];
+  let pickedUp = false;
   const left = {};
   Object.keys(o.loot).forEach(k => {
     const q = o.loot[k];
     if (k === '__tip') return;
-    if (k === 'money') { S.money += q; parts2.push(q + ' RU'); }
+    if (k === 'money') { S.money += q; pickedUp = true; }
     else if (WP[k] && !WP[k].melee && has(k)) left[k] = q;          // такой ствол уже есть — остаётся лежать
-    else { give(k, q); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); parts2.push(ITEMS[k].n + (q > 1 ? ' ×' + q : '')); }
+    else { give(k, q); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); pickedUp = true; }
   });
   o.loot = left;
   if (Object.keys(left).length) msg('Оставлено: такой ствол уже есть (' + Object.keys(left).map(k => ITEMS[k].n).join(', ') + ').', 'bad');
   if (o.stash && !Object.keys(o.loot).length) { o.looted = true; S.flags['st_' + o.stash] = 1; }
-  if (parts2.length) { msg('Взято: ' + parts2.join(', '), 'good'); play('pick'); }
+  if (pickedUp) play('pick');
 }
 function takeArt(a) {
   give(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
-  msg('Подобран ' + ITEMS[a.id].n + '. Его можно продать или повесить на пояс в рюкзаке.', 'good'); play('pick');
+  play('pick');
   news('Найден ' + ITEMS[a.id].n + '.');
 }
 function freeShust(e) {
   e.captive = 0; S.flags.shustFree = 1;
   e.home = (h => ({ x: h[0], y: h[1] }))(RMp(34.5 * T, 80.5 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; news('Шустрый освобождён. Флешка у тебя.'); }
+  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; bulletin('Шустрый освобождён. Флешка у тебя.'); }
 }
 
 let fadeT = 0, fadeTo = null;
@@ -1659,7 +1689,7 @@ function healWounded(e) {
   if (e.sid === 'tolik') {
     S.flags.tolikUp = 1; S.q2.tolik = 2; S.stats.q++; S.rep += 10; S.money += 300; give('antirad', 1);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-    news('Выполнено: раненый у дороги. Толик выжил.');
+    bulletin('Выполнено: раненый у дороги. Толик выжил.');
   }
   if (e.sid === 'fox') {
     S.flags.foxUp = 1; S.q2.fox = 2;
@@ -1679,7 +1709,6 @@ function save(quiet) {
   S.fog = f;
   dynSnapshot();
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { if (!quiet) msg('Сохранить не вышло: браузер не даёт места.'); return false; }
-  if (!quiet) msg('Игра сохранена.', 'good');
   return true;
 }
 function loadSave() {
@@ -1693,7 +1722,8 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   cam.x = P.x; cam.y = P.y;
-  deathT = 0; hurtFlash = 0; MSGS = [];
+  deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
+  if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
 }
 
 /* ===================== отрисовка ===================== */
@@ -2549,13 +2579,11 @@ function drawSticks() {
 /* ===================== погода, выброс, шаги, голоса, гитара ===================== */
 const WX = { cloud: 0.15, rain: 0, fog: 0, wind: 0.35, flash: 0, red: 0, clouds: [], drops: [] };
 const WXT = { clear: [0.1, 0, 0], cloudy: [0.65, 0, 0], rain: [0.85, 0.6, 0.06], storm: [1, 1, 0.06], fog: [0.45, 0, 0.8] };
-const WXN = { clear: 'Проясняется', cloudy: 'Небо затягивает тучами', rain: 'Начинается дождь', storm: 'Идёт гроза', fog: 'Опускается туман' };
 for (let i = 0; i < 7; i++) WX.clouds.push({ x: rnd(0, WW), y: rnd(0, WH), r: rnd(350, 700) });
 function pickWeather() {
   const r = Math.random(), h = hour();
   const k = r < 0.34 ? 'clear' : r < 0.58 ? 'cloudy' : r < 0.78 ? 'rain' : r < 0.87 ? 'storm' : (h < 9 || h > 18 ? 'fog' : 'cloudy');
   S.wx = { k: k, until: S.min + rnd(120, 300) };
-  if (P && P.alive && S.min > 430) msg('Погода: ' + WXN[k].toLowerCase() + '.', 'pda');
 }
 const sheltered = (x, y) => inBunker(x, y) || HOUSES.some(h => !h.ruin && x > (h.x + 0.6) * T && x < (h.x + h.w - 0.6) * T && y > (h.y + 0.6) * T && y < (h.y + h.h - 0.6) * T);
 const safeFromBlow = e => e.guard || ['wolf', 'sid', 'petr', 'petr2', 'fox', 'shust', 'tolik'].indexOf(e.sid) >= 0;
@@ -2682,20 +2710,18 @@ function worldFx(dt) {
   }
   guitar(dt);
 }
+const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей.';
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
     B.stage = 1; B.t = 80;
-    news('Внимание всем сталкерам! Приближается выброс! Срочно найдите укрытие!', true);
-    msg('Выброс через минуту! Укройся в доме с целой крышей или в бункере.', 'bad');
+    radioNews(BLOW_WARNING, true);
     ents.forEach(e => {
       if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
       HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
       if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
     });
-    const caller = ents.find(e => e.alive && e.fac === 'loner' && dE(e, P) < 500 && !e.captive);
-    if (caller) sayLine(caller, 'Выброс! Все в укрытие!');
   }
   if (B.stage === 1) {
     B.t -= dt; WX.red = lerp(WX.red, 0.5, dt * 0.05);
@@ -2720,7 +2746,7 @@ function blowout(dt) {
         delete S.flags['art_' + a.key];
         arts.push(Object.assign({}, a, { x: a.x + rnd(-10, 10), y: a.y + rnd(-10, 10) })); born++;
       });
-      news('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true);
+      radioNews('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true);
     }
   } else WX.red = Math.max(0, WX.red - dt * 0.3);
 }
@@ -2809,7 +2835,7 @@ function revealCache(fromName, idx) {
   const i = idx != null && free.includes(idx) ? idx : free[ri(0, free.length - 1)];
   S.caches[i] = 1;
   const c = CACHES[i];
-  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.', true);
+  bulletin('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
 }
 const cond = id => (S.cond[id] === undefined ? 80 : S.cond[id]);
 function wearAndJam(id) {
@@ -2840,7 +2866,7 @@ function survival(dt) {
   P.detD = bd;
   // ранг
   const r = rankOf(score());
-  if (r > S.rankSeen) { S.rankSeen = r; msg('Новый ранг: ' + RANKS[r] + '. О тебе заговорили на Кордоне.', 'good'); news('Ранг повышен: ' + RANKS[r] + '.'); play('pda'); }
+  if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }
   // тайники рядом
 }
 function cacheNear() {
@@ -3985,7 +4011,7 @@ function jobTake(j) {
   S.jobs.act = a;
   S.jobs.offer = S.jobs.offer.filter(o => o !== j);
   if (a.k === 'clear') spawnClear(a);
-  news('Заказ взят: ' + a.n_ + '.');
+  bulletin('Заказ взят: ' + a.n_ + '.');
 }
 function spawnClear(j) {
   const have = ents.filter(e => e.alive && e.jobTag === j.id).length;
@@ -4000,7 +4026,7 @@ function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag 
 function jobCancel() {
   const j = S.jobs.act; if (!j) return;
   j.status = 'cancelled'; releaseGroup(j.id); S.jobs.act = null; S.rep -= 2;
-  news('Заказ отменён: ' + j.n_ + '.');
+  bulletin('Заказ отменён: ' + j.n_ + '.');
 }
 function jobTurnIn(artId) {
   const j = S.jobs.act;
@@ -4019,7 +4045,7 @@ function jobTurnIn(artId) {
   S.money += pay; S.jobs.done = (S.jobs.done || 0) + 1; S.rep += 4; S.stats.q++;
   if (S.jobs.done % 5 === 0) { give('medkit', 2); give('grenade', 1); sys('Премия за постоянство: аптечка ×2, граната.'); }
   say(['Вот это я понимаю, работа. Держи.', 'Без обмана. Деньги твои.', 'Нормально. Заходи ещё, заказы будут.'][S.jobs.done % 3]);
-  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); news('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
+  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); bulletin('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
   return true;
 }
 const artPay = id => Math.round(sellPrice(id) * 1.5 / 10) * 10;
@@ -4209,6 +4235,8 @@ const SOS_FIRST = 150, SOS_GAP = [240, 360], SOS_TIME = 150, SOS_HOLD = 50;
    retreat — последний из 3–4 нападающих уходит, событие закрывается. Таймаут — только запасной исход. */
 function finishEncounter(reason) {
   const a = S.sos.act; if (!a) return;
+  const call = radioQueue.findIndex(note => note.k === 'radio');
+  if (call >= 0) radioQueue.splice(call, 1);
   const allies = ents.filter(e => e.alive && e.sos === a.id), foes = ents.filter(e => e.alive && e.sosFoe === a.id);
   const lead = a.names && a.names[0] || (allies[0] && allies[0].name) || 'сталкеров';
   if (reason === 'helped' && !a.rewarded) {
@@ -4220,11 +4248,11 @@ function finishEncounter(reason) {
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
     msg('Благодарность: ' + pay + ' RU, ' + ITEMS[gift].n + '.', 'good');
-    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.', true);
+    bulletin('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
     S.sos.saved = (S.sos.saved || []).concat([{ name: lead, t: S.min, where: a.where }]).slice(-10);
-  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.', true);
-  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.', true);
-  else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.', true);
+  } else if (reason === 'self') bulletin('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
+  else if (reason === 'dead') bulletin('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
+  else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
@@ -4284,7 +4312,7 @@ function sosTick() {
     e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; e.home = { x: e.ringPt.x, y: e.ringPt.y }; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
   }
   s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: ri(25, 55) * 10, gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
-  news('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»', true);
+  radioNews('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»');
   play('siren', undefined, undefined, 0.25);
 }
 function dirName(x, y) { return locNear(x, y).gen; }
@@ -4348,7 +4376,7 @@ function remapToMap() {
     else if (MAP_ID === 'rc1' && safe) { S.x = safe.x; S.y = safe.y; } else { S.x = f.x * T; S.y = f.y * T; }
   }
   if (P) { P.x = S.x; P.y = S.y; if (typeof cam !== 'undefined') { cam.x = P.x; cam.y = P.y; } }   // игрок уже создан spawnWorld до миграции
-  news('Карта обновлена (' + from + ' → ' + MAP_VERSION + '). Деньги, вещи и задания сохранены; места заданий пересчитаны' + (big ? '. Кордон стал больше: ты на том же месте, карту КПК придётся открыть заново. Копия старого сохранения оставлена.' : MAP_ID === 'rc1' ? ', тебя перенесли к костру деревни. Копия старого сохранения оставлена.' : '.'), true);
+  news('Карта обновлена (' + from + ' → ' + MAP_VERSION + '). Деньги, вещи и задания сохранены; места заданий пересчитаны' + (big ? '. Кордон стал больше: ты на том же месте, карту КПК придётся открыть заново. Копия старого сохранения оставлена.' : MAP_ID === 'rc1' ? ', тебя перенесли к костру деревни. Копия старого сохранения оставлена.' : '.'));
   S.mapVersion = MAP_VERSION;
 }
 
@@ -4516,13 +4544,13 @@ function plusKill(e, src) {
   const byMe = src === P || (src && src.follow);
   const j = S.jobs.act;
   if (j && j.status === 'active') {
-    if (j.k === 'hunt' && byMe && e.kind === j.kind) { j.got++; msg('Заказ: ' + Math.min(j.got, j.n) + ' из ' + j.n + (j.got >= j.n ? '. Возвращайся к Сидоровичу.' : '.'), 'good'); }
-    if (j.k === 'clear' && e.jobTag === j.id) { j.got++; if (j.got >= j.n) { msg('Зачистка выполнена. Возвращайся к Сидоровичу.', 'good'); news('Заказ: бандиты ' + j.where + ' уничтожены.'); } }
+    if (j.k === 'hunt' && byMe && e.kind === j.kind) { j.got++; bulletin('Заказ: ' + Math.min(j.got, j.n) + ' из ' + j.n + (j.got >= j.n ? '. Возвращайся к Сидоровичу.' : '.')); }
+    if (j.k === 'clear' && e.jobTag === j.id) { j.got++; if (j.got >= j.n) { bulletin('Заказ: бандиты ' + j.where + ' уничтожены. Возвращайся к Сидоровичу.'); } }
   }
   const a = S.sos.act;
   if (a && e.sosFoe === a.id && byMe) a.pk = (a.pk || 0) + 1;
-  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.', true); }
-  if (e.follow) { msg('Напарник погиб: ' + e.name + '.', 'bad'); news('Погиб напарник ' + e.name + '.'); }
+  if (e.kind === 'sucker') { S.q3.sucker = 2; bulletin('Кровосос в хлеву убит. Возвращайся к Волку.'); }
+  if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
   const d = dst(P.x, P.y, FIRE.x, FIRE.y);
@@ -4552,12 +4580,12 @@ function wolfPlusOpts() {
   const o = wolfRC1Opts();
   if (S.q.flash >= 2 && S.q3.sucker === 0) o.push({ t: 'Говорят, люди пропадают?', fn: () => {
     say('Пропадают. Двое наших пошли к старому хлеву за фермой, на северо-востоке, и с концами. Хомяк клянётся, что видел там, как воздух сам по себе дышит. Сходи, только не ночью. Принесёшь доказательство, что тварь мертва, деревня скинется: две тысячи и аптечки.');
-    S.q3.sucker = 1; news('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
+    S.q3.sucker = 1; bulletin('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
   } });
   if (S.q3.sucker === 2) o.push({ t: 'С тварью в хлеву покончено', k: 'key', fn: () => {
     S.money += 2000; give('medkit', 3); S.q3.sucker = 3; S.stats.q++; S.rep += 15;
     say('Сам ходил смотреть: лежит. Ну и мерзость. Держи, как обещали, и спасибо от всей деревни.');
-    sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); news('Выполнено: Ночной гость.'); save(true);
+    sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); bulletin('Выполнено: Ночной гость.'); save(true);
   } });
   return o;
 }
@@ -5019,9 +5047,9 @@ function drawPick(o) {   // растр G4 (gg7.js: g7Pick); ниже — пре�
 function pickUp(o) {
   give(o.pick, 1); S.flags['pk_' + o.pick] = 1;
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
-  play('pick'); msg('Подобрано: ' + ITEMS[o.pick].n + '.', 'good');
+  play('pick');
   const q = q5();
-  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.', true); }
+  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; bulletin('Предохранитель и топливо у тебя. Неси к генератору у костра.'); }
   else if (q.st === 'not_started') news('Нашёл ' + ITEMS[o.pick].n.toLowerCase() + '. Кому-то в деревне это может пригодиться.');
 }
 /* разговор с Волком */
@@ -5030,13 +5058,13 @@ function wolfRC1Opts() {
   const o = [], q = q5(), c = q3c();
   if (q.st === 'not_started' && S.q.flash >= 1) o.push({ t: 'Что с генератором у костра?', fn: () => {
     say('Стоит без дела с весны. Мотор целый, сгорел предохранитель, и бензина ни капли. Предохранитель поищи на старой водокачке к северу, там щиток был. Канистры видели на АТП, у бандитов. Принесёшь — вечером будет свет, и верстак заработает.');
-    q.st = has('fuse') && has('fuel') ? 'ready' : 'collecting'; news('Задание: Свет в деревне. Предохранитель — водокачка, топливо — АТП.');
+    q.st = has('fuse') && has('fuel') ? 'ready' : 'collecting'; bulletin('Задание: Свет в деревне. Предохранитель — водокачка, топливо — АТП.');
   } });
   if (q.st === 'completed') o.push({ t: 'Как вам со светом?', fn: () => say('Живём как люди. Вечером у костра видно, кто пришёл, а не только кто стреляет. И верстак теперь твой, пользуйся.') });
   if (S.q3.sucker >= 1 && S.q3.sucker < 3 && !c.story) o.push({ t: 'Расскажи подробнее про хлев', fn: () => {
     c.story = 1;
     say('Хомяк ночью шёл мимо фермы и видел следы босых ног, будто человек, только пальцы длинные. От фермы они уходят к хлеву на востоке. Если пойдёшь — бинты возьми побольше: кого оно цепляет, тот кровью истекает.');
-    news('Ночной гость: следы у фермы ведут к хлеву. Возьми бинты.');
+    bulletin('Ночной гость: следы у фермы ведут к хлеву. Возьми бинты.');
   } });
   if (S.q3.sucker === 3) o.push({ t: 'Ферма теперь спокойная?', fn: () => say('Лис говорит, по ночам больше никто не скребётся в стену. Спасибо тебе от всех, кто туда ходит.') });
   return o;
@@ -5056,7 +5084,7 @@ function gensetUse() {
   take('fuse', 1); take('fuel', 1); q.st = 'completed';
   if (!q.rewarded) { q.rewarded = 1; S.money += 600; S.rep += 10; S.stats.q++; }
   play('reload'); msg('Генератор заработал. Вечером в деревне будет свет.', 'good');
-  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.', true); save(true);
+  bulletin('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
@@ -5079,15 +5107,15 @@ function targetsRC1(out) {
 function cluesTick() {
   if (MAP_ID !== 'rc1' || !P || !P.alive || S.q3.sucker !== 1) return;
   const c = q3c();
-  if (!c.tracks && dst(P.x, P.y, locPt('farm', 'tracks').x, locPt('farm', 'tracks').y) < 70) { c.tracks = 1; msg('Следы босых ног с длинными пальцами. Уходят на восток, к хлеву.', 'say'); news('Ночной гость: следы у фермы ведут к хлеву.'); }
+  if (!c.tracks && dst(P.x, P.y, locPt('farm', 'tracks').x, locPt('farm', 'tracks').y) < 70) { c.tracks = 1; msg('Следы босых ног с длинными пальцами. Уходят на восток, к хлеву.', 'say'); bulletin('Ночной гость: следы у фермы ведут к хлеву.'); }
   const porch = locPt('lair', 'porch');
   if (!c.warned && dst(P.x, P.y, porch.x, porch.y) < 160) { c.warned = 1; msg('Внутри что-то дышит. Тварь невидима, пока не кинется; её удар вызывает кровотечение. Держи бинты под рукой.', 'bad'); }
   const ins = locPt('lair', 'inside');
-  if (!c.barn && dst(P.x, P.y, ins.x, ins.y) < 90) { c.barn = 1; news('Ночной гость: в хлеву кости и обрывки курток. Тварь где-то рядом.'); }
+  if (!c.barn && dst(P.x, P.y, ins.x, ins.y) < 90) { c.barn = 1; bulletin('Ночной гость: в хлеву кости и обрывки курток. Тварь где-то рядом.'); }
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
-  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.', true); save(true); }
+  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
   msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
 }
 function interactRC1(cand) {
@@ -5793,7 +5821,6 @@ body.is-touch .joy{background:${url('joy')} center/contain no-repeat;border:0;bo
 .zh-bar{height:19px;margin-bottom:3px}.zh-bar .bar{height:6px}.zh-bar b{font-size:11px}
 .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:66px;min-height:26px;height:26px;padding:0 9px;font-size:12px;border-width:4px}
 .hud.zh .zh-top button::after{inset:-16px -4px}
-.hud.zh .zh-q,body.is-touch .hud.zh .zh-q{font-size:12px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:180px;height:58px;padding:3px 8px 3px 4px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am{font-size:16px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire{width:100px;height:100px}body.is-touch .joy{width:112px;height:112px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
@@ -5808,7 +5835,6 @@ body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire
 .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{gap:8px}
 .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:72px;min-height:26px;height:26px;padding:0 10px;font-size:12px;border-width:4px}
 .hud.zh .zh-top button::after{inset:-16px -6px}
-.hud.zh .zh-q,body.is-touch .hud.zh .zh-q{top:calc(40px + var(--sat));font-size:12px;padding:2px 10px 2px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:172px;height:58px;padding:3px 8px 3px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:190px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.zh-wi{overflow:hidden}.zh-w .cnd span{overflow:hidden;text-overflow:ellipsis}.hud.zh .zh-w .wn{font-size:11px}
 .hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am,.hud.zh .zh-w .am small{font-size:16px}.zh-w .cnd span{font-size:10px}
@@ -6351,7 +6377,7 @@ function talk(e) {
     const o = [];
     if (S.q2.fox === 3) o.push({ t: 'Что знаешь про Стрелка?', k: 'key', fn: () => {
       say('Стрелок? Слышал. Ходил на север дальше всех и возвращался. Лично не знал. А вот брат мой, Серый, с его группой пересекался. Он на Свалке, в ангаре. Скажешь, что от Лиса.');
-      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); news('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
+      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); bulletin('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
     } });
     o.push({ t: 'Бывай', close: 1 });
     return o;
@@ -6399,16 +6425,16 @@ function talkWolf(e) {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
       give('w_pm', 1); give('a9', 16); S.mag.w_pm = 8; setWeapon('w_pm'); S.q.flash = 2;
       sys('Получено: ПМ, Патроны 9×18 ×24. Задание обновлено.');
-      news('Волк выдал ПМ. Цель: АТП на востоке.');
+      bulletin('Волк выдал ПМ. Цель: АТП на востоке.');
     } });
     if (S.q.flash >= 2 && S.q.pack === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
       say('Есть. В лесу на северо-западе завелась стая слепых псов, уже двоих наших порвали. Перебьёшь, отдам обрез и патроны к нему.');
-      S.q.pack = 1; news('Задание: перебить стаю слепых псов в северо-западном лесу.');
+      S.q.pack = 1; bulletin('Задание: перебить стаю слепых псов в северо-западном лесу.');
     } });
     if (S.q.pack === 2) o.push({ t: 'Стаи больше нет', k: 'key', fn: () => {
       if (!has('w_obrez')) { give('w_obrez', 1); give('a12', 12); sys('Получено: Обрез, Дробь ×12.'); } else { give('a12', 12); S.money += 500; sys('Получено: Дробь ×12, 500 RU.'); }
       say('Уважаю. Слово держу. И людям расскажу, что ты наш.');
-      S.q.pack = 3; S.stats.q++; S.rep += 10; news('Выполнено: Стая у леса.'); save(true);
+      S.q.pack = 3; S.stats.q++; S.rep += 10; bulletin('Выполнено: Стая у леса.'); save(true);
     } });
     wolfPlusOpts().forEach(x => o.push(x));
     o.push({ t: 'Что посоветуешь?', fn: () => say('Не стой на открытом, двигайся. Кидай болты, где воздух дрожит. Ночью включай голову: псы в темноте видят лучше тебя. И считай патроны, магазин кончается всегда не вовремя.') });
@@ -6422,7 +6448,7 @@ function talkTrader() {
     return dialog(SIDCARD(), ['Очухался, Меченый? Тебя сняли с грузовика смерти, с таких живыми не возвращаются. Ты первый на моей памяти.', 'В КПК у тебя одна запись: «Убить Стрелка». Имени не помнишь, так и будешь Меченым, по наколке. Я тебе жизнь спас, за тобой должок.'], () => [
       { t: 'Что за работа?', k: 'key', fn: () => {
         say('Мой курьер, Шустрый, пропал вместе с флешкой. Говорят, его взяли бандиты. Иди к Волку в деревню новичков, он поможет. Флешку принесёшь мне, остальное потом.');
-        S.q.flash = 1; news('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
+        S.q.flash = 1; bulletin('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
         sys('Задание: Флешка Шустрого. Метка на миникарте.');
         panel.opts = traderOpts;
       } }
@@ -6435,20 +6461,20 @@ function traderOpts() {
   if (S.q.flash === 3 && has('flash')) o.push({ t: 'Отдать флешку Шустрого', k: 'key', fn: () => {
     take('flash', 1); S.money += 1500; S.q.flash = 4; S.flags.flashDone = 1; S.stats.q++; S.rep += 15;
     say('Вот это дело. Держи полторы тысячи, заработал.');
-    sys('Получено: 1500 RU. Задание выполнено.'); news('Выполнено: Флешка Шустрого.'); save(true);
+    sys('Получено: 1500 RU. Задание выполнено.'); bulletin('Выполнено: Флешка Шустрого.'); save(true);
   } });
   if (S.q.flash === 4 && S.flags.flashDone && S.q2.fox === 0) o.push({ t: 'Что со Стрелком?', k: 'key', fn: () => {
     say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры.');
-    S.q2.fox = 1; news('Задание: Найти Лиса за насыпью.');
+    S.q2.fox = 1; bulletin('Задание: Найти Лиса за насыпью.');
   } });
   if (S.q.medusa === 1 && has('art_medusa')) o.push({ t: 'Отдать «Медузу» за 1000 RU', k: 'key', fn: () => {
     take('art_medusa', 1); S.money += 1000; S.q.medusa = 2; S.stats.q++;
-    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); news('Выполнено: «Медуза» для Сидоровича.');
+    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); bulletin('Выполнено: «Медуза» для Сидоровича.');
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
     say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
-    S.q.medusa = 1; news('Задание: «Медуза» для Сидоровича.');
+    S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
   if (S.rep <= -30) o.push({ t: 'Уладить с одиночками · 2000 RU', k: 'key', d: S.money < 2000, fn: () => {
@@ -6622,7 +6648,7 @@ function drawMenu() {
     else { save(true); panel.hint = 'Игра сохранена.'; }
     refresh();
   }));
-  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); msg('Загружено.'); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
+  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
   pbody.appendChild(btn('wide', (AC && master && master.gain.value === 0 ? 'Включить' : 'Выключить') + ' звук', () => { audioInit(); if (master) master.gain.value = master.gain.value ? 0 : 0.55; refresh(); }));
   pbody.appendChild(btn('wide warn', 'Начать заново', () => { if (panel.sure) { applyState(freshS()); closePanel(); intro(); } else { panel.sure = 1; panel.hint = 'Прогресс сотрётся. Нажми ещё раз, чтобы начать заново.'; refresh(); } }));
   const k = el('div', 'note'); k.style.lineHeight = '1.8';
@@ -6888,8 +6914,8 @@ const WSIL = {
   knife: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M44 17l58-4c6 0 10 3 12 7-4 2-8 3-14 3H44z" fill="#b9bcbd"/><path d="M44 17l58-4c6 0 10 3 12 7H44z" fill="#dfe2e2"/><path d="M38 11h6v20h-6z" fill="url(#wm)"/><path d="M12 15h26v11H12c-3 0-5-2-5-5.5S9 15 12 15z" fill="#2a2420"/><path d="M16 15v11M22 15v11M28 15v11" stroke="#3e352e" stroke-width="1.4"/></svg>'
 };
 const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
-  status: $('status'), quest: $('quest'), msgs: $('msgs'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
-let hudT = 0, lastW = '';
+  status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
+let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
   if (!P) return;
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
@@ -6900,7 +6926,7 @@ function hud(dt) {
   if (H.sig.dataset.v != sg) { H.sig.dataset.v = sg; [...H.sig.children].forEach((b, i) => b.classList.toggle('on', i < sg)); H.det.classList.toggle('on', sg > 0); }
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
-  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.crouch ? 'присел' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -6928,8 +6954,22 @@ function hud(dt) {
     H.quest.appendChild(el('span', 'ex', '!')); H.quest.appendChild(el('span', 'qn', q.n));
     const ar = el('span', 'arr', '➤'); ar.style.transform = 'rotate(' + a + 'rad)'; H.quest.appendChild(ar); H.quest.appendChild(el('span', 'qd', d + ' м'));
   }
-  H.msgs.textContent = '';
-  MSGS.forEach(m => { const p = el('p', m.k, m.t); p.style.opacity = clamp(m.life / 1.5, 0, 1); H.msgs.appendChild(p); });
+  const message = radioQueue[0];
+  if (message !== lastNotice) {
+    lastNotice = message;
+    H.msgs.replaceChildren();
+    if (message) {
+      const line = el('p', message.k);
+      line.append(el('span', 'sender', 'КПК'));
+      line.append(document.createTextNode(message.t));
+      H.msgs.append(line);
+    }
+  }
+  if (message) H.msgs.style.opacity = clamp(message.life / 1.2, 0, 1);
+  const local = !message && MSGS[MSGS.length - 1];
+  const feedback = local ? local.t : '';
+  if (H.feedback.textContent !== feedback) H.feedback.textContent = feedback;
+  if (local) H.feedback.style.opacity = clamp(local.life / 1.2, 0, 1);
   const n = G.near;
   H.prompt.textContent = ''; H.prompt.classList.toggle('kill', !!(n && n.k === 'kill'));
   if (n && P.alive && !panel) { const ic = el('span', 'pi ' + n.k); H.prompt.appendChild(ic); if (!IN.touch) H.prompt.appendChild(el('kbd', '', 'E')); H.prompt.appendChild(document.createTextNode(n.label.replace(/^Поговорить: /, 'Говорить: ') + '.')); }
@@ -6980,7 +7020,7 @@ addEventListener('keydown', e => {
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
-  if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }
+  if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }
@@ -7037,7 +7077,7 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
@@ -7130,8 +7170,8 @@ async function boot() {
 window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
-window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => MSGS.map(m => m.t || m.text || m[0] || '') };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 /* мост: тип открытой панели для стилей */
 (function(){ const oldHUD = hud; hud = function(dt){ oldHUD(dt); ov.dataset.kind = panel ? panel.kind : ''; }; })();
 

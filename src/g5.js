@@ -202,7 +202,7 @@ function talk(e) {
     const o = [];
     if (S.q2.fox === 3) o.push({ t: 'Что знаешь про Стрелка?', k: 'key', fn: () => {
       say('Стрелок? Слышал. Ходил на север дальше всех и возвращался. Лично не знал. А вот брат мой, Серый, с его группой пересекался. Он на Свалке, в ангаре. Скажешь, что от Лиса.');
-      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); news('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
+      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); bulletin('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
     } });
     o.push({ t: 'Бывай', close: 1 });
     return o;
@@ -250,16 +250,16 @@ function talkWolf(e) {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
       give('w_pm', 1); give('a9', 16); S.mag.w_pm = 8; setWeapon('w_pm'); S.q.flash = 2;
       sys('Получено: ПМ, Патроны 9×18 ×24. Задание обновлено.');
-      news('Волк выдал ПМ. Цель: АТП на востоке.');
+      bulletin('Волк выдал ПМ. Цель: АТП на востоке.');
     } });
     if (S.q.flash >= 2 && S.q.pack === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
       say('Есть. В лесу на северо-западе завелась стая слепых псов, уже двоих наших порвали. Перебьёшь, отдам обрез и патроны к нему.');
-      S.q.pack = 1; news('Задание: перебить стаю слепых псов в северо-западном лесу.');
+      S.q.pack = 1; bulletin('Задание: перебить стаю слепых псов в северо-западном лесу.');
     } });
     if (S.q.pack === 2) o.push({ t: 'Стаи больше нет', k: 'key', fn: () => {
       if (!has('w_obrez')) { give('w_obrez', 1); give('a12', 12); sys('Получено: Обрез, Дробь ×12.'); } else { give('a12', 12); S.money += 500; sys('Получено: Дробь ×12, 500 RU.'); }
       say('Уважаю. Слово держу. И людям расскажу, что ты наш.');
-      S.q.pack = 3; S.stats.q++; S.rep += 10; news('Выполнено: Стая у леса.'); save(true);
+      S.q.pack = 3; S.stats.q++; S.rep += 10; bulletin('Выполнено: Стая у леса.'); save(true);
     } });
     wolfPlusOpts().forEach(x => o.push(x));
     o.push({ t: 'Что посоветуешь?', fn: () => say('Не стой на открытом, двигайся. Кидай болты, где воздух дрожит. Ночью включай голову: псы в темноте видят лучше тебя. И считай патроны, магазин кончается всегда не вовремя.') });
@@ -273,7 +273,7 @@ function talkTrader() {
     return dialog(SIDCARD(), ['Очухался, Меченый? Тебя сняли с грузовика смерти, с таких живыми не возвращаются. Ты первый на моей памяти.', 'В КПК у тебя одна запись: «Убить Стрелка». Имени не помнишь, так и будешь Меченым, по наколке. Я тебе жизнь спас, за тобой должок.'], () => [
       { t: 'Что за работа?', k: 'key', fn: () => {
         say('Мой курьер, Шустрый, пропал вместе с флешкой. Говорят, его взяли бандиты. Иди к Волку в деревню новичков, он поможет. Флешку принесёшь мне, остальное потом.');
-        S.q.flash = 1; news('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
+        S.q.flash = 1; bulletin('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
         sys('Задание: Флешка Шустрого. Метка на миникарте.');
         panel.opts = traderOpts;
       } }
@@ -286,20 +286,20 @@ function traderOpts() {
   if (S.q.flash === 3 && has('flash')) o.push({ t: 'Отдать флешку Шустрого', k: 'key', fn: () => {
     take('flash', 1); S.money += 1500; S.q.flash = 4; S.flags.flashDone = 1; S.stats.q++; S.rep += 15;
     say('Вот это дело. Держи полторы тысячи, заработал.');
-    sys('Получено: 1500 RU. Задание выполнено.'); news('Выполнено: Флешка Шустрого.'); save(true);
+    sys('Получено: 1500 RU. Задание выполнено.'); bulletin('Выполнено: Флешка Шустрого.'); save(true);
   } });
   if (S.q.flash === 4 && S.flags.flashDone && S.q2.fox === 0) o.push({ t: 'Что со Стрелком?', k: 'key', fn: () => {
     say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры.');
-    S.q2.fox = 1; news('Задание: Найти Лиса за насыпью.');
+    S.q2.fox = 1; bulletin('Задание: Найти Лиса за насыпью.');
   } });
   if (S.q.medusa === 1 && has('art_medusa')) o.push({ t: 'Отдать «Медузу» за 1000 RU', k: 'key', fn: () => {
     take('art_medusa', 1); S.money += 1000; S.q.medusa = 2; S.stats.q++;
-    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); news('Выполнено: «Медуза» для Сидоровича.');
+    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); bulletin('Выполнено: «Медуза» для Сидоровича.');
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
     say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
-    S.q.medusa = 1; news('Задание: «Медуза» для Сидоровича.');
+    S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
   if (S.rep <= -30) o.push({ t: 'Уладить с одиночками · 2000 RU', k: 'key', d: S.money < 2000, fn: () => {
@@ -473,7 +473,7 @@ function drawMenu() {
     else { save(true); panel.hint = 'Игра сохранена.'; }
     refresh();
   }));
-  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); msg('Загружено.'); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
+  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
   pbody.appendChild(btn('wide', (AC && master && master.gain.value === 0 ? 'Включить' : 'Выключить') + ' звук', () => { audioInit(); if (master) master.gain.value = master.gain.value ? 0 : 0.55; refresh(); }));
   pbody.appendChild(btn('wide warn', 'Начать заново', () => { if (panel.sure) { applyState(freshS()); closePanel(); intro(); } else { panel.sure = 1; panel.hint = 'Прогресс сотрётся. Нажми ещё раз, чтобы начать заново.'; refresh(); } }));
   const k = el('div', 'note'); k.style.lineHeight = '1.8';
@@ -739,8 +739,8 @@ const WSIL = {
   knife: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M44 17l58-4c6 0 10 3 12 7-4 2-8 3-14 3H44z" fill="#b9bcbd"/><path d="M44 17l58-4c6 0 10 3 12 7H44z" fill="#dfe2e2"/><path d="M38 11h6v20h-6z" fill="url(#wm)"/><path d="M12 15h26v11H12c-3 0-5-2-5-5.5S9 15 12 15z" fill="#2a2420"/><path d="M16 15v11M22 15v11M28 15v11" stroke="#3e352e" stroke-width="1.4"/></svg>'
 };
 const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
-  status: $('status'), quest: $('quest'), msgs: $('msgs'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
-let hudT = 0, lastW = '';
+  status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
+let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
   if (!P) return;
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
@@ -751,7 +751,7 @@ function hud(dt) {
   if (H.sig.dataset.v != sg) { H.sig.dataset.v = sg; [...H.sig.children].forEach((b, i) => b.classList.toggle('on', i < sg)); H.det.classList.toggle('on', sg > 0); }
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
-  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.crouch ? 'присел' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -779,8 +779,22 @@ function hud(dt) {
     H.quest.appendChild(el('span', 'ex', '!')); H.quest.appendChild(el('span', 'qn', q.n));
     const ar = el('span', 'arr', '➤'); ar.style.transform = 'rotate(' + a + 'rad)'; H.quest.appendChild(ar); H.quest.appendChild(el('span', 'qd', d + ' м'));
   }
-  H.msgs.textContent = '';
-  MSGS.forEach(m => { const p = el('p', m.k, m.t); p.style.opacity = clamp(m.life / 1.5, 0, 1); H.msgs.appendChild(p); });
+  const message = radioQueue[0];
+  if (message !== lastNotice) {
+    lastNotice = message;
+    H.msgs.replaceChildren();
+    if (message) {
+      const line = el('p', message.k);
+      line.append(el('span', 'sender', 'КПК'));
+      line.append(document.createTextNode(message.t));
+      H.msgs.append(line);
+    }
+  }
+  if (message) H.msgs.style.opacity = clamp(message.life / 1.2, 0, 1);
+  const local = !message && MSGS[MSGS.length - 1];
+  const feedback = local ? local.t : '';
+  if (H.feedback.textContent !== feedback) H.feedback.textContent = feedback;
+  if (local) H.feedback.style.opacity = clamp(local.life / 1.2, 0, 1);
   const n = G.near;
   H.prompt.textContent = ''; H.prompt.classList.toggle('kill', !!(n && n.k === 'kill'));
   if (n && P.alive && !panel) { const ic = el('span', 'pi ' + n.k); H.prompt.appendChild(ic); if (!IN.touch) H.prompt.appendChild(el('kbd', '', 'E')); H.prompt.appendChild(document.createTextNode(n.label.replace(/^Поговорить: /, 'Говорить: ') + '.')); }
@@ -831,7 +845,7 @@ addEventListener('keydown', e => {
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
-  if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }
+  if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }
@@ -888,7 +902,7 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
@@ -981,6 +995,6 @@ async function boot() {
 window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
-window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => MSGS.map(m => m.t || m.text || m[0] || '') };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 boot();

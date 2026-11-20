@@ -125,5 +125,53 @@ Tt('K10_walk_through_doors', () => {
   }
   return {ok: villageHouses === 6 && villageGroups >= 9 && !failures.length, houses: houses.length, groups, villageHouses, villageGroups, openCells, failures};
 });
+Tt('K11_pda_emission_warning', () => {
+  reset();
+  z.clearMsgs();
+  S().min = 600;
+  S().wx.until = 0;
+  S().blow.next = S().min;
+  step(2);
+  const isWarning = text => /приближается выброс/i.test(text);
+  const oneWarning = () => B.msgs().filter(isWarning).length === 1;
+  const journalCount = () => S().news.filter(n => isWarning(n.x)).length;
+  const started = S().blow.stage === 1 && oneWarning() && journalCount() === 1;
+  const quietWeather = !B.msgs().some(t => t.startsWith('Погода:'));
+  z.applyState(JSON.parse(JSON.stringify(S())));
+  const resumed = oneWarning() && journalCount() === 1;
+  step(305);
+  const expired = !B.msgs().some(isWarning) && journalCount() === 1;
+  return { ok: started && quietWeather && resumed && expired, started, quietWeather, resumed, expired };
+});
+Tt('K12_sos_radio', () => {
+  reset();
+  z.clearMsgs();
+  S().sos.next = S().min;
+  z.plus.sosTick();
+  const sosCount = () => B.msgs().filter(text => text.startsWith('SOS!')).length;
+  const received = !!S().sos.act && sosCount() === 1;
+  S().blow.next = S().min;
+  step(2);
+  const priority = /приближается выброс/i.test(B.msgs()[0]) && sosCount() === 1;
+  z.plus.finishEncounter('timeout');
+  const closed = sosCount() === 0 && !B.msgs().some(text => text.includes('потеряна'));
+  const journal = S().news.some(n => n.x.startsWith('SOS!')) && S().news.some(n => n.x.includes('потеряна'));
+  return { ok: received && priority && closed && journal, received, priority, closed, journal };
+});
+Tt('K13_pda_quest_bulletin', () => {
+  reset(); z.clearMsgs();
+  S().q.pack = 1;
+  z.ents.filter(e => e.pack === 'lair').forEach(e => { e.alive = 0; });
+  // Обычный игровой цикл проверяет завершение задания.
+  step(60);
+  const report = S().news.find(n => n.x.includes('Стая у леса перебита'));
+  const shown = !!report && B.msgs().includes(report.x);
+  S().sos.next = S().min;
+  z.plus.sosTick();
+  const sosFirst = B.msgs()[0]?.startsWith('SOS!');
+  S().blow.next = S().min; step(2);
+  const order = B.msgs();
+  return { ok: shown && sosFirst && /приближается выброс/i.test(order[0]) && order[1]?.startsWith('SOS!') && order.includes(report.x), shown, sosFirst };
+});
 return JSON.stringify(R);
 })()

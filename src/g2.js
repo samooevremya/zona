@@ -28,7 +28,38 @@ const rankOf = sc => sc < 15 ? 0 : sc < 45 ? 1 : sc < 90 ? 2 : 3;
 
 let MSGS = [];
 function msg(t, k) { MSGS.push({ t: t, k: k || '', life: 6 }); if (MSGS.length > 5) MSGS.shift(); }
-function news(t, ping) { S.news.push({ t: S.min, x: t }); if (S.news.length > 60) S.news.shift(); if (ping) { msg('КПК: ' + t, 'pda'); play('pda'); } }
+const radioQueue = [];
+function radioNotice(t, urgent = false) {
+  const k = urgent ? 'radio urgent' : 'radio';
+  const i = radioQueue.findIndex(note => note.k === k);
+  if (i >= 0) {
+    if (radioQueue[i].t === t) return false;
+    radioQueue.splice(i, 1);
+  }
+  const note = { t, k, life: urgent ? 10 : 6 };
+  const position = !urgent && radioQueue[0]?.k === 'radio urgent' ? 1 : 0;
+  radioQueue.splice(position, 0, note);
+  return true;
+}
+function news(t) {
+  S.news.push({ t: S.min, x: t });
+  if (S.news.length > 60) S.news.shift();
+}
+function bulletin(t) {
+  news(t);
+  const pending = radioQueue.filter(note => note.k === 'radio bulletin');
+  if (pending.some(note => note.t === t)) return;
+  // Короткая серия идёт по одной строке. Большая пачка оставляет одну подсказку о журнале.
+  if (pending.length >= 2) {
+    if (pending.some(note => note.digest)) return;
+    radioQueue.push({ t: 'Другие сводки — в журнале КПК.', k: 'radio bulletin', life: 4, digest: true });
+  } else {
+    radioQueue.push({ t, k: 'radio bulletin', life: 5 });
+  }
+}
+function radioNews(t, urgent = false) {
+  if (radioNotice(t, urgent)) { news(t); play('pda'); }
+}
 
 function freshS() {
   return { v: 1, money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
@@ -437,13 +468,13 @@ function kill(e, src) {
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
     const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
-    news('Погиб сталкер ' + e.name + '. Причина: ' + why + '.', true);
+    bulletin('Погиб сталкер ' + e.name + '. Причина: ' + why + '.');
   } else if (e.fac === 'bandit' && src && src.fac === 'loner' && dE(e, P) > 380) {
-    news('Одиночки убили бандита по кличке ' + e.name + '.', true);
+    bulletin('Одиночки убили бандита по кличке ' + e.name + '.');
   }
   if (e.sid === 'tolik' && S.q2.tolik !== 2) S.q2.tolik = 3;
-  if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; msg('Лис погиб.', 'bad'); }
-  if (e.sid === 'shust' && S.q.flash > 0 && S.q.flash < 3) { S.q.flash = 4; S.flags.flashFail = 1; msg('Шустрый погиб. Флешку уже не вернуть.', 'bad'); news('Задание провалено: Флешка Шустрого.'); }
+  if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; bulletin('Лис погиб. Задание провалено.'); }
+  if (e.sid === 'shust' && S.q.flash > 0 && S.q.flash < 3) { S.q.flash = 4; S.flags.flashFail = 1; bulletin('Шустрый погиб. Задание «Флешка Шустрого» провалено.'); }
   checkQuests(); plusKill(e, src);
 }
 function dropBody(e) {
@@ -794,11 +825,11 @@ function qList() {
   return L;
 }
 function checkQuests() {
-  if (S.q2.fox === 2 && !ents.some(e => e.alive && e.pack === 'foxdogs')) { S.q2.fox = 3; msg('Стая отбита. Поговори с Лисом.', 'good'); }
-  if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); news('У дороги лежит раненый сталкер, просит аптечку.'); }
-  if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; msg('Стая перебита. Вернись к Волку.', 'good'); news('Стая у леса перебита.'); }
+  if (S.q2.fox === 2 && !ents.some(e => e.alive && e.pack === 'foxdogs')) { S.q2.fox = 3; bulletin('Стая отбита. Поговори с Лисом.'); }
+  if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); bulletin('У дороги лежит раненый сталкер, просит аптечку.'); }
+  if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; bulletin('Стая у леса перебита. Вернись к Волку.'); }
   if (!S.flags.atpClear && ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'boss'].every(s => S.dead[s])) {
-    S.flags.atpClear = 1; msg('АТП очищено от бандитов.', 'good'); news('Бандиты на АТП перебиты.', false);
+    S.flags.atpClear = 1; bulletin('Бандиты на АТП перебиты.');
     ['petr', 'petr2'].forEach(s => { const e = byS(s); if (e) { const p = locPt('atp', s); e.home = { x: p.x, y: p.y }; e.stay = 1; } });
   }
 }
@@ -823,7 +854,7 @@ function spawnTick() {
       e.patrol = 1; e.home = { x: (66 + i) * T, y: (91 + i) * T };
       ents.push(e);
     }
-    news('Сводка: на дорогу с востока вышла группа бандитов.', false);
+    news('Сводка: на дорогу с востока вышла группа бандитов.');
   }
   if (S.min - (S.flags.dogT || 0) > 360 && S.q.pack !== 1) {
     S.flags.dogT = S.min;

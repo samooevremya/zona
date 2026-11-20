@@ -40,9 +40,6 @@
 .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{left:50%;top:calc(6px + var(--sat));transform:translateX(-50%);display:flex;gap:10px;right:auto;bottom:auto}
 .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{position:relative;min-width:88px;min-height:34px;height:34px;padding:0 16px;font:700 15px "Arial Narrow",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#ece4d0;cursor:pointer}
 .zh-top button::after{content:"";position:absolute;inset:-6px -5px}
-.hud.zh .zh-q,body.is-touch .hud.zh .zh-q{left:50%;top:calc(48px + var(--sat));transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:4px 14px 4px 6px;font:700 13px "Arial Narrow",Arial;max-width:calc(100vw - 470px);white-space:nowrap;color:#ece4d0}
-.zh-q .ex{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid #f0a830;color:#f0a830;display:grid;place-items:center;font:900 13px Arial}
-.zh-q .qn{color:#ece4d0;overflow:hidden;text-overflow:ellipsis}.zh-q .arr{color:#f0a830;font-size:12px}.zh-q .qd{color:#b6a888;font-weight:400;font-size:11px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{top:calc(6px + var(--sat));right:calc(8px + var(--sar));left:auto;bottom:auto;width:212px;min-width:0;height:74px;padding:6px 10px 6px 6px;box-sizing:border-box;display:flex;align-items:center;gap:6px;cursor:pointer;flex-wrap:nowrap}
 .zh-w #wico{flex:none;width:100px;height:56px;display:grid;place-items:center;background:radial-gradient(closest-side,rgba(255,240,210,.07),transparent)}
 .zh-w #wico svg{width:100px;height:40px;filter:drop-shadow(0 2px 2px #000)}
@@ -61,8 +58,6 @@
 .zh-det .sig{display:flex;align-items:flex-end;gap:2px;height:18px}.zh-det .sig i{width:5px;background:#3a3530;border-radius:1px}
 .zh-det .sig i:nth-child(1){height:5px}.zh-det .sig i:nth-child(2){height:8px}.zh-det .sig i:nth-child(3){height:11px}.zh-det .sig i:nth-child(4){height:14px}.zh-det .sig i:nth-child(5){height:18px}
 .zh-det .sig i.on{background:#ece4d0;box-shadow:0 0 3px rgba(255,240,200,.6)}.zh-det .sig i.on:nth-child(n+4){background:#f07a3a}
-.hud.zh .msgs,body.is-touch .hud.zh .msgs{left:50%;transform:translateX(-50%);top:calc(84px + var(--sat));bottom:auto;width:min(340px,44vw);align-items:center}
-.hud.zh .msgs p{text-align:center;font:12px Arial!important;background:rgba(14,12,10,.72);padding:3px 9px;border-radius:3px;border:1px solid rgba(110,90,70,.35)}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{left:50%;transform:translateX(-50%);bottom:calc(10px + var(--sab));top:auto;min-height:40px;padding:0 18px 0 10px;display:flex;align-items:center;gap:10px;font:700 15px "Arial Narrow",Arial;color:#ece4d0;max-width:calc(100vw - 420px);white-space:nowrap;cursor:pointer;pointer-events:auto}
 .zh-p:empty{display:none}
 .zh-p .pi{flex:none;width:24px;height:20px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath d='M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H9l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z' fill='%23e9e1cc'/%3E%3Ccircle cx='7.5' cy='8' r='1.5' fill='%23222'/%3E%3Ccircle cx='12' cy='8' r='1.5' fill='%23222'/%3E%3Ccircle cx='16.5' cy='8' r='1.5' fill='%23222'/%3E%3C/svg%3E")}
@@ -111,8 +106,6 @@ body:not(.is-touch) .hud.zh .zh-p{bottom:calc(14px + var(--sab))}
  .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{top:calc(48px + var(--sat));width:184px;height:64px}
  .zh-w #wico{width:84px}.zh-w #wico svg{width:84px}
  .hud.zh .zh-det{top:calc(118px + var(--sat))}
- .hud.zh .zh-q,body.is-touch .hud.zh .zh-q{top:auto;bottom:calc(240px + var(--sab));max-width:86vw}
- .hud.zh .msgs,body.is-touch .hud.zh .msgs{top:auto;bottom:calc(276px + var(--sab));width:80vw}
  .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{bottom:calc(196px + var(--sab));max-width:86vw}
  body.is-touch .touch.zt .rb{top:auto!important}
  body.is-touch .touch.zt .c1{right:calc(8px + var(--sar));bottom:calc(130px + var(--sab))}
@@ -135,3 +128,36 @@ body .hud.zh .zh-map .rv.a{left:3px;top:3px;border-width:1px 0 0 1px}
 body .hud.zh .zh-map .rv.b{right:3px;top:3px;border-width:1px 1px 0 0}
 body .hud.zh .zh-map .rv.c{left:3px;bottom:3px;border-width:0 0 1px 1px}
 body .hud.zh .zh-map .rv.d{right:3px;bottom:3px;border-width:0 1px 1px 0}
+
+/* Рамка карты задаёт точку привязки независимо от размера спрайтов G8. */
+.hud.zh .zh-corner{left:calc(8px + var(--sal));top:calc(8px + var(--sat));display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none}
+.zh-map-group{position:relative}
+.hud.zh .zh-corner :is(.zh-map,.zh-clock,.zh-bars){position:relative;inset:auto}
+/* Цель и радиосвязь образуют одну колонку от верхнего края карты. */
+.zh-feed{position:absolute;left:calc(100% + 8px);top:0;width:256px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none}
+.hud.zh .zh-feed :is(.zh-q,.msgs),body.is-touch .hud.zh .zh-feed :is(.zh-q,.msgs){position:static;inset:auto;transform:none;max-width:100%;box-sizing:border-box}
+.hud.zh .zh-feed .zh-q{width:fit-content;display:flex;align-items:center;gap:5px;padding:3px 6px;border-width:2px;font:700 14px/1.15 Arial,sans-serif}
+.zh-q .ex{flex:none;width:15px;height:15px;border:1px solid #cb9d53;border-radius:50%;display:grid;place-items:center;font:700 11px/1 Arial;color:#e0b266}
+.zh-q .qn{min-width:0;white-space:normal;overflow-wrap:anywhere;color:#ece3cf}.zh-q .arr,.zh-q .qd{flex:none;font-size:10px;color:#c4ac82;white-space:nowrap}
+.hud.zh .zh-feed .msgs{width:100%;align-items:flex-start}
+.hud.zh .zh-feed .msgs p{box-sizing:border-box;max-width:100%;margin:0;padding:2px 5px;text-align:left;font:11px/1.3 Arial,sans-serif!important;border:0;border-radius:2px;background:rgba(18,17,14,.32);color:#e7e2d4;text-shadow:0 1px 2px #110e09,0 0 3px #18150f}
+.msgs .sender{margin-right:5px;font-size:10px;font-weight:700;color:#b7c7b3}.msgs .urgent .sender{color:#efc687}
+#field-feedback{left:50%;bottom:calc(62px + var(--sab));transform:translateX(-50%);max-width:min(390px,52vw);text-align:center;pointer-events:none;font:12px/1.3 Arial,sans-serif;color:#e7e2d4;text-shadow:0 1px 2px #100d08,0 0 4px #100d08}
+@media (orientation:landscape) and (max-width:1000px){
+ .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{left:auto;right:calc(212px + var(--sar));transform:none}
+ .zh-feed{width:min(250px,calc(100vw - 580px - var(--sal) - var(--sar)))}
+}
+@media (orientation:landscape) and (max-width:760px){
+ .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{right:calc(8px + var(--sar))}
+ .hud.zh .zh-w.rust,body.is-touch .hud.zh .zh-w.rust{top:calc(49px + var(--sat))}
+ .hud.zh .zh-det.rust{top:calc(52px + var(--sat));right:calc(205px + var(--sar))}
+ .zh-feed{width:min(243px,calc(100vw - 405px - var(--sal) - var(--sar)))}
+}
+@media (orientation:portrait){
+ .zh-feed{width:min(255px,calc(100vw - 136px - var(--sal) - var(--sar)))}
+ .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{left:auto;right:calc(8px + var(--sar));top:calc(115px + var(--sat));transform:none}
+ .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:55px;padding-inline:6px}
+ .hud.zh .zh-w.rust,body.is-touch .hud.zh .zh-w.rust{top:calc(161px + var(--sat));width:min(178px,calc(100vw - 178px - var(--sal) - var(--sar)))}
+ .hud.zh .zh-det.rust{top:calc(226px + var(--sat))}
+ #field-feedback{bottom:calc(245px + var(--sab));max-width:78vw}
+}

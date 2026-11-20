@@ -25,9 +25,9 @@ function drawPick(o) {   // растр G4 (gg7.js: g7Pick); ниже — пре�
 function pickUp(o) {
   give(o.pick, 1); S.flags['pk_' + o.pick] = 1;
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
-  play('pick'); msg('Подобрано: ' + ITEMS[o.pick].n + '.', 'good');
+  play('pick');
   const q = q5();
-  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.', true); }
+  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; bulletin('Предохранитель и топливо у тебя. Неси к генератору у костра.'); }
   else if (q.st === 'not_started') news('Нашёл ' + ITEMS[o.pick].n.toLowerCase() + '. Кому-то в деревне это может пригодиться.');
 }
 /* разговор с Волком */
@@ -36,13 +36,13 @@ function wolfRC1Opts() {
   const o = [], q = q5(), c = q3c();
   if (q.st === 'not_started' && S.q.flash >= 1) o.push({ t: 'Что с генератором у костра?', fn: () => {
     say('Стоит без дела с весны. Мотор целый, сгорел предохранитель, и бензина ни капли. Предохранитель поищи на старой водокачке к северу, там щиток был. Канистры видели на АТП, у бандитов. Принесёшь — вечером будет свет, и верстак заработает.');
-    q.st = has('fuse') && has('fuel') ? 'ready' : 'collecting'; news('Задание: Свет в деревне. Предохранитель — водокачка, топливо — АТП.');
+    q.st = has('fuse') && has('fuel') ? 'ready' : 'collecting'; bulletin('Задание: Свет в деревне. Предохранитель — водокачка, топливо — АТП.');
   } });
   if (q.st === 'completed') o.push({ t: 'Как вам со светом?', fn: () => say('Живём как люди. Вечером у костра видно, кто пришёл, а не только кто стреляет. И верстак теперь твой, пользуйся.') });
   if (S.q3.sucker >= 1 && S.q3.sucker < 3 && !c.story) o.push({ t: 'Расскажи подробнее про хлев', fn: () => {
     c.story = 1;
     say('Хомяк ночью шёл мимо фермы и видел следы босых ног, будто человек, только пальцы длинные. От фермы они уходят к хлеву на востоке. Если пойдёшь — бинты возьми побольше: кого оно цепляет, тот кровью истекает.');
-    news('Ночной гость: следы у фермы ведут к хлеву. Возьми бинты.');
+    bulletin('Ночной гость: следы у фермы ведут к хлеву. Возьми бинты.');
   } });
   if (S.q3.sucker === 3) o.push({ t: 'Ферма теперь спокойная?', fn: () => say('Лис говорит, по ночам больше никто не скребётся в стену. Спасибо тебе от всех, кто туда ходит.') });
   return o;
@@ -62,7 +62,7 @@ function gensetUse() {
   take('fuse', 1); take('fuel', 1); q.st = 'completed';
   if (!q.rewarded) { q.rewarded = 1; S.money += 600; S.rep += 10; S.stats.q++; }
   play('reload'); msg('Генератор заработал. Вечером в деревне будет свет.', 'good');
-  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.', true); save(true);
+  bulletin('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
@@ -85,15 +85,15 @@ function targetsRC1(out) {
 function cluesTick() {
   if (MAP_ID !== 'rc1' || !P || !P.alive || S.q3.sucker !== 1) return;
   const c = q3c();
-  if (!c.tracks && dst(P.x, P.y, locPt('farm', 'tracks').x, locPt('farm', 'tracks').y) < 70) { c.tracks = 1; msg('Следы босых ног с длинными пальцами. Уходят на восток, к хлеву.', 'say'); news('Ночной гость: следы у фермы ведут к хлеву.'); }
+  if (!c.tracks && dst(P.x, P.y, locPt('farm', 'tracks').x, locPt('farm', 'tracks').y) < 70) { c.tracks = 1; msg('Следы босых ног с длинными пальцами. Уходят на восток, к хлеву.', 'say'); bulletin('Ночной гость: следы у фермы ведут к хлеву.'); }
   const porch = locPt('lair', 'porch');
   if (!c.warned && dst(P.x, P.y, porch.x, porch.y) < 160) { c.warned = 1; msg('Внутри что-то дышит. Тварь невидима, пока не кинется; её удар вызывает кровотечение. Держи бинты под рукой.', 'bad'); }
   const ins = locPt('lair', 'inside');
-  if (!c.barn && dst(P.x, P.y, ins.x, ins.y) < 90) { c.barn = 1; news('Ночной гость: в хлеву кости и обрывки курток. Тварь где-то рядом.'); }
+  if (!c.barn && dst(P.x, P.y, ins.x, ins.y) < 90) { c.barn = 1; bulletin('Ночной гость: в хлеву кости и обрывки курток. Тварь где-то рядом.'); }
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
-  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.', true); save(true); }
+  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
   msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
 }
 function interactRC1(cand) {
