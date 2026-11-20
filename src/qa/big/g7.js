@@ -206,6 +206,8 @@ T_('G_fence_cover', () => {
   tick(100); cases.undetected = !guard.tgt && !guard.aw;
   p.crouch = 0; const full = guard.mag;
   tick(112); cases.openedFire = guard.tgt === p && guard.mag < full;
+  // Проверяем следующий выстрел у самой панели, отдельно от отбрасывания и кровотечения при первом попадании.
+  place(p, x, y - 20); p.kx = p.ky = 0; S().bleed = 0;
   p.crouch = 1; guard.cool = 0; const mag = guard.mag, hp = p.hp;
   tick(15); cases.lostSight = guard.unseen > 0 && guard.mag === mag && p.hp === hp;
   p.crouch = 0; tick(10); cases.resumedFire = guard.mag < mag;
