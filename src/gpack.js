@@ -8,7 +8,7 @@ function footprint(id) {
   if (id === 'w_pm') return [2,1];
   return ITEMS[id]?.armor ? [2,2] : [1,1];
 }
-const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || ITEMS[id]?.armor ? 1 : 5;
+const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
 function packCells(inv) {
   return Object.entries(inv).reduce((total,[id,n]) => {
     const [w,h] = footprint(id);

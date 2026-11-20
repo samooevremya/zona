@@ -34,6 +34,10 @@ function wearAndJam(id) {
   if (c < 65 && chance((65 - c) / 500)) { P.jam = 1; play('jam'); msg('Заклинило! ' + (IN.touch ? 'Жми «Перезар.»,' : 'Жми R,') + ' чтобы передёрнуть.', 'bad'); return true; }
   return false;
 }
+function activeDetectorRange() {
+  const model = S && DETECTORS[S.weapon];
+  return model && has(S.weapon) && P.alive && !inBunker(P.x, P.y) ? model.metres * T / 1.5 : 0;
+}
 function survival(dt) {
   survDefaults();
   // голод
@@ -47,12 +51,20 @@ function survival(dt) {
     P.bleedT = (P.bleedT || 0) - dt;
     if (P.bleedT <= 0) { P.bleedT = 0.6; decals.push({ x: P.x + rnd(-6, 6), y: P.y + rnd(-6, 6), r: rnd(1.5, 3), a: 0.7 }); }
   }
-  // детектор артефактов
-  let bd = 1e9;
-  for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < bd) bd = d; }
-  P.detT = (P.detT || 0) - dt;
-  if (bd < 280 && P.detT <= 0 && !inBunker(P.x, P.y)) { P.detT = 0.12 + (bd / 280) * 1.2; play('beep', undefined, undefined, 0.5 + (1 - bd / 280) * 0.8); }
-  P.detD = bd;
+  const range = activeDetectorRange();
+  P.detD = Infinity;
+  if (range) for (const a of arts) {
+    const distance = dE(P, a);
+    if (distance <= range && distance < P.detD) P.detD = distance;
+  }
+  if (Number.isFinite(P.detD)) {
+    P.detT = (P.detT || 0) - dt;
+    if (P.detT <= 0) {
+      const fraction = P.detD / range;
+      play('beep', undefined, undefined, 1.3 - 0.8 * fraction);
+      P.detT = 0.12 + 1.2 * fraction;
+    }
+  } else P.detT = 0;
   // ранг
   const r = rankOf(score());
   if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }

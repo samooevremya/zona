@@ -25,7 +25,20 @@ function vnoise(x, y, s) {
 }
 
 /* ===================== предметы и оружие ===================== */
+const DETECTORS = {
+  det_spark: { n: 'Детектор «Искра»', price: 500, w: 0.25, metres: 6 },
+  det_contour: { n: 'Детектор «Контур»', price: 1800, w: 0.45, metres: 15 },
+  det_spectrum: { n: 'Детектор «Спектр»', price: 4500, w: 0.75, metres: 30 }
+};
+const detectorImages = {};
+for (const [id, model] of Object.entries(DETECTORS)) {
+  model.d = 'Радиус поиска ' + model.metres + ' м. Возьми в руки через выбор оружия. Чем ближе артефакт, тем чаще сигнал.';
+  const image = new Image();
+  image.src = window.DETECTOR_IMAGES[id]; image.alt = ''; image.className = 'b1ic g3ic';
+  detectorImages[id] = image;
+}
 const ITEMS = {
+  ...DETECTORS,
   medkit: { n: 'Аптечка', price: 300, heal: 50, w: 0.3, d: '+50 здоровья' },
   bandage: { n: 'Бинт', price: 80, heal: 15, w: 0.1, d: '+15 здоровья' },
   antirad: { n: 'Антирад', price: 250, rad: 60, w: 0.1, d: '−60 радиации' },
@@ -61,8 +74,9 @@ const WP = {
   w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
   grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade'];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS)];
 const STOCK = [
+  ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
   { id: 'a9', q: 20, p: 160 }, { id: 'a12', q: 10, p: 200 }, { id: 'a545', q: 30, p: 450 },
@@ -453,7 +467,7 @@ function footprint(id) {
   if (id === 'w_pm') return [2,1];
   return ITEMS[id]?.armor ? [2,2] : [1,1];
 }
-const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || ITEMS[id]?.armor ? 1 : 5;
+const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
 function packCells(inv) {
   return Object.entries(inv).reduce((total,[id,n]) => {
     const [w,h] = footprint(id);
@@ -586,7 +600,7 @@ const beltCount = id => S.belt.filter(x => x === id).length;
 function take(id, n) {
   S.inv[id] = Math.max(0, cnt(id) - (n || 1)); if (!S.inv[id]) delete S.inv[id];
   while (beltCount(id) > cnt(id)) S.belt.splice(S.belt.indexOf(id), 1);
-  if (WP[id] && S.weapon === id && !has(id)) S.weapon = 'knife';
+  if (S.weapon === id && !has(id)) setWeapon('knife');
 }
 const hour = () => (S.min / 60) % 24;
 const night = () => { const h = hour(); return h >= 21 || h < 5; };
@@ -1404,7 +1418,7 @@ function qTargets() {
     if(box) at('flash',{x:box.x+box.w/2,y:box.y+box.h/2},'Забрать флешку из личного ящика');
     else sidT('flash','Отнести флешку Сидоровичу');
   }
-  if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field', 'medusa'), 'Поле аномалий');
+  if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field'), 'Поле аномалий');
   if (q.pack === 1) at('pack', locPt('dogs_lair', 'lair'), 'Логово псов');
   if (q.pack === 2 && w) at('pack', w, 'Вернуться к Волку');
   const fx = byS('fox');
@@ -1621,6 +1635,7 @@ let fogDirty = true;
 
 function startReload() {
   const W = WP[S.weapon];
+  if (!W) return;
   if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); return; }
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
@@ -1628,14 +1643,14 @@ function startReload() {
   P.reload = W.reload; play('reload');
 }
 function finishReload() {
-  const W = WP[S.weapon]; if (W.melee) return;
+  const W = WP[S.weapon]; if (!W || W.melee) return;
   const m = S.mag[S.weapon] || 0, n = Math.min(W.mag - m, cnt(W.ammo));
   take(W.ammo, n); S.mag[S.weapon] = m + n;
 }
 let noAmmoT = 0;
 function playerFire() {
   const W = WP[S.weapon];
-  if (P.cool > 0 || P.reload > 0) return;
+  if (!W || P.cool > 0 || P.reload > 0) return;
   if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; } }, 300); return; }
   if (W.melee) { P.cool = W.rate; melee(P, W); return; }
   if (P.jam) { if (noAmmoT <= 0) { noAmmoT = 1; play('click'); } return; }
@@ -1655,11 +1670,15 @@ function playerFire() {
 }
 function cycleWeapon(dir) {
   const own = WORDER.filter(w => w === 'knife' || has(w));
-  let i = own.indexOf(S.weapon);
-  S.weapon = own[(i + (dir || 1) + own.length) % own.length];
+  const i = own.indexOf(S.weapon);
+  setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
+}
+function setWeapon(w) {
+  if (w !== 'knife' && !has(w)) return;
+  S.weapon = w;
+  P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
 }
-function setWeapon(w) { if (w === 'knife' || has(w)) { S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
 function useItem(id) {
   const it = ITEMS[id];
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
@@ -1952,7 +1971,7 @@ function findInteract() {
       }
     }
   }
-  for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
+  if (activeDetectorRange()) for (const a of arts) { const d = dE(P, a); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
   plusInteract(cand);
   return best;
@@ -1967,6 +1986,7 @@ function lootAll(o) {
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
+  if (!activeDetectorRange() || !arts.includes(a) || dE(P, a) >= 38) return;
   const err=receiveError(a.id,1); if(err) { msg(err,'bad'); return; }
   addPacked(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
@@ -2019,6 +2039,7 @@ function loadSave() {
 }
 function applyState(d) {
   S = d;
+  if (DETECTORS[S.weapon] && !has(S.weapon)) S.weapon = 'knife';
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
   fogDirty = true;
@@ -2586,7 +2607,8 @@ function drawHuman(e, g) {
   if (lk.pack) { g.fillStyle = lk.pack; g.fillRect(-12, -6, 6, 12); }
   // оружие и руки
   if (!e.sit) {
-    if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
+    if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
+    else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
     g.beginPath(); g.arc(8 + bob * 0.3, 4, 3.2, 0, 6.28); g.fill();
@@ -2716,9 +2738,10 @@ function drawAnoms() {
     ctx.restore();
   }
 
-  for (const a of arts) {
-    const d = dst(a.x, a.y, P.x, P.y); if (d > 90) continue;
-    const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = clamp(1 - d / 90, 0, 1);
+  const range = activeDetectorRange();
+  if (range) for (const a of arts) {
+    const d = dE(a, P); if (d > range) continue;
+    const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = 1 - 0.65 * d / range;
     const gr = ctx.createRadialGradient(a.x, a.y, 1, a.x, a.y, 16);
     gr.addColorStop(0, 'rgba(' + c + ',' + (0.8 * al * p) + ')'); gr.addColorStop(1, 'rgba(' + c + ',0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(a.x, a.y, 16, 0, 6.28); ctx.fill();
@@ -2967,7 +2990,8 @@ function render() {
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e' && (anomalyPhase(a)==='active' || a.fx>.3)) hole(a.x, a.y, 70 + a.fx * 120, 0.5);
-    for (const a of arts) hole(a.x, a.y, 40, 0.6);
+    const range = activeDetectorRange();
+    if (range) for (const a of arts) if (dE(a, P) <= range) hole(a.x, a.y, 40, 0.6);
     ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);
@@ -3324,6 +3348,10 @@ function wearAndJam(id) {
   if (c < 65 && chance((65 - c) / 500)) { P.jam = 1; play('jam'); msg('Заклинило! ' + (IN.touch ? 'Жми «Перезар.»,' : 'Жми R,') + ' чтобы передёрнуть.', 'bad'); return true; }
   return false;
 }
+function activeDetectorRange() {
+  const model = S && DETECTORS[S.weapon];
+  return model && has(S.weapon) && P.alive && !inBunker(P.x, P.y) ? model.metres * T / 1.5 : 0;
+}
 function survival(dt) {
   survDefaults();
   // голод
@@ -3337,12 +3365,20 @@ function survival(dt) {
     P.bleedT = (P.bleedT || 0) - dt;
     if (P.bleedT <= 0) { P.bleedT = 0.6; decals.push({ x: P.x + rnd(-6, 6), y: P.y + rnd(-6, 6), r: rnd(1.5, 3), a: 0.7 }); }
   }
-  // детектор артефактов
-  let bd = 1e9;
-  for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < bd) bd = d; }
-  P.detT = (P.detT || 0) - dt;
-  if (bd < 280 && P.detT <= 0 && !inBunker(P.x, P.y)) { P.detT = 0.12 + (bd / 280) * 1.2; play('beep', undefined, undefined, 0.5 + (1 - bd / 280) * 0.8); }
-  P.detD = bd;
+  const range = activeDetectorRange();
+  P.detD = Infinity;
+  if (range) for (const a of arts) {
+    const distance = dE(P, a);
+    if (distance <= range && distance < P.detD) P.detD = distance;
+  }
+  if (Number.isFinite(P.detD)) {
+    P.detT = (P.detT || 0) - dt;
+    if (P.detT <= 0) {
+      const fraction = P.detD / range;
+      play('beep', undefined, undefined, 1.3 - 0.8 * fraction);
+      P.detT = 0.12 + 1.2 * fraction;
+    }
+  } else P.detT = 0;
   // ранг
   const r = rankOf(score());
   if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }
@@ -5294,11 +5330,12 @@ function drawInv2() {
     dv.appendChild(el('div', 'nm', it.n + (isGun(id) && cnt(id)>1?' · '+(copy+1)+' из '+cnt(id):'')));
     const rows = el('div', 'cmp');
     const line = (k, v, d) => { const r = el('div', 'cr'); r.appendChild(el('span', 'ck', k)); r.appendChild(el('span', 'cv', v)); if (d) r.appendChild(el('span', 'cd ' + (d > 0 ? 'up' : 'dn'), (d > 0 ? '+' : '') + d)); rows.appendChild(r); };
-    if (WP[id]) {
+    if (DETECTORS[id]) line('Радиус поиска', it.metres + ' м');
+    else if (WP[id]) {
       const W = WP[id], C = WP[S.weapon], same = S.weapon === id && !copy;
-      line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
-      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
-      if (!same) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
+      line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same || !C ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
+      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || !C || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || !C || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
+      if (!same && C) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
     } else if (it.armor) {
       line('Предел веса',carryLimit(id)+' кг');
       const cur = ITEMS[S.armor] ? ITEMS[S.armor].armor : 0;
@@ -5312,7 +5349,7 @@ function drawInv2() {
     dv.appendChild(rows);
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
-    if (WP[id] && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
+    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
     if (it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
@@ -5369,7 +5406,7 @@ function sellWhy(id, e, o) {
   const it = ITEMS[id]; if (!it) return null;
   if (it.quest) return 'квест';
   if (o && o.sell[id]) return 'в корз.';
-  if (id === S.weapon && WP[id] && !WP[id].melee) return 'в руках';
+  if (id === S.weapon && (isGun(id) || DETECTORS[id])) return 'в руках';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
   if (e && it.armor) return 'не берёт';
@@ -5380,7 +5417,7 @@ function sellable(id, e) {
   if (e && it.armor) return 0;
   let n = cnt(id) - beltCount(id);
   if (id === S.armor) n -= 1;
-  if (id === S.weapon && WP[id] && !WP[id].melee) n -= 1;
+  if (id === S.weapon && (isGun(id) || DETECTORS[id])) n -= 1;
   return Math.max(0, n);
 }
 function offerSum(e) {
@@ -5621,6 +5658,7 @@ function b1Flash(e, id, w, target = ctx) {   // попадание: подсве
   B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w); target.restore();
 }
 function b1Human(e, target) {
+  if (e === P && DETECTORS[S.weapon]) return false;
   if (!B1_READY() || e.captive) return false;
   const id = b1HumanId(e); if (!id || !b1Drawn(e, id)) return false;
   const w = e === P ? S.weapon : e.wpn;
@@ -6563,7 +6601,7 @@ const HELD_SPRITES = {
 function frameWeapon(e, id, W, grip) {
   const gait = gaitOf(e);
   const pose = e.campRise != null ? 'idle' : e.crouch ? 'crouch' : gait.moving ? G8_WALK[gait.phase] : 'idle';
-  const skin = g3Skin(e), mount = HELD_POSES[id], coords = GLOVE_FRAMES[pose];
+  const skin = g3Skin(e), mount = HELD_POSES[id] || HELD_POSES.grenade, coords = GLOVE_FRAMES[pose];
   const dy = skin === 'bandit' ? -1.5 : skin === 'army' ? -0.8 : 0;
   const right = [coords[0],coords[1]+dy], left = [coords[2],coords[3]+dy];
   const turn = mount.turn || 0, cos = Math.cos(turn), sin = Math.sin(turn);
@@ -6615,7 +6653,9 @@ function equippedFrame(images, asset, w) {
   if (!source) return null;
   let models = heldFrames.get(source);
   if (!models) { models=new Map(); heldFrames.set(source,models); }
-  const sprite=packImage(HELD_SPRITES[w.id].file), cached=models.get(w.id);
+  const detector = detectorImages[w.id];
+  const sprite = detector ? (detector.naturalWidth ? detector : null) : packImage(HELD_SPRITES[w.id].file);
+  const cached = models.get(w.id);
   if (cached && cached.sprite === sprite) return cached;
   const body=frameCanvas(source), b=body.getContext('2d');
   b.drawImage(source,0,0);
@@ -6937,8 +6977,8 @@ function g7PoseFrame(skin, pose) {
 
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
-  const id = e === P ? S.weapon : e.wpn, W = G3W[id]; if (!W) return null;
-  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' ? 'one' : 'two';
+  const id = e === P ? S.weapon : e.wpn, W = G3W[id] || (DETECTORS[id] && { len: 5 }); if (!W) return null;
+  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
   const r = rigActive(e);
   if (r) {
     const s = CordonRig.sockets(r.rig.pose, grip);
@@ -6957,7 +6997,7 @@ function localToWorld(e, ang, lat, fwd) {
   return { x: e.x + Math.sin(ang) * lat + Math.cos(ang) * fwd, y: e.y - Math.cos(ang) * lat + Math.sin(ang) * fwd };
 }
 function g7Muzzle(e, ang) {
-  const w = weaponLocal(e); if (!w || w.W.blade || w.W.toss) return null;
+  const w = weaponLocal(e); if (!w || DETECTORS[w.id] || w.W.blade || w.W.toss) return null;
   const tip = localToWorld(e, ang, w.muzzle[0], w.muzzle[1]);
   const motion = w.pose && e.campRise == null && actorFrameMotion(e,gaitOf(e).moving);
   if (motion) {
@@ -6967,9 +7007,17 @@ function g7Muzzle(e, ang) {
   return tip;
 }
 /* слой оружия: рукоять в main, ствол вдоль +y до muzzle. Тот же объект w, что и для дула */
+function drawHeldDetector(g, id, x, y) {
+  const image = detectorImages[id];
+  if (image.complete && image.naturalWidth) {
+    g.save(); g.translate(x,y); g.rotate(Math.PI);
+    g.drawImage(image,-5,-8,10,10); g.restore();
+  }
+}
 function drawWeaponLocal(c2, w) {
   if (!w) return;
   const W = w.W, x = w.main[0], y = w.main[1];
+  if (DETECTORS[w.id]) { drawHeldDetector(c2,w.id,x,y); return; }
   if (window.CORDON_G8_ON) {
     const shape = HELD_SPRITES[w.id], sprite = packImage(shape.file);
     if (sprite) {
@@ -7752,7 +7800,7 @@ const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-ak
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
   function hash(s) { var h = 7; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
   function avatar(name, fac) {
@@ -7892,7 +7940,7 @@ function talk(e) {
     const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : LORE[(e.seed + e.talked * 5) % LORE.length]); } }];
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
-    if (!e.robbed && !e.follow) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
+    if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
     o.push({ t: 'Бывай', close: 1 });
     return o;
   }, 'dialog', e);
@@ -7982,7 +8030,7 @@ function traderOpts() {
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
-    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болт покажет границу. К артефакту иди, когда пыль осядет.');
+    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Детекторы есть у меня. Возьми прибор в руки и слушай. А границу аномалии проверяй болтом.');
     S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
@@ -8256,6 +8304,19 @@ function visibleContact(e) {
 }
 /* карта КПК: o.u — сколько пикселей холста в одном CSS-пикселе (маркеры и подписи одного экранного размера при любом масштабе);
    подписи раскладываются без наложения: сначала выбранная цель, потом места; не влезла ни в одну позицию — не рисуется */
+function drawDetectorContacts(g, s, u) {
+  const range = activeDetectorRange();
+  if (!range) return;
+  g.save();
+  for (const a of arts) {
+    if (dE(P, a) > range) continue;
+    const x = a.x / T * s, y = a.y / T * s, r = 3.8 * u;
+    g.beginPath(); g.moveTo(x, y-r); g.lineTo(x+r, y); g.lineTo(x, y+r); g.lineTo(x-r, y); g.closePath();
+    g.lineWidth = 3*u; g.strokeStyle = '#22251d'; g.stroke();
+    g.lineWidth = 1.3*u; g.strokeStyle = '#ffe298'; g.stroke();
+  }
+  g.restore();
+}
 function drawMapTo(g, s, full, o) {
   o = o || { ppl: 1, cache: 1 };
   const u = o.u || 1;
@@ -8263,6 +8324,7 @@ function drawMapTo(g, s, full, o) {
   g.imageSmoothingEnabled = !!ART;
   g.drawImage(miniC, 0, 0, PW * s, MH * s);
   g.drawImage(fogC, 0, 0, PW * s, MH * s);
+  drawDetectorContacts(g, s, u);
   const busy = [];   // занятые прямоугольники: маркеры и подписи
   const mark = (x, y, r) => busy.push([x - r, y - r, x + r, y + r]);
   const hx = HATCH.x / T * s, hy = HATCH.y / T * s;
@@ -8336,6 +8398,7 @@ function drawMini() {
     mctx.fillStyle = 'rgba(4,7,12,0.35)';
     mctx.fillRect(P.x / T * s - size / 2, P.y / T * s - size / 2, size, size);
   }
+  drawDetectorContacts(mctx, s, 1.65);
   mapSymbol(mctx, 'hatch', HATCH.x / T * s, HATCH.y / T * s, 1.65);
   objs.forEach(o => {
     if(o.k==='locker') mapSymbol(mctx,'locker',(o.x+o.w/2)/T*s,(o.y+o.h/2)/T*s,1.65);
@@ -8386,7 +8449,7 @@ function hud(dt) {
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
   const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
-  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint(), P.detD < 280 ? 'артефакт ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -8397,14 +8460,15 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const W = WP[S.weapon];
-  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = W.n; }
+  const detector = DETECTORS[S.weapon], W = detector || WP[S.weapon];
+  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
-  $('wpnbox').classList.toggle('mel', !!W.melee);   // нож и граната: без полосы состояния, одна подпись
-  H.wcn.textContent = W.melee ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
-  if (W.toss) H.am.textContent = '× ' + cnt('grenade');
+  $('wpnbox').classList.toggle('mel', !!W.melee || !!detector);   // нож и граната: без полосы состояния, одна подпись
+  H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
+  if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
+  else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
   else if (W.melee) H.am.textContent = '∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
   const q = trackedTarget();
@@ -8484,6 +8548,7 @@ addEventListener('keydown', e => {
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
+  if (/^Digit[678]$/.test(k)) setWeapon(WORDER[Number(k.slice(-1)) - 1]);
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }

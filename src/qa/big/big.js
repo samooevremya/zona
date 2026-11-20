@@ -563,5 +563,39 @@ Tt('K22_open_channel_and_lost_witnesses',()=>cordonPlay(false));
 Tt('K23_radio_silence_and_old_save',()=>cordonPlay(true));
 Tt('K24_fresh_start_and_emergency_log',()=>cordonPlay(false,true));
 
+Tt('D1_detectors_purchase_range_and_pickup', () => {
+  reset();
+  S().money = 6800;
+  const [x,y] = RM.p(60.2*T,18.6*T);
+  const stand = metres => { P().x=x-metres*T/1.5; P().y=y; step(1); };
+  const signal = () => Number.isFinite(P().detD) && P().detT > 0;
+  const key = digit => window.dispatchEvent(new KeyboardEvent('keydown',{code:'Digit'+digit}));
+  const controls = () => Array.from(document.querySelectorAll('#pbody button'));
+  stand(0); key(6);
+  const absent = !signal() && z.near?.k !== 'art' && S().weapon === 'knife';
+  z.openTrade(null);
+  for (const name of ['Искра','Контур','Спектр']) controls().find(b=>b.getAttribute('aria-label')?.startsWith('Детектор «'+name+'»,')).click();
+  controls().find(b=>b.textContent==='Подтвердить').click();
+  z.closePanel(); stand(0);
+  const packed = S().money===0 && !signal() && z.near?.k !== 'art';
+  const tiers = ['det_spark','det_contour','det_spectrum'].map((id,i) => {
+    const limit = [6,15,30][i];
+    key(6+i); stand(limit+.1);
+    const outside = !signal();
+    stand(limit-.1); const far = P().detT;
+    const inside = signal();
+    key(1); key(6+i); stand(.2);
+    return outside && inside && P().detT < far && S().weapon === id && z.near?.k === 'art';
+  });
+  z.save(true); z.applyState(z.loadSave()); stand(0);
+  const saved = S().weapon==='det_spectrum' && signal();
+  key(1); z.interact(); stand(0);
+  const holstered = !S().inv.art_medusa && !signal() && z.near?.k !== 'art';
+  document.getElementById('wpnbox').click();
+  key(6); stand(0); z.interact(); z.interact(); step(1);
+  const collected = S().inv.art_medusa===1 && !signal();
+  return {ok:absent && packed && tiers.every(Boolean) && saved && holstered && collected, absent,packed,tiers,saved,holstered,collected};
+});
+
 return JSON.stringify(R);
 })()
