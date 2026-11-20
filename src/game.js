@@ -2392,7 +2392,10 @@ function render() {
     const sw = Math.sin(S.min * 0.8 + x * 0.7 + y) * 1.2;
     if (C1 && ART) {
       const nb = (map[y * MW + x - 1] === TR) + (map[y * MW + x + 1] === TR) + (map[(y - 1) * MW + x] === TR) + (map[(y + 1) * MW + x] === TR);
-      const edge = nb <= 1;
+      // На сухой кромке у дороги даже тесная пара деревьев даёт
+      // силуэты берёз и сухостоя. Используем уже существующие клетки деревьев.
+      const verge = BIG && ARTM.autumn && ARTM.autumn.verge[y * MW + x] <= 3;
+      const edge = nb <= 1 || (verge && nb === 2 && ARTM.autumn.water[y * MW + x] > 2);
       const ci = edge ? forestCrowns.length + Math.floor(h * edgeCrowns.length) : Math.floor(h * forestCrowns.length);
       const scale = .65 + hash2(x + 73, y + 13) * .52;
       const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
@@ -2873,6 +2876,71 @@ function c1Rail(g, x, y) {
 /* дёшево сравнить, относится ли клетка к земле, на которой лежит текстура */
 const GROUNDISH = t => t === GR || t === TR || t === BU;
 
+// Клетки брода проходимы как грунт. Для материалов и прибрежных растений
+// русло продолжается через них, как на соседних участках ручья.
+function surfaceTiles() {
+  if (!BIG || !C1) return map;
+  if (!ARTM.surface) {
+    const tiles = map.slice();
+    for (let y = FORD[0]; y <= FORD[1]; y++) {
+      const center = STREAM_X(y);
+      tiles.fill(SW, y * MW + center - 1, y * MW + center + 2);
+    }
+    ARTM.surface = tiles;
+  }
+  return ARTM.surface;
+}
+
+// Расстояние в клетках до берега или твёрдого покрытия. Два прохода
+// по карте вместо поиска соседей для каждого пикселя маски и кадра.
+function terrainDistance(matches) {
+  const tiles = surfaceTiles(), dist = new Uint8Array(MW * MH);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const i = y * MW + x;
+    dist[i] = matches(tiles[i]) ? 0 : Math.min(10,
+      x ? dist[i - 1] + 1 : 10, y ? dist[i - MW] + 1 : 10);
+  }
+  for (let y = MH - 1; y >= 0; y--) for (let x = MW - 1; x >= 0; x--) {
+    const i = y * MW + x;
+    dist[i] = Math.min(dist[i], x + 1 < MW ? dist[i + 1] + 1 : 10,
+      y + 1 < MH ? dist[i + MW] + 1 : 10);
+  }
+  return dist;
+}
+
+function autumnTerrain() {
+  if (!ARTM.autumn) {
+    ARTM.autumn = {
+      water: terrainDistance(t => t === SW),
+      verge: terrainDistance(t => t === DI || t === AS || t === RA || t === CF)
+    };
+  }
+  return ARTM.autumn;
+}
+
+// Светлые стебли выделены сильнее тёмной почвы. Исходный рисунок
+// бесшовной текстуры остаётся в масштабе мира; материал создаётся один раз.
+function autumnGrassPattern(g) {
+  if (!PATS.straw) {
+    const sp = ART.m.sprites.grass_dry;
+    const tile = document.createElement('canvas');
+    tile.width = sp.rect[2]; tile.height = sp.rect[3];
+    const tg = tile.getContext('2d');
+    tg.drawImage(ART.images[sp.atlas], ...sp.rect, 0, 0, tile.width, tile.height);
+    const pixels = tg.getImageData(0, 0, tile.width, tile.height), d = pixels.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const straw = clamp((d[i] + d[i + 1] - 60) / 220, 0, 1);
+      d[i] += 12 + 27 * straw;
+      d[i + 1] += 6 + 16 * straw;
+      d[i + 2] += 2 + 4 * straw;
+    }
+    tg.putImageData(pixels, 0, 0);
+    PATS.straw = g.createPattern(tile, 'repeat');
+    PATS.straw.setTransform(new DOMMatrix().scale(sp.logicalSize[0] / tile.width, sp.logicalSize[1] / tile.height));
+  }
+  return PATS.straw;
+}
+
 // Короткий отпечаток из исходной фотографии грунта. Мягкая граница
 // оставляет видимой фактуру обочины между проездами.
 function wheelPrint() {
@@ -2911,13 +2979,47 @@ function drawWheelTracks(g, x, y, w, h) {
   }
 }
 
+// У брода изгиб ручья пересекает границу клеток. Сглаживаем оба берега
+// в мировых координатах и сводим их к обычной воде на концах участка.
+function drawFordWater(g) {
+  const top = FORD[0] - 4, bottom = FORD[1] + 5;
+  const left = (STREAM_X(FORD[0]) - 5) * T, width = 10 * T;
+  if (GWP.y1 <= top * T || GWP.y0 >= bottom * T || GWP.x1 <= left || GWP.x0 >= left + width) return;
+  if (!ARTM.fordWater) {
+    const c = document.createElement('canvas');
+    c.width = width; c.height = (bottom - top) * T;
+    const ctx = c.getContext('2d');
+    ctx.translate(-left, -top * T);
+    artFill(ctx, 'water', left, top * T, c.width, c.height);
+    const pixels = ctx.getImageData(0, 0, c.width, c.height);
+    for (let y = 0; y < c.height; y++) {
+      const row = top + (y + .5) / T;
+      const blend = clamp(Math.min(row - top, bottom - row), 0, 1);
+      const axis = streamCenter(row - .5);
+      const center = (lerp(STREAM_X(Math.floor(row)), axis, blend) + .5) * T - left;
+      const west = center - 1.5 * T + blend * (vnoise(7, y, 19) - .5) * 12;
+      const east = center + 1.5 * T + blend * (vnoise(83, y, 23) - .5) * 14;
+      for (let x = 0; x < c.width; x++) {
+        const edge = Math.min(x + .5 - west, east - x - .5);
+        const silt = blend * (hash2(x + left, y + top * T) - .5) * 3;
+        pixels.data[(y * c.width + x) * 4 + 3] = 255 * clamp(.5 + (edge + silt) / (1 + 10 * blend), 0, 1);
+      }
+    }
+    ctx.putImageData(pixels, 0, 0); ARTM.fordWater = c;
+  }
+  g.drawImage(ARTM.fordWater, left, top * T);
+}
+
 function* artGround(g, R) {
-  const shoulders = BIG && C1;
+  const shoulders = BIG && C1, tiles = surfaceTiles();
   // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
   for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
-    const t = map[y * MW + x], px = x * T, py = y * T;
+    const t = tiles[y * MW + x], px = x * T, py = y * T;
     let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
-    if (C1 && t === SW) id = BIG && x >= 224 ? 'water' : 'swamp';
+    if (C1 && t === SW) {
+      id = BIG && x >= 224 ? 'water' : 'swamp';
+      if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
+    }
     if (id) artFill(g, id, px, py, T, T);
     if (C1 && t === RA) c1Rail(g, x, y);
     if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
@@ -2927,11 +3029,18 @@ function* artGround(g, R) {
   // 2. Сухая трава крупными мягкими пятнами: маска низкого разрешения, накладывается кусками 512 px
   if (!ARTM.dry) {
     const mask = document.createElement('canvas'); mask.width = MW * 2; mask.height = MH * 2;
+    const terrain = shoulders && autumnTerrain();
     const mg = mask.getContext('2d'), md = mg.createImageData(mask.width, mask.height);
     for (let y = 0; y < mask.height; y++) for (let x = 0; x < mask.width; x++) {
-      const tx = x >> 1, ty = y >> 1, t = tAt(tx, ty);
+      const tx = x >> 1, ty = y >> 1, t = tiles[ty * MW + tx];
       const v = vnoise(x, y, 11) * 0.7 + vnoise(x + 31, y + 17, 4) * 0.3;
-      const a = GROUNDISH(t) ? clamp((v - 0.5) * 4, 0, 1) : 0;
+      let a = GROUNDISH(t) ? clamp((v - 0.5) * 4, 0, 1) : 0;
+      if (terrain && GROUNDISH(t) && tx < PW) {
+        const i = ty * MW + tx;
+        const exposure = clamp((terrain.water[i] - 1) / 5, 0, 1);
+        const shoulder = Math.max(0, 1 - terrain.verge[i] / 4);
+        a = exposure * clamp((v - .20) * 1.9 + shoulder * .25, 0, 1);
+      }
       md.data[(y * mask.width + x) * 4 + 3] = Math.round(a * 235);
     }
     mg.putImageData(md, 0, 0); ARTM.dry = mask;
@@ -2944,7 +3053,10 @@ function* artGround(g, R) {
   for (let cy = wy0; cy < wy1; cy += SH) { for (let cx = wx0; cx < wx1; cx += CH) {
     const w = Math.min(CH, wx1 - cx), h = Math.min(SH, wy1 - cy);
     cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
-    cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS); artFill(cg, 'grass_dry', cx, cy, w, h); cg.setTransform(1, 0, 0, 1, 0, 0);
+    cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS);
+    if (shoulders) { cg.fillStyle = autumnGrassPattern(cg); cg.fillRect(cx, cy, w, h); }
+    else artFill(cg, 'grass_dry', cx, cy, w, h);
+    cg.setTransform(1, 0, 0, 1, 0, 0);
     cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
     const s = mask.width / WW;
     cg.drawImage(mask, cx * s, cy * s, w * s, h * s, 0, 0, w * GS, h * GS);
@@ -2959,7 +3071,7 @@ function* artGround(g, R) {
     const K = 4, mw = PW * K, mh = MH * K;
     if (!ARTM[id]) {
     const a = new Float32Array(mw * mh), b2 = new Float32Array(mw * mh);
-    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) a[y * mw + x] = coverage(map[(y / K | 0) * MW + (x / K | 0)]) ? 1 : 0;
+    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) a[y * mw + x] = coverage(tiles[(y / K | 0) * MW + (x / K | 0)]) ? 1 : 0;
     for (let pass = 0; pass < 2; pass++) {
       for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < mw) { s += a[y * mw + xx]; n++; } } b2[y * mw + x] = s / n; }
       for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < mh) { s += b2[yy * mw + x]; n++; } } a[y * mw + x] = s / n; }
@@ -2967,7 +3079,7 @@ function* artGround(g, R) {
     const mk = document.createElement('canvas'); mk.width = mw; mk.height = mh;
     const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
     for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
-      const t = map[(y / K | 0) * MW + (x / K | 0)];
+      const t = tiles[(y / K | 0) * MW + (x / K | 0)];
       if (!GROUNDISH(t) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
       const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
       const alpha = shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
@@ -2980,14 +3092,18 @@ function* artGround(g, R) {
     // только прямоугольник вокруг клеток этого покрытия (края расплываются на 3 клетки): кусок без дороги пропускается
     let bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1;
     for (let y = Math.max(0, GW.y0 - 3); y <= Math.min(MH - 1, GW.y1 + 3); y++) for (let x = Math.max(0, GW.x0 - 3); x <= Math.min(PW - 1, GW.x1 + 3); x++)
-      if (coverage(map[y * MW + x])) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
+      if (coverage(tiles[y * MW + x])) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
     if (bx1 >= 0 && (bx1 + 4) * T > GWP.x0 && (bx0 - 3) * T < GWP.x1 && (by1 + 4) * T > GWP.y0 && (by0 - 3) * T < GWP.y1) {
       const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(GWP.x1, (bx1 + 4) * T), ry1 = Math.min(GWP.y1, (by1 + 4) * T);
       for (let cy = ry0; cy < ry1; cy += CH) for (let cx = rx0; cx < rx1; cx += CH) {
         const w = Math.min(CH, rx1 - cx), h = Math.min(CH, ry1 - cy);
         cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
         cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS); artFill(cg, id, cx, cy, w, h);
-        if (shoulders && tt === DI) drawWheelTracks(cg, cx, cy, w, h);
+        if (shoulders && tt === DI) {
+          cg.fillStyle = 'rgba(178,145,101,.16)';
+          cg.fillRect(cx, cy, w, h);
+          drawWheelTracks(cg, cx, cy, w, h);
+        }
         if (shoulders && tt === AS) {
           cg.fillStyle = 'rgba(200,190,150,0.16)';
           for (let row = Math.max(9, Math.floor(cy / (3 * T)) * 3); row * T < cy + h; row += 3)
@@ -3003,7 +3119,9 @@ function* artGround(g, R) {
   }
   yield;
   if (C1) {
-    c1ForestFloor(g); yield;
+    c1ForestFloor(g);
+    if (BIG) drawFordWater(g);
+    yield;
     c1Scatter(g); yield;
     const [w, h] = ART.m.sprites.camp_yard.logicalSize;
     if (Math.abs(FIRE.x - (GWP.x0 + GWP.x1) / 2) < (w + GWP.x1 - GWP.x0) / 2 &&
@@ -3053,8 +3171,31 @@ function c1ForestFloor(g) {
     g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
   }
 }
+// Пучки группируются по мировым координатам. Берег узнаётся по камышу,
+// обочина — по низкой траве, открытое поле — по более редким куртинам.
+function scatterAutumnPlants(g, x, y, terrain) {
+  const i = y * MW + x, bank = terrain.water[i] <= 2, verge = terrain.verge[i];
+  const patch = vnoise(x + 31, y - 19, 5);
+  const density = bank ? .23 : verge <= 2 ? .22 : .12;
+  if (hash2(x + 191, y + 67) > density * (.25 + patch * 1.4)) return;
+  const r = mulberry32((y * MW + x) * 31 + 57);
+  const cx = (x + .35 + r() * .3) * T, cy = (y + .35 + r() * .3) * T;
+  if (bank || (verge >= 2 && patch > .57 && r() < .19)) {
+    const size = bank ? 21 + r() * 13 : 23 + r() * 17;
+    groundShadow(g, cx, cy, size * .37, size * .23, .3, 3);
+    ART.draw(g, bank ? 'c1_bush3' : 'c1_bush' + Math.floor(r() * 3), cx, cy, size, size, r() * 6.28);
+  } else {
+    const count = 2 + Math.floor(r() * 3);
+    for (let n = 0; n < count; n++) {
+      const size = 8 + r() * 12, dx = (r() - .5) * 21, dy = (r() - .5) * 13;
+      ART.draw(g, 'c1_tuft' + Math.floor(r() * 6), cx + dx, cy + dy, size, size * .8, r() * 6.28);
+    }
+  }
+}
+
 /* разброс C1: брёвна, пни, камни, пятна. Место выбирается по хешу клетки, так что соседние куски рисуют одно и то же */
 function c1Scatter(g) {
+  const terrain = BIG && autumnTerrain();
   const M = 5;
   for (let y = Math.max(3, GW.y0 - M); y <= Math.min(MH - 4, GW.y1 + M); y++) for (let x = Math.max(3, GW.x0 - M); x <= Math.min(PW - 4, GW.x1 + M); x++) {
     const t0 = map[y * MW + x];
@@ -3065,6 +3206,7 @@ function c1Scatter(g) {
       continue;
     }
     if (t0 !== GR) continue;
+    if (terrain) scatterAutumnPlants(g, x, y, terrain);
     const h = hash2(x * 3 + 11, y * 7 + 5); if (h > 0.03) continue;
     let road = false; for (let dy = -2; dy <= 2 && !road; dy++) for (let dx = -2; dx <= 2; dx++) { const t = tAt(x + dx, y + dy); if (t === DI || t === AS || t === BR || t === CO || t === FL || t === CF || t === RA) { road = true; break; } }
     if (road) continue;
@@ -3335,12 +3477,41 @@ const DECOR = [
   ['fence', 38.5, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
   ['fence', 12.6, 75.5, Math.PI / 2], ['fence', 12.6, 77.5, Math.PI / 2], ['fence', 12.6, 89.5, Math.PI / 2]
 ];
-const C1DECOR = { yardDrum: ['c1_yard_drum', 19], ford: ['c1_ford', 230], logs: ['c1_log1', 46], bench: ['c1_log0', 44], barrel: ['c1_barrel', 22], rubble: ['c1_bricks', 32], fence: ['c1_fence_picket', 66] };
+// Контуры трёх плит в исходном атласе брода, в пикселях спрайта.
+const FORD_SLABS = [
+  [[42,213],[92,207],[148,210],[150,237],[145,290],[88,293],[42,292]],
+  [[162,211],[218,208],[262,207],[310,207],[313,245],[312,288],[293,292],[277,283],[258,294],[197,297],[192,289],[160,288]],
+  [[329,218],[372,209],[399,211],[451,215],[450,288],[405,294],[327,299],[324,269]]
+];
+function drawFord(g, x, y) {
+  const slabScale = .37, sp = ART.m.sprites.c1_ford;
+  g.save(); g.translate(x, y); g.scale(slabScale, slabScale); g.translate(-249, -252);
+  for (const points of FORD_SLABS) {
+    const outline = new Path2D();
+    outline.moveTo(...points[0]);
+    for (const pt of points.slice(1)) outline.lineTo(...pt);
+    outline.closePath();
+    if (SHADOWS) {
+      g.save(); g.translate(SUN_DX * 4, SUN_DY * 4);
+      g.fillStyle = 'rgba(24,25,19,.42)'; g.fill(outline); g.restore();
+    }
+    g.save(); g.clip(outline);
+    g.drawImage(ART.images[sp.atlas], ...sp.rect, 0, 0, sp.rect[2], sp.rect[3]);
+    g.restore();
+  }
+  g.restore();
+  for (const [dx, dy, size, variant] of [[-42,-26,9,1],[-32,-31,6,0],[19,32,12,2],[27,35,7,1],[43,51,10,0]]) {
+    groundShadow(g, x + dx, y + dy, size * .4, size * .25, variant, 1);
+    ART.draw(g, 'c1_rock' + variant, x + dx, y + dy, size, size * .74, variant);
+  }
+}
+const C1DECOR = { yardDrum: ['c1_yard_drum', 19], logs: ['c1_log1', 46], bench: ['c1_log0', 44], barrel: ['c1_barrel', 22], rubble: ['c1_bricks', 32], fence: ['c1_fence_picket', 66] };
 function artDecor(g) { C1SH = 1; try { artDecor0(g); } finally { C1SH = 0; } }
 function artDecor0(g) {
   DECOR.forEach(d => {
     const x = d[1] * T, y = d[2] * T;
     if (!C1 && !ART.m.sprites[d[0]]) return;
+    if (C1 && d[0] === 'ford') { drawFord(g, x, y); return; }
     if (C1 && C1DECOR[d[0]]) {
       const [id, width] = C1DECOR[d[0]], log = d[0] === 'logs' || d[0] === 'bench';
       if (log) groundShadow(g, x, y, width * .48, width * .11, d[3], 1);
@@ -4935,7 +5106,8 @@ function bigPath(pts, rad, tile) {
     }
   }
 }
-const STREAM_X = y => 230 + Math.round(2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1));
+const streamCenter = y => 230 + 2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1);
+const STREAM_X = y => Math.round(streamCenter(y));
 const FORD = [89, 95];
 const BIG_EXITS = { north: { x: 128, y: 0 }, west: { x: 0, y: 118 }, east: { x: 239, y: 92 } };
 
@@ -5088,7 +5260,7 @@ function bigNewObjects(R) {
   addObj({ k: 'crate', x: 122 * T + 3, y: 21 * T + 3, w: 26, h: 26, solid: 1, stash: 'st8', loot: { a545: 30, medkit: 1, money: 240 } });
   ANOM0.push({ x: 125.5 * T, y: 26.5 * T, r: 26, k: 'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
   rads.push({ x: 123 * T, y: 24 * T, r: 110, p: 2.2 });
-  DECOR.push(['ford', 230.5, 92, 0]);
+  DECOR.push(['ford', STREAM_X(92) + .5, 92.5, 0]);
 
   // брод: аномалия на середине, тайник у берега
   ANOM0.push({ x: 231.5 * T, y: 95.5 * T, r: 22, k: 'e' });

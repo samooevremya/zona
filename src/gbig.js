@@ -74,7 +74,8 @@ function bigPath(pts, rad, tile) {
     }
   }
 }
-const STREAM_X = y => 230 + Math.round(2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1));
+const streamCenter = y => 230 + 2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1);
+const STREAM_X = y => Math.round(streamCenter(y));
 const FORD = [89, 95];
 const BIG_EXITS = { north: { x: 128, y: 0 }, west: { x: 0, y: 118 }, east: { x: 239, y: 92 } };
 
@@ -227,7 +228,7 @@ function bigNewObjects(R) {
   addObj({ k: 'crate', x: 122 * T + 3, y: 21 * T + 3, w: 26, h: 26, solid: 1, stash: 'st8', loot: { a545: 30, medkit: 1, money: 240 } });
   ANOM0.push({ x: 125.5 * T, y: 26.5 * T, r: 26, k: 'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
   rads.push({ x: 123 * T, y: 24 * T, r: 110, p: 2.2 });
-  DECOR.push(['ford', 230.5, 92, 0]);
+  DECOR.push(['ford', STREAM_X(92) + .5, 92.5, 0]);
 
   // брод: аномалия на середине, тайник у берега
   ANOM0.push({ x: 231.5 * T, y: 95.5 * T, r: 22, k: 'e' });

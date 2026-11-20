@@ -719,7 +719,10 @@ function render() {
     const sw = Math.sin(S.min * 0.8 + x * 0.7 + y) * 1.2;
     if (C1 && ART) {
       const nb = (map[y * MW + x - 1] === TR) + (map[y * MW + x + 1] === TR) + (map[(y - 1) * MW + x] === TR) + (map[(y + 1) * MW + x] === TR);
-      const edge = nb <= 1;
+      // На сухой кромке у дороги даже тесная пара деревьев даёт
+      // силуэты берёз и сухостоя. Используем уже существующие клетки деревьев.
+      const verge = BIG && ARTM.autumn && ARTM.autumn.verge[y * MW + x] <= 3;
+      const edge = nb <= 1 || (verge && nb === 2 && ARTM.autumn.water[y * MW + x] > 2);
       const ci = edge ? forestCrowns.length + Math.floor(h * edgeCrowns.length) : Math.floor(h * forestCrowns.length);
       const scale = .65 + hash2(x + 73, y + 13) * .52;
       const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
