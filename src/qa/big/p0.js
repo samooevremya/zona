@@ -92,7 +92,7 @@ T('7_rest_vs_hunger_bleed', () => {
   reset();
   const r = {};
   if (!X.advanceWorldTime) {
-    S().food = 50; P().hp = 40; const f0 = S().food; __setOld(30.5 * 32 + 20, 84.5 * 32);
+    S().food = 50; P().hp = 40; const f0 = S().food; Object.assign(P(), z.loc.locPt('village', 'fire')); P().x += 24;
     for (let i = 0; i < 3; i++) { X.restAtFire(); const o = z.panel && z.panel.opts ? z.panel.opts : null; z.closePanel(); }
     return { ok: false, note: '0.6: отдых — отдельная кнопка, сытость не тратится, см. код restAtFire' };
   }
@@ -122,7 +122,7 @@ T('8_trophy_text_vs_pay', () => {
 T('9_vodka_no_caches', () => {
   reset();
   S().inv.vodka = 1; S().caches = S().caches || {}; for (let i = 0; i < 20; i++) S().caches[i] = 2;
-  __setOld(30.5 * 32 + 20, 84.5 * 32); step(3);
+  Object.assign(P(), z.loc.locPt('village', 'fire')); P().x += 24; step(3);
   X.restAtFire();
   const opt = z.panel && z.panel.opts ? null : null;
   // ищем в отрисованных кнопках панели
@@ -153,7 +153,7 @@ T('11_migrate_06_save', () => {
 T('12_rest_crosses_sos_deadline', () => {
   if (!NEW) return { ok: false, note: 'в 0.6 отдых не проверяет события' };
   reset(); const a = forceSos(); if (!a) return { ok: false };
-  __setOld(30.5 * 32 + 20, 84.5 * 32); X.advanceWorldTime(180, 'rest'); step(2);
+  Object.assign(P(), z.loc.locPt('village', 'fire')); P().x += 24; X.advanceWorldTime(180, 'rest'); step(2);
   return { ok: !S().sos.act && !z.ents.some(e => e.alive && (e.sos || e.sosFoe)), last: S().sos.last, news: S().news.slice(-1)[0].x };
 });
 T('13_sos_outcomes_without_player', () => {

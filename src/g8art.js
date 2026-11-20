@@ -179,6 +179,92 @@ function drawFordWater(g) {
   g.drawImage(ARTM.fordWater, left, top * T);
 }
 
+// Небольшие пятна вынесены в кэш. Поворот и размер меняются вдоль тропы,
+// но для обоих соседних кусков земли последовательность одинакова.
+const trailPrints = new Map();
+function trailPrint(wet, variant) {
+  const key = variant + (wet ? 4 : 0);
+  if (trailPrints.has(key)) return trailPrints.get(key);
+  const c = document.createElement('canvas'); c.width = 92; c.height = 64;
+  const g = c.getContext('2d');
+  g.translate(-variant * 31, -variant * 17);
+  artFill(g, 'bare_soil', variant * 31, variant * 17, c.width, c.height);
+  const image = g.getImageData(0, 0, c.width, c.height), d = image.data;
+  const tint = wet ? [49,45,37] : [166,143,111];
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const grit = hash2(x + variant * 57, y) - .5, grain = vnoise(x, y + 25 * variant, 6) - .5;
+    const falloff = 1 - Math.hypot((x - 46) / 44, (y - 32) / 29) + grain * .22;
+    const i = (y * c.width + x) * 4;
+    for (let channel = 0; channel < 3; channel++) {
+      d[i + channel] = d[i + channel] * .54 + tint[channel] * .46 + 19 * grain + 12 * grit;
+    }
+    d[i + 3] = 255 * clamp(falloff * (wet ? 1.3 : 1.05), 0, 1);
+  }
+  g.putImageData(image, 0, 0); trailPrints.set(key, c); return c;
+}
+
+function drawVillageLanes(g) {
+  if (GWP.x1 < 40*T || GWP.x0 > 86*T || GWP.y1 < 159*T || GWP.y0 > 184*T) return;
+  g.save();
+  VILLAGE_LANES.forEach((lane, l) => {
+    for (let i = 1; i < lane.length; i++) {
+      const [ax, ay] = lane[i - 1], [bx, by] = lane[i];
+      const dx = (bx - ax) * T, dy = (by - ay) * T, len = Math.hypot(dx, dy);
+      for (let dist = 0, j = 0; dist < len; dist += 19, j++) {
+        const x = ax*T + dx*dist/len, y = ay*T + dy*dist/len;
+        if (x < GWP.x0-55 || x > GWP.x1+55 || y < GWP.y0-55 || y > GWP.y1+55) continue;
+        const n = hash2(l * 13 + i, j);
+        g.save(); g.translate(x, y); g.rotate(Math.atan2(dy, dx) + (n - .5) * .23);
+        const w = 56 + n * 16, h = (l === 0 || l === 3 || l === 6 ? 42 : 29) + n * 7;
+        g.globalAlpha = .65; g.drawImage(trailPrint(false, j % 4), -w/2, -h/2, w, h); g.restore();
+      }
+    }
+  });
+  g.restore();
+}
+
+function drawSurfaceEdges(g, tiles) {
+  for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
+    const t = tiles[y * MW + x];
+    if (t !== CF && t !== AS && t !== DI) continue;
+    for (const [nx, ny] of [[1,0],[0,1],[-1,0],[0,-1]]) {
+      const other = inb(x + nx, y + ny) ? tiles[(y + ny) * MW + x + nx] : VO;
+      if (!GROUNDISH(other) && !(t !== DI && other === DI)) continue;
+      const r = mulberry32(1423 + (y * MW + x) * 13 + nx * 3 + ny);
+      g.save();
+      g.translate((x + .5 + nx*.5)*T, (y + .5 + ny*.5)*T);
+      g.rotate(Math.atan2(-nx, ny));  // +Y указывает на внешнюю сторону кромки
+      if (t === CF) {
+        // Заход грунта на плиту, скол и короткий шов среди гравия.
+        g.save(); g.beginPath(); g.moveTo(-16, 0);
+        for (let u = -16; u <= 16; u += 4) {
+          const worldX = (x + .5 + nx*.5)*T + ny*u, worldY = (y + .5 + ny*.5)*T - nx*u;
+          const depth = 1 + 13 * vnoise(worldX+9, worldY, 17) + 3 * hash2(worldX, worldY);
+          g.lineTo(u, -depth);
+        }
+        g.lineTo(16, 2); g.lineTo(-16, 2); g.closePath(); g.clip();
+        artFill(g, 'bare_soil', -16, -14, 32, 18); g.restore();
+        if (r() < .32) {
+          const u = r()*18-9;
+          g.strokeStyle = 'rgba(50,44,35,.53)'; g.lineWidth = .9; g.beginPath();
+          g.moveTo(u,-5); g.lineTo(u+3,-11); g.lineTo(u+2,-15-r()*8); g.stroke();
+        }
+      }
+      const stones = Math.floor((t === CF ? 24 : 11) * r());
+      for (let j = 0; j < stones; j++) {
+        const u = (r()-.5)*T, v = (r()-.47)*(t === DI ? 19 : 14), size = .65+r()*1.7;
+        g.fillStyle = j % 3 ? 'rgba(78,69,52,.54)' : 'rgba(168,152,125,.58)';
+        g.beginPath(); g.ellipse(u,v,size,size*.57,r()*3,0,2*Math.PI); g.fill();
+      }
+      if (other !== DI && r() < .17) {
+        const size = 8 + r()*9;
+        ART.draw(g, 'c1_tuft'+Math.floor(r()*6), r()*18-9, 4+r()*4, size, size*.86, r()*6, .84);
+      }
+      g.restore();
+    }
+  }
+}
+
 function* artGround(g, R) {
   const shoulders = BIG && C1, tiles = surfaceTiles();
   // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
@@ -289,13 +375,24 @@ function* artGround(g, R) {
   yield;
   if (C1) {
     c1ForestFloor(g);
-    if (BIG) drawFordWater(g);
+    if (BIG) {
+      drawSurfaceEdges(g, tiles);
+      drawFordWater(g);
+    }
     yield;
     c1Scatter(g); yield;
     const [w, h] = ART.m.sprites.camp_yard.logicalSize;
     if (Math.abs(FIRE.x - (GWP.x0 + GWP.x1) / 2) < (w + GWP.x1 - GWP.x0) / 2 &&
-        Math.abs(FIRE.y - (GWP.y0 + GWP.y1) / 2) < (h + GWP.y1 - GWP.y0) / 2)
-      ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h);
+        Math.abs(FIRE.y - (GWP.y0 + GWP.y1) / 2) < (h + GWP.y1 - GWP.y0) / 2) {
+      g.save(); g.beginPath(); g.rect(FIRE.x-w/2, FIRE.y-h/2, w, h);
+      for (const house of HOUSES) {
+        if (house.x*T >= FIRE.x+w/2 || house.y*T >= FIRE.y+h/2 ||
+            (house.x+house.w)*T <= FIRE.x-w/2 || (house.y+house.h)*T <= FIRE.y-h/2) continue;
+        g.rect(house.x*T, house.y*T, house.w*T, house.h*T);
+      }
+      g.clip('evenodd'); ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h); g.restore();
+    }
+    if (BIG) drawVillageLanes(g);
   }
   // 4. Растительность группами: у стен, заборов, деревьев и насыпи; середина проходов свободна
   const RT = mulberry32(4242 + GW.x0 * 97 + GW.y0 * 13);
@@ -424,7 +521,7 @@ function artWall(g, x, y) {
 // зависит от координат двери и сохраняется при перестроении соседних кусков.
 function wornEntrance(width, seed) {
   const c = document.createElement('canvas');
-  c.width = Math.ceil(width + 16); c.height = 43;
+  c.width = Math.ceil(width + 24); c.height = 63;
   const g = c.getContext('2d');
   g.fillStyle = '#a18461'; g.fillRect(0, 0, c.width, c.height);
   if (ART) {
@@ -436,7 +533,7 @@ function wornEntrance(width, seed) {
     const depth = y / c.height;
     const center = c.width / 2 + Math.sin(depth * 3 + seed) * 3;
     const lateral = (x - center) / (width * (.53 - .16 * depth));
-    const rim = Math.hypot(lateral, (y - 5) / 32);
+    const rim = Math.hypot(lateral, (y - 9) / 53);
     const tuft = vnoise(x + seed, y, 5) - .5;
     const grit = hash2(x + seed, y) - .5, i = (y * c.width + x) * 4;
     data[i + 3] = 235 * clamp((1 - rim + tuft * .32 + grit * .10) * 3.8, 0, 1);
@@ -450,34 +547,29 @@ function wornEntrance(width, seed) {
 // Ступени выступают за свес даже у дальней стены. Вся площадка запекается в землю.
 function drawThresholds(g) {
   for (const h of HOUSES) {
-    if (h.x > GW.x1 + 1 || h.y > GW.y1 + 1 || h.x + h.w < GW.x0 - 1 || h.y + h.h < GW.y0 - 1) continue;
+    if (h.x > GW.x1 + 3 || h.y > GW.y1 + 3 || h.x + h.w < GW.x0 - 3 || h.y + h.h < GW.y0 - 3) continue;
     const concrete = h.mat === 'conc';
     for (const door of h.entrances) {
       const w = door.width, left = -w / 2;
       g.save(); g.translate(h.x * T + door.x, h.y * T + door.y);
       g.rotate(Math.atan2(-door.nx, door.ny));
       const style = hash2((h.x + door.x / T) * 2, (h.y + door.y / T) * 2);
-      if (!concrete && (h.ruin || style < .40)) {
-        if (!door.soil) door.soil = wornEntrance(w, Math.floor(style * 4096));
-        g.drawImage(door.soil, -door.soil.width / 2, -3);
-      } else {
-        g.fillStyle = 'rgba(39,30,21,.23)';
-        g.beginPath(); g.ellipse(0, 14, w * .60, 14, 0, 0, 2 * Math.PI); g.fill();
-        g.fillStyle = concrete ? '#59574d' : '#4b3b2c';
-        g.fillRect(left, -T / 2 - 4, w, T / 2 + 26);
-        for (let row = 0; row < 3; row++) {
-          const y = row * 7, inset = row * 1.3, x = left + inset, width = w - inset * 2;
-          g.fillStyle = concrete ? '#9b998b' : '#a38a66'; g.fillRect(x, y, width, 6);
-          if (ART) {
-            g.globalAlpha = .55;
-            artFill(g, concrete ? 'floor_concrete' : 'floor_wood', x, y, width, 6);
-            g.globalAlpha = 1;
-          }
-          g.fillStyle = concrete ? '#b4b0a0' : '#b49a77'; g.fillRect(x, y + 5, width, 1);
-          if (!concrete) {
-            g.fillStyle = '#524635'; g.fillRect(x + 3, y + 2, 1.4, 1.4);
-            g.fillRect(x + width - 4, y + 2, 1.4, 1.4);
-          }
+      if (!door.soil) door.soil = wornEntrance(w, Math.floor(style * 4096));
+      g.drawImage(door.soil, -door.soil.width / 2, -3);
+      const broken = h.ruin && door.breach, depth = broken ? 12 : 26;
+      g.fillStyle = 'rgba(39,30,21,.36)';
+      g.fillRect(left + 2, -2, w, depth + 4);
+      g.fillStyle = concrete ? '#59574d' : '#4b3b2c';
+      g.fillRect(left, -T / 2 - 4, w, T / 2 + depth);
+      for (let row = 0; row < (broken ? 2 : 4); row++) {
+        const y = row * 7, inset = row * 1.15, x = left + inset, width = w - 2*inset;
+        g.fillStyle = concrete ? '#918d7e' : '#947958'; g.fillRect(x, y, width, 6);
+        if (ART) {
+          g.globalAlpha = .54; artFill(g, concrete ? 'floor_concrete' : 'floor_wood', x, y, width, 6); g.globalAlpha = 1;
+        }
+        g.fillStyle = concrete ? '#b3ae9e' : '#b9a17c'; g.fillRect(x + 1, y + 4.7, width - 2, 1.3);
+        if (!concrete) {
+          g.fillStyle = '#504637'; g.fillRect(x + 3, y + 2, 1.4, 1.4); g.fillRect(x+width-4,y+2,1.4,1.4);
         }
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
@@ -643,7 +735,7 @@ const DECOR = [
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
   ['rubble', 34.3, 92.4, 0.5], ['rubble', 11.6, 90.4, 2.1], ['rubble', 25.6, 18.6, 1], ['rubble', 95.5, 18.2, 0.3],
   ['fence', 16.5, 70.7, 0], ['fence', 18.5, 70.7, 0], ['fence', 20.5, 70.7, 0.04],
-  ['fence', 38.5, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
+  ['fence', 44.45, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
   ['fence', 12.6, 75.5, Math.PI / 2], ['fence', 12.6, 77.5, Math.PI / 2], ['fence', 12.6, 89.5, Math.PI / 2]
 ];
 // Контуры трёх плит в исходном атласе брода, в пикселях спрайта.
@@ -654,6 +746,21 @@ const FORD_SLABS = [
 ];
 function drawFord(g, x, y) {
   const slabScale = .37, sp = ART.m.sprites.c1_ford;
+  if (Math.abs(x - (GWP.x0 + GWP.x1)/2) > (GWP.x1 - GWP.x0)/2 + 155 ||
+      Math.abs(y - (GWP.y0 + GWP.y1)/2) > (GWP.y1 - GWP.y0)/2 + 65) return;
+  for (const side of [-1, 1]) {
+    for (let j = 0; j < 4; j++) {
+      g.save(); g.translate(x + side*(55 + j*17), y + Math.sin(j+side)*4);
+      g.rotate(side*.16); g.globalAlpha = .8 - j*.13;
+      g.drawImage(trailPrint(true, j), -32,-18,64,36);
+      g.restore();
+    }
+    for (let j = 0; j < 8; j++) {
+      const n = hash2(side*31+j, 194), m = hash2(j, side*19);
+      const size = 3 + 5*n;
+      ART.draw(g, 'c1_rock'+(j%3), x+side*(68 + m*47), y+(n-.5)*40, size, size*.75, m*6, .9);
+    }
+  }
   g.save(); g.translate(x, y); g.scale(slabScale, slabScale); g.translate(-249, -252);
   for (const points of FORD_SLABS) {
     const outline = new Path2D();
@@ -782,8 +889,8 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
   if (BIG && !h.ok && h.x === 15 && h.y === 28) return 'c1_tower';
-  if (h.ruin) return big <= 16 ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
-  if (h.mat === 'conc') return big >= 110 ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
+  if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
+  if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (long > 2.1 && big > 40) return 'c1_roof_barn';
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
   return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
@@ -810,15 +917,47 @@ function balancedGable(id) {
   gableMaterials.set(id, tile);
   return tile;
 }
+// Вальма замыкает короткий торец другим направлением волн того же шифера.
+function hipEnd(g, image, sx, sy, sw, sh, width, height) {
+  const left = -width/2, depth = Math.min(width*.26, height*.53);
+  g.save(); g.beginPath(); g.moveTo(left,-height/2); g.lineTo(left+depth,0);
+  g.lineTo(left,height/2); g.closePath(); g.clip();
+  g.translate(left + depth/2, 0); g.rotate(-Math.PI/2);
+  g.drawImage(image, sx, sy, sw, sh*.46, -height/2, -depth/2, height, depth);
+  g.fillStyle = 'rgba(55,47,36,.14)'; g.fillRect(-height/2,-depth/2,height,depth);
+  g.restore();
+  g.strokeStyle = '#756e61'; g.lineWidth = 1.6; g.beginPath();
+  g.moveTo(left,-height/2); g.lineTo(left+depth,0); g.lineTo(left,height/2); g.stroke();
+}
+function drawPorch(g, h, id, y, depth) {
+  const door = h.entrances.find(d => d.ny === 1 && !d.breach);
+  if (!door) return;
+  const width = door.width + 18, left = door.x + 3 - width/2;
+  const plank = balancedGable(id);
+  g.save();
+  // Односкатный козырёк, выцветший лоб и два торца стоек. Передняя ступень открыта.
+  g.shadowColor = 'transparent';
+  g.fillStyle = '#514432'; g.fillRect(left+2,y+depth-2,3,8); g.fillRect(left+width-5,y+depth-2,3,8);
+  if (SHADOWS) { g.fillStyle = 'rgba(29,24,19,.35)'; g.fillRect(left+3,y+7,width,depth); }
+  g.drawImage(plank, plank.width*.28, plank.height*.67, plank.width*.38, plank.height*.22,
+    left,y-4,width,depth+6);
+  g.fillStyle = '#605342'; g.fillRect(left,y+depth,width,3);
+  g.fillStyle = '#b3a18a'; g.fillRect(left,y+depth,width,1);
+  g.restore();
+}
 function artRoof(h, idx) {
   let id = ROOF_AT[h.ok || (h.x + ',' + h.y)] || (h.ruin ? 'roof_broken' : h.mat === 'conc' ? null : ['roof_slate', 'roof_rust', 'roof_patch'][idx % 3]);
   if (C1) id = c1RoofId(h, idx, id);
   if (!id) return null;
   const W = h.w * T + 10, Hh = h.h * T + 10, c = document.createElement('canvas');
-  c.width = W * 2; c.height = Hh * 2;
+  const home = h.ok || (h.x + ',' + h.y);
+  const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
+  h.porchDepth = BIG && gable && (home === '26,71' || home === '37,73') ? 13 : 0;
+  c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
-  const along = h.w >= h.h, sp = ART.m.sprites[id];
+  const crossRidge = BIG && gable && (home === '15,87' || home === '26,71');
+  const along = crossRidge ? false : h.w >= h.h, sp = ART.m.sprites[id];
   if (C1 && id.startsWith('c1_')) {   // крыша C1: вырезать середину под пропорции дома, не растягивать
     // объём: снизу видна полоса передней стены, крыша над ней чуть короче и бросает тень на стену
     const flat = id === 'c1_tower' || id.startsWith('c1_booth');
@@ -853,13 +992,17 @@ function artRoof(h, idx) {
     }
     const tw = along ? RW : RH, th = along ? RH : RW, r = sp.rect, ka = tw / th;
     let sw = r[2], sh = r[3]; if (sw / sh > ka) sw = sh * ka; else sh = sw / ka;
-    const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
     const image = gable ? balancedGable(id) : ART.images[sp.atlas];
     const sx = (gable ? 0 : r[0]) + (r[2] - sw) * (sp.cropFocusX ?? 0.5);
     const sy = (gable ? 0 : r[1]) + (r[3] - sh) / 2;
     g.save(); g.translate(RW / 2, RH / 2);
     if (!along) g.rotate(gable ? -Math.PI / 2 : Math.PI / 2);
-    g.drawImage(image, sx, sy, sw, sh, -tw / 2, -th / 2, tw, th); g.restore();
+    g.drawImage(image, sx, sy, sw, sh, -tw / 2, -th / 2, tw, th);
+    if (BIG && gable && (home === '15,72' || home === '39,87' || home === '28,128')) {
+      g.shadowColor = 'transparent'; hipEnd(g, image, sx, sy, sw, sh, tw, th);
+    }
+    g.restore();
+    if (h.porchDepth) drawPorch(g, h, id, Hh - 10, h.porchDepth);
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;
   }

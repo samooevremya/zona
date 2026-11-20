@@ -446,6 +446,11 @@ function buildRoofs() {
     ROOFS.push(c);
   });
 }
+// Единый размер для мира, мини-карты и запекаемой аэрофотокарты.
+function drawHouseRoof(g, h, i, scale) {
+  g.drawImage(ROOFS[i], (h.x*T-3)*scale, (h.y*T-3)*scale,
+    (h.w*T+10)*scale, (h.h*T+10+(h.porchDepth || 0))*scale);
+}
 function roofHidden(h) {
   const px = P.x / T, py = P.y / T;
   return px > h.x + 0.6 && px < h.x + h.w - 0.6 && py > h.y + 0.6 && py < h.y + h.h - 0.6;
@@ -700,7 +705,7 @@ function render() {
       ctx.fillStyle = 'rgba(6,8,4,' + 0.2 * h.a + ')'; ctx.fillRect(x0 + 6, y0 + 8, w + 16, hh + 18);
       ctx.fillStyle = 'rgba(6,8,4,' + 0.22 * h.a + ')'; ctx.fillRect(x0 + 4, y0 + 6, w + 10, hh + 11);
     }
-    ctx.globalAlpha = h.a; ctx.drawImage(ROOFS[i], h.x * T - 3, h.y * T - 3, h.w * T + 10, h.h * T + 10); ctx.globalAlpha = 1;
+    ctx.globalAlpha = h.a; drawHouseRoof(ctx, h, i, 1); ctx.globalAlpha = 1;
   });
   // провода ЛЭП
   const py0 = objs.filter(o => o.k === 'pylon');

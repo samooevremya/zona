@@ -115,26 +115,31 @@ function house(x, y, w, h, doors, wall, broken, roof) {
   if (roof !== 'none') HOUSES.push({ x: x, y: y, w: w, h: h, doors, mat: roof || (wall === CO ? 'conc' : 'slate'), ruin: broken > 0.2, a: 1 });
 }
 
-// doors хранит клетки относительно дома. После переноса штампов объединяем
-// соседние клетки на одной стене и сверяем проход с окончательной картой.
+// Штамп дома может оставить пролом помимо заданных дверей. Обход конечной
+// сетки покрывает оба случая и объединяет смежные клетки в один проход.
 function buildEntrances(h) {
   h.entrances = [];
   for (const [nx, ny] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
-    const edge = nx > 0 ? h.w - 1 : ny > 0 ? h.h - 1 : 0;
-    const offsets = h.doors.filter(([x, y]) =>
-      (nx ? x : y) === edge && isFloor(tAt(h.x + x, h.y + y)) &&
-      !SOLID[tAt(h.x + x + nx, h.y + y + ny)]
-    ).map(([x, y]) => nx ? y : x).sort((a, b) => a - b);
-    for (let i = 0; i < offsets.length;) {
-      const start = offsets[i++];
-      let end = start;
-      while (i < offsets.length && offsets[i] === end + 1) end = offsets[i++];
+    const length = nx ? h.h : h.w;
+    let start = 0, declared = false;
+    for (let i = 1; i < length; i++) {
+      const col = nx ? (nx > 0 ? h.w - 1 : 0) : i;
+      const row = ny ? (ny > 0 ? h.h - 1 : 0) : i;
+      const x = h.x + col, y = h.y + row;
+      if (i < length - 1 && isFloor(tAt(x, y)) && !SOLID[tAt(x - nx, y - ny)] && !SOLID[tAt(x + nx, y + ny)]) {
+        if (!start) start = i;
+        declared ||= h.doors.some(([dx, dy]) => dx === col && dy === row);
+        continue;
+      }
+      if (!start) continue;
+      const end = i - 1;
       const mid = (start + end + 1) * T / 2;
       h.entrances.push({
         x: nx ? (nx > 0 ? h.w * T : 0) : mid,
         y: ny ? (ny > 0 ? h.h * T : 0) : mid,
-        nx, ny, width: (end - start + 1) * T - 4
+        nx, ny, breach: !declared, width: (end - start + 1) * T - 4
       });
+      start = 0; declared = false;
     }
   }
 }
@@ -144,7 +149,8 @@ const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
 const STAIRS = { x: 124.5 * T, y: 11.4 * T };
-const FIRE = { x: 30.5 * T, y: 84.5 * T };
+const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
+const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
 const BUNK = { x0: 121 * T, y0: 1 * T, x1: 132 * T, y1: 13 * T };
 const inBunker = (x, y) => x > BUNK.x0;
@@ -260,10 +266,10 @@ function gen() {
   for (let i = 0; i < 9; i++) { const x = 6 + i * 13, y = 36 + i * 7; if (x < PW - 4) addObj({ k: 'pylon', x: x * T + 6, y: y * T + 6, w: 20, h: 20, solid: 1 }); }
   [[92, 64], [93, 64], [108, 66], [108, 67], [87, 79], [100, 70], [101, 70], [96, 78]].forEach(c => addObj({ k: 'crate', x: c[0] * T + 3, y: c[1] * T + 3, w: 26, h: 26, solid: 1 }));
   // мебель и тайники в домах
-  [[16, 73], [21, 73], [27, 72], [38, 74], [43, 74], [16, 88], [40, 88], [26, 94], [31, 94]].forEach((c, i) => addObj({ k: i % 3 ? 'bed' : 'table', x: c[0] * T + 2, y: c[1] * T + 4, w: i % 3 ? 28 : 26, h: i % 3 ? 20 : 22, solid: 1 }));
+  [[16, 73], [21, 73], [27, 72], [40, 74], [43, 74], [16, 88], [40, 88], [26, 94], [31, 94]].forEach((c, i) => addObj({ k: i % 3 ? 'bed' : 'table', x: c[0] * T + 2, y: c[1] * T + 4, w: i % 3 ? 28 : 26, h: i % 3 ? 20 : 22, solid: 1 }));
   addObj({ k: 'crate', x: 104 * T + 3, y: 63 * T + 3, w: 26, h: 26, solid: 1, stash: 'st1', loot: { money: 250, a9: 16, medkit: 1 } });
-  addObj({ k: 'crate', x: 85 * T + 3, y: 11 * T + 3, w: 26, h: 26, solid: 1, stash: 'st2', loot: { money: 400, antirad: 2, a12: 10 } });
-  addObj({ k: 'crate', x: 21 * T + 3, y: 76 * T + 3, w: 26, h: 26, solid: 1, stash: 'st3', loot: { a9: 10, bandage: 1 } });
+  addObj({ k: 'crate', x: 87 * T + 3, y: 12 * T + 3, w: 26, h: 26, solid: 1, stash: 'st2', loot: { money: 400, antirad: 2, a12: 10 } });
+  addObj({ k: 'crate', x: 19 * T + 3, y: 75 * T + 3, w: 26, h: 26, solid: 1, stash: 'st3', loot: { a9: 10, bandage: 1 } });
   addObj({ k: 'crate', x: 44 * T + 3, y: 91 * T + 3, w: 26, h: 26, solid: 1, stash: 'st4', loot: { vodka: 1, cans: 1, money: 120 } });
   addObj({ k: 'crate', x: 11 * T + 3, y: 9 * T + 3, w: 26, h: 26, solid: 1, stash: 'st5', loot: { a545: 30, grenade: 1, money: 300 } });
   addObj({ k: 'crate', x: 107 * T + 3, y: 78 * T + 3, w: 26, h: 26, solid: 1, stash: 'st6', loot: { a12: 8, sausage: 2 } });

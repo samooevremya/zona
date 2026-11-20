@@ -85,5 +85,45 @@ Tt('K9_new_places_registered', () => {
   const sos = z.plus.SOS_SPOTS.map(s => s[2]);
   return { ok: miss.length === 0 && ['hutor', 'ford', 'column'].every(i => sos.includes(i)), missing: miss, sosPlaces: sos };
 });
+Tt('K10_walk_through_doors', () => {
+  reset();
+  // Проверяем постоянную геометрию. Случайный бой или толчок NPC не часть этой проверки.
+  for (const e of z.ents) if (e !== P()) e.alive = false;
+  const failures = [], tiles = window.__bigTiles();
+  const bounds = M.LOC.village.bounds;
+  const houses = z.gfxSnap().HOUSES;
+  let villageHouses = 0, villageGroups = 0;
+  let groups = 0, openCells = 0;
+  for (const h of houses) {
+    if (h.x >= bounds[0] && h.x < bounds[2] && h.y >= bounds[1] && h.y < bounds[3]) {
+      villageHouses++; villageGroups += h.entrances.length;
+    }
+    for (let y = 0; y < h.h; y++) for (let x = 0; x < h.w; x++) {
+      const nx = x === 0 ? -1 : x === h.w-1 ? 1 : 0, ny = y === 0 ? -1 : y === h.h-1 ? 1 : 0;
+      if (Math.abs(nx)+Math.abs(ny) !== 1) continue;
+      const pos = (h.y+y)*M.MW + h.x+x;
+      if (![6,10].includes(tiles[pos]) || [4,5,7,9,11].includes(tiles[pos+nx+ny*M.MW])) continue;
+      openCells++;
+      const along = (nx ? y+.5 : x+.5)*T;
+      if (!h.entrances.some(d => d.nx === nx && d.ny === ny && Math.abs(along-(nx ? d.y : d.x)) < d.width/2))
+        failures.push([h.ok,x,y,'unmarked']);
+    }
+    for (const d of h.entrances) {
+      groups++;
+      const x = h.x*T+d.x, y = h.y*T+d.y;
+      const distance = () => (P().x-x)*d.nx + (P().y-y)*d.ny;
+      P().x = x+40*d.nx; P().y = y+40*d.ny;
+      z.cam.x = x; z.cam.y = y;
+      z.IN.moveX = -d.nx; z.IN.moveY = -d.ny;
+      for (let i=0;i<32 && distance()>-40;i++) step(1);
+      if (distance()>-40) failures.push([h.ok,d.nx,d.ny,'in',Math.round(distance())]);
+      z.IN.moveX = d.nx; z.IN.moveY = d.ny;
+      for (let i=0;i<32 && distance()<40;i++) step(1);
+      if (distance()<40) failures.push([h.ok,d.nx,d.ny,'out',Math.round(distance())]);
+      z.resetInput();
+    }
+  }
+  return {ok: villageHouses === 6 && villageGroups >= 9 && !failures.length, houses: houses.length, groups, villageHouses, villageGroups, openCells, failures};
+});
 return JSON.stringify(R);
 })()
