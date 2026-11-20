@@ -297,7 +297,8 @@ function traderOpts() {
     say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); bulletin('Выполнено: «Медуза» для Сидоровича.');
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
-    say('Нужна «Медуза». Ищи на поле аномалий за ржавым автобусом у дороги. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
+    const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
+    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
     S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
@@ -563,7 +564,7 @@ function buildBigMini() {
 }
 async function buildMini() {
   fogC.width = PW; fogC.height = MH;
-  if (BIG && ART && C1 && window.CORDON_AERIAL) {
+  if (TOLIK_AT_JUNCTION && ART && C1 && window.CORDON_AERIAL) {
     const photo = new Image();
     photo.src = window.CORDON_AERIAL;
     try {

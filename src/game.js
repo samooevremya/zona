@@ -1230,10 +1230,10 @@ function qList() {
   const L = [], q = S.q;
   const F = ['', 'Найди Волка в деревне новичков: он знает, где держат Шустрого.', 'Освободи Шустрого: бандиты держат его в гараже на АТП, на востоке.', 'Отнеси флешку Сидоровичу в бункер.', ''];
   if (q.flash >= 1) L.push({ id: 'flash', loc: 'atp', n: 'Флешка Шустрого', d: q.flash === 4 ? (S.flags.flashFail ? 'Провалено.' : 'Выполнено.') : F[q.flash], st: q.flash === 4 ? (S.flags.flashFail ? 'f' : 'd') : 'a' });
-  if (q.medusa >= 1) L.push({ id: 'medusa', loc: 'field', n: '«Медуза» для Сидоровича', d: q.medusa === 2 ? 'Выполнено.' : 'Найди артефакт «Медуза» на поле аномалий за ржавым автобусом и принеси Сидоровичу.', st: q.medusa === 2 ? 'd' : 'a' });
+  if (q.medusa >= 1) L.push({ id: 'medusa', loc: 'field', n: '«Медуза» для Сидоровича', d: q.medusa === 2 ? 'Выполнено.' : TOLIK_AT_JUNCTION ? 'Найди артефакт «Медуза» на поле аномалий к северу от развилки на АТП и принеси Сидоровичу.' : 'Найди артефакт «Медуза» на поле аномалий за ржавым автобусом и принеси Сидоровичу.', st: q.medusa === 2 ? 'd' : 'a' });
   if (q.pack >= 1) L.push({ id: 'pack', loc: 'dogs_lair', n: 'Стая у леса', d: q.pack === 3 ? 'Выполнено.' : q.pack === 1 ? 'Перебей стаю слепых псов в лесу на северо-западе.' : 'Стая перебита. Вернись к Волку.', st: q.pack === 3 ? 'd' : 'a' });
   if (S.q2.fox >= 1) L.push({ id: 'fox', loc: 'farm', n: 'Найти Лиса', d: S.q2.fox === 4 ? 'Выполнено. Брат Лиса, Серый, ждёт на Свалке. Продолжение в следующей версии.' : S.q2.fox === 1 ? 'Лис ушёл за насыпь, к разрушенной ферме на северо-востоке. Пройти можно под мостом за 500 RU или через туннель с электрами.' : S.q2.fox === 2 ? 'Отбейся от стаи вместе с Лисом.' : 'Поговори с Лисом.', st: S.q2.fox === 4 ? 'd' : 'a' });
-  if (S.q2.tolik >= 1) L.push({ id: 'tolik', loc: 'village', n: 'Раненый у дороги', d: S.q2.tolik === 2 ? 'Выполнено.' : S.q2.tolik === 3 ? 'Провалено: Толик погиб.' : 'Сталкер лежит у дороги и просит аптечку.', st: S.q2.tolik === 2 ? 'd' : S.q2.tolik === 3 ? 'f' : 'a' });
+  if (S.q2.tolik >= 1) L.push({ id: 'tolik', loc: TOLIK_AT_JUNCTION ? 'bus' : 'village', n: 'Раненый у дороги', d: S.q2.tolik === 2 ? 'Выполнено.' : S.q2.tolik === 3 ? 'Провалено: Толик погиб.' : TOLIK_AT_JUNCTION ? 'Сталкер лежит у автобуса на западной стороне шоссе возле развилки на АТП и просит аптечку.' : 'Сталкер лежит у дороги и просит аптечку.', st: S.q2.tolik === 2 ? 'd' : S.q2.tolik === 3 ? 'f' : 'a' });
   plusQList(L);
   return L;
 }
@@ -5295,6 +5295,8 @@ const LOC_STAMP = { village: 'village', sid: 'village', bus: 'village', pump: 'p
   army: 'army', swamp: 'swamp', dogs_lair: 'dogs', trafo: 'tunnel', tunnel: 'tunnel', bridge: 'bridge', camp: 'camp', farm: 'farm',
   lair: 'east', east_ditch: 'east', relay: 'east', rail: 'rail', exit: 'exit', south_path: { d: [74, 97] } };
 /* отдельные точки, которые в старой карте стояли между местами и требуют ручной постановки (новые клетки) */
+const TOLIK_AT_JUNCTION = BIG && !/(?:^#|&)tolik-junction-off(?:&|$)/.test(location.hash);
+const TOLIK_SCENE_SHIFT = [34, -11];
 const RM_FIX = { petr: [168, 138.5], petr2: [168, 148.5] };
 
 function stampAt(x, y, pad) {
@@ -5429,6 +5431,7 @@ function bigWorld() {
   }
   // У западного выхода из малого сарая оставляем свободный подход к порогу.
   if (tAt(199, 42) === TR) setT(199, 42, GR);
+  if (TOLIK_AT_JUNCTION) bigTolikScene();
   bigNewObjects(RH);
 }
 
@@ -5457,6 +5460,26 @@ function bigRemap() {
   SOS_SPOTS.length = 0; locAnchors('sos').forEach(a => SOS_SPOTS.push([a.x, a.y, a.loc]));
   CLEAR_SPOTS.length = 0; locAnchors('clear').forEach(a => CLEAR_SPOTS.push([a.x, a.y, 'у ' + LOC[a.loc].gen, a.loc]));
   const sh = locPt('lair', 'sucker'); SUCKER_HOME.x = sh.x; SUCKER_HOME.y = sh.y;
+}
+
+// Переносим стоянку целиком на поляну западнее шоссе у поворота на АТП.
+function bigTolikScene() {
+  LORE[2] = 'К северу от развилки на АТП поле с гравитационными аномалиями. Там «Медузу» видели, но и фонит там прилично.';
+  const [dx, dy] = TOLIK_SCENE_SHIFT;
+  const bus = objs.find(o => o.k === 'bus');
+  bus.x += dx * T;
+  bus.y += dy * T;
+  const site = LOC.bus;
+  const [x0, y0, x1, y1] = site.bounds;
+  site.bounds = [x0 + dx, y0 + dy, x1 + dx, y1 + dy];
+  site.entrances = [[82 + dx, 159 + dy], [82 + dx, 163 + dy]];
+  for (const a of Object.values(site.anchors)) {
+    a[0] += dx;
+    a[1] += dy;
+  }
+  const tolik = NPCDEF.find(d => d.sid === 'tolik');
+  [tolik.x, tolik.y] = site.anchors.tolik;
+  rcClear(74 + dx, 157 + dy, 81 + dx, 162 + dy);
 }
 
 /* ---------- новые места и предметы ---------- */
@@ -5630,7 +5653,13 @@ const CORDON_DETAILS = [
   ['c1_tires', 194.4, 141.4, 36, 0.1],
   ['c1_trace_pipes', 200, 148, 49, 0.2],
   // Автобус
-  ['c1_trace_wheel', 81, 160, 25, 0.18],
+  ...(TOLIK_AT_JUNCTION ? [
+    ['c1_trace_wheel', 81, 160, 25, 0.18],
+    ['c1_junk', 75, 160.6, 34, -0.27],
+    ['c1_trace_kettle', 78, 161, 22, 0.22],
+  ].map(([id, x, y, width, angle]) =>
+    [id, x + TOLIK_SCENE_SHIFT[0], y + TOLIK_SCENE_SHIFT[1], width, angle]
+  ) : [['c1_trace_wheel', 81, 160, 25, 0.18]]),
   // Восточные сады
   ['c1_trace_apples', 195, 187, 37, -0.13],
   ['c1_trace_apples', 197.4, 187.9, 25, 0.56],
@@ -6443,7 +6472,8 @@ function traderOpts() {
     say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); bulletin('Выполнено: «Медуза» для Сидоровича.');
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
-    say('Нужна «Медуза». Ищи на поле аномалий за ржавым автобусом у дороги. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
+    const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
+    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
     S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
@@ -6709,7 +6739,7 @@ function buildBigMini() {
 }
 async function buildMini() {
   fogC.width = PW; fogC.height = MH;
-  if (BIG && ART && C1 && window.CORDON_AERIAL) {
+  if (TOLIK_AT_JUNCTION && ART && C1 && window.CORDON_AERIAL) {
     const photo = new Image();
     photo.src = window.CORDON_AERIAL;
     try {
