@@ -318,7 +318,9 @@ function openBarrier() { const b = objs.find(o => o.key === 'bar'); if (b && b.s
 /* сетки проходимости и видимости */
 const nav = new Uint8Array(MW * MH), opq = new Uint8Array(MW * MH);
 const fences = [];
+let navRevision = 0;
 function buildGrids() {
+  navRevision++;
   fences.length = 0;
   for (let i = 0; i < MW * MH; i++) { nav[i] = SOLID[map[i]] ? 0 : 1; opq[i] = OPAQ[map[i]]; }
   objs.forEach(o => {
@@ -347,6 +349,12 @@ function los(ax, ay, bx, by) {
 }
 const bfsPrev = new Int32Array(MW * MH), bfsQ = new Int32Array(MW * MH);
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+function navNeighbor(x, y, k) {
+  const nx = x + DIRS[k][0], ny = y + DIRS[k][1];
+  if (!inb(nx, ny) || !nav[ny * MW + nx]) return -1;
+  if (k >= 4 && (!nav[y * MW + nx] || !nav[ny * MW + x])) return -1;
+  return ny * MW + nx;
+}
 function nearestNav(tx, ty) {
   for (let r = 0; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
     const x = tx + dx, y = ty + dy; if (inb(x, y) && nav[y * MW + x]) return y * MW + x;
@@ -362,11 +370,8 @@ function findPath(sx, sy, tx, ty) {
     const c = bfsQ[h++]; if (c === g) break;
     const cx = c % MW, cy = (c / MW) | 0;
     for (let k = 0; k < 8; k++) {
-      const nx = cx + DIRS[k][0], ny = cy + DIRS[k][1];
-      if (!inb(nx, ny)) continue;
-      const ni = ny * MW + nx;
-      if (bfsPrev[ni] >= 0 || !nav[ni]) continue;
-      if (k >= 4 && (!nav[cy * MW + nx] || !nav[ny * MW + cx])) continue;
+      const ni = navNeighbor(cx, cy, k);
+      if (ni < 0 || bfsPrev[ni] >= 0) continue;
       bfsPrev[ni] = c; bfsQ[t++] = ni;
     }
   }
@@ -1465,7 +1470,7 @@ function spawnTick() {
 /* ===================== игрок и мир за кадр ===================== */
 const HURTDIR = [];
 let hurtFlash = 0, deathT = 0, shakeA = 0, geigerAcc = 0, radRate = 0, ambT = 0;
-const IN = { mx: 0, my: 0, fire: false, moveX: 0, moveY: 0, sprint: false, aimStick: null, touchFire: false };
+const IN = { mx: 0, my: 0, fire: false, moveX: 0, moveY: 0, sprint: false, runPointer: null, aimStick: null, touchFire: false };
 function shake(a) { shakeA = Math.max(shakeA, a); }
 const fog = new Uint8Array(MW * MH);
 function reveal() {
@@ -1719,7 +1724,7 @@ function updatePlayer(dt) {
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const over = weight() > carryLimit();
-  const sprint = (IN.sprint || ml > 0.95 && IN.touch && !P.crouch) && P.st > 5 && !over && ml > 0.1;
+  const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * dt); else P.st = Math.min(100, P.st + 14 * dt);
@@ -2618,8 +2623,14 @@ function drawDeskTrader(e) {
   ctx.drawImage(deskPoses, pose*128,0,128,128, 0,0,128,128);
   ctx.restore();
 }
+const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function render() {
-  const sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
+  let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
+  if (S && P && S.blow?.stage === 2 && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
+    const t = S.blow.t;
+    sx += 1.1 * Math.sin(t * 23) + .45 * Math.sin(t * 41);
+    sy += .85 * Math.sin(t * 29);
+  }
   if (P) {
     let tx = P.x, ty = P.y;
     if (!IN.touch && P.alive) { const w = screenToWorld(IN.mx, IN.my); tx += clamp(w.x - P.x, -260, 260) * 0.22; ty += clamp(w.y - P.y, -260, 260) * 0.22; }
@@ -2925,7 +2936,7 @@ function pluck(f, vol) {
   s.connect(lp); lp.connect(g); g.connect(master); s.start();
 }
 function guitar(dt) {
-  if (!AC || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow.stage) return;
+  if (!AC || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow?.stage) return;
   const d = dst(P.x, P.y, FIRE.x, FIRE.y);
   if (d > 520) return;
   const player = ents.find(e => e.alive && e.sit && e.fireRef === FIRE && e.fac === 'loner');
@@ -2972,10 +2983,10 @@ function worldFx(dt) {
   for (const e of ents) {
     if (!e.alive) continue;
     const mv = (e.step - (e.ps || 0)) / Math.max(dt, 0.001); e.ps = e.step; e.mv = lerp(e.mv || 0, mv, 0.3);
-    const stride = e.kind === 'dog' ? 26 : e === P && IN.sprint ? 44 : 36;
+    const stride = e.kind === 'dog' ? 26 : e === P && P.sprinting ? 44 : 36;
     if (e.step - (e.ls || 0) > stride) {
       e.ls = e.step;
-      if (e === P) { if (!P.crouch) play(surf(e.x, e.y), undefined, undefined, IN.sprint ? 1.3 : 1); }
+      if (e === P) { if (!P.crouch) play(surf(e.x, e.y), undefined, undefined, P.sprinting ? 1.3 : 1); }
       else if (dE(e, P) < 380 && e.kind === 'human') play(surf(e.x, e.y), e.x, e.y, 0.6);
       else if (dE(e, P) < 320 && e.kind === 'dog') play('stepDog', e.x, e.y);
     }
@@ -2995,7 +3006,50 @@ function worldFx(dt) {
   }
   guitar(dt);
 }
-const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей.';
+const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей. Ближайшее укрытие отмечено на карте.';
+// One flood from all usable doorways gives each reachable tile its closest shelter.
+let shelterRevision = -1;
+const shelterOwner = new Int16Array(MW * MH), shelterDoors = [];
+function rebuildShelterRoutes() {
+  shelterOwner.fill(-1);
+  shelterDoors.length = 0;
+  let head = 0, tail = 0;
+  function seed(x, y) {
+    const cx = Math.floor(x / T), cy = Math.floor(y / T), i = cy * MW + cx;
+    if (!inb(cx, cy) || !nav[i] || shelterOwner[i] >= 0) return;
+    shelterOwner[i] = shelterDoors.length;
+    shelterDoors.push({ x, y });
+    bfsQ[tail++] = i;
+  }
+  for (const h of HOUSES) {
+    if (h.ruin) continue;
+    for (const d of h.entrances) {
+      const lanes = Math.round(d.width / T);
+      for (let lane = 0; lane < lanes; lane++) {
+        const offset = (lane - (lanes - 1) / 2) * T;
+        seed(h.x*T + d.x - 1.5*T*d.nx + offset*d.ny,
+             h.y*T + d.y - 1.5*T*d.ny + offset*d.nx);
+      }
+    }
+  }
+  seed(HATCH.x, HATCH.y + (SID_SHOP ? 27 : -30));
+  while (head < tail) {
+    const i = bfsQ[head++], x = i % MW, y = Math.floor(i / MW);
+    for (let k = 0; k < DIRS.length; k++) {
+      const j = navNeighbor(x, y, k);
+      if (j < 0 || shelterOwner[j] >= 0) continue;
+      shelterOwner[j] = shelterOwner[i];
+      bfsQ[tail++] = j;
+    }
+  }
+  shelterRevision = navRevision;
+}
+function blowShelterTarget() {
+  if (!P || !P.alive || !S.blow?.stage || sheltered(P.x, P.y)) return null;
+  if (shelterRevision !== navRevision) rebuildShelterRoutes();
+  const cell = nearestNav(Math.floor(P.x / T), Math.floor(P.y / T));
+  return shelterDoors[shelterOwner[cell]] || null;
+}
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
@@ -3019,9 +3073,9 @@ function blowout(dt) {
       });
     }
   } else if (B.stage === 2) {
-    B.t -= dt; WX.red = lerp(WX.red, 1, dt * 2); shake(2);
+    B.t -= dt; WX.red = lerp(WX.red, 1, dt * 2);
     if (chance(dt * 1.5)) WX.flash = 0.8;
-    if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); hurtFlash = Math.max(hurtFlash, 0.25); if (P.hp <= 0) kill(P, 'blow'); }
+    if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
     if (B.t <= 0) {
       B.stage = 0; B.next = S.min + rnd(1440, 2400);
       ents.forEach(e => { if (e.trip && e.trip.shelter) e.trip.stage = 2; });
@@ -3086,12 +3140,13 @@ function drawWeatherScreen() {
       for (let i = 0; i < n / 8; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * VW, Math.random() * VH, 3, 1.2, 0, 0, 6.28); ctx.fill(); }
     }
   }
-  if (WX.red > 0.02) {
+  const exposed = S.blow?.stage && !sheltered(P.x, P.y);
+  if (WX.red > 0.02 && exposed) {
     ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(255,' + Math.round(255 - WX.red * 140) + ',' + Math.round(255 - WX.red * 160) + ')'; ctx.fillRect(0, 0, VW, VH);
     ctx.globalCompositeOperation = 'source-over';
-    if (S.blow.stage === 2) { ctx.fillStyle = 'rgba(200,40,20,' + (0.12 + 0.1 * Math.sin(S.min * 14)) + ')'; ctx.fillRect(0, 0, VW, VH); }
+    if (S.blow?.stage === 2) { ctx.fillStyle = 'rgba(200,40,20,' + (0.12 + 0.1 * Math.sin(S.min * 14)) + ')'; ctx.fillRect(0, 0, VW, VH); }
   }
-  if (WX.flash > 0 && !bunk) { ctx.fillStyle = 'rgba(235,240,255,' + WX.flash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
+  if (WX.flash > 0 && !bunk && (!S.blow?.stage || exposed)) { ctx.fillStyle = 'rgba(235,240,255,' + WX.flash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
 }
 
 /* ===================== выживание: кровь, голод, износ, присед, детектор, тайники, ранги ===================== */
@@ -6166,7 +6221,7 @@ function g3Draw(e, extra, target = ctx) {
 /* шаг: корпус качается из стороны в сторону (период — два шага) и чуть «подпрыгивает» к камере на каждом шаге */
 function gaitSway(e) {
   const g = GAIT.get(e); if (!g) return null;
-  const ph = g.dist / 44 * Math.PI * 2, side = Math.sin(ph) * 0.9, run = e === P && IN.sprint ? 1.4 : 1;
+  const ph = g.dist / 44 * Math.PI * 2, side = Math.sin(ph) * 0.9, run = e === P && P.sprinting ? 1.4 : 1;
   return { dx: -Math.sin(e.ang) * side * run, dy: Math.cos(e.ang) * side * run, k: 1 + 0.03 * run * Math.abs(Math.cos(ph)) };
 }
 function g3DrawFrame(e, a, f) {   // мутанты: шаг — левая фаза, нейтраль, правая фаза, нейтраль
@@ -6273,7 +6328,6 @@ body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:172px;height:58px;padding:3px 8px 3px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:190px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.zh-wi{overflow:hidden}.zh-w .cnd span{overflow:hidden;text-overflow:ellipsis}.hud.zh .zh-w .wn{font-size:11px}
 .hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am,.hud.zh .zh-w .am small{font-size:16px}.zh-w .cnd span{font-size:10px}
-.hud.zh .zh-det{top:calc(68px + var(--sat));height:30px;width:66px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .rb svg{width:21px;height:21px}
 body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 122px - var(--sat) - var(--sab)) / 5))}
 body.is-touch .touch.zt .c1{top:calc(114px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(114px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(114px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(114px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(114px + var(--sat) + var(--st) * 4)}
@@ -6291,8 +6345,6 @@ body.is-touch .touch.zt .medpick[hidden]{display:none}
 body.is-touch .touch.zt .medpick button{position:static!important;inset:auto!important;transform:none!important;width:auto!important;height:auto!important;text-transform:none;letter-spacing:0;pointer-events:auto;min-width:96px!important;min-height:46px!important;padding:4px 10px!important;border-radius:10px!important;border:1.5px solid rgba(236,229,206,.35)!important;background:rgba(14,14,11,.85)!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important;color:#ece6d3!important;font:700 12px Arial!important;filter:none!important;display:grid;grid-template-columns:auto auto;align-items:center;column-gap:6px;text-align:left}
 .touch.zt .medpick em{font-style:normal;font-size:16px!important;color:#f6c446;justify-self:end}.touch.zt .medpick small{grid-column:1/3;font-size:10px!important;font-weight:400;color:#bfb69c}
 /* фонарик (блок над детектором) и ровная панель оружия */
-.hud.zh .zh-det{cursor:pointer;pointer-events:auto}.hud.zh .zh-det::after{content:'';position:absolute;inset:-3px -4px -11px}
-.hud.zh .zh-det .torch{color:#6f7a7c;fill:currentColor;width:18px;height:18px}.hud.zh .zh-det.on .torch{color:#62b6ff;filter:drop-shadow(0 0 4px rgba(80,170,255,.7))}.hud.zh .zh-det:not(.on) .beam{display:none}
 .zh-w #wico{flex:0 0 76px!important;width:76px!important;height:44px!important;overflow:hidden}.zh-w #wico img{width:76px!important;height:44px!important;object-fit:contain!important}
 .hud.zh .zh-w .wn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.zh-w.mel .cnd{display:none}
 body.is-touch .touch.zt .rb.on{background:rgba(70,62,40,.6)!important;border-color:rgba(246,190,90,.7)!important}
@@ -7233,7 +7285,7 @@ function openPanel(kind, title, tabs) {
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   ptitle.textContent = title;
   ov.classList.add('open');
-  IN.fire = false; IN.touchFire = false; IN.fireStick = null; IN.btnFire = false; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
+  resetInput();
   drawTabs();
 }
 function drawTabs() {
@@ -7609,7 +7661,7 @@ function updateFog() {
   g.putImageData(id, 0, 0);
 }
 const MAP_INK = {
-  player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
+  shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
   cache: '#e7bd79', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
 };
 function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
@@ -7619,6 +7671,10 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
   g.beginPath();
   if (kind === 'player') {
     g.rotate(angle); g.moveTo(7, 0); g.lineTo(-4.7, -4.9); g.lineTo(-2.7, 0); g.lineTo(-4.7, 4.9); g.closePath();
+  } else if (kind === 'shelter') {
+    g.moveTo(0,-6); g.lineTo(6,0); g.lineTo(4.5,0); g.lineTo(4.5,5);
+    g.lineTo(1.4,5); g.lineTo(1.4,1); g.lineTo(-1.4,1); g.lineTo(-1.4,5);
+    g.lineTo(-4.5,5); g.lineTo(-4.5,0); g.lineTo(-6,0); g.closePath();
   } else if (kind === 'locker') {
     g.rect(-5,-3.8,10,7.6); g.fill(); g.stroke();
     g.beginPath(); g.moveTo(-4,-1); g.lineTo(4,-1); g.stroke();
@@ -7641,7 +7697,7 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
 function mapLegend() {
   const legend = el('div', 'legend map-key');
   for (const [kind, name] of [['player','Вы'], ['neutral','Нейтрал'], ['enemy','Враг'], ['friend','Друг'],
-      ['target','Цель'], ['sos','SOS'], ['locker','Личный ящик'], ['cache','Тайник'], ['hatch','Бункер']]) {
+      ['target','Цель'], ['sos','SOS'], ['locker','Личный ящик'], ['cache','Тайник'], ['hatch','Бункер'], ...(S.blow?.stage ? [['shelter','Укрытие']] : [])]) {
     const item = el('span'), icon = el('canvas'); icon.width = icon.height = 32;
     mapSymbol(icon.getContext('2d'), kind, 16, 16, 2);
     item.append(icon, document.createTextNode(name)); legend.appendChild(item);
@@ -7687,6 +7743,12 @@ function drawMapTo(g, s, full, o) {
     g.globalAlpha = 1; mark(x, y, (selected ? 9 : 6) * u);
     if (selected) labs.push({ t: q.n, x, y, gap: 11 * u, pri: 0, font: '700 ' + Math.round(13 * u) + 'px Arial', c: '#c2f4f3' });
   });
+  const shelter = blowShelterTarget();
+  if (shelter) {
+    const x = shelter.x / T * s, y = shelter.y / T * s;
+    mapSymbol(g, 'shelter', x, y, 1.25*u); mark(x, y, 7*u);
+    labs.push({t:'Укрытие', x, y, gap:9*u, pri:-1, font:'700 '+Math.round(13*u)+'px Arial', c:MAP_INK.shelter});
+  }
   const pp = inBunker(P.x, P.y) ? HATCH : P;
   const px = pp.x / T * s, py = pp.y / T * s;
   mark(px, py, 8 * u);
@@ -7746,6 +7808,12 @@ function drawMini() {
     mapSymbol(mctx, q.qid === 'sos' ? 'sos' : 'target', x, y, 1.8, 0, onContact);
   });
   mctx.globalAlpha = 1;
+  const shelter = blowShelterTarget();
+  if (shelter) {
+    const dx = (shelter.x - P.x) / T * s, dy = (shelter.y - P.y) / T * s;
+    const scale = Math.min(1, (size / 2 - 15) / Math.max(1, Math.abs(dx), Math.abs(dy)));
+    mapSymbol(mctx, 'shelter', size/2 + dx*scale, size/2 + dy*scale, 2);
+  }
   mapSymbol(mctx, 'player', size / 2, size / 2, 2, P.ang);
 }
 
@@ -7758,7 +7826,7 @@ const WSIL = {
   w_obrez: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M40 11h72v4.5H40zM40 15.5h72V20H40z" fill="url(#wm)"/><path d="M26 10h16v12H26z" fill="url(#wm)"/><path d="M6 19c8-3 14-6 21-8v11c-5 3-10 7-15 11l-6-3z" fill="url(#ww)"/><path d="M42 20h20v4H42z" fill="url(#ww)"/><path d="M30 22c1 4 3 5 7 4" fill="none" stroke="#2a2a29" stroke-width="1.6"/></svg>',
   knife: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M44 17l58-4c6 0 10 3 12 7-4 2-8 3-14 3H44z" fill="#b9bcbd"/><path d="M44 17l58-4c6 0 10 3 12 7H44z" fill="#dfe2e2"/><path d="M38 11h6v20h-6z" fill="url(#wm)"/><path d="M12 15h26v11H12c-3 0-5-2-5-5.5S9 15 12 15z" fill="#2a2420"/><path d="M16 15v11M22 15v11M28 15v11" stroke="#3e352e" stroke-width="1.4"/></svg>'
 };
-const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
+const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
   status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
 let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
@@ -7767,13 +7835,13 @@ function hud(dt) {
   H.fd.style.width = clamp(S.food, 0, 100) + '%'; H.fdv.textContent = Math.round(S.food); H.fd.parentNode.classList.toggle('low', S.food < 20);
   H.sRad.classList.toggle('on', S.rad > 1); H.sRad.classList.toggle('hi', S.rad > 40); H.radv.textContent = S.rad > 1 ? Math.round(S.rad) : '';
   H.sBleed.classList.toggle('on', !!S.bleed); H.sBleedN.textContent = S.bleed > 1 ? S.bleed : '';
-  const sg = P.detD < 280 ? Math.ceil((1 - P.detD / 280) * 5) : 0;
-  if (H.sig.dataset.v != sg) { H.sig.dataset.v = sg; [...H.sig.children].forEach((b, i) => b.classList.toggle('on', i < sg)); H.det.classList.toggle('on', sg > 0); }
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > carryLimit() ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
-  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const shelter = blowShelterTarget();
+  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
+  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
-  $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
+  $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
   drawMini();   // мини-карта каждый кадр: метки двигаются плавно (туман обновляется реже, ниже)
   hudT -= dt;
@@ -7875,6 +7943,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { KEYS[e.code] = false; });
 /* сворачивание окна/потеря фокуса: никакой ввод не остаётся «зажатым» */
 function resetInput() {
+  IN.sprint = false; IN.runPointer = null; $('b-run').classList.remove('on');
   for (const k in KEYS) KEYS[k] = false;
   IN.fire = false; IN.touchFire = false; IN.btnFire = false; IN.fireStick = null; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
   const fb = document.getElementById('b-fire'); if (fb) { fb.classList.remove('on'); fb.style.setProperty('--fx', '0px'); fb.style.setProperty('--fy', '0px'); }
@@ -7883,10 +7952,10 @@ function resetInput() {
 addEventListener('blur', resetInput);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetInput(); });
 function keyMove() {
+  IN.sprint = !!(KEYS.ShiftLeft || KEYS.ShiftRight);
   if (IN.touch) return;
   IN.moveX = (KEYS.KeyD || KEYS.ArrowRight ? 1 : 0) - (KEYS.KeyA || KEYS.ArrowLeft ? 1 : 0);
   IN.moveY = (KEYS.KeyS || KEYS.ArrowDown ? 1 : 0) - (KEYS.KeyW || KEYS.ArrowUp ? 1 : 0);
-  IN.sprint = !!(KEYS.ShiftLeft || KEYS.ShiftRight);
 }
 function setTouch(on) { if (IN.touch === on) return; IN.touch = on; document.body.classList.toggle('is-touch', on); }
 const JOY = $('joy'), JOYK = $('joyk');
@@ -7924,7 +7993,25 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'b-wpn': () => cycleWeapon(1) };
+$('det').addEventListener('click', () => {
+  if (P.alive && !panel && !title.open) { audioInit(); toggleTorch(); }
+});
+const runB = $('b-run');
+runB.addEventListener('pointerdown', e => {
+  if (!P.alive || panel || title.open || IN.runPointer !== null) return;
+  e.preventDefault();
+  runB.setPointerCapture(e.pointerId);
+  IN.runPointer = e.pointerId;
+  runB.classList.add('on');
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  runB.addEventListener(type, e => {
+    if (e.pointerId !== IN.runPointer) return;
+    IN.runPointer = null;
+    runB.classList.remove('on');
+  });
+}
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
@@ -7942,6 +8029,7 @@ if (window.matchMedia && matchMedia('(pointer: coarse)').matches) setTouch(true)
 /* ===================== заставка и смерть ===================== */
 const title = { open: true, el: $('title') };
 function showTitle(kind) {
+  resetInput();
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
   const c = $('tcard'); c.textContent = ''; c.classList.toggle('death', kind === 'death');
   if (kind === 'death') {

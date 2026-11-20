@@ -141,7 +141,7 @@ function openPanel(kind, title, tabs) {
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   ptitle.textContent = title;
   ov.classList.add('open');
-  IN.fire = false; IN.touchFire = false; IN.fireStick = null; IN.btnFire = false; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
+  resetInput();
   drawTabs();
 }
 function drawTabs() {
@@ -517,7 +517,7 @@ function updateFog() {
   g.putImageData(id, 0, 0);
 }
 const MAP_INK = {
-  player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
+  shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
   cache: '#e7bd79', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
 };
 function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
@@ -527,6 +527,10 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
   g.beginPath();
   if (kind === 'player') {
     g.rotate(angle); g.moveTo(7, 0); g.lineTo(-4.7, -4.9); g.lineTo(-2.7, 0); g.lineTo(-4.7, 4.9); g.closePath();
+  } else if (kind === 'shelter') {
+    g.moveTo(0,-6); g.lineTo(6,0); g.lineTo(4.5,0); g.lineTo(4.5,5);
+    g.lineTo(1.4,5); g.lineTo(1.4,1); g.lineTo(-1.4,1); g.lineTo(-1.4,5);
+    g.lineTo(-4.5,5); g.lineTo(-4.5,0); g.lineTo(-6,0); g.closePath();
   } else if (kind === 'locker') {
     g.rect(-5,-3.8,10,7.6); g.fill(); g.stroke();
     g.beginPath(); g.moveTo(-4,-1); g.lineTo(4,-1); g.stroke();
@@ -549,7 +553,7 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
 function mapLegend() {
   const legend = el('div', 'legend map-key');
   for (const [kind, name] of [['player','Вы'], ['neutral','Нейтрал'], ['enemy','Враг'], ['friend','Друг'],
-      ['target','Цель'], ['sos','SOS'], ['locker','Личный ящик'], ['cache','Тайник'], ['hatch','Бункер']]) {
+      ['target','Цель'], ['sos','SOS'], ['locker','Личный ящик'], ['cache','Тайник'], ['hatch','Бункер'], ...(S.blow?.stage ? [['shelter','Укрытие']] : [])]) {
     const item = el('span'), icon = el('canvas'); icon.width = icon.height = 32;
     mapSymbol(icon.getContext('2d'), kind, 16, 16, 2);
     item.append(icon, document.createTextNode(name)); legend.appendChild(item);
@@ -595,6 +599,12 @@ function drawMapTo(g, s, full, o) {
     g.globalAlpha = 1; mark(x, y, (selected ? 9 : 6) * u);
     if (selected) labs.push({ t: q.n, x, y, gap: 11 * u, pri: 0, font: '700 ' + Math.round(13 * u) + 'px Arial', c: '#c2f4f3' });
   });
+  const shelter = blowShelterTarget();
+  if (shelter) {
+    const x = shelter.x / T * s, y = shelter.y / T * s;
+    mapSymbol(g, 'shelter', x, y, 1.25*u); mark(x, y, 7*u);
+    labs.push({t:'Укрытие', x, y, gap:9*u, pri:-1, font:'700 '+Math.round(13*u)+'px Arial', c:MAP_INK.shelter});
+  }
   const pp = inBunker(P.x, P.y) ? HATCH : P;
   const px = pp.x / T * s, py = pp.y / T * s;
   mark(px, py, 8 * u);
@@ -654,6 +664,12 @@ function drawMini() {
     mapSymbol(mctx, q.qid === 'sos' ? 'sos' : 'target', x, y, 1.8, 0, onContact);
   });
   mctx.globalAlpha = 1;
+  const shelter = blowShelterTarget();
+  if (shelter) {
+    const dx = (shelter.x - P.x) / T * s, dy = (shelter.y - P.y) / T * s;
+    const scale = Math.min(1, (size / 2 - 15) / Math.max(1, Math.abs(dx), Math.abs(dy)));
+    mapSymbol(mctx, 'shelter', size/2 + dx*scale, size/2 + dy*scale, 2);
+  }
   mapSymbol(mctx, 'player', size / 2, size / 2, 2, P.ang);
 }
 
@@ -666,7 +682,7 @@ const WSIL = {
   w_obrez: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M40 11h72v4.5H40zM40 15.5h72V20H40z" fill="url(#wm)"/><path d="M26 10h16v12H26z" fill="url(#wm)"/><path d="M6 19c8-3 14-6 21-8v11c-5 3-10 7-15 11l-6-3z" fill="url(#ww)"/><path d="M42 20h20v4H42z" fill="url(#ww)"/><path d="M30 22c1 4 3 5 7 4" fill="none" stroke="#2a2a29" stroke-width="1.6"/></svg>',
   knife: '<svg viewBox="0 0 120 44">' + WSG + '<path d="M44 17l58-4c6 0 10 3 12 7-4 2-8 3-14 3H44z" fill="#b9bcbd"/><path d="M44 17l58-4c6 0 10 3 12 7H44z" fill="#dfe2e2"/><path d="M38 11h6v20h-6z" fill="url(#wm)"/><path d="M12 15h26v11H12c-3 0-5-2-5-5.5S9 15 12 15z" fill="#2a2420"/><path d="M16 15v11M22 15v11M28 15v11" stroke="#3e352e" stroke-width="1.4"/></svg>'
 };
-const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
+const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
   status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
 let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
@@ -675,13 +691,13 @@ function hud(dt) {
   H.fd.style.width = clamp(S.food, 0, 100) + '%'; H.fdv.textContent = Math.round(S.food); H.fd.parentNode.classList.toggle('low', S.food < 20);
   H.sRad.classList.toggle('on', S.rad > 1); H.sRad.classList.toggle('hi', S.rad > 40); H.radv.textContent = S.rad > 1 ? Math.round(S.rad) : '';
   H.sBleed.classList.toggle('on', !!S.bleed); H.sBleedN.textContent = S.bleed > 1 ? S.bleed : '';
-  const sg = P.detD < 280 ? Math.ceil((1 - P.detD / 280) * 5) : 0;
-  if (H.sig.dataset.v != sg) { H.sig.dataset.v = sg; [...H.sig.children].forEach((b, i) => b.classList.toggle('on', i < sg)); H.det.classList.toggle('on', sg > 0); }
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > carryLimit() ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
-  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const shelter = blowShelterTarget();
+  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
+  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
-  $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
+  $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
   drawMini();   // мини-карта каждый кадр: метки двигаются плавно (туман обновляется реже, ниже)
   hudT -= dt;
@@ -783,6 +799,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { KEYS[e.code] = false; });
 /* сворачивание окна/потеря фокуса: никакой ввод не остаётся «зажатым» */
 function resetInput() {
+  IN.sprint = false; IN.runPointer = null; $('b-run').classList.remove('on');
   for (const k in KEYS) KEYS[k] = false;
   IN.fire = false; IN.touchFire = false; IN.btnFire = false; IN.fireStick = null; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
   const fb = document.getElementById('b-fire'); if (fb) { fb.classList.remove('on'); fb.style.setProperty('--fx', '0px'); fb.style.setProperty('--fy', '0px'); }
@@ -791,10 +808,10 @@ function resetInput() {
 addEventListener('blur', resetInput);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetInput(); });
 function keyMove() {
+  IN.sprint = !!(KEYS.ShiftLeft || KEYS.ShiftRight);
   if (IN.touch) return;
   IN.moveX = (KEYS.KeyD || KEYS.ArrowRight ? 1 : 0) - (KEYS.KeyA || KEYS.ArrowLeft ? 1 : 0);
   IN.moveY = (KEYS.KeyS || KEYS.ArrowDown ? 1 : 0) - (KEYS.KeyW || KEYS.ArrowUp ? 1 : 0);
-  IN.sprint = !!(KEYS.ShiftLeft || KEYS.ShiftRight);
 }
 function setTouch(on) { if (IN.touch === on) return; IN.touch = on; document.body.classList.toggle('is-touch', on); }
 const JOY = $('joy'), JOYK = $('joyk');
@@ -832,7 +849,25 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'b-wpn': () => cycleWeapon(1) };
+$('det').addEventListener('click', () => {
+  if (P.alive && !panel && !title.open) { audioInit(); toggleTorch(); }
+});
+const runB = $('b-run');
+runB.addEventListener('pointerdown', e => {
+  if (!P.alive || panel || title.open || IN.runPointer !== null) return;
+  e.preventDefault();
+  runB.setPointerCapture(e.pointerId);
+  IN.runPointer = e.pointerId;
+  runB.classList.add('on');
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  runB.addEventListener(type, e => {
+    if (e.pointerId !== IN.runPointer) return;
+    IN.runPointer = null;
+    runB.classList.remove('on');
+  });
+}
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
@@ -850,6 +885,7 @@ if (window.matchMedia && matchMedia('(pointer: coarse)').matches) setTouch(true)
 /* ===================== заставка и смерть ===================== */
 const title = { open: true, el: $('title') };
 function showTitle(kind) {
+  resetInput();
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
   const c = $('tcard'); c.textContent = ''; c.classList.toggle('death', kind === 'death');
   if (kind === 'death') {

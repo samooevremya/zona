@@ -686,8 +686,14 @@ function drawDeskTrader(e) {
   ctx.drawImage(deskPoses, pose*128,0,128,128, 0,0,128,128);
   ctx.restore();
 }
+const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function render() {
-  const sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
+  let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
+  if (S && P && S.blow?.stage === 2 && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
+    const t = S.blow.t;
+    sx += 1.1 * Math.sin(t * 23) + .45 * Math.sin(t * 41);
+    sy += .85 * Math.sin(t * 29);
+  }
   if (P) {
     let tx = P.x, ty = P.y;
     if (!IN.touch && P.alive) { const w = screenToWorld(IN.mx, IN.my); tx += clamp(w.x - P.x, -260, 260) * 0.22; ty += clamp(w.y - P.y, -260, 260) * 0.22; }

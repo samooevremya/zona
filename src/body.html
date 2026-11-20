@@ -31,13 +31,14 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
     <button type="button" class="rust" id="t-menu">Меню</button>
   </div>
   <div class="wpn zh-w rust" id="wpnbox" title="Сменить оружие"><span id="wico"></span><div class="zh-wi"><div class="wn" id="wn">Нож</div><div class="am" id="am">∞</div><div class="cnd"><span id="wcn">Состояние: 100%</span><div class="cb"><i id="wcb"></i></div></div></div></div>
-  <div class="zh-det rust" id="det" role="button" aria-label="Фонарик" title="Фонарик (L)"><svg viewBox="0 0 24 24" class="zi torch"><path d="M4 9.5h8.5l5-3.5h2.5v12h-2.5l-5-3.5H4z"/><rect x="2" y="9.5" width="2.5" height="5" rx="1"/><path class="beam" d="M21.5 8.5l1.8-1.2M21.8 12h2M21.5 15.5l1.8 1.2" stroke="currentColor" stroke-width="1.3" fill="none"/></svg><span class="sig" id="sig"><i></i><i></i><i></i><i></i><i></i></span></div>
+  <button type="button" id="det" aria-label="Фонарь" aria-pressed="true" title="Фонарь (L)"><svg aria-hidden="true" viewBox="0 0 28 28"><g transform="rotate(42 14 14)"><path fill="currentColor" d="M9 5h10v5l-2.5 3.5V23a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-9.5L9 10z"/><path d="M9.5 8h9M13.5 16v5" fill="none" stroke="#39382e" stroke-width="1.4"/><path class="beam" d="M10 2 9 0m5 2V0m4 2 1-2" stroke="currentColor" stroke-linecap="round" stroke-width="1.6"/></g></svg></button>
   <div id="field-feedback" role="status"></div>
   <button type="button" class="prompt zh-p rust" id="prompt"></button>
-  <div class="keys">E действие · C присесть · V прыжок · L фонарик · R перезарядка · F болт · G граната · Q аптечка · B бинт · I рюкзак · M КПК</div>
+  <div class="keys">E действие · Shift бег · C присесть · V прыжок · L фонарик · R перезарядка · F болт · G граната · Q аптечка · B бинт · I рюкзак · M КПК</div>
 </div>
 <div class="touch zt">
   <div class="joy" id="joy" aria-hidden="true"><i class="ar u"></i><i class="ar d"></i><i class="ar l"></i><i class="ar r"></i><b id="joyk"></b></div>
+  <button type="button" class="rb" id="b-run" aria-label="Бег (удерживать)" title="Удерживайте для бега"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="14.5" cy="4" r="2.3"/><path d="M13 7.2l-4 1.6-2 4 1.8.8 1.5-2.9 1.6-.5-1.6 5.3-3.8 4.4 1.6 1.4 4.2-4.6 2.1 2.2V23h2.2v-5.8l-2.6-2.9.9-3.2 1.3 2.1H20v-2h-2.6l-2.2-3.6c-.6-.8-1.3-.9-2.2-.4z"/></svg></button>
   <button type="button" class="fire" id="b-fire" aria-label="Огонь"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="12" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M24 4v12M24 32v12M4 24h12M32 24h12" stroke="currentColor" stroke-width="2.6"/><circle cx="24" cy="24" r="2.4" fill="currentColor"/></svg></button>
   <button type="button" class="rb c1" id="b-rel" aria-label="Перезарядка"><svg viewBox="0 0 24 24"><path d="M19.5 9A8 8 0 006 6.3L4 4.5V10h5.5L7.7 8.1A5.5 5.5 0 0117 9.6zM4.5 15A8 8 0 0018 17.7l2 1.8V14h-5.5l1.8 1.9A5.5 5.5 0 017 14.4z"/></svg></button>
   <div class="medpick" id="medpick" hidden><button type="button" id="mp-bandage"><b>Бинт</b><em id="mp-bn">0</em><small>+15, кровь</small></button><button type="button" id="mp-medkit"><b>Аптечка</b><em id="mp-mn">0</em><small>+50, кровь</small></button></div>

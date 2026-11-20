@@ -1,7 +1,7 @@
 /* ===================== игрок и мир за кадр ===================== */
 const HURTDIR = [];
 let hurtFlash = 0, deathT = 0, shakeA = 0, geigerAcc = 0, radRate = 0, ambT = 0;
-const IN = { mx: 0, my: 0, fire: false, moveX: 0, moveY: 0, sprint: false, aimStick: null, touchFire: false };
+const IN = { mx: 0, my: 0, fire: false, moveX: 0, moveY: 0, sprint: false, runPointer: null, aimStick: null, touchFire: false };
 function shake(a) { shakeA = Math.max(shakeA, a); }
 const fog = new Uint8Array(MW * MH);
 function reveal() {
@@ -255,7 +255,7 @@ function updatePlayer(dt) {
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const over = weight() > carryLimit();
-  const sprint = (IN.sprint || ml > 0.95 && IN.touch && !P.crouch) && P.st > 5 && !over && ml > 0.1;
+  const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * dt); else P.st = Math.min(100, P.st + 14 * dt);
