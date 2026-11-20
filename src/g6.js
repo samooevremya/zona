@@ -62,7 +62,7 @@ function pluck(f, vol) {
   s.connect(lp); lp.connect(g); g.connect(master); s.start();
 }
 function guitar(dt) {
-  if (!AC || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow.stage) return;
+  if (!AC || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow?.stage) return;
   const d = dst(P.x, P.y, FIRE.x, FIRE.y);
   if (d > 520) return;
   const player = ents.find(e => e.alive && e.sit && e.fireRef === FIRE && e.fac === 'loner');
@@ -109,10 +109,10 @@ function worldFx(dt) {
   for (const e of ents) {
     if (!e.alive) continue;
     const mv = (e.step - (e.ps || 0)) / Math.max(dt, 0.001); e.ps = e.step; e.mv = lerp(e.mv || 0, mv, 0.3);
-    const stride = e.kind === 'dog' ? 26 : e === P && IN.sprint ? 44 : 36;
+    const stride = e.kind === 'dog' ? 26 : e === P && P.sprinting ? 44 : 36;
     if (e.step - (e.ls || 0) > stride) {
       e.ls = e.step;
-      if (e === P) { if (!P.crouch) play(surf(e.x, e.y), undefined, undefined, IN.sprint ? 1.3 : 1); }
+      if (e === P) { if (!P.crouch) play(surf(e.x, e.y), undefined, undefined, P.sprinting ? 1.3 : 1); }
       else if (dE(e, P) < 380 && e.kind === 'human') play(surf(e.x, e.y), e.x, e.y, 0.6);
       else if (dE(e, P) < 320 && e.kind === 'dog') play('stepDog', e.x, e.y);
     }
@@ -132,7 +132,50 @@ function worldFx(dt) {
   }
   guitar(dt);
 }
-const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей.';
+const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей. Ближайшее укрытие отмечено на карте.';
+// One flood from all usable doorways gives each reachable tile its closest shelter.
+let shelterRevision = -1;
+const shelterOwner = new Int16Array(MW * MH), shelterDoors = [];
+function rebuildShelterRoutes() {
+  shelterOwner.fill(-1);
+  shelterDoors.length = 0;
+  let head = 0, tail = 0;
+  function seed(x, y) {
+    const cx = Math.floor(x / T), cy = Math.floor(y / T), i = cy * MW + cx;
+    if (!inb(cx, cy) || !nav[i] || shelterOwner[i] >= 0) return;
+    shelterOwner[i] = shelterDoors.length;
+    shelterDoors.push({ x, y });
+    bfsQ[tail++] = i;
+  }
+  for (const h of HOUSES) {
+    if (h.ruin) continue;
+    for (const d of h.entrances) {
+      const lanes = Math.round(d.width / T);
+      for (let lane = 0; lane < lanes; lane++) {
+        const offset = (lane - (lanes - 1) / 2) * T;
+        seed(h.x*T + d.x - 1.5*T*d.nx + offset*d.ny,
+             h.y*T + d.y - 1.5*T*d.ny + offset*d.nx);
+      }
+    }
+  }
+  seed(HATCH.x, HATCH.y + (SID_SHOP ? 27 : -30));
+  while (head < tail) {
+    const i = bfsQ[head++], x = i % MW, y = Math.floor(i / MW);
+    for (let k = 0; k < DIRS.length; k++) {
+      const j = navNeighbor(x, y, k);
+      if (j < 0 || shelterOwner[j] >= 0) continue;
+      shelterOwner[j] = shelterOwner[i];
+      bfsQ[tail++] = j;
+    }
+  }
+  shelterRevision = navRevision;
+}
+function blowShelterTarget() {
+  if (!P || !P.alive || !S.blow?.stage || sheltered(P.x, P.y)) return null;
+  if (shelterRevision !== navRevision) rebuildShelterRoutes();
+  const cell = nearestNav(Math.floor(P.x / T), Math.floor(P.y / T));
+  return shelterDoors[shelterOwner[cell]] || null;
+}
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
@@ -156,9 +199,9 @@ function blowout(dt) {
       });
     }
   } else if (B.stage === 2) {
-    B.t -= dt; WX.red = lerp(WX.red, 1, dt * 2); shake(2);
+    B.t -= dt; WX.red = lerp(WX.red, 1, dt * 2);
     if (chance(dt * 1.5)) WX.flash = 0.8;
-    if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); hurtFlash = Math.max(hurtFlash, 0.25); if (P.hp <= 0) kill(P, 'blow'); }
+    if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
     if (B.t <= 0) {
       B.stage = 0; B.next = S.min + rnd(1440, 2400);
       ents.forEach(e => { if (e.trip && e.trip.shelter) e.trip.stage = 2; });
@@ -223,10 +266,11 @@ function drawWeatherScreen() {
       for (let i = 0; i < n / 8; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * VW, Math.random() * VH, 3, 1.2, 0, 0, 6.28); ctx.fill(); }
     }
   }
-  if (WX.red > 0.02) {
+  const exposed = S.blow?.stage && !sheltered(P.x, P.y);
+  if (WX.red > 0.02 && exposed) {
     ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(255,' + Math.round(255 - WX.red * 140) + ',' + Math.round(255 - WX.red * 160) + ')'; ctx.fillRect(0, 0, VW, VH);
     ctx.globalCompositeOperation = 'source-over';
-    if (S.blow.stage === 2) { ctx.fillStyle = 'rgba(200,40,20,' + (0.12 + 0.1 * Math.sin(S.min * 14)) + ')'; ctx.fillRect(0, 0, VW, VH); }
+    if (S.blow?.stage === 2) { ctx.fillStyle = 'rgba(200,40,20,' + (0.12 + 0.1 * Math.sin(S.min * 14)) + ')'; ctx.fillRect(0, 0, VW, VH); }
   }
-  if (WX.flash > 0 && !bunk) { ctx.fillStyle = 'rgba(235,240,255,' + WX.flash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
+  if (WX.flash > 0 && !bunk && (!S.blow?.stage || exposed)) { ctx.fillStyle = 'rgba(235,240,255,' + WX.flash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
 }

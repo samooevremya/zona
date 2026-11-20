@@ -316,7 +316,9 @@ function openBarrier() { const b = objs.find(o => o.key === 'bar'); if (b && b.s
 /* сетки проходимости и видимости */
 const nav = new Uint8Array(MW * MH), opq = new Uint8Array(MW * MH);
 const fences = [];
+let navRevision = 0;
 function buildGrids() {
+  navRevision++;
   fences.length = 0;
   for (let i = 0; i < MW * MH; i++) { nav[i] = SOLID[map[i]] ? 0 : 1; opq[i] = OPAQ[map[i]]; }
   objs.forEach(o => {
@@ -345,6 +347,12 @@ function los(ax, ay, bx, by) {
 }
 const bfsPrev = new Int32Array(MW * MH), bfsQ = new Int32Array(MW * MH);
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+function navNeighbor(x, y, k) {
+  const nx = x + DIRS[k][0], ny = y + DIRS[k][1];
+  if (!inb(nx, ny) || !nav[ny * MW + nx]) return -1;
+  if (k >= 4 && (!nav[y * MW + nx] || !nav[ny * MW + x])) return -1;
+  return ny * MW + nx;
+}
 function nearestNav(tx, ty) {
   for (let r = 0; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
     const x = tx + dx, y = ty + dy; if (inb(x, y) && nav[y * MW + x]) return y * MW + x;
@@ -360,11 +368,8 @@ function findPath(sx, sy, tx, ty) {
     const c = bfsQ[h++]; if (c === g) break;
     const cx = c % MW, cy = (c / MW) | 0;
     for (let k = 0; k < 8; k++) {
-      const nx = cx + DIRS[k][0], ny = cy + DIRS[k][1];
-      if (!inb(nx, ny)) continue;
-      const ni = ny * MW + nx;
-      if (bfsPrev[ni] >= 0 || !nav[ni]) continue;
-      if (k >= 4 && (!nav[cy * MW + nx] || !nav[ny * MW + cx])) continue;
+      const ni = navNeighbor(cx, cy, k);
+      if (ni < 0 || bfsPrev[ni] >= 0) continue;
       bfsPrev[ni] = c; bfsQ[t++] = ni;
     }
   }
