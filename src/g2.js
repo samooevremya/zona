@@ -189,7 +189,7 @@ function spawnWorld() {
   rcSpawnObjs();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
   for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
-  anoms = ANOM0.map(a => Object.assign({}, a, { cd: 0, reveal: 0, fx: 0, arc: 0 }));
+  anoms = ANOM0.map(spawnAnomaly);
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
 }
 const byS = sid => ents.find(e => e.sid === sid && e.alive);

@@ -224,7 +224,7 @@ Tt('K14_break_loot_search', () => {
   const bullet = box.broken && S().mag.w_pm === 5 && box.loot.money === amount;
   const search = {};
   for (const kind of ['safe','hiding']) {
-    const o = M.objs.find(o => o.k === kind);
+    const o = M.objs.find(o => o.k === kind && !o.anomalyId);
     left(o); attack('knife'); z.interact();
     const opens = z.panel?.kind === 'loot' && z.panel.o === o;
     const take = [...document.querySelectorAll('button')].find(b => b.textContent === 'Взять' && b.offsetWidth);
@@ -277,9 +277,19 @@ Tt('K15_all_prop_colliders_and_containers', () => {
     let reachable=false;
     for(let i=0;i<16 && !reachable;i++){
       const x=cx+35*Math.cos(i*Math.PI/8), y=cy+35*Math.sin(i*Math.PI/8);
-      if(!M.nav[Math.floor(y/T)*M.MW+Math.floor(x/T)] || !M.los(x,y,cx,cy)) continue;
-      const probe={x,y,r:11}; M.collide(probe);
-      reachable=Math.hypot(probe.x-x,probe.y-y)<.1 && !!z.findPath(...start,x,y);
+      const field=o.anomalyId && z.gfxSnap().ANOM0.find(a=>a.id===o.anomalyId);
+      // NPC navigation avoids even dormant fields. The last metres to a guarded
+      // stash must be physically walkable from the closest safe approach.
+      const reach=field ? field.r+2*T : 35;
+      const sx=cx+reach*Math.cos(i*Math.PI/8), sy=cy+reach*Math.sin(i*Math.PI/8);
+      if(!M.nav[Math.floor(sy/T)*M.MW+Math.floor(sx/T)] || !M.los(x,y,cx,cy) || !z.findPath(...start,sx,sy)) continue;
+      reachable=true;
+      const n=Math.max(1,Math.ceil((reach-35)/4));
+      for(let j=0;j<=n;j++){
+        const px=sx+(x-sx)*j/n,py=sy+(y-sy)*j/n,probe={x:px,y:py,r:11};
+        M.collide(probe);
+        if(Math.hypot(probe.x-px,probe.y-py)>=.1){reachable=false;break;}
+      }
     }
     if(!reachable) unreachable.push(o.stash);
   }
@@ -412,5 +422,61 @@ Tt('K19_outer_gates_and_old_bunker_save', () => {
   const kept=Math.abs(P().y-insideY)<1;
   return {ok:frames.length===3 && blocked && walkIn && landed && migrated && kept,blocked,walkIn,landed,migrated,kept};
 });
+Tt('K20_bolt_crossing', () => {
+  const gate=z.gfxSnap().ANOM0.find(a=>a.id==='ditch-electra');
+  const pass=[];
+  // Walk the centre and both shoulders, from each bank of the embankment.
+  for (const dir of [-1,1]) for (const side of [-16,0,16]) for (const probe of [false,true]) {
+    reset();
+    const p=P(); p.x=gate.x+side;p.y=gate.y-dir*100;p.ang=dir*Math.PI/2;
+    Object.assign(z.IN,{touch:true,moveX:0,moveY:0});
+    if(probe) {
+      document.getElementById('b-bolt').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+      step(20);
+    }
+    z.IN.moveY=dir;step(61);z.IN.moveY=0;
+    pass.push({dir,side,probe,across:(p.y-gate.y)*dir>78});
+  }
+  reset();P().x=gate.x;P().y=gate.y+100;P().ang=-Math.PI/2;z.IN.touch=true;
+  const bolt=()=>document.getElementById('b-bolt').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+  bolt();step(24);
+  const until=S().flags.anomalyDischarges?.[gate.id];
+  z.save(true);z.applyState(z.loadSave());const restored=until>S().min && S().flags.anomalyDischarges?.[gate.id]===until;
+  P().ang=-Math.PI/2;bolt();step(24);
+  const fixed=S().flags.anomalyDischarges?.[gate.id]===until;
+  step(160);
+  const rearmed=!S().flags.anomalyDischarges?.[gate.id];
+  return {ok:pass.every(v=>v.probe===v.across)&&restored&&fixed&&rearmed,pass,restored,fixed,rearmed};
+});
+Tt('K21_vortex_cache', () => {
+  reset();const o=M.objs.find(o=>o.stash==='column_wayman');
+  const a=z.gfxSnap().ANOM0.find(a=>a.id===o.anomalyId);
+  Object.assign(P(),{x:a.x,y:a.y+90,ang:-Math.PI/2});z.IN.touch=true;
+  // Walk in from outside the field and check the actual search prompt in each phase.
+  const cue=()=>z.near?.label || '';
+  const offset=((Math.floor(a.x/T)*17+Math.floor(a.y/T)*31)%80)/10;
+  const phase=t=>{S().min+=((8-(S().min+offset)%8)%8)+t;};
+  phase(3.8);
+  document.getElementById('b-bolt').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));step(20);
+  const notDischarged=!S().flags.anomalyDischarges?.[a.id];
+  z.IN.moveY=-1;step(16);z.IN.moveY=0;
+  const wait=cue().includes('дождись');
+  z.interact();const denied=!z.panel;
+  const hp=P().hp;
+  step(14);const pull=P().hp<hp || Math.hypot(P().kx,P().ky)>0;
+  Object.assign(P(),{x:a.x,y:a.y+90,kx:0,ky:0});phase(.1);
+  z.IN.moveY=-1;step(18);z.IN.moveY=0;
+  const found=z.near?.o===o && cue().includes('Обыскать');
+  z.interact();const opened=z.panel?.kind==='loot' && z.panel.o===o;
+  const buttons=()=>[...document.querySelectorAll('#pbody button')].filter(e=>e.textContent==='Взять' && !e.disabled);
+  const before=JSON.stringify(o.loot);if(opened)buttons()[0]?.click();const partial=JSON.stringify(o.loot);
+  z.closePanel();z.save(true);z.applyState(z.loadSave());
+  const persisted=partial!==before && JSON.stringify(o.loot)===partial;
+  phase(.1);step(1);z.interact();if(z.panel?.o===o){for(let i=0;i<5&&buttons().length;i++)buttons()[0].click();}
+  z.closePanel();z.save(true);z.applyState(z.loadSave());
+  const once=o.looted && !Object.keys(o.loot).length;
+  return {ok:notDischarged&&wait&&denied&&pull&&found&&opened&&persisted&&once,notDischarged,wait,denied,pull,found,opened,persisted,once};
+});
+
 return JSON.stringify(R);
 })()

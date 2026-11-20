@@ -184,15 +184,9 @@ function update(dt) {
       }
     }
   }
+  updateBolts(dt);
   updateAnoms(dt);
-  g7Tick(dt);   // шаг/риг: от фактического пути за тик
-  // болты
-  for (let i = bolts.length - 1; i >= 0; i--) {
-    const b = bolts[i]; b.t += dt;
-    const k = Math.min(1, b.t / b.dur), x = lerp(b.x0, b.x1, k), y = lerp(b.y0, b.y1, k);
-    if (!b.hit) for (const a of anoms) if (dst(x, y, a.x, a.y) < a.r) { b.hit = a; triggerAnom(a, null); a.reveal = 12; b.x1 = x + rnd(-60, 60); b.y1 = y + rnd(-60, 60); b.x0 = x; b.y0 = y; b.t = 0; b.dur = 0.3; break; }
-    if (b.t >= b.dur) { if (!b.hit) play('bolt', x, y); bolts.splice(i, 1); }
-  }
+  g7Tick(dt);
   // гранаты
   for (let i = nades.length - 1; i >= 0; i--) {
     const n = nades[i];
@@ -311,37 +305,6 @@ function updatePlayer(dt) {
 }
 function screenToWorld(sx, sy) { return { x: cam.x + (sx - VW / 2) / Z, y: cam.y + (sy - VH / 2) / Z }; }
 
-/* ===================== аномалии ===================== */
-function triggerAnom(a, victim) {
-  a.fx = 1; a.reveal = Math.max(a.reveal, 8); a.cd = 1.1;
-  play(a.k === 'g' ? 'anomG' : 'anomE', a.x, a.y);
-  if (a.k === 'e') flashes.push({ x: a.x, y: a.y, a: 0, life: 0.15, big: 1, blue: 1 });
-  for (let i = 0; i < 14; i++) { const ang = rnd(0, 6.28); parts.push({ x: a.x + Math.cos(ang) * a.r, y: a.y + Math.sin(ang) * a.r, vx: -Math.cos(ang) * rnd(40, 120) * (a.k === 'g' ? 1 : -1), vy: -Math.sin(ang) * rnd(40, 120) * (a.k === 'g' ? 1 : -1), life: rnd(0.3, 0.7), c: a.k === 'g' ? '#7a6a4a' : '#bfe6ff', s: a.k === 'g' ? 2.5 : 1.5 }); }
-}
-function updateAnoms(dt) {
-  for (const a of anoms) {
-    a.cd -= dt; a.reveal = Math.max(0, a.reveal - dt); a.fx = Math.max(0, a.fx - dt * 1.6);
-    a.arc -= dt;
-    for (const e of ents) {
-      if (!e.alive || e.captive) continue;
-      const d = dE(e, a);
-      if (d < a.r + e.r * 0.5) {
-        if (a.k === 'g') { e.kx += (a.x - e.x) * 4 * dt * 60; e.ky += (a.y - e.y) * 4 * dt * 60; }
-        if (a.cd <= 0) {
-          triggerAnom(a, e);
-          let dmg = a.k === 'g' ? 30 : 26;
-          if (e === P && a.k === 'e' && beltCount('art_bengal')) dmg /= 2;
-          const out = Math.atan2(e.y - a.y, e.x - a.x) + (d < 2 ? rnd(0, 6.28) : 0);
-          e.kx = Math.cos(out) * (a.k === 'g' ? 420 : 260); e.ky = Math.sin(out) * (a.k === 'g' ? 420 : 260);
-          if (e === P) msg(a.k === 'g' ? 'Гравитационная аномалия! Кидай болты перед собой.' : 'Электра! Обходи голубые вспышки.', 'bad');
-          hurt(e, dmg, 'anom');
-          if (!e.alive && e !== P) { /* смерть в аномалии уже учтена */ }
-        }
-      }
-    }
-  }
-}
-
 /* ===================== взаимодействие ===================== */
 const G = { near: null };
 function findInteract() {
@@ -376,7 +339,10 @@ function findInteract() {
     if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
-        cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+        if (o.anomalyId) {
+          const quiet=cacheFieldQuiet(o);
+          cand(d,{k:'loot',o,label:quiet?'Обыскать схрон путейца':'Схрон путейца · дождись затишья'});
+        } else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
       }
     }
   }
