@@ -238,5 +238,43 @@ Tt('K15_all_prop_colliders_and_containers', () => {
   const covered=['c1_trace_pipes','c1_sandbags','c1_barrel','c1_trace_reel'].every(id=>kinds.has(id));
   return {ok:covered && !unchecked.length && !unreachable.length,count,unchecked,unreachable};
 });
+Tt('K16_roaming_field_crates', () => {
+  reset();
+  const stock = () => S().flags.fieldCrates;
+  const intact = () => M.objs.filter(o => o.fieldTile != null && !o.broken);
+  const sector = tile => Math.floor((tile%M.MW)*3/B.PW()) + (Math.floor(tile/M.MW)>=B.MH()/2 ? 3 : 0);
+  const initial = intact(), sectors = [0,0,0,0,0,0];
+  for (const o of initial) sectors[sector(o.fieldTile)]++;
+  const oldSites = initial.map(o=>o.fieldTile);
+  for (const o of initial) {
+    for (const e of z.ents) if (e !== P()) e.alive = false;
+    P().x=o.x-20; P().y=o.y+o.h/2; P().ang=0; P().cool=0;
+    z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
+  }
+  const timers = stock().slots.map(s=>s.due);
+  const broken = !intact().length && timers.every(t=>t>=S().min+118 && t<=S().min+240);
+  const first = initial[0], originalLoot = JSON.stringify(stock().drops[first.fieldTile]);
+  // Забираем второй ящик. Содержимое первого ждёт игрока на старом месте даже после замены.
+  const second=initial[1]; P().x=second.x-19; P().y=second.y+13; step(1); z.interact();
+  const picked = !Object.keys(stock().drops[second.fieldTile]||{}).length;
+  z.save(true); z.applyState(z.loadSave());
+  S().min=Math.min(...timers)-1; step(1);
+  const waiting = !intact().length && JSON.stringify(stock().slots.map(s=>s.due))===JSON.stringify(timers);
+  S().food=100; z.plus.advanceWorldTime(180,{});
+  const newSites=stock().slots.map(s=>s.tile);
+  const renewed = intact().length===24 && new Set(newSites).size===24 &&
+    newSites.every((t,i)=>sector(t)!==sector(oldSites[i]) && Math.hypot(t%M.MW-oldSites[i]%M.MW,Math.floor(t/M.MW)-Math.floor(oldSites[i]/M.MW))>=32);
+  const saved=JSON.stringify(stock());
+  z.save(true); z.applyState(z.loadSave());
+  const restored=JSON.stringify(stock())===saved && intact().length===24;
+  const drops=M.objs.filter(o=>o.fieldTile===first.fieldTile && o.broken);
+  const kept=drops.length===1 && JSON.stringify(drops[0].loot)===originalLoot && !(second.fieldTile in stock().drops);
+  if (drops.length) {
+    P().x=drops[0].x-18; P().y=drops[0].y+13; step(1); z.interact();
+  }
+  const collected=!(first.fieldTile in stock().drops);
+  return {ok:sectors.every(n=>n===4) && broken && waiting && renewed && restored && picked && kept && collected,
+    sectors,broken,waiting,renewed,restored,picked,kept,collected};
+});
 return JSON.stringify(R);
 })()

@@ -1445,6 +1445,7 @@ function explode(n) {
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
+  renewFieldCrates();
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
@@ -1749,6 +1750,7 @@ function applyState(d) {
   fogDirty = true;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
+  loadFieldCrates();
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
@@ -4203,6 +4205,7 @@ function advanceWorldTime(minutes, ctx) {
   const r = simRest(minutes, ctx, { food: S.food, hp: P.hp, bleed: S.bleed });
   S.food = r.food; P.hp = r.hp; if (r.minutes > 0) P.st = 100;
   S.min += r.minutes;
+  renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
   const done = r.minutes;
   // события, у которых прошёл срок, закрываются сразу и честно
@@ -6299,7 +6302,16 @@ function restoreContainer(o){
 }
 function recordContents(o){
   const empty=!Object.keys(o.loot).length;
-  if(o.stash){
+  if(o.fieldTile != null){
+    const stock = S.flags.fieldCrates;
+    stock.drops[o.fieldTile] = o.loot;
+    o.looted = empty;
+    if (empty && !stock.slots.some(s => s.tile === o.fieldTile && s.due)) {
+      delete stock.drops[o.fieldTile];
+      const index = objs.indexOf(o);
+      if (index >= 0) objs.splice(index,1);
+    }
+  }else if(o.stash){
     S.flags['contents_'+o.stash]={...o.loot}; o.looted=empty;
     if(empty) S.flags['st_'+o.stash]=1;
   }else if(o.k==='cache'){
@@ -6309,7 +6321,9 @@ function recordContents(o){
 }
 function breakCrate(o){
   if(o.broken || o.k!=='crate' || !o.stash) return;
-  o.broken=true; o.solid=false; S.flags['broken_'+o.stash]=1; buildGrids();
+  if(o.fieldTile != null) breakFieldBox(o);
+  else S.flags['broken_'+o.stash]=1;
+  o.broken=true; o.solid=false; buildGrids();
   play('hit',o.x,o.y);
   for(let i=0;i<8;i++) parts.push({x:o.x+o.w/2,y:o.y+o.h/2,vx:rnd(-50,50),vy:rnd(-45,45),life:rnd(.15,.4),c:i%2?'#947349':'#59402a',s:2});
 }
@@ -6366,6 +6380,139 @@ function clearPropSpawn(e) {
       return;
     }
   }
+}
+
+// На большом Кордоне 24 сменных ящика. В сохранении хранятся клетки, добыча и
+// абсолютные сроки по игровым часам. Обломки с вещами существуют независимо от замены.
+const FIELD_CRATE_COUNT = 24;
+const fieldCrateSites = [];
+let nextFieldCrateAt = Infinity;
+
+function buildFieldCrateSites() {
+  if (!BIG) return;
+  const start = locPt('village', 'safe');
+  const root = nearestNav(Math.floor(start.x / T), Math.floor(start.y / T));
+  const reachable = new Uint8Array(MW * MH), queue = [root];
+  reachable[root] = 1;
+  for (let i = 0; i < queue.length; i++) {
+    for (const adjacent of [queue[i]-1, queue[i]+1, queue[i]-MW, queue[i]+MW]) {
+      if (nav[adjacent] && !reachable[adjacent]) {
+        reachable[adjacent] = 1;
+        queue.push(adjacent);
+      }
+    }
+  }
+  // Между точками остаётся не менее шести клеток. Вокруг каждой свободен
+  // квадрат 3×3, поэтому поставленный ящик можно обойти с четырёх сторон.
+  fieldCrateSites.length = 0;
+  for (let y = 4; y < MH-4; y += 6) for (let x = 4; x < PW-4; x += 6) {
+    const tile = y*MW+x, cx = (x+.5)*T, cy = (y+.5)*T;
+    if (map[tile] !== GR || !reachable[tile] || DIRS.some(([dx,dy]) => !nav[tile+dx+dy*MW])) continue;
+    const clearance = {x:cx, y:cy, r:20};
+    if ([[0,0],...DIRS].some(([dx,dy]) =>
+      propCells.get(tile+dx+dy*MW)?.some(prop => touchesProp(prop,clearance)))) continue;
+    if (HOUSES.some(h => x >= h.x-2 && x < h.x+h.w+2 && y >= h.y-2 && y < h.y+h.h+2)) continue;
+    if (objs.some(o => Math.hypot(o.x+(o.w||0)/2-cx,o.y+(o.h||0)/2-cy) < 65)) continue;
+    if (NPCDEF.some(n => Math.hypot(n.x*T-cx,n.y*T-cy) < 70)) continue;
+    if (CACHES.some(c => Math.hypot(c.x*T-cx,c.y*T-cy) < 48)) continue;
+    fieldCrateSites.push(tile);
+  }
+}
+
+function fieldSector(tile) {
+  return Math.floor((tile%MW)*3/PW) + (Math.floor(tile/MW) >= MH/2 ? 3 : 0);
+}
+
+function chooseFieldSite(stock, previous) {
+  const used = new Set(stock.slots.map(slot => slot.tile)), counts = [0,0,0,0,0,0];
+  for (const slot of stock.slots) if (!slot.due) counts[fieldSector(slot.tile)]++;
+  const candidates = [], questItems = objs.filter(o => o.pick);
+  let best = Infinity;
+  for (const tile of fieldCrateSites) {
+    if (used.has(tile) || (previous != null && fieldSector(tile) === fieldSector(previous))) continue;
+    if (previous != null && Math.hypot(tile%MW-previous%MW,Math.floor(tile/MW)-Math.floor(previous/MW)) < 32) continue;
+    const cx = (tile%MW+.5)*T, cy = (Math.floor(tile/MW)+.5)*T;
+    if (previous != null && Math.abs(cx-P.x) < VW/(2*Z)+2*T && Math.abs(cy-P.y) < VH/(2*Z)+2*T) continue;
+    const score = counts[fieldSector(tile)] + (stock.drops[tile] ? FIELD_CRATE_COUNT+1 : 0);
+    if (score > best || !nav[tile]) continue;
+    if (ents.some(e => e.alive && Math.hypot(e.x-cx,e.y-cy) < 60)) continue;
+    if (questItems.some(o => Math.hypot(o.x-cx,o.y-cy) < 50)) continue;
+    if (score < best) { best = score; candidates.length = 0; }
+    candidates.push(tile);
+  }
+  return candidates.length ? candidates[ri(0,candidates.length-1)] : null;
+}
+
+function fieldCrateLoot() {
+  const ammo = ['a9','a12','a545'][ri(0,2)];
+  const supplies = ['bandage','bread','cans','antirad','medkit'][ri(0,4)];
+  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12), [supplies]: 1 };
+  if (ri(1,4) === 1) loot.money = ri(15,65);
+  return loot;
+}
+
+function fieldBox(tile, loot, broken) {
+  return {k:'crate', stash:'field_'+tile, fieldTile:tile,
+    x:(tile%MW+.5)*T-13, y:(Math.floor(tile/MW)+.5)*T-13,
+    w:26, h:26, loot, broken, solid:!broken, looted:broken && !Object.keys(loot).length};
+}
+
+function loadFieldCrates() {
+  nextFieldCrateAt = Infinity;
+  if (!BIG) return;
+  const stock = S.flags.fieldCrates || (S.flags.fieldCrates = {slots:[], drops:{}});
+  while (stock.slots.length < FIELD_CRATE_COUNT) {
+    const tile = chooseFieldSite(stock, null);
+    if (tile == null) break;
+    stock.slots.push({tile, loot:fieldCrateLoot(), due:0});
+  }
+  for (const slot of stock.slots) {
+    if (!slot.due) objs.push(fieldBox(slot.tile,slot.loot,false));
+    else nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due);
+  }
+  for (const [tile,loot] of Object.entries(stock.drops)) objs.push(fieldBox(Number(tile),loot,true));
+  buildGrids();
+  renewFieldCrates();
+}
+
+function breakFieldBox(o) {
+  const stock = S.flags.fieldCrates, tile = o.fieldTile;
+  const slot = stock.slots.find(s => s.tile === tile && !s.due);
+  const old = objs.find(b => b !== o && b.fieldTile === tile && b.broken);
+  if (old) {
+    for (const [id,n] of Object.entries(old.loot)) o.loot[id] = (o.loot[id] || 0)+n;
+    objs.splice(objs.indexOf(old),1);
+  }
+  stock.drops[tile] = o.loot;
+  slot.loot = {};
+  slot.due = S.min + ri(120,240);
+  nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due);
+}
+
+function renewFieldCrates() {
+  if (S.min < nextFieldCrateAt) return;
+  const stock = S.flags.fieldCrates;
+  let changed = false;
+  nextFieldCrateAt = Infinity;
+  for (const slot of stock.slots) {
+    if (!slot.due) continue;
+    if (slot.due <= S.min) {
+      const tile = chooseFieldSite(stock,slot.tile);
+      if (tile != null) {
+        if (!Object.keys(stock.drops[slot.tile] || {}).length) {
+          const index = objs.findIndex(o => o.fieldTile === slot.tile && o.broken);
+          if (index >= 0) objs.splice(index,1);
+          delete stock.drops[slot.tile];
+        }
+        slot.tile = tile; slot.due = 0; slot.loot = fieldCrateLoot();
+        objs.push(fieldBox(tile,slot.loot,false));
+        changed = true;
+        continue;
+      }
+    }
+    nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due > S.min ? slot.due : S.min+1);
+  }
+  if (changed) buildGrids();
 }
 
 /* ===================== звук ===================== */
@@ -7374,7 +7521,7 @@ async function boot() {
   bootStep('мир'); gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids();
+  bootStep('графика'); await loadArt(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {
