@@ -399,7 +399,7 @@ function freeShust(e) {
 let fadeT = 0, fadeTo = null;
 function goThrough(down) {
   if (fadeT > 0) return;
-  fadeT = 0.5; fadeTo = down ? { x: RMp(124.5 * T, 9.6 * T)[0], y: RMp(124.5 * T, 9.6 * T)[1], a: -Math.PI / 2 } : { x: HATCH.x + 2, y: HATCH.y - 30, a: -Math.PI / 2 };
+  fadeT = 0.5; fadeTo = down ? { x: RMp(SID_STAIR_X * T, 9.6 * T)[0], y: RMp(SID_STAIR_X * T, 9.6 * T)[1], a: -Math.PI / 2 } : { x: HATCH.x + 2, y: HATCH.y - 30, a: -Math.PI / 2 };
   play('reload');
 }
 function healWounded(e) {

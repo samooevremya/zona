@@ -148,7 +148,9 @@ const objs = [];
 const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
-const STAIRS = { x: 124.5 * T, y: 11.4 * T };
+const SID_SHOP = !!window.SID_SHOP_IMAGE && !/sid-shop-off/.test(location.hash);
+const SID_STAIR_X = SID_SHOP ? 126.5 : 124.5;
+const STAIRS = { x: SID_STAIR_X * T, y: 11.4 * T };
 const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
 const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
@@ -278,8 +280,9 @@ function gen() {
   // бункер: прилавок, полки, лестница
   addObj({ k: 'counter', x: 122 * T, y: 6 * T + 4, w: 9 * T, h: 22, solid: 1, opaque: 0 });
   [[122, 2], [125, 2], [128, 2]].forEach(c => addObj({ k: 'shelf', x: c[0] * T + 2, y: c[1] * T + 2, w: 2 * T + 28, h: 20, solid: 1 }));
-  [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
-  addObj({ k: 'stairs', x: 123.5 * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
+  if (SID_SHOP) addObj({ k: 'crate', x: 129.55 * T, y: 6.98 * T, w: 1.28 * T, h: 2.12 * T, solid: 1 });
+  else [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
+  addObj({ k: 'stairs', x: (SID_STAIR_X - 1) * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
   // аномалии и артефакты
   [[72, 52], [75, 50], [77, 54], [73, 56], [76, 57], [79, 52], [70, 55], [58, 16], [67, 21], [24, 26]].forEach(c => ANOM0.push({ x: c[0] * T + 16, y: c[1] * T + 16, r: 26, k: 'g' }));
   [[37.4, 28.5, 20], [39.6, 29.7, 20], [37.6, 31.9, 20], [30.5, 33.5, 24], [35.5, 32.5, 24]].forEach(c => ANOM0.push({ x: c[0] * T, y: c[1] * T, r: c[2], k: 'e' }));

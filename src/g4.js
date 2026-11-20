@@ -631,6 +631,39 @@ function drawAnoms() {
 }
 
 /* ---------- кадр ---------- */
+const shopImage = new Image();
+if (SID_SHOP) shopImage.src = window.SID_SHOP_IMAGE;
+
+// Coordinates below use the illustration's 345 × 410 layout.
+function drawSidShop() {
+  ctx.save();
+  ctx.translate(BUNK.x0 + .75 * T, 1.25 * T);
+  ctx.scale(9.5 * T / 345, 10.25 * T / 410);
+  ctx.drawImage(shopImage, 0, 0, 345, 410);
+  const sid = byS('sid');
+  if (sid) {
+    const t = sid.deskTime || 0, look = sid.deskLook || 0;
+    const sx = shopImage.naturalWidth / 345, sy = shopImage.naturalHeight / 410;
+    // The chair and shoulders stay fixed as he lifts his head from the ledger.
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(171, 129, 10, 13, 0, 0, Math.PI * 2); ctx.clip();
+    const lift = look * 2 + Math.sin(t * 1.7) * .25;
+    ctx.drawImage(shopImage, 159 * sx, 113 * sy, 24 * sx, 32 * sy, 159, 113 - lift, 24, 32 + lift);
+    ctx.restore();
+    const turn = (t % 11 - 7) / 1.3;
+    if (turn > 0 && turn < 1) {
+      const angle = turn * Math.PI, fold = Math.sin(angle);
+      // One hand slides from the desk edge to the corner of the sheet.
+      ctx.drawImage(shopImage, 165 * sx, 156 * sy, 15 * sx, 17 * sy,
+        165, 156, 15, 17 + 7 * fold);
+      ctx.save(); ctx.translate(173, 178);
+      ctx.transform(Math.cos(angle), -.22 * fold, 0, 1, 0, 0);
+      ctx.drawImage(shopImage, 174 * sx, 178 * sy, 20 * sx, 20 * sy, 0, 0, 20, 20);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
 function render() {
   const sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
   if (P) {
@@ -639,13 +672,23 @@ function render() {
     cam.x = lerp(cam.x, tx, 0.12); cam.y = lerp(cam.y, ty, 0.12);
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
+  if (SID_SHOP && P && inBunker(P.x, P.y)) {
+    if (VW / Z >= 9.5 * T) cam.x = BUNK.x0 + 5.5 * T;
+    if (VH / Z >= 10.25 * T) cam.y = 6.375 * T;
+  }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#121410'; ctx.fillRect(0, 0, VW, VH);
   ctx.setTransform(DPR * Z, 0, 0, DPR * Z, DPR * (-vx * Z + sx), DPR * (-vy * Z + sy));
   const gx = clamp(Math.floor(vx), 0, WW), gy = clamp(Math.floor(vy), 0, WH);
   const gw = Math.min(WW - gx, Math.ceil(vw) + 2), gh = Math.min(WH - gy, Math.ceil(vh) + 2);
-  drawGround(vx, vy, vw, vh);
+  const shopVisible = SID_SHOP && P && inBunker(P.x, P.y) && shopImage.complete && shopImage.naturalWidth;
+  if (shopVisible) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(BUNK.x0 + .75 * T, 1.25 * T, 9.5 * T, 10.25 * T); ctx.clip();
+    drawSidShop();
+  }
+  else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
@@ -658,7 +701,7 @@ function render() {
   // костёр
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if (o.k === 'crate' && inView(o.x, o.y, 40)) crateDraw(o);
+    if (o.k === 'crate' && !(shopVisible && inBunker(o.x, o.y) && o.static) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
@@ -679,6 +722,7 @@ function render() {
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
+    if (shopVisible && e.sid === 'sid') continue;
     if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
@@ -747,7 +791,8 @@ function render() {
   }
   // имена дружественных рядом
   ctx.textAlign = 'center';
-  for (const e of vis) {   // стелс: «?» — враг насторожился, «!» — заметил
+  for (const e of vis) {
+    // стелс: «?» — враг насторожился, «!» — заметил
     if (e === P || !e.alive || !hostile(e, P) || e.kind !== 'human' && e.kind !== 'dog') continue;
     const aw = e.tgt === P ? (e.alertT = (e.alertT == null ? 1.5 : e.alertT)) && 1 : (e.alertT = null, e.aw || 0);
     if (e.tgt === P) { e.alertT -= 1 / 60; if (e.alertT <= 0) continue; }
@@ -777,12 +822,13 @@ function render() {
     ctx.lineWidth = 1;
   }
   // свет, цвет, ночь
+  if (shopVisible) ctx.restore();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalCompositeOperation = 'multiply';
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
   const bunk = P && inBunker(P.x, P.y);
-  const dk = bunk ? 0.62 : darkness();
+  const dk = bunk ? (SID_SHOP ? 0.32 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
@@ -805,7 +851,7 @@ function render() {
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);
-    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
+    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);
     // тёплый свет костра поверх

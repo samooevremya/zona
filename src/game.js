@@ -150,7 +150,9 @@ const objs = [];
 const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
-const STAIRS = { x: 124.5 * T, y: 11.4 * T };
+const SID_SHOP = !!window.SID_SHOP_IMAGE && !/sid-shop-off/.test(location.hash);
+const SID_STAIR_X = SID_SHOP ? 126.5 : 124.5;
+const STAIRS = { x: SID_STAIR_X * T, y: 11.4 * T };
 const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
 const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
@@ -280,8 +282,9 @@ function gen() {
   // бункер: прилавок, полки, лестница
   addObj({ k: 'counter', x: 122 * T, y: 6 * T + 4, w: 9 * T, h: 22, solid: 1, opaque: 0 });
   [[122, 2], [125, 2], [128, 2]].forEach(c => addObj({ k: 'shelf', x: c[0] * T + 2, y: c[1] * T + 2, w: 2 * T + 28, h: 20, solid: 1 }));
-  [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
-  addObj({ k: 'stairs', x: 123.5 * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
+  if (SID_SHOP) addObj({ k: 'crate', x: 129.55 * T, y: 6.98 * T, w: 1.28 * T, h: 2.12 * T, solid: 1 });
+  else [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
+  addObj({ k: 'stairs', x: (SID_STAIR_X - 1) * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
   // аномалии и артефакты
   [[72, 52], [75, 50], [77, 54], [73, 56], [76, 57], [79, 52], [70, 55], [58, 16], [67, 21], [24, 26]].forEach(c => ANOM0.push({ x: c[0] * T + 16, y: c[1] * T + 16, r: 26, k: 'g' }));
   [[37.4, 28.5, 20], [39.6, 29.7, 20], [37.6, 31.9, 20], [30.5, 33.5, 24], [35.5, 32.5, 24]].forEach(c => ANOM0.push({ x: c[0] * T, y: c[1] * T, r: c[2], k: 'e' }));
@@ -361,7 +364,7 @@ const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
     anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
   { id: 'sid', name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-    anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [124.5, 11.4], spawn: [126.5, 8.6] } },
+    anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6] } },
   { id: 'atp', name: 'АТП', gen: 'АТП', type: 'danger', bounds: [84, 58, 112, 84], entrances: [[86, 70], [104, 84]],
     anchors: { garage: [94.5, 64.6], petr: [93, 71.5], petr2: [97, 71.5], approach: [66, 37], sos: [[96, 96]] } },
   { id: 'field', name: 'Поле аномалий', gen: 'поля аномалий', type: 'anomaly', bounds: [66, 46, 84, 60], entrances: [[70, 60]],
@@ -955,6 +958,13 @@ function findTarget(e) {
   return best;
 }
 function aiHuman(e, dt) {
+  if (SID_SHOP && e.sid === 'sid') {
+    e.ang = Math.PI / 2;
+    e.deskTime = (e.deskTime || 0) + dt;
+    const visiting = inBunker(P.x, P.y) && dE(e, P) < 120;
+    e.deskLook = lerp(e.deskLook || 0, visiting ? 1 : 0, Math.min(1, dt * 3));
+    return;
+  }
   if (e.captive) return;
   e.cool -= dt; e.think -= dt; stealthTick(e, dt);
   const W = WP[e.wpn];
@@ -1680,7 +1690,7 @@ function freeShust(e) {
 let fadeT = 0, fadeTo = null;
 function goThrough(down) {
   if (fadeT > 0) return;
-  fadeT = 0.5; fadeTo = down ? { x: RMp(124.5 * T, 9.6 * T)[0], y: RMp(124.5 * T, 9.6 * T)[1], a: -Math.PI / 2 } : { x: HATCH.x + 2, y: HATCH.y - 30, a: -Math.PI / 2 };
+  fadeT = 0.5; fadeTo = down ? { x: RMp(SID_STAIR_X * T, 9.6 * T)[0], y: RMp(SID_STAIR_X * T, 9.6 * T)[1], a: -Math.PI / 2 } : { x: HATCH.x + 2, y: HATCH.y - 30, a: -Math.PI / 2 };
   play('reload');
 }
 function healWounded(e) {
@@ -2359,6 +2369,39 @@ function drawAnoms() {
 }
 
 /* ---------- кадр ---------- */
+const shopImage = new Image();
+if (SID_SHOP) shopImage.src = window.SID_SHOP_IMAGE;
+
+// Coordinates below use the illustration's 345 × 410 layout.
+function drawSidShop() {
+  ctx.save();
+  ctx.translate(BUNK.x0 + .75 * T, 1.25 * T);
+  ctx.scale(9.5 * T / 345, 10.25 * T / 410);
+  ctx.drawImage(shopImage, 0, 0, 345, 410);
+  const sid = byS('sid');
+  if (sid) {
+    const t = sid.deskTime || 0, look = sid.deskLook || 0;
+    const sx = shopImage.naturalWidth / 345, sy = shopImage.naturalHeight / 410;
+    // The chair and shoulders stay fixed as he lifts his head from the ledger.
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(171, 129, 10, 13, 0, 0, Math.PI * 2); ctx.clip();
+    const lift = look * 2 + Math.sin(t * 1.7) * .25;
+    ctx.drawImage(shopImage, 159 * sx, 113 * sy, 24 * sx, 32 * sy, 159, 113 - lift, 24, 32 + lift);
+    ctx.restore();
+    const turn = (t % 11 - 7) / 1.3;
+    if (turn > 0 && turn < 1) {
+      const angle = turn * Math.PI, fold = Math.sin(angle);
+      // One hand slides from the desk edge to the corner of the sheet.
+      ctx.drawImage(shopImage, 165 * sx, 156 * sy, 15 * sx, 17 * sy,
+        165, 156, 15, 17 + 7 * fold);
+      ctx.save(); ctx.translate(173, 178);
+      ctx.transform(Math.cos(angle), -.22 * fold, 0, 1, 0, 0);
+      ctx.drawImage(shopImage, 174 * sx, 178 * sy, 20 * sx, 20 * sy, 0, 0, 20, 20);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
 function render() {
   const sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
   if (P) {
@@ -2367,13 +2410,23 @@ function render() {
     cam.x = lerp(cam.x, tx, 0.12); cam.y = lerp(cam.y, ty, 0.12);
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
+  if (SID_SHOP && P && inBunker(P.x, P.y)) {
+    if (VW / Z >= 9.5 * T) cam.x = BUNK.x0 + 5.5 * T;
+    if (VH / Z >= 10.25 * T) cam.y = 6.375 * T;
+  }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#121410'; ctx.fillRect(0, 0, VW, VH);
   ctx.setTransform(DPR * Z, 0, 0, DPR * Z, DPR * (-vx * Z + sx), DPR * (-vy * Z + sy));
   const gx = clamp(Math.floor(vx), 0, WW), gy = clamp(Math.floor(vy), 0, WH);
   const gw = Math.min(WW - gx, Math.ceil(vw) + 2), gh = Math.min(WH - gy, Math.ceil(vh) + 2);
-  drawGround(vx, vy, vw, vh);
+  const shopVisible = SID_SHOP && P && inBunker(P.x, P.y) && shopImage.complete && shopImage.naturalWidth;
+  if (shopVisible) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(BUNK.x0 + .75 * T, 1.25 * T, 9.5 * T, 10.25 * T); ctx.clip();
+    drawSidShop();
+  }
+  else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
@@ -2386,7 +2439,7 @@ function render() {
   // костёр
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if (o.k === 'crate' && inView(o.x, o.y, 40)) crateDraw(o);
+    if (o.k === 'crate' && !(shopVisible && inBunker(o.x, o.y) && o.static) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
@@ -2407,6 +2460,7 @@ function render() {
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
+    if (shopVisible && e.sid === 'sid') continue;
     if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
@@ -2475,7 +2529,8 @@ function render() {
   }
   // имена дружественных рядом
   ctx.textAlign = 'center';
-  for (const e of vis) {   // стелс: «?» — враг насторожился, «!» — заметил
+  for (const e of vis) {
+    // стелс: «?» — враг насторожился, «!» — заметил
     if (e === P || !e.alive || !hostile(e, P) || e.kind !== 'human' && e.kind !== 'dog') continue;
     const aw = e.tgt === P ? (e.alertT = (e.alertT == null ? 1.5 : e.alertT)) && 1 : (e.alertT = null, e.aw || 0);
     if (e.tgt === P) { e.alertT -= 1 / 60; if (e.alertT <= 0) continue; }
@@ -2505,12 +2560,13 @@ function render() {
     ctx.lineWidth = 1;
   }
   // свет, цвет, ночь
+  if (shopVisible) ctx.restore();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalCompositeOperation = 'multiply';
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
   const bunk = P && inBunker(P.x, P.y);
-  const dk = bunk ? 0.62 : darkness();
+  const dk = bunk ? (SID_SHOP ? 0.32 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
@@ -2533,7 +2589,7 @@ function render() {
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);
-    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
+    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);
     // тёплый свет костра поверх
@@ -5139,7 +5195,7 @@ const RC1 = {
       anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-      anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [124.5, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
+      anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
     bus: { name: 'Автобус у дороги', gen: 'автобуса', type: 'story', bounds: [44, 72, 53, 80], entrances: [[48, 80], [44, 75]],
       anchors: { bus: [47, 75], tolik: [49.5, 77.5], safe: [47, 79] } },
     pump: { name: 'Старая водокачка', gen: 'старой водокачки', type: 'story', bounds: [32, 57, 42, 67], entrances: [[36, 67], [42, 62]],

@@ -542,6 +542,13 @@ function findTarget(e) {
   return best;
 }
 function aiHuman(e, dt) {
+  if (SID_SHOP && e.sid === 'sid') {
+    e.ang = Math.PI / 2;
+    e.deskTime = (e.deskTime || 0) + dt;
+    const visiting = inBunker(P.x, P.y) && dE(e, P) < 120;
+    e.deskLook = lerp(e.deskLook || 0, visiting ? 1 : 0, Math.min(1, dt * 3));
+    return;
+  }
   if (e.captive) return;
   e.cool -= dt; e.think -= dt; stealthTick(e, dt);
   const W = WP[e.wpn];
