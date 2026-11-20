@@ -141,6 +141,8 @@ function openPanel(kind, title, tabs) {
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
   ptitle.textContent = title;
+  ov.classList.toggle('pause-open', kind==='menu');
+  ov.setAttribute('aria-labelledby', kind==='menu'?'pause-heading':'ptitle');
   ov.classList.add('open');
   resetInput();
   drawTabs();
@@ -154,9 +156,9 @@ function drawTabs() {
     ptabs.appendChild(b);
   });
 }
-function closePanel() { if (!panel) return; const k = panel.kind; panel = null; ov.classList.remove('open'); if (k === 'trader' || k === 'trade') save(true); }
+function closePanel() { if (!panel) return; const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
 $('pclose').addEventListener('click', closePanel);
-ov.addEventListener('click', e => { if (e.target === ov) closePanel(); });
+ov.addEventListener('click', e => { if (e.target === ov && panel?.kind!=='menu') closePanel(); });
 function refresh() {
   if (!panel) return;
   const top = pbody.scrollTop;
@@ -428,19 +430,51 @@ function drawPda() {
 }
 /* ---------- меню ---------- */
 function drawMenu() {
-  pbody.appendChild(el('p', 'note', 'Зона: Кордон, 2D-прототип RC1 (тестовая карта). Игра сохраняется сама у костра и у Сидоровича. Здесь можно сохраниться вручную, если рядом нет врагов.'));
-  pbody.appendChild(btn('wide', 'Настроить управление', openControlEditor));
-  pbody.appendChild(btn('wide', 'Сохранить игру', () => {
-    if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 450)) panel.hint = 'Рядом враги, сохраниться нельзя.';
-    else { save(true); panel.hint = 'Игра сохранена.'; }
-    refresh();
+  const card=$('pause-card'), nav=el('nav','start-nav');
+  // The title mark is shared with the start screen, which retains its own node.
+  const heading=el('h2','pause-caption','Пауза');
+  heading.id='pause-heading';
+  nav.setAttribute('aria-labelledby',heading.id);
+  card.replaceChildren(title.name.cloneNode(true),heading,nav);
+  if (panel.pausePage==='help') {
+    heading.textContent='Управление и сохранения';
+    nav.appendChild(el('p','pause-note',IN.touch
+      ? 'Джойстик отвечает за движение. Удерживай кнопку бега, а для смены оружия коснись его панели.'
+      : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
+    if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
+    nav.appendChild(el('p','pause-note','Игра сохраняется автоматически у костра и у Сидоровича. Вручную можно сохраниться, когда рядом нет врагов.'));
+    nav.appendChild(btn('start-primary','Назад',()=>{delete panel.pausePage;drawMenu();card.querySelector('.pause-help').focus();}));
+    return;
+  }
+  if (panel.pausePage==='restart') {
+    heading.textContent='Начать заново?';
+    nav.appendChild(el('p','pause-note','Текущая игра начнётся с начала Кордона.'));
+    nav.appendChild(btn('start-primary','Отмена',()=>{delete panel.pausePage;drawMenu();card.querySelector('.restart').focus();}));
+    nav.appendChild(btn('','Начать новую игру',()=>{applyState(freshS());closePanel();intro();}));
+    return;
+  }
+  const message=el('p','pause-note');
+  message.setAttribute('role','status');
+  nav.appendChild(btn('start-primary','Продолжить игру',closePanel));
+  nav.appendChild(btn('','Сохранить игру',()=>{
+    if (ents.some(e=>e.alive && e!==P && hostile(e,P) && dE(e,P)<450)) message.textContent='Рядом враги, сохраниться нельзя.';
+    else message.textContent=save(true)?'Игра сохранена.':'Не удалось записать сохранение.';
   }));
-  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
-  pbody.appendChild(btn('wide', (AC && master && master.gain.value === 0 ? 'Включить' : 'Выключить') + ' звук', () => { audioInit(); if (master) master.gain.value = master.gain.value ? 0 : 0.55; refresh(); }));
-  pbody.appendChild(btn('wide warn', 'Начать заново', () => { if (panel.sure) { applyState(freshS()); closePanel(); intro(); } else { panel.sure = 1; panel.hint = 'Прогресс сотрётся. Нажми ещё раз, чтобы начать заново.'; refresh(); } }));
-  const k = el('div', 'note'); k.style.lineHeight = '1.8';
-  k.textContent = 'Клавиатура: WASD ходить, Shift бег, C присесть, мышь целиться, ЛКМ стрелять, R перезарядка или передёрнуть затвор, E действие, F болт, G граната, Q или H аптечка, 1–4 оружие, I рюкзак, M КПК, Esc меню. На телефоне: левый палец ходит, правый целится и стреляет.';
-  pbody.appendChild(k);
+  nav.appendChild(btn('','Загрузить сохранение',()=>{
+    const saved=loadSave();
+    if (saved) {applyState(saved);closePanel();}
+    else message.textContent='Сохранений пока нет.';
+  }));
+  nav.appendChild(btn('','Настроить управление',openControlEditor));
+  const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
+  const sound=btn('',soundLabel(),()=>{
+    audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
+    sound.textContent=soundLabel();
+  });
+  nav.appendChild(sound);
+  nav.appendChild(btn('restart','Начать заново',()=>{panel.pausePage='restart';drawMenu();card.querySelector('button').focus();}));
+  card.appendChild(message);
+  card.appendChild(btn('pause-help','Подсказки',()=>{panel.pausePage='help';drawMenu();card.querySelector('button').focus();}));
 }
 
 /* ===================== карта ===================== */

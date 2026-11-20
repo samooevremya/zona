@@ -67,7 +67,7 @@ with sync_playwright() as pw:
     drag('b-fire', .40, .52)
     click('Сохранить')
     assert page.locator('#ov.open').is_visible()
-    click('Закрыть')
+    click('Продолжить игру')
     assert fixed_hud()==hud
     page.evaluate('async()=>{if(document.fullscreenElement) await document.exitFullscreen()}')
     page.set_viewport_size({'width':390,'height':844})
