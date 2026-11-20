@@ -1921,6 +1921,7 @@ function spawnWorld() {
   });
   DOGDEF.forEach(d => { if (!S.dead[d.sid]) ents.push(mkDog(d)); });
   rcSpawnObjs();
+  cordonCast();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
   for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
   anoms = ANOM0.map(spawnAnomaly);
@@ -1944,7 +1945,7 @@ function hostile(a, b) {
 function playerRelation(e) {
   if (hostile(e, P)) return 'enemy';
   if (e.fac !== 'loner') return 'neutral';
-  if (e.follow || (e.uid && S.flags['sosFriend_' + e.uid])) return 'friend';
+  if (e.storyMan || e.follow || (e.uid && S.flags['sosFriend_' + e.uid])) return 'friend';
   if ((e.sid === 'tolik' && S.flags.tolikUp) || (e.sid === 'fox' && S.flags.foxUp) ||
       (e.sid === 'shust' && S.flags.shustFree) || (e.sid === 'wolf' && S.q.pack === 3)) return 'friend';
   return 'neutral';
@@ -2291,6 +2292,7 @@ function findTarget(e) {
   return best;
 }
 function aiHuman(e, dt) {
+  if (e.storyMan) { cordonAI(e,dt); return; }
   if (SID_SHOP && e.sid === 'sid') {
     e.ang = Math.PI / 2;
     e.deskTime = (e.deskTime || 0) + dt;
@@ -2548,10 +2550,15 @@ function qTargets() {
   const at = (qid, p, n) => out.push({ qid: qid, x: p.x, y: p.y, n: n });
   const w = byS('wolf');
   const sidT = (qid, n) => at(qid, inBunker(P.x, P.y) ? locPt('sid', 'trader') : locPt('sid', 'hatch'), n || (inBunker(P.x, P.y) ? 'Сидорович' : 'Бункер Сидоровича'));
+  if (BIG && q.flash===4 && !S.q2.fox && S.flags.flashDone && !cordonStage()) sidT('foxLead','Спросить Сидоровича о Стрелке');
   if (!q.flash) sidT('flash', 'Поговорить с Сидоровичем');
   if (q.flash === 1 && w) at('flash', w, 'Найти Волка в деревне');
-  if (q.flash === 2) { const s = byS('shust'); at('flash', s || locPt('atp', 'garage'), 'Освободить Шустрого на АТП'); }
-  if (q.flash === 3) sidT('flash', 'Отнести флешку Сидоровичу');
+  if (q.flash === 2) { const s = byS('shust'); at('flash', s || locPt('atp', 'garage'), S.flags.shustFree?'Забрать флешку у Шустрого':'Освободить Шустрого на АТП'); }
+  if (q.flash === 3) {
+    const box=!has('flash') && objs.find(o=>o.k==='locker' && personalStock().loot.flash);
+    if(box) at('flash',{x:box.x+box.w/2,y:box.y+box.h/2},'Забрать флешку из личного ящика');
+    else sidT('flash','Отнести флешку Сидоровичу');
+  }
   if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field', 'medusa'), 'Поле аномалий');
   if (q.pack === 1) at('pack', locPt('dogs_lair', 'lair'), 'Логово псов');
   if (q.pack === 2 && w) at('pack', w, 'Вернуться к Волку');
@@ -2571,11 +2578,13 @@ function trackedTarget() {
 }
 function qList() {
   const L = [], q = S.q;
+  if (BIG && !q.flash) L.push({id:'flash',loc:'sid',n:'Первый разговор',d:'Подойди к прилавку в бункере и выслушай торговца.',st:'a'});
   const F = ['', 'Найди Волка в деревне новичков: он знает, где держат Шустрого.', 'Освободи Шустрого: бандиты держат его в гараже на АТП, на востоке.', 'Отнеси флешку Сидоровичу в бункер.', ''];
+  if (BIG && q.flash===4 && !S.q2.fox && S.flags.flashDone && !cordonStage()) L.push({id:'foxLead',loc:'sid',n:'След Стрелка',d:'Вернись к Сидоровичу и спроси о Стрелке.',st:'a'});
   if (q.flash >= 1) L.push({ id: 'flash', loc: 'atp', n: 'Флешка Шустрого', d: q.flash === 4 ? (S.flags.flashFail ? 'Провалено.' : 'Выполнено.') : F[q.flash], st: q.flash === 4 ? (S.flags.flashFail ? 'f' : 'd') : 'a' });
   if (q.medusa >= 1) L.push({ id: 'medusa', loc: 'field', n: '«Медуза» для Сидоровича', d: q.medusa === 2 ? 'Выполнено.' : TOLIK_AT_JUNCTION ? 'Найди артефакт «Медуза» на поле аномалий к северу от развилки на АТП и принеси Сидоровичу.' : 'Найди артефакт «Медуза» на поле аномалий за ржавым автобусом и принеси Сидоровичу.', st: q.medusa === 2 ? 'd' : 'a' });
   if (q.pack >= 1) L.push({ id: 'pack', loc: 'dogs_lair', n: 'Стая у леса', d: q.pack === 3 ? 'Выполнено.' : q.pack === 1 ? 'Перебей стаю слепых псов в лесу на северо-западе.' : 'Стая перебита. Вернись к Волку.', st: q.pack === 3 ? 'd' : 'a' });
-  if (S.q2.fox >= 1) L.push({ id: 'fox', loc: 'farm', n: 'Найти Лиса', d: S.q2.fox === 4 ? 'Выполнено. Брат Лиса, Серый, ждёт на Свалке. Продолжение в следующей версии.' : S.q2.fox === 1 ? 'Лис ушёл за насыпь, к разрушенной ферме на северо-востоке. Пройти можно под мостом за 500 RU или через туннель с электрами.' : S.q2.fox === 2 ? 'Отбейся от стаи вместе с Лисом.' : 'Поговори с Лисом.', st: S.q2.fox === 4 ? 'd' : 'a' });
+  if (S.q2.fox >= 1) L.push({ id: 'fox', loc: 'farm', n: 'Найти Лиса', d: S.q2.fox === 4 ? (S.flags.foxFail ? 'Лис погиб на ферме.' : 'Лис рассказал, что его брат Серый знает о группе Стрелка.') : S.q2.fox === 1 ? 'Лис ушёл за насыпь, к разрушенной ферме на северо-востоке. У военных проход стоит 500 RU. В обход ведут туннель и Восточная канава с Электрой.' : S.q2.fox === 2 ? 'Отбейся от стаи вместе с Лисом.' : 'Поговори с Лисом.', st: S.q2.fox === 4 ? (S.flags.foxFail?'f':'d') : 'a' });
   if (S.q2.tolik >= 1) L.push({ id: 'tolik', loc: TOLIK_AT_JUNCTION ? 'bus' : 'village', n: 'Раненый у дороги', d: S.q2.tolik === 2 ? 'Выполнено.' : S.q2.tolik === 3 ? 'Провалено: Толик погиб.' : TOLIK_AT_JUNCTION ? 'Сталкер лежит у автобуса на западной стороне шоссе возле развилки на АТП и просит аптечку.' : 'Сталкер лежит у дороги и просит аптечку.', st: S.q2.tolik === 2 ? 'd' : S.q2.tolik === 3 ? 'f' : 'a' });
   plusQList(L);
   return L;
@@ -2899,7 +2908,7 @@ function update(dt) {
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
-  if (P.alive && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (!cordonStage() && P.alive && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
   if (BIG && P.alive && !inBunker(P.x, P.y) && warnT <= 0 && (P.x < 5 * T || P.x > (PW - 5) * T)) { warnT = 6; msg(P.x < 5 * T ? 'Дальше Залесье. Эта часть Зоны появится в следующей версии.' : 'Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
@@ -3067,6 +3076,7 @@ function findInteract() {
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
+    if (e.storyMan) { cand(d,{k:'talk',e,label:'Поговорить: '+e.name}); continue; }
     if (e.wounded) cand(d, { k: 'heal', e: e, label: 'Помочь раненому: ' + e.name });
     else if (e.captive) cand(d, { k: 'free', e: e, label: 'Освободить: ' + e.name });
     else if (e.kind === 'human' && !hostile(e, P) && !e.tgt && e.fac !== 'trader') cand(d, { k: 'talk', e: e, label: 'Поговорить: ' + e.name });
@@ -3121,7 +3131,7 @@ function takeArt(a) {
 function freeShust(e) {
   e.captive = 0; S.flags.shustFree = 1;
   e.home = (h => ({ x: h[0], y: h[1] }))(RMp(34.5 * T, 80.5 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; bulletin('Шустрый освобождён. Флешка у тебя.'); }
+  if (S.q.flash === 2 || S.q.flash === 1) { const moved=give('flash',1); S.q.flash=3; bulletin(moved?'Шустрый освобождён. Флешка у тебя.':'Флешка Шустрого в личном ящике. Забери её для Сидоровича.'); }
 }
 
 let fadeT = 0, fadeTo = null;
@@ -3947,6 +3957,7 @@ function render() {
     if (d.r > 5) { ctx.beginPath(); ctx.ellipse(d.x + Math.cos(q * 9) * d.r * 0.9, d.y + Math.sin(q * 9) * d.r * 0.9, d.r * 0.35, d.r * 0.25, q * 3, 0, 6.28); ctx.fill();
       ctx.beginPath(); ctx.arc(d.x - Math.cos(q * 5) * d.r * 1.2, d.y - Math.sin(q * 5) * d.r * 1.1, d.r * 0.14, 0, 6.28); ctx.fill(); }
   }
+  drawCordonTrail(inView);
   // костёр
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
@@ -6206,7 +6217,7 @@ function plusTick(dt) {
   S._plusT = (S._plusT || 0) - dt;
   if (S._plusT > 0) return;
   S._plusT = 1;
-  sosTick(); suckerTick(); cluesTick();
+  sosTick(); suckerTick(); cluesTick(); cordonTick();
 }
 function plusKill(e, src) {
   plusDefaults();
@@ -6289,7 +6300,7 @@ function drawDialog2() {
   const box = el('div', 'dlg');
   const side = el('div', 'dlg-who');
   const c = panel.card;
-  side.appendChild(portraitFor(c));
+  if (!c.record) side.appendChild(portraitFor(c));
   side.appendChild(el('div', 'pn', c.n));
   side.appendChild(el('div', 'pm', [c.rank, c.grp].filter(Boolean).join(' · ')));
   if (c.att) side.appendChild(el('div', 'pa' + (/враг/.test(c.att) ? ' foe' : /друг|свой/.test(c.att) ? ' pal' : ''), c.att));
@@ -6861,12 +6872,14 @@ function gensetUse() {
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
+  cordonList(L);
   const q = q5();
   if (q.st !== 'not_started') L.push({ id: 'light', loc: 'village', n: 'Свет в деревне', st: q.st === 'completed' ? 'd' : 'a',
     d: q.st === 'completed' ? 'Генератор работает, верстак у костра открыт.' : 'Нужны предохранитель (водокачка) и канистра топлива (АТП) — в любом порядке. ' + (has('fuse') ? 'Предохранитель есть. ' : '') + (has('fuel') ? 'Топливо есть. ' : '') + (q.st === 'ready' ? 'Неси к генератору у костра.' : '') });
 }
 function targetsRC1(out) {
   if (MAP_ID !== 'rc1') return;
+  const story=cordonTarget(); if(story) out.push(story);
   const q = q5();
   if (q.st === 'collecting') {
     if (!has('fuse')) { const p = locPt('pump', 'fuse'); out.push({ qid: 'light', x: p.x, y: p.y, n: 'Предохранитель на водокачке' }); }
@@ -6888,16 +6901,243 @@ function cluesTick() {
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
+  if (cordonExit()) return;
   if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
   msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
 }
 function interactRC1(cand) {
   if (MAP_ID !== 'rc1') return;
+  storyPrompt(cand);
   for (const o of objs) if (o.pick) { const d = dst(P.x, P.y, o.x + o.w / 2, o.y + o.h / 2); if (d < 44) cand(d - 15, { k: 'pick', o: o, label: 'Взять: ' + ITEMS[o.pick].n }); }
   const g = locPt('village', 'generator'), dg = dst(P.x, P.y, g.x, g.y);
   if (dg < 56) cand(dg - 5, { k: 'genset', label: q5().st === 'completed' ? 'Верстак у генератора' : 'Генератор' });
   const ex = locPt('exit', 'gate'), de = dst(P.x, P.y, ex.x, ex.y);
-  if (de < 90) cand(de, { k: 'exit', label: 'Переход на Свалку' });
+  if (de < 90) cand(de, { k: 'exit', label: cordonStage()==='north'?'Вызвать Серого':'Переход на Свалку' });
+}
+
+/* Большой Кордон. Строковый этап и выбранный канал живут в обычных flags.
+   Координаты двух сюжетных жителей подхватывает существующий снимок resident. */
+const CORDON_CHAPTERS = ['Чужой голос', 'Двое у колонны', 'Кому слышно', 'На связи — Серый'];
+const CORDON_STEPS = {
+  broken: [0,'atp','garage','Осмотреть вещи Шустрого','Ищи сломанный КПК в гараже на АТП.'],
+  decode: [0,'sid','trader','Отнести КПК Сидоровичу','Торговец может прочитать память курьера.'],
+  foxNote: [0,'farm','fox','Найти запись Лиса','Осмотри место Лиса на ферме.'],
+  voice: [0,'village','shust','Выслушать Шустрого','У Шустрого сохранилась копия подозрительного вызова.'],
+  confirm: [0,'village','wolf','Сверить позывные в деревне','Узнай, кто ушёл по ложному вызову.'],
+  relay: [0,'relay','booth','Настроить приёмник в будке','Найди местный повторитель и прослушай хвост передачи.'],
+  cache: [1,'column','note','Проверить схрон у колонны','Крышку схрона можно открыть, когда пыль воронки осядет.'],
+  tracks: [1,'column','note','Осмотреть след у схрона','От схрона тянется борозда. Иди по следу к разбитой машине.'],
+  rescue: [2,'column','wreck','Найти людей у машины','Окликни людей за кузовом и реши, как их выводить.'],
+  pickup: [2,'village','fire','Встретить спасённых в деревне','За людьми вышла группа. Встреться с выжившими у костра.'],
+  escort: [2,'farm','safe','Проводить людей на ферму','Держись рядом. У фермы дождись всех, кто ещё в пути.'],
+  listen: [2,'relay','booth','Перехватить второй сеанс','Вернись к приёмнику, пока отправитель считает частоту чистой.'],
+  lastLog: [2,'column','wreck','Забрать журнал частот','У разбитой машины осталась резервная запись с частотой Серого.'],
+  north: [3,'exit','gate','Вызвать Серого у перехода','У северного перехода КПК сможет поймать ответ со Свалки.']
+};
+const CORDON_MEN = [{sid:'column_spool',name:'Катушка'}, {sid:'column_chalk',name:'Мел'}];
+function cordonMen() { return CORDON_MEN.map(m=>byS(m.sid)).filter(Boolean); }
+function cordonStage() { return BIG && S.flags.cordonStage; }
+function cordonSet(stage,notice) {
+  if (stage===cordonStage()) return;
+  const previous=CORDON_STEPS[cordonStage()], next=CORDON_STEPS[stage];
+  S.flags.cordonStage=stage;
+  if (next && (!S.trackedQuestId || ['fox','foxLead','flash'].includes(S.trackedQuestId) || S.trackedQuestId==='cordon'+previous?.[0]))
+    S.trackedQuestId='cordon'+next[0];
+  if (stage==='rescue') cordonCast();
+  if (notice) bulletin(notice);
+  save(true);
+}
+function cordonStart() {
+  if (!BIG) return;
+  const stage=cordonStage();
+  if (S.q.flash===1 && S.dead.wolf && !S.dead.shust) { S.q.flash=2; bulletin('Волк погиб. Шустрый в гараже на АТП.'); }
+  if (!stage && S.dead.shust && S.q.flash>0 && S.q.flash<3) { S.q.flash=4; S.flags.flashFail=1; }
+  if (!stage && S.flags.flashFail) {
+    cordonSet('broken','В гараже Шустрого могли остаться записи. Проверь АТП.'); return;
+  }
+  if (stage && stage!=='waitFox') return;
+  if (!S.flags.flashDone && !S.flags.courierDecoded) return;
+  if (S.dead.fox && (S.flags.foxFail || (S.q2.fox>0 && S.q2.fox<4))) {
+    S.q2.fox=4; S.flags.foxFail=1; cordonSet('foxNote','Лис погиб. Проверь его вещи на ферме.'); return;
+  }
+  if (S.q2.fox!==4) return;
+  if (S.dead.shust) cordonSet('confirm','В записи курьера слышны два позывных. Сверь их в деревне.');
+  else cordonSet('voice','Шустрый по КПК: «Меченый, зайди. Надо дать тебе кое-что послушать».');
+}
+function cordonPoint(step) {
+  if (step[2]==='note') {
+    const stash=objs.find(o=>o.stash==='column_wayman');
+    return {x:stash.x+stash.w/2,y:stash.y+stash.h/2};
+  }
+  return locPt(step[1],step[2]);
+}
+function cordonTarget() {
+  const stage=cordonStage(), step=CORDON_STEPS[stage];
+  if (!step) return null;
+  let pos=cordonPoint(step), label=step[3];
+  if (stage==='voice' && byS('shust')) pos=byS('shust');
+  if (stage==='confirm' && byS('wolf') && !hostile(byS('wolf'),P)) pos=byS('wolf');
+  if (stage==='confirm' && (!byS('wolf') || hostile(byS('wolf'),P))) { pos=locPt('village','fire'); label='Проверить журнал у костра'; }
+  if (stage==='escort') {
+    const missing=cordonMen().filter(e=>dE(e,P)>400).sort((a,b)=>dE(b,P)-dE(a,P))[0];
+    if(missing) { pos=missing; label='Вернуться за сталкером: '+missing.name; }
+  }
+  if (stage==='decode' && !inBunker(P.x,P.y)) pos=locPt('sid','hatch');
+  if (stage==='rescue' || (stage==='pickup' && S.flags.cordonExtracted)) pos=cordonMen()[0] || pos;
+  return {qid:'cordon'+step[0],x:pos.x,y:pos.y,n:label};
+}
+function cordonList(list) {
+  const stage=cordonStage(), step=CORDON_STEPS[stage];
+  if (!step && stage!=='done') return;
+  const current=step ? step[0] : CORDON_CHAPTERS.length;
+  const finished=['Ложный вызов передавала релейная будка.','След от схрона привёл к машине.',
+    S.flags.cordonLoss?'Журнал частот найден у разбитой машины.':S.flags.cordonQuiet?'Удалось записать второй сеанс.':'Спасённых приняли в деревне.',
+    'Серый ответил. Встреча назначена в ангаре на Свалке.'];
+  for(let i=0;i<CORDON_CHAPTERS.length && i<=current;i++)
+    list.push({id:'cordon'+i,n:CORDON_CHAPTERS[i],loc:i===current?step[1]:['relay','column','farm','exit'][i],
+      st:i===current?'a':'d',d:i===current?step[4]:finished[i]});
+}
+function cordonMessage(name,lines) {
+  const npc=ents.find(e=>e.alive && e.name===name);
+  dialog(npc?cardOf(npc):{n:name,grp:'Запись в КПК',record:true},lines,()=> [{t:'Убрать КПК',close:1}]);
+}
+function cordonRelay() {
+  if (cordonStage()==='listen') {
+    cordonSet('north','Второй сеанс записан. Серого можно вызвать у северного перехода.');
+    cordonMessage('Релейная будка',['В наушниках два щелчка. «Седьмой вагон, приём. Запись курьера сработала. Жду следующую пару».',
+      'Ты сохраняешь передачу вместе с позывным отправителя. Серому будет что послушать.']);
+  } else {
+    cordonSet('cache','Разбитая колонна. Ищи схрон путейца, пока воронка спокойна.');
+    cordonMessage('Релейная будка',['На повторе крутится обрезанная фраза Шустрого. Ты отключаешь петлю. Из шороха проступает другой голос.',
+      '«Мел ранен. Оставил записку под крышкой путейского схрона, у колонны. Если слышите, ответьте».']);
+  }
+}
+function cordonCast() {
+  const stage=cordonStage();
+  if (!['rescue','pickup','escort','listen','north','done'].includes(stage) || S.flags.cordonLoss) return;
+  const settled=(stage==='pickup' && S.flags.cordonExtracted) || ['listen','north','done'].includes(stage);
+  const point=settled ? (S.flags.cordonQuiet ? locPt('farm','safe'):locPt('village','fire')) : locPt('column','wreck');
+  CORDON_MEN.forEach((m,i)=>{
+    if (S.dead[m.sid] || byS(m.sid)) return;
+    const tile=freeTile(point.x/T+(i?1:-1),point.y/T+(settled?1:0));
+    const e=mkHuman({...m,x:tile.x,y:tile.y,fac:'loner',wpn:i?'knife':'w_pm',rank:0,stay:1,named:1});
+    e.resident=1; e.storyMan=1; e.sit=stage!=='escort'; e.seat=e.sit;
+    ents.push(e);
+  });
+}
+function settleCordonMen(loc,anchor) {
+  const p=locPt(loc,anchor);
+  cordonMen().forEach((e,i)=>{
+    const tile=freeTile(p.x/T+(i?1:-1),p.y/T+1);
+    e.x=tile.x*T; e.y=tile.y*T; e.home={x:e.x,y:e.y}; e.sit=e.seat=1; e.path=e.tgt=null;
+  });
+}
+function cordonAI(e,dt) {
+  if (cordonStage()==='escort' && !inBunker(P.x,P.y)) {
+    e.sit=e.seat=0;
+    const gap=dE(e,P);
+    if (gap>35 && gap<750) goTo(e,P.x,P.y,e.sid==='column_chalk'?84:96,dt);
+  }
+}
+function cordonSurvivor(e) {
+  const stage=cordonStage(), together=cordonMen().length===2;
+  if (stage==='rescue') return dialog(cardOf(e),[together?'«Кто-то звал нас голосом Шустрого. У Мела нога перебита. На общей частоте услышат и деревня, и тот, кто нас сюда привёл».':'«Второго не уберёг. У меня есть рация. Вызовешь деревню или выйдем тихо?»'],()=>[
+    {t:'Вызвать помощь из деревни',fn:()=>{
+      cordonSet('pickup','Деревня приняла вызов. Встреть группу у костра.');
+      cordonMessage('Эфир деревни',['«Приняли. Носилки есть. Встречаемся у костра». Через минуту ложный вызов обрывается.']);}},
+    {t:'Сохранить тишину и вести людей на ферму',fn:()=>{
+      S.flags.cordonQuiet=1; cordonSet('escort','Веди группу на ферму. Если оторвёшься, люди будут ждать.');
+      cordonMessage(e.name,[together?'«Рацию выключил. До фермы дойдём вдвоём. Иди так, чтобы мы тебя видели».':'«Рацию выключил. Показывай дорогу на ферму».']);}},
+    {t:'Погоди здесь',close:1}]);
+  if (stage==='pickup' && !S.flags.cordonExtracted) return cordonMessage(e.name,['«Слышу группу. Иди, встретимся у костра».']);
+  if (stage==='pickup') {
+    cordonSet('north','Спасённые передали частоту Серого. Выйди на связь у северного перехода.');
+    return cordonMessage(e.name,['«А то бы так и лежали у колеса. Бери частоту Серого. Вызывай с насыпи у северных ворот, отсюда ангар не слышно».']);
+  }
+  return cordonMessage(e.name,[stage==='escort'?'«Идём за тобой до фермы. Если потеряемся — вернись».':'«Руку пожал бы, да бинт жалко. Спасибо, что зашёл».']);
+}
+function cordonTick() {
+  if (!BIG) return;
+  cordonStart();
+  const stage=cordonStage();
+  if (stage==='voice' && (S.dead.shust || (byS('shust') && hostile(byS('shust'),P)))) cordonSet('confirm','У костра осталась копия вызова Шустрого.');
+  if (!['escort','rescue','pickup'].includes(stage)) return;
+  const men=cordonMen();
+  if (!men.length) { S.flags.cordonLoss=1; cordonSet('lastLog','Оба сталкера погибли. Отыщи резервный журнал у машины.'); return; }
+  if (stage==='pickup' && !S.flags.cordonExtracted && men.every(e=>dE(e,P)>650)) {
+    settleCordonMen('village','fire'); S.flags.cordonExtracted=1; save(true);
+  }
+  if (stage==='escort') {
+    const safe=locPt('farm','safe');
+    if (dE(P,safe)<96 && men.every(e=>dE(e,safe)<128)) {
+      settleCordonMen('farm','safe');
+      cordonSet('listen','На ферме тебе передали частоту Серого. Остался второй сеанс в релейной будке.');
+    }
+  }
+}
+function storyPrompt(cand) {
+  const stage=cordonStage(), step=CORDON_STEPS[stage];
+  if (!step) return;
+  if (['voice','pickup','rescue'].includes(stage) || (stage==='confirm' && byS('wolf') && !hostile(byS('wolf'),P)) || stage==='escort' || stage==='north' || stage==='decode') return;
+  const p=stage==='confirm'?locPt('village','fire'):cordonPoint(step), d=dE(P,p);
+  if(d<48 && los(P.x,P.y,p.x,p.y)) {
+    const label=stage==='tracks'?'Осмотреть борозду в земле':stage==='confirm'?'Прочитать вахтенный журнал':step[3];
+    if (stage==='cache') {
+      const stash=objs.find(o=>o.stash==='column_wayman');
+      if(stash && d<44) cand(d-16,{k:'loot',o:stash,label:cacheFieldQuiet(stash)?'Прочитать записку в схроне':'Схрон путейца · дождись затишья'});
+    } else cand(d-35,{k:'story',stage,label});
+  }
+}
+function cordonConfirm() {
+  cordonSet('relay','Катушка и Мел ушли по ложному вызову. Проверь релейную будку у Восточной канавы.');
+  cordonMessage('Вахтенный журнал',['Две подписи карандашом: Катушка и Мел. Ушли к разбитой колонне. Обратно никто не расписался.',
+    'Напротив позывного Шустрого дежурный приписал: «Сигнал местный. Слишком чистый для севера». В этих местах ещё стоит релейная будка.']);
+}
+function cordonUse(stage) {
+  if (stage!==cordonStage()) return;
+  switch(stage) {
+    case 'broken':
+      cordonSet('decode','Память КПК Шустрого цела. Неси её в бункер.');
+      return cordonMessage('КПК Шустрого',['Экран треснул, под крышкой осталась карта памяти. Ты заворачиваешь её в кусок сухой подкладки.']);
+    case 'foxNote':
+      cordonSet(S.dead.shust?'confirm':'voice','В блокноте Лиса записан позывной его брата Серого. Проверь копию вызова в деревне.');
+      return cordonMessage('Блокнот Лиса',['«Серый, ангар. Передать лично». Между страниц лежит расшифровка вызова Шустрого с двумя незнакомыми позывными.']);
+    case 'confirm': return cordonConfirm();
+    case 'relay': case 'listen': return cordonRelay();
+    case 'tracks':
+      cordonSet('rescue','След тянется к разбитой машине. Кто-то укрылся за колесом.');
+      return cordonMessage('След у колонны',['Два отпечатка каблука, потом длинная борозда. На глине осталась нитка от лямки. След уходит от схрона к машине на северо-востоке.']);
+    case 'lastLog':
+      cordonSet('north','Из аварийного журнала восстановлена частота Серого.');
+      return cordonMessage('Аварийный журнал',['Между кузовом и колесом зажат пакет с промасленной тетрадью. Последняя строка: «Серый. Северные ворота. Слушает до отбоя».']);
+  }
+}
+function cordonExit() {
+  const stage=cordonStage();
+  if (stage!=='north' && stage!=='done') return false;
+  if (stage==='done') { msg('Серый ждёт в ангаре. Кордон остаётся открыт для свободной игры.','say'); return true; }
+  const line=S.flags.cordonLoss?'«Журнал принял. Имена тоже запишу. Приходи в ангар, поговорим о том, кто их вызвал».':
+    S.flags.cordonQuiet?'«Слышу запись. Седьмой вагон… Знаю, чей это голос. Сохрани оригинал и приходи в ангар».':
+      '«Я Серый. Из деревни передали, что ты вывел людей. По поводу Стрелка поговорим лично. Найдёшь меня в ангаре».';
+  S.stats.q++; S.flags.reachedExit=1;
+  cordonSet('done','Глава «Кордон» завершена. Серый на связи, встреча назначена в ангаре на Свалке.');
+  cordonMessage('Серый · северный канал',[line,'Связь обрывается. Координаты ангара записаны в КПК. До открытия Свалки можно остаться на Кордоне.']);
+  return true;
+}
+// Тёмная колея и раздельные отпечатки связывают крышку с машиной.
+function drawCordonTrail(inView) {
+  if (!['tracks','rescue'].includes(cordonStage())) return;
+  const a=cordonPoint(CORDON_STEPS.cache), b=locPt('column','wreck');
+  if (!inView(a.x,a.y,180)) return;
+  const ang=Math.atan2(b.y-a.y,b.x-a.x);
+  ctx.save(); ctx.translate(a.x,a.y); ctx.rotate(ang);
+  const distance=dE(a,b);
+  for(let i=15;i<distance-7;i+=7) {
+    ctx.fillStyle='rgba(54,32,21,.42)';
+    ctx.beginPath(); ctx.ellipse(i,2*Math.sin(i*.09),5.5,1.8,0,0,2*Math.PI); ctx.fill();
+    if(i%2) { ctx.fillStyle='rgba(42,28,19,.58)'; ctx.beginPath(); ctx.ellipse(i,-7+2*Math.cos(i),3.6,1.8,.2,0,2*Math.PI); ctx.fill(); }
+  }
+  ctx.restore();
 }
 
 /* ===================== Тестовая карта RC1 (mapVersion kordon-rc1) =====================
@@ -7291,7 +7531,7 @@ function bigNewObjects(R) {
   bigLoc('ford', { name: 'Брод через ручей', gen: 'брода', type: 'anomaly', bounds: [222, 84, 238, 100], entrances: [[222, 92], [238, 92]],
     anchors: { clear: [226, 97], sos: [[224, 99]] } });
   bigLoc('column', { name: 'Разбитая колонна', gen: 'разбитой колонны', type: 'danger', bounds: [116, 16, 136, 34], entrances: [[128, 34], [128, 16]],
-    anchors: { clear: [122, 25], sos: [[133, 22]] } });
+    anchors: { clear: [122, 25], sos: [[133, 22]], wreck: [131.5,22.5] } });
   bigLoc('tower', { name: 'Охотничья вышка', gen: 'охотничьей вышки', type: 'story', bounds: [11, 24, 22, 35], entrances: [[19, 31]],
     anchors: { top: [16.5, 29.5], clear: [18, 33] } });
   bigLoc('exit_w', { name: 'Дорога на Залесье', gen: 'дороги на Залесье', type: 'story', bounds: [0, 112, 8, 124], entrances: [[6, 118]], anchors: { gate: [3, 118] } });
@@ -8764,6 +9004,16 @@ function drawDialog() {
   pbody.appendChild(O);
 }
 function talk(e) {
+  if (e.storyMan) return cordonSurvivor(e);
+  if (cordonStage()==='voice' && e.sid==='shust') {
+    cordonSet('confirm','Шустрый узнал свой голос, но такого приказа не давал. Сверь позывные у Волка.');
+    return cordonMessage('Шустрый',['«Слушай. Это мой голос, даже кашель мой. Только в тот день я сидел в гараже, а рацию у меня отобрали».',
+      'С записи доносится: «Катушка, Мел, жду у колонны». Потом другой голос: «Приняли, выходим». Волк ведёт вахтенный журнал у костра.']);
+  }
+  if (BIG && e.sid==='shust' && S.flags.shustFree && S.q.flash>0 && S.q.flash<3) {
+    give('flash',1); S.q.flash=3;
+    return cordonMessage('Шустрый',['«Флешка в подкладке. Отнеси Сидоровичу, пока он зря людей не послал».']);
+  }
   if (e.sid === 'wolf') return talkWolf(e);
   if (e.fac === 'army') {
     const south = e.guard === 'south';
@@ -8827,6 +9077,7 @@ function robNpc(e) {
 function talkWolf(e) {
   dialog(cardOf(e), [S.q.flash === 1 ? 'Меченый? Сидорович по рации предупредил. Про Шустрого знаешь?' : 'Здорово, Меченый.'], () => {
     const o = [];
+    if (cordonStage()==='confirm') o.push({t:'Кто ушёл к разбитой колонне?',k:'key',fn:cordonConfirm});
     if (S.q.flash === 1) o.push({ t: 'Я насчёт Шустрого', k: 'key', fn: () => {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
       const equipped=give('w_pm',1,{cond:85,mag:8}); give('a9',16); if (equipped) selectGun('w_pm',cnt('w_pm')-1); S.q.flash = 2;
@@ -8849,7 +9100,7 @@ function talkWolf(e) {
   }, 'dialog', e);
 }
 function talkTrader() {
-  if (!S.flags.intro) {
+  if (!S.flags.intro || !S.q.flash) {
     S.flags.intro = 1;
     return dialog(SIDCARD(), ['Очухался, Меченый? Тебя сняли с грузовика смерти, с таких живыми не возвращаются. Ты первый на моей памяти.', 'В КПК у тебя одна запись: «Убить Стрелка». Имени не помнишь, так и будешь Меченым, по наколке. Я тебе жизнь спас, за тобой должок.'], () => [
       { t: 'Что за работа?', k: 'key', fn: () => {
@@ -8864,13 +9115,20 @@ function talkTrader() {
 }
 function traderOpts() {
   const o = [{ t: 'Торговать', k: 'key', fn: () => openTrade(null) }];
+  if (cordonStage()==='decode') o.push({t:'Прочитать память КПК Шустрого',k:'key',fn:()=>{
+    S.flags.courierDecoded=1;
+    if (!S.q2.fox) S.q2.fox=1;
+    cordonSet('waitFox','Память прочитана. Ищи Лиса на ферме за насыпью.');
+    say('Память жива. Слышишь два позывных? Сохрани копию. А про Стрелка спроси Лиса. Он на ферме за насыпью. За живого курьера я бы заплатил, за эту весть платить нечем.');
+    cordonStart();
+  }});
   if (S.q.flash === 3 && has('flash')) o.push({ t: 'Отдать флешку Шустрого', k: 'key', fn: () => {
     take('flash', 1); S.money += 1500; S.q.flash = 4; S.flags.flashDone = 1; S.stats.q++; S.rep += 15;
     say('Вот это дело. Держи полторы тысячи, заработал.');
     sys('Получено: 1500 RU. Задание выполнено.'); bulletin('Выполнено: Флешка Шустрого.'); save(true);
   } });
   if (S.q.flash === 4 && S.flags.flashDone && S.q2.fox === 0) o.push({ t: 'Что со Стрелком?', k: 'key', fn: () => {
-    say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры.');
+    say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры. Справа есть канава: брось болт в разряд и проходи, пока тихо.');
     S.q2.fox = 1; bulletin('Задание: Найти Лиса за насыпью.');
   } });
   if (S.q.medusa === 1 && has('art_medusa')) o.push({ t: 'Отдать «Медузу» за 1000 RU', k: 'key', fn: () => {
@@ -8909,6 +9167,11 @@ function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefin
 function openLoot(o) {
   if (!cacheFieldQuiet(o)) {
     msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
+    return;
+  }
+  if (cordonStage()==='cache' && o.stash==='column_wayman') {
+    cordonSet('tracks','Записка в схроне: «Ногу Мелу зажало. Тащу его к машине». Осмотри след у крышки.');
+    cordonMessage('Записка в схроне',['«Ногу Мелу зажало. Руки заняты, лишнее оставлю здесь. Тащу его к машине. Катушка». Под крышкой прилип клочок мокрой лямки.']);
     return;
   }
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
@@ -9346,6 +9609,7 @@ function interact() {
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);
   else if (n.k === 'genset') gensetUse();
+  else if (n.k === 'story') cordonUse(n.stage);
   else if (n.k === 'exit') exitUse();
   else if (n.k === 'art') takeArt(n.a);
   else if (n.k === 'free') {

@@ -253,7 +253,7 @@ function bigNewObjects(R) {
   bigLoc('ford', { name: 'Брод через ручей', gen: 'брода', type: 'anomaly', bounds: [222, 84, 238, 100], entrances: [[222, 92], [238, 92]],
     anchors: { clear: [226, 97], sos: [[224, 99]] } });
   bigLoc('column', { name: 'Разбитая колонна', gen: 'разбитой колонны', type: 'danger', bounds: [116, 16, 136, 34], entrances: [[128, 34], [128, 16]],
-    anchors: { clear: [122, 25], sos: [[133, 22]] } });
+    anchors: { clear: [122, 25], sos: [[133, 22]], wreck: [131.5,22.5] } });
   bigLoc('tower', { name: 'Охотничья вышка', gen: 'охотничьей вышки', type: 'story', bounds: [11, 24, 22, 35], entrances: [[19, 31]],
     anchors: { top: [16.5, 29.5], clear: [18, 33] } });
   bigLoc('exit_w', { name: 'Дорога на Залесье', gen: 'дороги на Залесье', type: 'story', bounds: [0, 112, 8, 124], entrances: [[6, 118]], anchors: { gate: [3, 118] } });

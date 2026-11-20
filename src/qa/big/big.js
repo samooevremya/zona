@@ -478,5 +478,90 @@ Tt('K21_vortex_cache', () => {
   return {ok:notDischarged&&wait&&denied&&pull&&found&&opened&&persisted&&once,notDischarged,wait,denied,pull,found,opened,persisted,once};
 });
 
+// Игровые действия, а не прямое изменение нового сюжетного этапа.
+function cordonPlay(quiet,loss=false) {
+  const checkpoint=()=>S().flags.cordonStage;
+  const assert=(v,n)=>{if(!v) throw Error(n+' / '+checkpoint()+' / '+z.near?.label);};
+  const btn=part=>{const b=[...document.querySelectorAll('#pbody .opt')].find(el=>el.textContent.includes(part));assert(b,part);b.click();};
+  const reload=()=>{z.closePanel();z.save(true);z.applyState(z.loadSave());hold();};
+  const hold=()=>z.ents.forEach(e=>{if(!e.storyMan && e!==P()) e.qaHold=1;});
+  const tick=()=>{S()._plusT=0;step(1);};
+  const interactAt=(p,match)=>{
+    z.closePanel();
+    for(const length of [25,14,35,3,42]) for(let i=0;i<8;i++) {
+      const angle=i*Math.PI/4, x=p.x+length*Math.cos(angle),y=p.y+length*Math.sin(angle);
+      const probe={x,y,r:11};M.collide(probe);if(Math.hypot(x-probe.x,y-probe.y)>1)continue;
+      Object.assign(P(),{x,y});tick();
+      if(match(z.near)){z.interact();return;}
+    }
+    throw Error('Нет точки взаимодействия '+JSON.stringify([p.x,p.y])+' / '+checkpoint()+' / '+z.near?.label);
+  };
+  const actor=id=>z.ents.find(e=>e.alive && e.sid===id);
+  const talk=id=>interactAt(actor(id),n=>n?.k==='talk' && n.e.sid===id);
+  const use=(loc,anchor,kind)=>interactAt(z.loc.locPt(loc,anchor),n=>n?.k===kind);
+  const stage=n=>assert(checkpoint()===n,n);
+  reset();hold();const s=S();
+  if(loss){
+    // Начало через настоящие разговоры, освобождение и лечение, включая повторный визит в бункер.
+    s.q.flash=0;s.flags.intro=0;z.talkTrader();z.closePanel();z.talkTrader();btn('Что за работа');z.closePanel();
+    talk('wolf');btn('Я насчёт');z.closePanel();
+    for(const e of z.ents) if(e.fac==='bandit') e.alive=0;
+    interactAt(actor('shust'),n=>n?.k==='free');assert(S().q.flash===3,'флешка');z.closePanel();
+    z.talkTrader();btn('Отдать флешку');btn('Что со Стрелком');z.closePanel();
+    interactAt(actor('fox'),n=>n?.k==='heal');z.closePanel();for(const d of z.ents) if(d.pack==='foxdogs') d.alive=0;
+    tick();talk('fox');btn('Что знаешь');z.closePanel();tick();stage('voice');
+    talk('shust');stage('confirm');z.closePanel();
+  }else if(quiet){
+    // Сохранение предыдущей версии: Лис уже найден и северные ворота осмотрены.
+    s.flags.flashDone=s.flags.shustFree=s.flags.foxUp=s.flags.reachedExit=1;s.q.flash=s.q2.fox=4;
+    reload();tick();stage('voice');talk('shust');stage('confirm');z.closePanel();
+  }else{
+    // Потеря обоих первоначальных свидетелей и заранее опустошённый схрон.
+    s.dead.shust=s.dead.fox=1;s.q.flash=4;s.flags.flashFail=1;
+    reload();tick();stage('broken');
+    use('atp','garage','story');stage('decode');z.closePanel();z.talkTrader();btn('Прочитать память');stage('foxNote');
+    use('farm','fox','story');stage('confirm');
+    const stash=M.objs.find(o=>o.stash==='column_wayman');stash.loot={};stash.looted=true;
+  }
+  talk('wolf');btn('Кто ушёл');stage('relay');
+  use('relay','booth','story');stage('cache');
+  const stash=M.objs.find(o=>o.stash==='column_wayman'),note={x:stash.x+stash.w/2,y:stash.y+stash.h/2},offset=((Math.floor(note.x/T)*17+Math.floor(note.y/T)*31)%80)/10;
+  S().min+=((8-(S().min+offset)%8)%8)+.1;
+  interactAt(note,n=>n?.k==='loot');stage('tracks');
+  interactAt(note,n=>n?.k==='story');stage('rescue');
+  reload();assert(z.ents.filter(e=>e.storyMan).length===2,'двое у колонны');
+  talk('column_spool');btn(quiet?'Сохранить тишину':'Вызвать помощь');
+  stage(quiet?'escort':'pickup');reload();
+  if(loss){
+    for(const e of z.ents.filter(e=>e.storyMan)){e.alive=0;S().dead[e.sid]=1;}
+    tick();stage('lastLog');reload();use('column','wreck','story');
+  }else if(quiet){
+    const safe=z.loc.locPt('farm','safe'),start=actor('column_chalk');
+    Object.assign(P(),safe);tick();stage('escort'); // игрок один не закрывает этап
+    const route=z.findPath(start.x,start.y,safe.x,safe.y);assert(route?.length,'дорога до фермы');
+    for(const p of route){
+      Object.assign(P(),{x:p.x,y:p.y}); // игрок ведёт по дороге, NPC проходят её своим AI
+      for(let i=0;i<9;i++) z.update(1/12);
+    }
+    for(let i=0;i<110 && checkpoint()==='escort';i++) z.update(1/12);
+    assert(checkpoint()==='listen','ферма '+[actor('column_spool'),actor('column_chalk')].map(e=>[Math.round(e.x/T),Math.round(e.y/T)])+' цель '+safe.x/T+','+safe.y/T);
+    use('relay','booth','story');
+  }else{
+    Object.assign(P(),z.loc.locPt('village','fire'));tick();
+    assert(S().flags.cordonExtracted,'прибытие носилок');talk('column_spool');
+  }
+  stage('north');reload();
+  const count=S().stats.q;
+  use('exit','gate','exit');stage('done');
+  assert(z.panel.lines.some(l=>l.t.includes(loss?'Имена тоже':quiet?'Седьмой вагон':'деревни передали')),'ответ Серого');
+  reload();use('exit','gate','exit');assert(S().stats.q===count+1,'финал один раз');
+  const chapters=z.plus.qList().filter(q=>q.id.startsWith('cordon'));
+  assert(chapters.length===4 && chapters.every(q=>q.st==='d'),'четыре главы в журнале');
+  return {ok:true,quiet,chapters:chapters.length};
+}
+Tt('K22_open_channel_and_lost_witnesses',()=>cordonPlay(false));
+Tt('K23_radio_silence_and_old_save',()=>cordonPlay(true));
+Tt('K24_fresh_start_and_emergency_log',()=>cordonPlay(false,true));
+
 return JSON.stringify(R);
 })()

@@ -28,7 +28,7 @@ function drawDialog2() {
   const box = el('div', 'dlg');
   const side = el('div', 'dlg-who');
   const c = panel.card;
-  side.appendChild(portraitFor(c));
+  if (!c.record) side.appendChild(portraitFor(c));
   side.appendChild(el('div', 'pn', c.n));
   side.appendChild(el('div', 'pm', [c.rank, c.grp].filter(Boolean).join(' · ')));
   if (c.att) side.appendChild(el('div', 'pa' + (/враг/.test(c.att) ? ' foe' : /друг|свой/.test(c.att) ? ' pal' : ''), c.att));

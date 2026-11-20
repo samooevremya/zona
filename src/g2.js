@@ -187,6 +187,7 @@ function spawnWorld() {
   });
   DOGDEF.forEach(d => { if (!S.dead[d.sid]) ents.push(mkDog(d)); });
   rcSpawnObjs();
+  cordonCast();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
   for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
   anoms = ANOM0.map(spawnAnomaly);
@@ -210,7 +211,7 @@ function hostile(a, b) {
 function playerRelation(e) {
   if (hostile(e, P)) return 'enemy';
   if (e.fac !== 'loner') return 'neutral';
-  if (e.follow || (e.uid && S.flags['sosFriend_' + e.uid])) return 'friend';
+  if (e.storyMan || e.follow || (e.uid && S.flags['sosFriend_' + e.uid])) return 'friend';
   if ((e.sid === 'tolik' && S.flags.tolikUp) || (e.sid === 'fox' && S.flags.foxUp) ||
       (e.sid === 'shust' && S.flags.shustFree) || (e.sid === 'wolf' && S.q.pack === 3)) return 'friend';
   return 'neutral';
@@ -557,6 +558,7 @@ function findTarget(e) {
   return best;
 }
 function aiHuman(e, dt) {
+  if (e.storyMan) { cordonAI(e,dt); return; }
   if (SID_SHOP && e.sid === 'sid') {
     e.ang = Math.PI / 2;
     e.deskTime = (e.deskTime || 0) + dt;
@@ -814,10 +816,15 @@ function qTargets() {
   const at = (qid, p, n) => out.push({ qid: qid, x: p.x, y: p.y, n: n });
   const w = byS('wolf');
   const sidT = (qid, n) => at(qid, inBunker(P.x, P.y) ? locPt('sid', 'trader') : locPt('sid', 'hatch'), n || (inBunker(P.x, P.y) ? 'Сидорович' : 'Бункер Сидоровича'));
+  if (BIG && q.flash===4 && !S.q2.fox && S.flags.flashDone && !cordonStage()) sidT('foxLead','Спросить Сидоровича о Стрелке');
   if (!q.flash) sidT('flash', 'Поговорить с Сидоровичем');
   if (q.flash === 1 && w) at('flash', w, 'Найти Волка в деревне');
-  if (q.flash === 2) { const s = byS('shust'); at('flash', s || locPt('atp', 'garage'), 'Освободить Шустрого на АТП'); }
-  if (q.flash === 3) sidT('flash', 'Отнести флешку Сидоровичу');
+  if (q.flash === 2) { const s = byS('shust'); at('flash', s || locPt('atp', 'garage'), S.flags.shustFree?'Забрать флешку у Шустрого':'Освободить Шустрого на АТП'); }
+  if (q.flash === 3) {
+    const box=!has('flash') && objs.find(o=>o.k==='locker' && personalStock().loot.flash);
+    if(box) at('flash',{x:box.x+box.w/2,y:box.y+box.h/2},'Забрать флешку из личного ящика');
+    else sidT('flash','Отнести флешку Сидоровичу');
+  }
   if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field', 'medusa'), 'Поле аномалий');
   if (q.pack === 1) at('pack', locPt('dogs_lair', 'lair'), 'Логово псов');
   if (q.pack === 2 && w) at('pack', w, 'Вернуться к Волку');
@@ -837,11 +844,13 @@ function trackedTarget() {
 }
 function qList() {
   const L = [], q = S.q;
+  if (BIG && !q.flash) L.push({id:'flash',loc:'sid',n:'Первый разговор',d:'Подойди к прилавку в бункере и выслушай торговца.',st:'a'});
   const F = ['', 'Найди Волка в деревне новичков: он знает, где держат Шустрого.', 'Освободи Шустрого: бандиты держат его в гараже на АТП, на востоке.', 'Отнеси флешку Сидоровичу в бункер.', ''];
+  if (BIG && q.flash===4 && !S.q2.fox && S.flags.flashDone && !cordonStage()) L.push({id:'foxLead',loc:'sid',n:'След Стрелка',d:'Вернись к Сидоровичу и спроси о Стрелке.',st:'a'});
   if (q.flash >= 1) L.push({ id: 'flash', loc: 'atp', n: 'Флешка Шустрого', d: q.flash === 4 ? (S.flags.flashFail ? 'Провалено.' : 'Выполнено.') : F[q.flash], st: q.flash === 4 ? (S.flags.flashFail ? 'f' : 'd') : 'a' });
   if (q.medusa >= 1) L.push({ id: 'medusa', loc: 'field', n: '«Медуза» для Сидоровича', d: q.medusa === 2 ? 'Выполнено.' : TOLIK_AT_JUNCTION ? 'Найди артефакт «Медуза» на поле аномалий к северу от развилки на АТП и принеси Сидоровичу.' : 'Найди артефакт «Медуза» на поле аномалий за ржавым автобусом и принеси Сидоровичу.', st: q.medusa === 2 ? 'd' : 'a' });
   if (q.pack >= 1) L.push({ id: 'pack', loc: 'dogs_lair', n: 'Стая у леса', d: q.pack === 3 ? 'Выполнено.' : q.pack === 1 ? 'Перебей стаю слепых псов в лесу на северо-западе.' : 'Стая перебита. Вернись к Волку.', st: q.pack === 3 ? 'd' : 'a' });
-  if (S.q2.fox >= 1) L.push({ id: 'fox', loc: 'farm', n: 'Найти Лиса', d: S.q2.fox === 4 ? 'Выполнено. Брат Лиса, Серый, ждёт на Свалке. Продолжение в следующей версии.' : S.q2.fox === 1 ? 'Лис ушёл за насыпь, к разрушенной ферме на северо-востоке. Пройти можно под мостом за 500 RU или через туннель с электрами.' : S.q2.fox === 2 ? 'Отбейся от стаи вместе с Лисом.' : 'Поговори с Лисом.', st: S.q2.fox === 4 ? 'd' : 'a' });
+  if (S.q2.fox >= 1) L.push({ id: 'fox', loc: 'farm', n: 'Найти Лиса', d: S.q2.fox === 4 ? (S.flags.foxFail ? 'Лис погиб на ферме.' : 'Лис рассказал, что его брат Серый знает о группе Стрелка.') : S.q2.fox === 1 ? 'Лис ушёл за насыпь, к разрушенной ферме на северо-востоке. У военных проход стоит 500 RU. В обход ведут туннель и Восточная канава с Электрой.' : S.q2.fox === 2 ? 'Отбейся от стаи вместе с Лисом.' : 'Поговори с Лисом.', st: S.q2.fox === 4 ? (S.flags.foxFail?'f':'d') : 'a' });
   if (S.q2.tolik >= 1) L.push({ id: 'tolik', loc: TOLIK_AT_JUNCTION ? 'bus' : 'village', n: 'Раненый у дороги', d: S.q2.tolik === 2 ? 'Выполнено.' : S.q2.tolik === 3 ? 'Провалено: Толик погиб.' : TOLIK_AT_JUNCTION ? 'Сталкер лежит у автобуса на западной стороне шоссе возле развилки на АТП и просит аптечку.' : 'Сталкер лежит у дороги и просит аптечку.', st: S.q2.tolik === 2 ? 'd' : S.q2.tolik === 3 ? 'f' : 'a' });
   plusQList(L);
   return L;
