@@ -6,26 +6,32 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
 </script>
 <canvas id="cv" aria-label="Игровое поле"></canvas>
 <div class="hud zh">
-  <div class="zh-map rust"><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
-  <div class="zh-clock rust"><span id="clock">07:00</span></div>
-  <div class="zh-bars">
-    <div class="zh-bar rust hp"><svg viewBox="0 0 24 24" class="zi"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><div class="bar"><i id="hpb"></i></div><b id="hpv">100</b></div>
-    <div class="zh-bar rust st"><svg viewBox="0 0 24 24" class="zi"><circle cx="14.5" cy="4" r="2.3"/><path d="M13 7.2l-4 1.6-2 4 1.8.8 1.5-2.9 1.6-.5-1.6 5.3-3.8 4.4 1.6 1.4 4.2-4.6 2.1 2.2V23h2.2v-5.8l-2.6-2.9.9-3.2 1.3 2.1H20v-2h-2.6l-2.2-3.6c-.6-.8-1.3-.9-2.2-.4z"/></svg><div class="bar"><i id="stb"></i></div><b id="stv">100</b></div>
-    <div class="zh-bar rust fd"><svg viewBox="0 0 24 24" class="zi"><path d="M6 2h1.5v6H9V2h1.5v6H12V2h1.5v7.5c0 1.6-1.1 2.8-2.5 3.2V22H8.5v-9.3C7.1 12.3 6 11.1 6 9.5zM17 2c1.8 0 3 2.5 3 6.5 0 2.3-.9 3.6-2 4V22h-2.5V2z"/></svg><div class="bar"><i id="fdb"></i></div><b id="fdv">100</b></div>
-    <span class="zh-st bl" id="s-bleed" title="Кровотечение"><svg viewBox="0 0 24 24"><path d="M12 2.5S5.5 10 5.5 14.5a6.5 6.5 0 0013 0C18.5 10 12 2.5 12 2.5z"/></svg><em id="s-bleedn"></em></span>
-    <span class="zh-st rd" id="s-rad" title="Радиация"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M12 9.2L9 4a9 9 0 016 0zM14.4 13.4l6 .1a9 9 0 01-3 5.2zM9.6 13.4l-3 5.3a9 9 0 01-3-5.2z"/></svg><em id="radv"></em></span>
-    <div class="zh-sub"><b id="money">0 RU</b><span class="belt" id="belt"></span></div>
-    <div class="zh-status" id="status"></div>
+  <div class="zh-corner">
+    <div class="zh-map-group">
+    <div class="zh-map rust"><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
+      <div class="zh-feed">
+        <div class="quest zh-q rust" id="quest"></div>
+        <div class="msgs" id="msgs" role="status" aria-live="polite" aria-atomic="true"></div>
+      </div>
+    </div>
+    <div class="zh-clock rust"><span id="clock">07:00</span></div>
+    <div class="zh-bars">
+      <div class="zh-bar rust hp"><svg viewBox="0 0 24 24" class="zi"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><div class="bar"><i id="hpb"></i></div><b id="hpv">100</b></div>
+      <div class="zh-bar rust st"><svg viewBox="0 0 24 24" class="zi"><circle cx="14.5" cy="4" r="2.3"/><path d="M13 7.2l-4 1.6-2 4 1.8.8 1.5-2.9 1.6-.5-1.6 5.3-3.8 4.4 1.6 1.4 4.2-4.6 2.1 2.2V23h2.2v-5.8l-2.6-2.9.9-3.2 1.3 2.1H20v-2h-2.6l-2.2-3.6c-.6-.8-1.3-.9-2.2-.4z"/></svg><div class="bar"><i id="stb"></i></div><b id="stv">100</b></div>
+      <div class="zh-bar rust fd"><svg viewBox="0 0 24 24" class="zi"><path d="M6 2h1.5v6H9V2h1.5v6H12V2h1.5v7.5c0 1.6-1.1 2.8-2.5 3.2V22H8.5v-9.3C7.1 12.3 6 11.1 6 9.5zM17 2c1.8 0 3 2.5 3 6.5 0 2.3-.9 3.6-2 4V22h-2.5V2z"/></svg><div class="bar"><i id="fdb"></i></div><b id="fdv">100</b></div>
+      <span class="zh-st bl" id="s-bleed" title="Кровотечение"><svg viewBox="0 0 24 24"><path d="M12 2.5S5.5 10 5.5 14.5a6.5 6.5 0 0013 0C18.5 10 12 2.5 12 2.5z"/></svg><em id="s-bleedn"></em></span>
+      <span class="zh-st rd" id="s-rad" title="Радиация"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M12 9.2L9 4a9 9 0 016 0zM14.4 13.4l6 .1a9 9 0 01-3 5.2zM9.6 13.4l-3 5.3a9 9 0 01-3-5.2z"/></svg><em id="radv"></em></span>
+      <div class="zh-sub"><b id="money">0 RU</b><span class="belt" id="belt"></span></div>
+      <div class="zh-status" id="status"></div>
+    </div>
   </div>
   <div class="topbtns zh-top">
     <button type="button" class="rust" id="t-pda">КПК</button>
     <button type="button" class="rust" id="t-inv">Рюкзак</button>
     <button type="button" class="rust" id="t-menu">Меню</button>
   </div>
-  <div class="quest zh-q rust" id="quest"></div>
   <div class="wpn zh-w rust" id="wpnbox" title="Сменить оружие"><span id="wico"></span><div class="zh-wi"><div class="wn" id="wn">Нож</div><div class="am" id="am">∞</div><div class="cnd"><span id="wcn">Состояние: 100%</span><div class="cb"><i id="wcb"></i></div></div></div></div>
   <div class="zh-det rust" id="det" role="button" aria-label="Фонарик" title="Фонарик (L)"><svg viewBox="0 0 24 24" class="zi torch"><path d="M4 9.5h8.5l5-3.5h2.5v12h-2.5l-5-3.5H4z"/><rect x="2" y="9.5" width="2.5" height="5" rx="1"/><path class="beam" d="M21.5 8.5l1.8-1.2M21.8 12h2M21.5 15.5l1.8 1.2" stroke="currentColor" stroke-width="1.3" fill="none"/></svg><span class="sig" id="sig"><i></i><i></i><i></i><i></i><i></i></span></div>
-  <div class="msgs" id="msgs" aria-live="polite"></div>
   <button type="button" class="prompt zh-p rust" id="prompt"></button>
   <div class="keys">E действие · C присесть · V прыжок · L фонарик · R перезарядка · F болт · G граната · Q аптечка · B бинт · I рюкзак · M КПК</div>
 </div>

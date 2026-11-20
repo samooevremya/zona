@@ -28,7 +28,19 @@ const rankOf = sc => sc < 15 ? 0 : sc < 45 ? 1 : sc < 90 ? 2 : 3;
 
 let MSGS = [];
 function msg(t, k) { MSGS.push({ t: t, k: k || '', life: 6 }); if (MSGS.length > 5) MSGS.shift(); }
-function news(t, ping) { S.news.push({ t: S.min, x: t }); if (S.news.length > 60) S.news.shift(); if (ping) { msg('КПК: ' + t, 'pda'); play('pda'); } }
+const radioQueue = [];
+function radioNotice(t, urgent = false) {
+  const note = { t, k: urgent ? 'radio urgent' : 'radio', life: urgent ? 10 : 6 };
+  if (urgent) radioQueue.unshift(note);
+  else radioQueue.push(note);
+  // Полный текст каждого сообщения остаётся в журнале КПК.
+  if (radioQueue.length > 4) radioQueue.splice(1, 1);
+}
+function news(t, ping, urgent = false) {
+  S.news.push({ t: S.min, x: t });
+  if (S.news.length > 60) S.news.shift();
+  if (ping) { radioNotice(t, urgent); play('pda'); }
+}
 
 function freshS() {
   return { v: 1, money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},

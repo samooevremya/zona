@@ -1,13 +1,11 @@
 /* ===================== погода, выброс, шаги, голоса, гитара ===================== */
 const WX = { cloud: 0.15, rain: 0, fog: 0, wind: 0.35, flash: 0, red: 0, clouds: [], drops: [] };
 const WXT = { clear: [0.1, 0, 0], cloudy: [0.65, 0, 0], rain: [0.85, 0.6, 0.06], storm: [1, 1, 0.06], fog: [0.45, 0, 0.8] };
-const WXN = { clear: 'Проясняется', cloudy: 'Небо затягивает тучами', rain: 'Начинается дождь', storm: 'Идёт гроза', fog: 'Опускается туман' };
 for (let i = 0; i < 7; i++) WX.clouds.push({ x: rnd(0, WW), y: rnd(0, WH), r: rnd(350, 700) });
 function pickWeather() {
   const r = Math.random(), h = hour();
   const k = r < 0.34 ? 'clear' : r < 0.58 ? 'cloudy' : r < 0.78 ? 'rain' : r < 0.87 ? 'storm' : (h < 9 || h > 18 ? 'fog' : 'cloudy');
   S.wx = { k: k, until: S.min + rnd(120, 300) };
-  if (P && P.alive && S.min > 430) msg('Погода: ' + WXN[k].toLowerCase() + '.', 'pda');
 }
 const sheltered = (x, y) => inBunker(x, y) || HOUSES.some(h => !h.ruin && x > (h.x + 0.6) * T && x < (h.x + h.w - 0.6) * T && y > (h.y + 0.6) * T && y < (h.y + h.h - 0.6) * T);
 const safeFromBlow = e => e.guard || ['wolf', 'sid', 'petr', 'petr2', 'fox', 'shust', 'tolik'].indexOf(e.sid) >= 0;
@@ -134,20 +132,18 @@ function worldFx(dt) {
   }
   guitar(dt);
 }
+const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей.';
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
     B.stage = 1; B.t = 80;
-    news('Внимание всем сталкерам! Приближается выброс! Срочно найдите укрытие!', true);
-    msg('Выброс через минуту! Укройся в доме с целой крышей или в бункере.', 'bad');
+    news(BLOW_WARNING, true, true);
     ents.forEach(e => {
       if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
       HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
       if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
     });
-    const caller = ents.find(e => e.alive && e.fac === 'loner' && dE(e, P) < 500 && !e.captive);
-    if (caller) sayLine(caller, 'Выброс! Все в укрытие!');
   }
   if (B.stage === 1) {
     B.t -= dt; WX.red = lerp(WX.red, 0.5, dt * 0.05);
@@ -172,7 +168,7 @@ function blowout(dt) {
         delete S.flags['art_' + a.key];
         arts.push(Object.assign({}, a, { x: a.x + rnd(-10, 10), y: a.y + rnd(-10, 10) })); born++;
       });
-      news('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true);
+      news('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true, true);
     }
   } else WX.red = Math.max(0, WX.red - dt * 0.3);
 }

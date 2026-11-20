@@ -16,7 +16,7 @@ let fogDirty = true;
 
 function startReload() {
   const W = WP[S.weapon];
-  if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); msg('Затвор передёрнут.'); return; }
+  if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); return; }
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
   if (m >= W.mag || !cnt(W.ammo)) return;
@@ -31,7 +31,7 @@ let noAmmoT = 0;
 function playerFire() {
   const W = WP[S.weapon];
   if (P.cool > 0 || P.reload > 0) return;
-  if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; msg('Гранаты кончились. В руках: Нож'); } }, 300); return; }
+  if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; } }, 300); return; }
   if (W.melee) { P.cool = W.rate; melee(P, W); return; }
   if (P.jam) { if (noAmmoT <= 0) { noAmmoT = 1; play('click'); } return; }
   const m = S.mag[S.weapon] || 0;
@@ -53,9 +53,8 @@ function cycleWeapon(dir) {
   let i = own.indexOf(S.weapon);
   S.weapon = own[(i + (dir || 1) + own.length) % own.length];
   P.reload = 0; P.cool = 0.25; P.jam = 0;
-  msg('В руках: ' + WP[S.weapon].n + (WP[S.weapon].toss ? '. «Огонь» — бросок' : ''));
 }
-function setWeapon(w) { if (w === 'knife' || has(w)) { if (WP[w] && WP[w].toss) msg('В руках: Граната. «Огонь» — бросок.'); S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
+function setWeapon(w) { if (w === 'knife' || has(w)) { S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
 function useItem(id) {
   const it = ITEMS[id];
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
@@ -64,7 +63,6 @@ function useItem(id) {
   if (it.rad) S.rad = Math.max(0, S.rad - it.rad);
   if (FOOD[id]) { S.food = Math.min(100, S.food + FOOD[id]); play('eat'); } else play('pick');
   if (id === 'medkit') S.bleed = 0; if (id === 'bandage') S.bleed = Math.max(0, S.bleed - 2);
-  msg(it.n + ': здоровье ' + Math.round(P.hp) + (FOOD[id] ? ', сытость ' + Math.round(S.food) : ', радиация ' + Math.round(S.rad)) + (id === 'bandage' || id === 'medkit' ? (S.bleed ? ', кровь ещё идёт' : ', кровь остановлена') : ''), 'good');
   return true;
 }
 function healWith(id) {
@@ -95,7 +93,7 @@ function throwBolt() {
   bolts.push({ x0: P.x, y0: P.y, x1: ex, y1: ey, t: 0, dur: 0.45, hit: null });
 }
 /* фонарик: ночью светит конусом; выключенный — почти темнота вокруг, зато тебя хуже видно издалека */
-function toggleTorch() { S.torch = S.torch === false; play('click'); msg(S.torch ? 'Фонарик включён.' : 'Фонарик выключен.' + (darkness() > 0.3 ? ' В темноте тебя хуже видно, но и ты видишь мало.' : '')); }
+function toggleTorch() { S.torch = S.torch === false; play('click'); }
 /* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
 const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier', 'fence']);
 function startJump() {
@@ -238,6 +236,7 @@ function update(dt) {
     }
   }
   checkQuests();
+  if (radioQueue.length && (radioQueue[0].life -= dt) <= 0) radioQueue.shift();
   for (const m of MSGS) m.life -= dt;
   MSGS = MSGS.filter(m => m.life > 0);
   hurtFlash = Math.max(0, hurtFlash - dt * 1.2);
@@ -371,24 +370,24 @@ function findInteract() {
   return best;
 }
 function lootAll(o) {
-  const parts2 = [];
+  let pickedUp = false;
   const left = {};
   Object.keys(o.loot).forEach(k => {
     const q = o.loot[k];
     if (k === '__tip') return;
-    if (k === 'money') { S.money += q; parts2.push(q + ' RU'); }
+    if (k === 'money') { S.money += q; pickedUp = true; }
     else if (WP[k] && !WP[k].melee && has(k)) left[k] = q;          // такой ствол уже есть — остаётся лежать
-    else { give(k, q); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); parts2.push(ITEMS[k].n + (q > 1 ? ' ×' + q : '')); }
+    else { give(k, q); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); pickedUp = true; }
   });
   o.loot = left;
   if (Object.keys(left).length) msg('Оставлено: такой ствол уже есть (' + Object.keys(left).map(k => ITEMS[k].n).join(', ') + ').', 'bad');
   if (o.stash && !Object.keys(o.loot).length) { o.looted = true; S.flags['st_' + o.stash] = 1; }
-  if (parts2.length) { msg('Взято: ' + parts2.join(', '), 'good'); play('pick'); }
+  if (pickedUp) play('pick');
 }
 function takeArt(a) {
   give(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
-  msg('Подобран ' + ITEMS[a.id].n + '. Его можно продать или повесить на пояс в рюкзаке.', 'good'); play('pick');
+  play('pick');
   news('Найден ' + ITEMS[a.id].n + '.');
 }
 function freeShust(e) {
@@ -429,7 +428,6 @@ function save(quiet) {
   S.fog = f;
   dynSnapshot();
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { if (!quiet) msg('Сохранить не вышло: браузер не даёт места.'); return false; }
-  if (!quiet) msg('Игра сохранена.', 'good');
   return true;
 }
 function loadSave() {
@@ -443,5 +441,6 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   cam.x = P.x; cam.y = P.y;
-  deathT = 0; hurtFlash = 0; MSGS = [];
+  deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
+  if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
 }

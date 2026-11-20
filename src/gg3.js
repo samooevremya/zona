@@ -147,7 +147,6 @@ body.is-touch .joy{background:${url('joy')} center/contain no-repeat;border:0;bo
 .zh-bar{height:19px;margin-bottom:3px}.zh-bar .bar{height:6px}.zh-bar b{font-size:11px}
 .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:66px;min-height:26px;height:26px;padding:0 9px;font-size:12px;border-width:4px}
 .hud.zh .zh-top button::after{inset:-16px -4px}
-.hud.zh .zh-q,body.is-touch .hud.zh .zh-q{font-size:12px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:180px;height:58px;padding:3px 8px 3px 4px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am{font-size:16px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire{width:100px;height:100px}body.is-touch .joy{width:112px;height:112px}.joy b{width:46px;height:46px;margin:-23px}
 .hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
@@ -162,7 +161,6 @@ body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire
 .hud.zh .zh-top,body.is-touch .hud.zh .zh-top{gap:8px}
 .hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:72px;min-height:26px;height:26px;padding:0 10px;font-size:12px;border-width:4px}
 .hud.zh .zh-top button::after{inset:-16px -6px}
-.hud.zh .zh-q,body.is-touch .hud.zh .zh-q{top:calc(40px + var(--sat));font-size:12px;padding:2px 10px 2px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:172px;height:58px;padding:3px 8px 3px 4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:190px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.zh-wi{overflow:hidden}.zh-w .cnd span{overflow:hidden;text-overflow:ellipsis}.hud.zh .zh-w .wn{font-size:11px}
 .hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am,.hud.zh .zh-w .am small{font-size:16px}.zh-w .cnd span{font-size:10px}

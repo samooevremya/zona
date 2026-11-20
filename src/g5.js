@@ -472,7 +472,7 @@ function drawMenu() {
     else { save(true); panel.hint = 'Игра сохранена.'; }
     refresh();
   }));
-  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); msg('Загружено.'); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
+  pbody.appendChild(btn('wide', 'Загрузить последнее сохранение', () => { const d = loadSave(); if (d) { applyState(d); closePanel(); } else { panel.hint = 'Сохранений нет.'; refresh(); } }));
   pbody.appendChild(btn('wide', (AC && master && master.gain.value === 0 ? 'Включить' : 'Выключить') + ' звук', () => { audioInit(); if (master) master.gain.value = master.gain.value ? 0 : 0.55; refresh(); }));
   pbody.appendChild(btn('wide warn', 'Начать заново', () => { if (panel.sure) { applyState(freshS()); closePanel(); intro(); } else { panel.sure = 1; panel.hint = 'Прогресс сотрётся. Нажми ещё раз, чтобы начать заново.'; refresh(); } }));
   const k = el('div', 'note'); k.style.lineHeight = '1.8';
@@ -739,7 +739,7 @@ const WSIL = {
 };
 const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), sig: $('sig'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
   status: $('status'), quest: $('quest'), msgs: $('msgs'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
-let hudT = 0, lastW = '';
+let hudT = 0, lastW = '', lastNotice;
 function hud(dt) {
   if (!P) return;
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
@@ -750,7 +750,7 @@ function hud(dt) {
   if (H.sig.dataset.v != sg) { H.sig.dataset.v = sg; [...H.sig.children].forEach((b, i) => b.classList.toggle('on', i < sg)); H.det.classList.toggle('on', sg > 0); }
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
-  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.crouch ? 'присел' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -778,8 +778,18 @@ function hud(dt) {
     H.quest.appendChild(el('span', 'ex', '!')); H.quest.appendChild(el('span', 'qn', q.n));
     const ar = el('span', 'arr', '➤'); ar.style.transform = 'rotate(' + a + 'rad)'; H.quest.appendChild(ar); H.quest.appendChild(el('span', 'qd', d + ' м'));
   }
-  H.msgs.textContent = '';
-  MSGS.forEach(m => { const p = el('p', m.k, m.t); p.style.opacity = clamp(m.life / 1.5, 0, 1); H.msgs.appendChild(p); });
+  const message = radioQueue[0] || MSGS[MSGS.length - 1];
+  if (message !== lastNotice) {
+    lastNotice = message;
+    H.msgs.replaceChildren();
+    if (message) {
+      const line = el('p', message.k);
+      if (radioQueue.length) line.append(el('span', 'sender', 'КПК'));
+      line.append(document.createTextNode(message.t));
+      H.msgs.append(line);
+    }
+  }
+  if (message) H.msgs.style.opacity = clamp(message.life / 1.2, 0, 1);
   const n = G.near;
   H.prompt.textContent = ''; H.prompt.classList.toggle('kill', !!(n && n.k === 'kill'));
   if (n && P.alive && !panel) { const ic = el('span', 'pi ' + n.k); H.prompt.appendChild(ic); if (!IN.touch) H.prompt.appendChild(el('kbd', '', 'E')); H.prompt.appendChild(document.createTextNode(n.label.replace(/^Поговорить: /, 'Говорить: ') + '.')); }
@@ -830,7 +840,7 @@ addEventListener('keydown', e => {
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
-  if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }
+  if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }
@@ -887,7 +897,7 @@ function endPtr(e) {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
-const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); msg(P.crouch ? 'Присел: тише и незаметнее.' : 'Встал.'); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
+const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'det': toggleTorch, 'b-wpn': () => cycleWeapon(1) };
 const fireB = $('b-fire');
 fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
 fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
@@ -980,6 +990,6 @@ async function boot() {
 window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
-window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => MSGS.map(m => m.t || m.text || m[0] || '') };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 boot();

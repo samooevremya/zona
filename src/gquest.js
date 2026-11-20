@@ -25,7 +25,7 @@ function drawPick(o) {   // растр G4 (gg7.js: g7Pick); ниже — пре�
 function pickUp(o) {
   give(o.pick, 1); S.flags['pk_' + o.pick] = 1;
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
-  play('pick'); msg('Подобрано: ' + ITEMS[o.pick].n + '.', 'good');
+  play('pick');
   const q = q5();
   if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.', true); }
   else if (q.st === 'not_started') news('Нашёл ' + ITEMS[o.pick].n.toLowerCase() + '. Кому-то в деревне это может пригодиться.');

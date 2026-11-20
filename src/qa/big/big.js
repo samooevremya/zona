@@ -125,5 +125,23 @@ Tt('K10_walk_through_doors', () => {
   }
   return {ok: villageHouses === 6 && villageGroups >= 9 && !failures.length, houses: houses.length, groups, villageHouses, villageGroups, openCells, failures};
 });
+Tt('K11_pda_emission_warning', () => {
+  reset();
+  z.clearMsgs();
+  S().min = 600;
+  S().wx.until = 0;
+  S().blow.next = S().min;
+  step(2);
+  const isWarning = text => /приближается выброс/i.test(text);
+  const oneWarning = () => B.msgs().filter(isWarning).length === 1;
+  const journalCount = () => S().news.filter(n => isWarning(n.x)).length;
+  const started = S().blow.stage === 1 && oneWarning() && journalCount() === 1;
+  const quietWeather = !B.msgs().some(t => t.startsWith('Погода:'));
+  z.applyState(JSON.parse(JSON.stringify(S())));
+  const resumed = oneWarning() && journalCount() === 1;
+  step(305);
+  const expired = !B.msgs().some(isWarning) && journalCount() === 1;
+  return { ok: started && quietWeather && resumed && expired, started, quietWeather, resumed, expired };
+});
 return JSON.stringify(R);
 })()
