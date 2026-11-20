@@ -30,6 +30,8 @@ const LOC_STAMP = { village: 'village', sid: 'village', bus: 'village', pump: 'p
   army: 'army', swamp: 'swamp', dogs_lair: 'dogs', trafo: 'tunnel', tunnel: 'tunnel', bridge: 'bridge', camp: 'camp', farm: 'farm',
   lair: 'east', east_ditch: 'east', relay: 'east', rail: 'rail', exit: 'exit', south_path: { d: [74, 97] } };
 /* отдельные точки, которые в старой карте стояли между местами и требуют ручной постановки (новые клетки) */
+const TOLIK_AT_JUNCTION = BIG && !/(?:^#|&)tolik-junction-off(?:&|$)/.test(location.hash);
+const TOLIK_SCENE_SHIFT = [34, -11];
 const RM_FIX = { petr: [168, 138.5], petr2: [168, 148.5] };
 
 function stampAt(x, y, pad) {
@@ -164,6 +166,7 @@ function bigWorld() {
   }
   // У западного выхода из малого сарая оставляем свободный подход к порогу.
   if (tAt(199, 42) === TR) setT(199, 42, GR);
+  if (TOLIK_AT_JUNCTION) bigTolikScene();
   bigNewObjects(RH);
 }
 
@@ -192,6 +195,26 @@ function bigRemap() {
   SOS_SPOTS.length = 0; locAnchors('sos').forEach(a => SOS_SPOTS.push([a.x, a.y, a.loc]));
   CLEAR_SPOTS.length = 0; locAnchors('clear').forEach(a => CLEAR_SPOTS.push([a.x, a.y, 'у ' + LOC[a.loc].gen, a.loc]));
   const sh = locPt('lair', 'sucker'); SUCKER_HOME.x = sh.x; SUCKER_HOME.y = sh.y;
+}
+
+// Переносим стоянку целиком на поляну западнее шоссе у поворота на АТП.
+function bigTolikScene() {
+  LORE[2] = 'К северу от развилки на АТП поле с гравитационными аномалиями. Там «Медузу» видели, но и фонит там прилично.';
+  const [dx, dy] = TOLIK_SCENE_SHIFT;
+  const bus = objs.find(o => o.k === 'bus');
+  bus.x += dx * T;
+  bus.y += dy * T;
+  const site = LOC.bus;
+  const [x0, y0, x1, y1] = site.bounds;
+  site.bounds = [x0 + dx, y0 + dy, x1 + dx, y1 + dy];
+  site.entrances = [[82 + dx, 159 + dy], [82 + dx, 163 + dy]];
+  for (const a of Object.values(site.anchors)) {
+    a[0] += dx;
+    a[1] += dy;
+  }
+  const tolik = NPCDEF.find(d => d.sid === 'tolik');
+  [tolik.x, tolik.y] = site.anchors.tolik;
+  rcClear(74 + dx, 157 + dy, 81 + dx, 162 + dy);
 }
 
 /* ---------- новые места и предметы ---------- */
@@ -365,7 +388,13 @@ const CORDON_DETAILS = [
   ['c1_tires', 194.4, 141.4, 36, 0.1],
   ['c1_trace_pipes', 200, 148, 49, 0.2],
   // Автобус
-  ['c1_trace_wheel', 81, 160, 25, 0.18],
+  ...(TOLIK_AT_JUNCTION ? [
+    ['c1_trace_wheel', 81, 160, 25, 0.18],
+    ['c1_junk', 75, 160.6, 34, -0.27],
+    ['c1_trace_kettle', 78, 161, 22, 0.22],
+  ].map(([id, x, y, width, angle]) =>
+    [id, x + TOLIK_SCENE_SHIFT[0], y + TOLIK_SCENE_SHIFT[1], width, angle]
+  ) : [['c1_trace_wheel', 81, 160, 25, 0.18]]),
   // Восточные сады
   ['c1_trace_apples', 195, 187, 37, -0.13],
   ['c1_trace_apples', 197.4, 187.9, 25, 0.56],
