@@ -129,10 +129,21 @@ function drawInv2() {
   const box = el('div', 'inv3');
   // снаряжение
   const eq = el('div', 'inv-eq');
-  { const who = el('div', 'tr-who'); who.appendChild(portraitFor(meCard())); const t = el('div'); t.appendChild(el('div', 'pn', 'Меченый')); t.appendChild(el('div', 'price', RANKS[rankOf(score())])); who.appendChild(t); eq.appendChild(who); }
-  const slot = (label, id, onTap) => { const s = el('div', 'slot'); s.appendChild(el('span', 'sl', label)); s.appendChild(id ? itemCell(id, { on: 1, cond: condOf(id), sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); return s; };
-  eq.appendChild(slot('В руках', S.weapon));
-  eq.appendChild(slot('Костюм', S.armor));
+  eq.appendChild(el('h3','pack-heading','Снаряжение'));
+  const rack = el('div','gear-rack');
+  const slot = (label,id) => {
+    const field = el('div','gear-slot');
+    field.appendChild(el('span','sl',label));
+    if (id) {
+      const cell = itemCell(id,{cond:condOf(id),on:id===S.weapon,sel:panel.sel===id && !panel.copy,
+        fn:()=>{panel.sel=id;panel.copy=0;refresh();}});
+      cell.title=itemName(id); field.appendChild(cell);
+    } else field.appendChild(el('span','gear-empty','—'));
+    return field;
+  };
+  rack.appendChild(slot('Костюм',S.armor)); rack.appendChild(slot('Нож','knife'));
+  for (const [key,label] of Object.entries(KIT_LABELS)) rack.appendChild(slot(label,kitItem(key)));
+  eq.appendChild(rack);
   const belt = el('div', 'slot beltslot'); belt.appendChild(el('span', 'sl', 'Пояс'));
   const br = el('div', 'beltrow');
   for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); }
@@ -147,17 +158,16 @@ function drawInv2() {
   box.appendChild(eq);
   // сетка
   const gw = el('div', 'inv-grid');
-  const ids = ['knife'].concat(Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0));
+  const ids = Object.keys(S.inv).filter(id => ITEMS[id] && cnt(id) > wornCount(id));
   const used=packCells(S.inv);
-  gw.appendChild(el('h3','pack-heading','Рюкзак · '+used+' / '+PACK_CELLS+' ячеек'));
+  gw.appendChild(el('h3','pack-heading','Рюкзак · '+used+' / '+PACK_CELLS+' ячеек · '+showKg(wt)+' / '+carryLimit()+' кг'));
   const g = el('div', 'igrid pack-grid');
   for (const id of ids) {
-    const count=id==='knife'?1:cnt(id), stack=stackLimit(id);
-    for(let start=0;start<count;start+=stack) {
+    const count=cnt(id), stack=stackLimit(id);
+    for(let start=wornCount(id);start<count;start+=stack) {
       const selected=panel.sel===id && (panel.copy || 0)===start;
       const cd=isGun(id)?Math.round(gunCopy(id,start).cond):null;
       const cell=itemCell(id,{q:Math.min(count-start,stack),cond:cd,sel:selected,
-        on:(S.weapon===id || S.armor===id || beltCount(id)>0) && start===0,
         fn:()=>{panel.sel=id; panel.copy=start; panel.hint=''; refresh();}});
       cell.dataset.item=id;
       const [w,h]=footprint(id);
@@ -171,7 +181,7 @@ function drawInv2() {
   // описание
   const dv = el('div', 'inv-detail');
   const id = panel.sel, copy=Math.min(panel.copy || 0,Math.max(0,cnt(id)-1));
-  if (!id || (id !== 'knife' && !has(id))) dv.appendChild(el('p', 'note', 'Выбери вещь. Артефакты вешаются на пояс, до трёх штук. Оружие в руках меняется по кругу кнопкой на HUD.'));
+  if (!id || (id !== 'knife' && !has(id))) dv.appendChild(el('p', 'note', 'Выбери вещь в рюкзаке и нажми «В слот». В игре касание панели оружия перебирает снаряжение.'));
   else {
     const it = id === 'knife' ? { n: 'Нож', w: 0.3 } : ITEMS[id];
     dv.appendChild(el('div', 'nm', it.n + (isGun(id) && cnt(id)>1?' · '+(copy+1)+' из '+cnt(id):'')));
@@ -196,17 +206,32 @@ function drawInv2() {
     dv.appendChild(rows);
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
-    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
+    const slotKey=kitSlot(id), mounted=slotKey && kitItem(slotKey)===id && !copy;
+    if (slotKey && !mounted) row.appendChild(btn('go','В слот',()=>{
+      mountGear(id,copy,false); panel.copy=0; refresh();
+    }));
+    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{
+      if (slotKey) mountGear(id,copy,true); else setWeapon(id);
+      panel.copy=0; refresh();
+    }));
+    if (mounted) row.appendChild(btn('wide','В рюкзак',()=>{
+      if (packCells(S.inv,id)>PACK_CELLS) panel.hint='Освободи место в рюкзаке.';
+      else stowGear(id);
+      refresh();
+    }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
-    if (it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
+    if (id==='energy' || it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', id==='energy' ? 'Выпить' : FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
-      if (beltCount(id)) S.belt.splice(S.belt.indexOf(id), 1);
+      if (beltCount(id)) {
+        if (packCells(S.inv,id)>PACK_CELLS) panel.hint='Освободи место в рюкзаке.';
+        else S.belt.splice(S.belt.indexOf(id),1);
+      }
       else if (S.belt.length >= 3) panel.hint = 'Пояс занят: сначала сними другой артефакт.';
       else S.belt.push(id);
       refresh();
     }));
-    if (id !== 'knife' && !it.quest && (id!==S.armor || copy) && (id!==S.weapon || copy) && cnt(id)>beltCount(id)) row.appendChild(btn('wide','Выбросить',()=>{
-      const q=isGun(id)||it.armor?1:Math.min(stackLimit(id),cnt(id)-beltCount(id));
+    if (id !== 'knife' && !it.quest && copy>=wornCount(id) && cnt(id)>wornCount(id)) row.appendChild(btn('wide','Выбросить',()=>{
+      const q=isGun(id)||it.armor?1:Math.min(stackLimit(id),cnt(id)-wornCount(id));
       const gun=removePacked(id,q,copy);
       const sack={k:'body',kind:'sack',x:P.x,y:P.y,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min,scatterStart:performance.now()};
       putStock(sack,id,q,gun); objs.push(sack); groundItems(sack);
@@ -253,7 +278,7 @@ function sellWhy(id, e, o) {
   const it = ITEMS[id]; if (!it) return null;
   if (it.quest) return 'квест';
   if (o && o.sell[id]) return 'в корз.';
-  if (id === S.weapon && (isGun(id) || DETECTORS[id])) return 'в руках';
+  if (kitSlot(id) && kitItem(kitSlot(id))===id) return id===S.weapon?'в руках':'в слоте';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
   if (e && it.armor) return 'не берёт';
@@ -262,10 +287,7 @@ function sellWhy(id, e, o) {
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
   if (e && it.armor) return 0;
-  let n = cnt(id) - beltCount(id);
-  if (id === S.armor) n -= 1;
-  if (id === S.weapon && (isGun(id) || DETECTORS[id])) n -= 1;
-  return Math.max(0, n);
+  return Math.max(0,cnt(id)-wornCount(id));
 }
 function offerSum(e) {
   const o = panel.offer, st = tradeStock(e);
@@ -281,7 +303,7 @@ function offerSum(e) {
     const q=s.q*n; buy+=s.p*n; inv[id]=(inv[id] || 0)+q; kg+=itemW(id)*q;
     if(isGun(id)) for(let i=0;i<n;i++) kg+=loadedMass(id,vendorGun(e,id,i));
   }
-  return {buy,sell,net:sell-buy,wAfter:Math.round(kg*1000)/1000,cells:packCells(inv)};
+  return {buy,sell,net:sell-buy,wAfter:Math.round(kg*1000)/1000,cells:packCells(inv,null,incomingKit(Object.keys(o.buy)))};
 
 }
 function tradeCheck(e) {
@@ -292,6 +314,7 @@ function tradeCheck(e) {
     const u = ITEMS[id].ammo ? 10 : 1; if (n <= Math.ceil(sellable(id,e)/u)) continue;
     if (cnt(id) <= 0) return 'У тебя больше нет: ' + itemName(id) + '.';
     if (id === S.weapon) return itemName(id) + ' в руках: сначала возьми другое оружие.';
+    if (kitSlot(id) && kitItem(kitSlot(id))===id) return 'Сначала убери '+itemName(id)+' в рюкзак.';
     if (id === S.armor) return itemName(id) + ' надет: сначала сними.';
     if (beltCount(id)) return itemName(id) + ' на поясе: сначала сними.';
     return 'Это нельзя продать: ' + itemName(id) + '.';
@@ -419,7 +442,7 @@ function drawLocker() {
       for(let i=0;i<total;i++) {
         const gun=isGun(id)?(deposit?gunCopy(id,i):stock.guns[id]?.[i] || {cond:80,mag:0}):null;
         const available=deposit?sellable(id,null):count;
-        const fixed=deposit && (available<=0 || (isGun(id) && id===S.weapon && i===0));
+        const fixed=deposit && (available<=0 || (isGun(id) && wornCount(id)>0 && i===0));
         const row=el('div','locker-row');
         row.appendChild(itemIcon(id));
         const label=el('div','locker-item',itemName(id));

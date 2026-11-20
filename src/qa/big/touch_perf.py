@@ -38,6 +38,17 @@ async def run(vw, vh):
         await touch('touchEnd',[]); await pg.wait_for_timeout(100)
         s4=await pg.evaluate("({mx:__z.IN.moveX,left:!!__z.IN.left})")
         res['move+action']={'bothDown':dbg,'ok': (s3['mag']==8 or s3['rel']>0) and abs(s3['mx'])>0.2 and s4['mx']==0 and not s4['left'], 'during':s3,'after':s4}
+        # Второй палец меняет оружие, первый продолжает двигать героя.
+        await pg.evaluate("__z.closePanel();__z.S.flags.kit.sidearm='w_pm';__z.S.weapon='knife'")
+        hand=await pg.evaluate("(()=>{const r=document.getElementById('wpnbox').getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()")
+        drag=(mv[0]+36,mv[1])
+        await touch('touchStart',[(0,mv)]);await touch('touchMove',[(0,drag)])
+        await touch('touchStart',[(0,drag),(1,hand)])
+        await pg.wait_for_timeout(100)
+        moving=await pg.evaluate("({gun:__z.S.weapon,stick:!!__z.IN.left,x:__z.IN.moveX})")
+        await touch('touchEnd',[]);await pg.wait_for_timeout(80)
+        once=await pg.evaluate("__z.S.weapon==='w_pm' && !__z.IN.left")
+        res['move+switch']={'ok':moving['gun']=='w_pm' and moving['stick'] and moving['x']>.2 and once}
         # свернули окно с зажатыми касаниями
         await touch('touchStart',[(0,mv),(1,fire)]); await touch('touchMove',[(0,(mv[0]+40,mv[1])),(1,fire)]); await pg.wait_for_timeout(100)
         await pg.evaluate("window.dispatchEvent(new Event('blur'))"); await pg.wait_for_timeout(80)

@@ -116,7 +116,7 @@ const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-ak
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if (id === 'energy') return icon('i-energy'); if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
 /*AVATAR*/
 function person(c) {
@@ -139,6 +139,7 @@ let panel = null;
 const ov = $('ov'), pbody = $('pbody'), ptitle = $('ptitle'), ptabs = $('ptabs');
 function openPanel(kind, title, tabs) {
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
+  pbody.replaceChildren(); pbody.scrollTop=0;
   ptitle.textContent = title;
   ov.classList.add('open');
   resetInput();
@@ -159,9 +160,19 @@ ov.addEventListener('click', e => { if (e.target === ov) closePanel(); });
 function refresh() {
   if (!panel) return;
   const top = pbody.scrollTop;
+  const selectors = panel.kind === 'trade' ? ['.tr-col.mine','.tr-col.their','.clines','.cside:first-child','.cside:last-child'] : [];
+  const positions = panel.scrollPositions ||= {};
+  for (const sel of selectors) {
+    const node = pbody.querySelector(sel);
+    if (node && node.clientHeight) positions[sel] = node.scrollTop;
+  }
   pbody.textContent = '';
   if (panel.hint) pbody.appendChild(el('p', 'hint', panel.hint));
   ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
+  for (const sel of selectors) {
+    const node = pbody.querySelector(sel);
+    if (node && positions[sel]) node.scrollTop = positions[sel];
+  }
   pbody.scrollTop = top;
 }
 
@@ -265,7 +276,7 @@ function talkWolf(e) {
     if (cordonStage()==='confirm') o.push({t:'Кто ушёл к разбитой колонне?',k:'key',fn:cordonConfirm});
     if (S.q.flash === 1) o.push({ t: 'Я насчёт Шустрого', k: 'key', fn: () => {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
-      const equipped=give('w_pm',1,{cond:85,mag:8}); give('a9',16); if (equipped) selectGun('w_pm',cnt('w_pm')-1); S.q.flash = 2;
+      const equipped=give('w_pm',1,{cond:85,mag:8}); give('a9',16); if (equipped) mountGear('w_pm',cnt('w_pm')-1,true); S.q.flash = 2;
       sys('Получено: ПМ, Патроны 9×18 ×24. Задание обновлено.');
       bulletin('Волк выдал ПМ. Цель: АТП на востоке.');
     } });
@@ -741,7 +752,7 @@ function hud(dt) {
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
   const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
-  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
+  const stt = [shelterStatus, energyActive() ? 'энергетик · ' + Math.ceil(S.flags.energyUntil-S.min) + ' с' : '', fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -838,10 +849,11 @@ addEventListener('keydown', e => {
   if (k === 'KeyH') quickHeal();
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
-  if (k === 'Digit5') setWeapon('grenade');
+  if (/^Digit[1-8]$/.test(k)) {
+    const id=WORDER[Number(k.slice(-1))-1];
+    if (id==='knife' || kitItem(kitSlot(id))===id) setWeapon(id);
+  }
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
-  if (/^Digit[678]$/.test(k)) setWeapon(WORDER[Number(k.slice(-1)) - 1]);
-  if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }
 });
@@ -925,7 +937,16 @@ $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); i
 $('rot-skip').addEventListener('click', () => document.body.classList.add('portrait-ok'));
 Object.keys(TB).forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); if (P.alive && !panel) TB[id](); }));
 ['mp-bandage', 'mp-medkit'].forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (P.alive && !panel) healWith(id === 'mp-medkit' ? 'medkit' : 'bandage'); }));
-$('wpnbox').addEventListener('click', () => { if (P.alive && !panel) cycleWeapon(1); });
+const weaponButton = $('wpnbox');
+function cycleFromHud() {
+  if (P.alive && !panel && !title.open) cycleWeapon(1);
+}
+weaponButton.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation(); cycleFromHud();
+});
+// Keyboard, assistive activation and programmatic clicks have no pointer press.
+weaponButton.addEventListener('click', e => { if (e.detail === 0) cycleFromHud(); });
 $('t-inv').addEventListener('click', () => { if (!panel && P.alive) { openPanel('inv', 'Рюкзак'); refresh(); } });
 $('t-pda').addEventListener('click', () => { if (!panel && P.alive) { openPanel('pda', 'КПК', PDA_TABS2); refresh(); } });
 $('t-menu').addEventListener('click', () => { if (!panel) { openPanel('menu', 'Меню'); refresh(); } });

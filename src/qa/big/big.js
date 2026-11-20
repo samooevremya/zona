@@ -610,6 +610,8 @@ Tt('D1_detectors_purchase_range_and_pickup', () => {
   const packed = S().money===0 && !signal() && z.near?.k !== 'art';
   const tiers = ['det_spark','det_contour','det_spectrum'].map((id,i) => {
     const limit = [6,15,30][i];
+    z.openPanel('inv','Рюкзак'); z.panel.sel=id; z.refresh();
+    controls().find(b=>b.textContent==='Взять в руки')?.click(); z.closePanel();
     key(6+i); stand(limit+.1);
     const outside = !signal();
     stand(limit-.1); const far = P().detT;
@@ -622,10 +624,52 @@ Tt('D1_detectors_purchase_range_and_pickup', () => {
   key(1); z.interact(); stand(0);
   const holstered = !S().inv.art_medusa && !signal() && z.near?.k !== 'art';
   document.getElementById('wpnbox').click();
-  key(6); stand(0); z.interact(); z.interact(); step(1);
+  key(8); stand(0); z.interact(); z.interact(); step(1);
   const collected = S().inv.art_medusa===1 && !signal();
   return {ok:absent && packed && tiers.every(Boolean) && saved && holstered && collected, absent,packed,tiers,saved,holstered,collected};
 });
 
+Tt('L1_carried_mass_and_energy', () => {
+  reset();
+  const drain=()=>{P().st=80;z.IN.sprint=true;z.IN.moveX=1;step(6);z.IN.moveX=0;z.IN.sprint=false;return 80-P().st;};
+  const regen=()=>{P().st=30;step(6);return P().st-30;};
+  const light=drain(), normal=regen();
+  S().inv.cans=35;
+  const heavy=drain();
+  S().money=300;z.openTrade(null);
+  const buy=document.querySelector('.their button[aria-label^="Энергетик"]');
+  buy.click();buy.click();document.querySelector('.deal').click();z.closePanel();
+  const drink=()=>{z.openPanel('inv','Рюкзак');z.panel.sel='energy';z.refresh();
+    [...document.querySelectorAll('.inv-detail button')].find(b=>b.textContent==='Выпить').click();z.closePanel();};
+  drink();const boost=drain(), quick=regen(), end=S().flags.energyUntil;
+  z.save(true);z.applyState(z.loadSave());
+  const saved=end===S().flags.energyUntil && S().inv.energy===1;
+  S().min+=10;drink();const renewed=Math.abs(S().flags.energyUntil-S().min-60)<.001;
+  S().min=S().flags.energyUntil;const expired=regen();
+  return {ok:heavy>light && boost<heavy*.7 && quick>normal*1.45 && saved && renewed && Math.abs(expired-normal)<.01,
+    light,heavy,boost,normal,quick,expired,saved,renewed};
+});
+Tt('L2_equipment_and_trade_scroll', () => {
+  reset();
+  Object.assign(S().inv,{w_pm:1,w_aksu:1,w_obrez:1,grenade:2,det_spark:1,det_spectrum:1});
+  const legacy=JSON.parse(JSON.stringify(S()));delete legacy.flags.kit;legacy.weapon='w_aksu';z.applyState(legacy);
+  const inv=()=>{z.openPanel('inv','Рюкзак');z.refresh();};
+  inv();
+  const six=document.querySelectorAll('.gear-slot .icell').length===6;
+  const grid=id=>document.querySelector('.pack-grid button[data-item="'+id+'"]');
+  const separate=!grid('w_pm') && !grid('w_aksu') && grid('w_obrez') && grid('det_spectrum');
+  grid('w_obrez').click();[...document.querySelectorAll('.inv-detail button')].find(b=>b.textContent==='В слот').click();
+  z.closePanel();window.dispatchEvent(new KeyboardEvent('keydown',{code:'Digit4'}));inv();
+  const swapped=!!grid('w_aksu') && !grid('w_obrez') && S().weapon==='w_obrez';
+  z.closePanel();z.save(true);z.applyState(z.loadSave());const kit=S().flags.kit;
+  Object.assign(S().inv,{tail:4,tentacle:4,hoof:4,vodka:8,antirad:8,cans:8,a9:8,a12:8,a545:8,sausage:8,art_blood:8});
+  z.openTrade(null);
+  const mine=()=>document.querySelector('.tr-col.mine'),their=()=>document.querySelector('.tr-col.their');
+  mine().scrollTop=mine().scrollHeight;their().scrollTop=24;
+  const a=mine().scrollTop,b=their().scrollTop;
+  mine().querySelector('button[aria-label^="Артефакт «Кровь камня»"]').click();
+  const retained=a>0 && Math.abs(mine().scrollTop-a)<=1 && Math.abs(their().scrollTop-b)<=1 && z.panel.offer.sell.art_blood===1;
+  z.closePanel();return {ok:six && !!separate && swapped && kit.primary==='w_obrez' && retained,six,separate:!!separate,swapped,retained};
+});
 return JSON.stringify(R);
 })()
