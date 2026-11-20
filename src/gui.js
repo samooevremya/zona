@@ -71,7 +71,10 @@ function drawPda2() {
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);
-  const focusPt = () => panel.focus === 'target' && selT[0] ? selT[0] : (inBunker(P.x, P.y) ? HATCH : P);
+  const focusPt = () => {
+    const p = panel.focus === 'target' && selT[0] ? selT[0] : P;
+    return inBunker(p.x, p.y) ? HATCH : p;
+  };
   requestAnimationFrame(() => {
     if (!cv2.isConnected) return;
     const fit = Math.min(w.clientWidth / PW, w.clientHeight / MH);      // ×1: вся карта влезает
@@ -87,9 +90,7 @@ function drawPda2() {
     const f = focusPt();
     w.scrollLeft = f.x / (PW * T) * cssW - w.clientWidth / 2; w.scrollTop = f.y / (MH * T) * cssH - w.clientHeight / 2;
   });
-  const lg = el('div', 'legend');
-  [['#e6dcb4', 'Ты'], ['#ffb347', 'Выбранное задание'], ['#dc9330', 'Другие цели'], ['#e0573a', 'SOS'], ['#d9c25a', 'Одиночки'], ['#d64541', 'Враги рядом'], ['#e8c070', 'Тайник']].forEach(x => { const s = el('span'); const i = el('i'); i.style.background = x[0]; s.appendChild(i); s.appendChild(document.createTextNode(x[1])); lg.appendChild(s); });
-  mapc.appendChild(lg);
+  mapc.appendChild(mapLegend());
   box.appendChild(mapc);
   // задания
   const qc = el('div', 'kpk-q');

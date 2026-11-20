@@ -188,3 +188,14 @@ img.b1ic.tall{width:62%;height:86%}
  .kpk{gap:6px}.kpk-map{gap:3px}
  .kpk .legend{flex-wrap:nowrap;overflow:hidden;gap:8px;font-size:10px;line-height:12px;white-space:nowrap}
 }
+
+/* Карта полевого КПК: матовый экран и общие с мини-картой обозначения. */
+.kpk-wrap{background:#292a23;border:1px solid #595448}
+.kpk-wrap #bigmap{image-rendering:auto}
+.kpk .map-key{display:flex;flex-wrap:wrap;align-items:center;gap:1px 8px;overflow:visible;color:#d3ccbb;line-height:15px}
+.map-key span{display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+.map-key canvas{width:15px;height:15px}
+#ov[data-kind=pda] .body{background:#25251f}
+.kpk-detail{background:#292a22;border-color:#504c3d}
+#ov[data-kind=pda] .kpk-bar .chip{border:1px solid #625e4e;border-radius:2px;background:linear-gradient(#37392f,#292a24);color:#ddd8c5;box-shadow:inset 0 1px #ffffff0c}
+#ov[data-kind=pda] .kpk-bar .chip.on{background:#42493a;border-color:#899278;color:#f3eed9}

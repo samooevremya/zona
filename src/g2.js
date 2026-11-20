@@ -177,12 +177,19 @@ function hostile(a, b) {
   if (pair('loner', 'player')) { const l = fa === 'loner' ? a : b; return S.rep <= -30 || !!l.angry; }
   return false;
 }
+function playerRelation(e) {
+  if (hostile(e, P)) return 'enemy';
+  if (e.fac !== 'loner') return 'neutral';
+  if (e.follow || (e.uid && S.flags['sosFriend_' + e.uid])) return 'friend';
+  if ((e.sid === 'tolik' && S.flags.tolikUp) || (e.sid === 'fox' && S.flags.foxUp) ||
+      (e.sid === 'shust' && S.flags.shustFree) || (e.sid === 'wolf' && S.q.pack === 3)) return 'friend';
+  return 'neutral';
+}
 function attWord(e) {
-  if (e.fac === 'trader') return 'нейтрал';
-  if (e.fac === 'mutant' || e.fac === 'bandit') return 'враг';
-  if (hostile(e, P)) return 'враг';
-  if (e.fac === 'army') return 'нейтрал';
-  return S.rep >= 20 ? 'друг' : S.rep < 0 ? 'не доверяет' : 'нейтрал';
+  const rel = playerRelation(e);
+  if (rel === 'enemy') return 'враг';
+  if (rel === 'friend') return 'друг';
+  return e.fac === 'loner' && S.rep < 0 ? 'не доверяет' : 'нейтрал';
 }
 function anger(e) {
   if (e.fac === 'loner' && !e.angry) {
@@ -193,7 +200,10 @@ function anger(e) {
   }
   if (e.fac === 'army' && !armyAngry) { armyAngry = true; S.flags.armyAngry = 1; msg('Военные открывают огонь!', 'bad'); }
 }
-function markAngry(e) { if (e.sid) { S.flags.angry = S.flags.angry || {}; S.flags.angry[e.sid] = 1; } }
+function markAngry(e) {
+  const id = e.sid || e.uid;
+  if (id) { S.flags.angry = S.flags.angry || {}; S.flags.angry[id] = 1; }
+}
 
 /* ===================== движение и столкновения ===================== */
 function pushOut(e, rx, ry, rw, rh) {
@@ -392,7 +402,10 @@ function melee(sh, W) {
 }
 function hurt(e, dmg, src, ang) {
   if (!e.alive) return;
-  if (src && (src === P || src.follow)) e.hitByP = 1;
+  if (src && (src === P || src.follow)) {
+    e.hitByP = 1;
+    if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
+  }
   if (e === P) {
     dmg *= 1 - def(); hurtFlash = Math.min(0.6, hurtFlash + 0.35); play('hurt'); shake(4);
     if (src && src.x !== undefined) { HURTDIR.push({ a: Math.atan2(src.y - P.y, src.x - P.x), life: 1.2 }); if (HURTDIR.length > 6) HURTDIR.shift(); }

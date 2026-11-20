@@ -20,6 +20,9 @@ art+='\n'+open('art/b2/items.inline.js',encoding='utf8').read()+'\nwindow.CORDON
 art+='\n'+'\n'.join(open('art/g7/'+f,encoding='utf8').read() for f in ['assets.inline.js','renderer.js','portraits.js','rig.inline.nodead.js','rig.js','pose-keys.js'])
 art+='\n'+open('art/g8/g8.inline.js',encoding='utf8').read()
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
+if BIGF:
+    aerial = _b64.b64encode(open('art/cordon-aerial.webp', 'rb').read()).decode()
+    art += '\nwindow.CORDON_AERIAL="data:image/webp;base64,' + aerial + '";'
 OUT = 'index_big.html' if BIGF else 'index.html' if MAPFLAG == 'rc1' else 'index_k07.html'
 open(OUT,'w',encoding='utf8').write(h+sp+"\n"+icons+"\n"+b+"\n<script>window.ZONA_MAP="+repr(MAPFLAG)+";"+("window.ZONA_BIG=1;" if BIGF else "")+"\n"+art+"\n</script>\n<script>\n"+js+"</script>\n</body>\n</html>\n")
 print('built', OUT, MAPFLAG)
