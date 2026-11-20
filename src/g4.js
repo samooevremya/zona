@@ -317,7 +317,43 @@ function gensetProc(g, o) {   // прежняя процедурная отри�
   g.fillStyle = '#56603e'; g.fillRect(o.x, o.y, o.w, o.h); g.fillStyle = '#3a4029'; g.fillRect(o.x + 3, o.y + 3, o.w - 6, 6);
   g.fillStyle = '#2a2a26'; g.fillRect(o.x + o.w - 8, o.y + o.h - 9, 6, 6); g.fillStyle = '#8a8a7a'; g.fillRect(o.x + 4, o.y + o.h - 6, 10, 3);
 }
+// Дорожный отбойник. Контактная тень и подошва привязаны к прямоугольнику столкновения.
+function drawRoadblock(g, o) {
+  const w = o.w, h = o.h;
+  g.save(); g.translate(o.x, o.y);
+  if (SHADOWS) {
+    g.fillStyle = 'rgba(27,24,19,.35)';
+    g.beginPath(); g.ellipse(w / 2 + SUN_DX * 5, h / 2 + SUN_DY * 5, w * .54, h * .68, 0, 0, 2 * Math.PI); g.fill();
+  }
+  // Один рисунок заполнителя на всех гранях, разный срез текстуры для каждого блока.
+  function face(points, tone) {
+    g.save(); g.beginPath(); g.moveTo(points[0], points[1]);
+    for (let i = 2; i < points.length; i += 2) g.lineTo(points[i], points[i + 1]);
+    g.closePath(); g.fillStyle = tone; g.fill();
+    if (ART) {
+      g.clip(); g.globalAlpha = .45; g.translate(-w, 0);
+      artFill(g, 'wall_concrete', w - 2, -12, w + 5, h + 15);
+    }
+    g.restore();
+  }
+  face([0, 3, w - 3, 2, w, 5, w, h - 2, w - 3, h, 2, h, 0, h - 3], '#5c5950');
+  face([1, h - 4, 4, h - 9, w - 5, h - 9, w - 2, h - 4, w - 4, h - 2, 2, h - 2], '#989487');
+  face([4, h - 9, 3, -4, w - 7, -4, w - 5, h - 9], '#827f72');
+  face([w - 7, -9, w - 3, -7, w - 2, 1, w, 5, w, h - 3, w - 5, h - 9], '#656157');
+  face([1, -7, 3, -10, w - 7, -10, w - 3, -7, w - 7, -4, 3, -4], '#b2aea0');
+  // Петли утоплены в гребень плиты. Сколы нарушают ровную светлую кромку.
+  for (const x of [w * .23, w * .74]) {
+    g.beginPath(); g.ellipse(x, -7.5, 2.5, 1.6, -.2, Math.PI, 2 * Math.PI);
+    g.strokeStyle = '#595148'; g.lineWidth = 1.2; g.stroke();
+  }
+  for (let i = 0; i < 8; i++) {
+    const x = 4 + hash2(w, i) * (w - 12);
+    g.fillStyle = i % 2 ? '#615e55' : '#aaa593'; g.fillRect(x, i % 2 ? -4.8 : h - 5, 1 + hash2(i, w) * 3, 1.1);
+  }
+  g.restore();
+}
 function drawStaticObj(g, o) {
+  if (o.roadblock) { drawRoadblock(g, o); return; }
   if (ART && artStatic(g, o)) return;
   if (o.k === 'genset') { if (!(G3.on && G3.pack && G3.pack.manifest.props && G3.pack.manifest.props.generator)) gensetProc(g, o); return; }   // растр G4 рисуется в динамическом слое
   if (o.k === 'tracks') {
