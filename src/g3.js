@@ -393,7 +393,7 @@ function takeArt(a) {
 function freeShust(e) {
   e.captive = 0; S.flags.shustFree = 1;
   e.home = (h => ({ x: h[0], y: h[1] }))(RMp(34.5 * T, 80.5 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; news('Шустрый освобождён. Флешка у тебя.'); }
+  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; bulletin('Шустрый освобождён. Флешка у тебя.'); }
 }
 
 let fadeT = 0, fadeTo = null;
@@ -408,7 +408,7 @@ function healWounded(e) {
   if (e.sid === 'tolik') {
     S.flags.tolikUp = 1; S.q2.tolik = 2; S.stats.q++; S.rep += 10; S.money += 300; give('antirad', 1);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-    news('Выполнено: раненый у дороги. Толик выжил.');
+    bulletin('Выполнено: раненый у дороги. Толик выжил.');
   }
   if (e.sid === 'fox') {
     S.flags.foxUp = 1; S.q2.fox = 2;

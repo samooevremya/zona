@@ -24,7 +24,7 @@ function revealCache(fromName, idx) {
   const i = idx != null && free.includes(idx) ? idx : free[ri(0, free.length - 1)];
   S.caches[i] = 1;
   const c = CACHES[i];
-  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
+  bulletin('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
 }
 const cond = id => (S.cond[id] === undefined ? 80 : S.cond[id]);
 function wearAndJam(id) {

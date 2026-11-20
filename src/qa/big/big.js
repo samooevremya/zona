@@ -158,5 +158,20 @@ Tt('K12_sos_radio', () => {
   const journal = S().news.some(n => n.x.startsWith('SOS!')) && S().news.some(n => n.x.includes('потеряна'));
   return { ok: received && priority && closed && journal, received, priority, closed, journal };
 });
+Tt('K13_pda_quest_bulletin', () => {
+  reset(); z.clearMsgs();
+  S().q.pack = 1;
+  z.ents.filter(e => e.pack === 'lair').forEach(e => { e.alive = 0; });
+  // Обычный игровой цикл проверяет завершение задания.
+  step(60);
+  const report = S().news.find(n => n.x.includes('Стая у леса перебита'));
+  const shown = !!report && B.msgs().includes(report.x);
+  S().sos.next = S().min;
+  z.plus.sosTick();
+  const sosFirst = B.msgs()[0]?.startsWith('SOS!');
+  S().blow.next = S().min; step(2);
+  const order = B.msgs();
+  return { ok: shown && sosFirst && /приближается выброс/i.test(order[0]) && order[1]?.startsWith('SOS!') && order.includes(report.x), shown, sosFirst };
+});
 return JSON.stringify(R);
 })()

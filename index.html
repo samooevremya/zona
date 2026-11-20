@@ -1537,13 +1537,25 @@ function radioNotice(t, urgent = false) {
     radioQueue.splice(i, 1);
   }
   const note = { t, k, life: urgent ? 10 : 6 };
-  if (urgent) radioQueue.unshift(note);
-  else radioQueue.push(note);
+  const position = !urgent && radioQueue[0]?.k === 'radio urgent' ? 1 : 0;
+  radioQueue.splice(position, 0, note);
   return true;
 }
 function news(t) {
   S.news.push({ t: S.min, x: t });
   if (S.news.length > 60) S.news.shift();
+}
+function bulletin(t) {
+  news(t);
+  const pending = radioQueue.filter(note => note.k === 'radio bulletin');
+  if (pending.some(note => note.t === t)) return;
+  // Короткая серия идёт по одной строке. Большая пачка оставляет одну подсказку о журнале.
+  if (pending.length >= 2) {
+    if (pending.some(note => note.digest)) return;
+    radioQueue.push({ t: 'Другие сводки — в журнале КПК.', k: 'radio bulletin', life: 4, digest: true });
+  } else {
+    radioQueue.push({ t, k: 'radio bulletin', life: 5 });
+  }
 }
 function radioNews(t, urgent = false) {
   if (radioNotice(t, urgent)) { news(t); play('pda'); }
@@ -1956,13 +1968,13 @@ function kill(e, src) {
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
     const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
-    news('Погиб сталкер ' + e.name + '. Причина: ' + why + '.');
+    bulletin('Погиб сталкер ' + e.name + '. Причина: ' + why + '.');
   } else if (e.fac === 'bandit' && src && src.fac === 'loner' && dE(e, P) > 380) {
-    news('Одиночки убили бандита по кличке ' + e.name + '.');
+    bulletin('Одиночки убили бандита по кличке ' + e.name + '.');
   }
   if (e.sid === 'tolik' && S.q2.tolik !== 2) S.q2.tolik = 3;
-  if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; msg('Лис погиб.', 'bad'); }
-  if (e.sid === 'shust' && S.q.flash > 0 && S.q.flash < 3) { S.q.flash = 4; S.flags.flashFail = 1; msg('Шустрый погиб. Флешку уже не вернуть.', 'bad'); news('Задание провалено: Флешка Шустрого.'); }
+  if (e.sid === 'fox' && S.q2.fox > 0 && S.q2.fox < 4) { S.q2.fox = 4; S.flags.foxFail = 1; bulletin('Лис погиб. Задание провалено.'); }
+  if (e.sid === 'shust' && S.q.flash > 0 && S.q.flash < 3) { S.q.flash = 4; S.flags.flashFail = 1; bulletin('Шустрый погиб. Задание «Флешка Шустрого» провалено.'); }
   checkQuests(); plusKill(e, src);
 }
 function dropBody(e) {
@@ -2313,11 +2325,11 @@ function qList() {
   return L;
 }
 function checkQuests() {
-  if (S.q2.fox === 2 && !ents.some(e => e.alive && e.pack === 'foxdogs')) { S.q2.fox = 3; msg('Стая отбита. Поговори с Лисом.', 'good'); }
-  if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); news('У дороги лежит раненый сталкер, просит аптечку.'); }
-  if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; msg('Стая перебита. Вернись к Волку.', 'good'); news('Стая у леса перебита.'); }
+  if (S.q2.fox === 2 && !ents.some(e => e.alive && e.pack === 'foxdogs')) { S.q2.fox = 3; bulletin('Стая отбита. Поговори с Лисом.'); }
+  if (S.q2.tolik === 0 && P && P.alive && byS('tolik') && byS('tolik').captive && dE(P, byS('tolik')) < 260) { S.q2.tolik = 1; msg('Толик: — Братишка... помоги... аптечку...', 'say'); bulletin('У дороги лежит раненый сталкер, просит аптечку.'); }
+  if (S.q.pack === 1 && !ents.some(e => e.alive && e.pack === 'lair')) { S.q.pack = 2; bulletin('Стая у леса перебита. Вернись к Волку.'); }
   if (!S.flags.atpClear && ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'boss'].every(s => S.dead[s])) {
-    S.flags.atpClear = 1; msg('АТП очищено от бандитов.', 'good'); news('Бандиты на АТП перебиты.');
+    S.flags.atpClear = 1; bulletin('Бандиты на АТП перебиты.');
     ['petr', 'petr2'].forEach(s => { const e = byS(s); if (e) { const p = locPt('atp', s); e.home = { x: p.x, y: p.y }; e.stay = 1; } });
   }
 }
@@ -2749,7 +2761,7 @@ function takeArt(a) {
 function freeShust(e) {
   e.captive = 0; S.flags.shustFree = 1;
   e.home = (h => ({ x: h[0], y: h[1] }))(RMp(34.5 * T, 80.5 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; news('Шустрый освобождён. Флешка у тебя.'); }
+  if (S.q.flash === 2 || S.q.flash === 1) { give('flash', 1); S.q.flash = 3; bulletin('Шустрый освобождён. Флешка у тебя.'); }
 }
 
 let fadeT = 0, fadeTo = null;
@@ -2764,7 +2776,7 @@ function healWounded(e) {
   if (e.sid === 'tolik') {
     S.flags.tolikUp = 1; S.q2.tolik = 2; S.stats.q++; S.rep += 10; S.money += 300; give('antirad', 1);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-    news('Выполнено: раненый у дороги. Толик выжил.');
+    bulletin('Выполнено: раненый у дороги. Толик выжил.');
   }
   if (e.sid === 'fox') {
     S.flags.foxUp = 1; S.q2.fox = 2;
@@ -3910,7 +3922,7 @@ function revealCache(fromName, idx) {
   const i = idx != null && free.includes(idx) ? idx : free[ri(0, free.length - 1)];
   S.caches[i] = 1;
   const c = CACHES[i];
-  news('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
+  bulletin('В КПК ' + (fromName ? fromName : 'покойника') + ' нашлись координаты тайника. Метка на карте.');
 }
 const cond = id => (S.cond[id] === undefined ? 80 : S.cond[id]);
 function wearAndJam(id) {
@@ -5086,7 +5098,7 @@ function jobTake(j) {
   S.jobs.act = a;
   S.jobs.offer = S.jobs.offer.filter(o => o !== j);
   if (a.k === 'clear') spawnClear(a);
-  news('Заказ взят: ' + a.n_ + '.');
+  bulletin('Заказ взят: ' + a.n_ + '.');
 }
 function spawnClear(j) {
   const have = ents.filter(e => e.alive && e.jobTag === j.id).length;
@@ -5101,7 +5113,7 @@ function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag 
 function jobCancel() {
   const j = S.jobs.act; if (!j) return;
   j.status = 'cancelled'; releaseGroup(j.id); S.jobs.act = null; S.rep -= 2;
-  news('Заказ отменён: ' + j.n_ + '.');
+  bulletin('Заказ отменён: ' + j.n_ + '.');
 }
 function jobTurnIn(artId) {
   const j = S.jobs.act;
@@ -5120,7 +5132,7 @@ function jobTurnIn(artId) {
   S.money += pay; S.jobs.done = (S.jobs.done || 0) + 1; S.rep += 4; S.stats.q++;
   if (S.jobs.done % 5 === 0) { give('medkit', 2); give('grenade', 1); sys('Премия за постоянство: аптечка ×2, граната.'); }
   say(['Вот это я понимаю, работа. Держи.', 'Без обмана. Деньги твои.', 'Нормально. Заходи ещё, заказы будут.'][S.jobs.done % 3]);
-  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); news('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
+  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); bulletin('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
   return true;
 }
 const artPay = id => Math.round(sellPrice(id) * 1.5 / 10) * 10;
@@ -5323,10 +5335,10 @@ function finishEncounter(reason) {
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
     msg('Благодарность: ' + pay + ' RU, ' + ITEMS[gift].n + '.', 'good');
-    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
+    bulletin('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
     S.sos.saved = (S.sos.saved || []).concat([{ name: lead, t: S.min, where: a.where }]).slice(-10);
-  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
-  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
+  } else if (reason === 'self') bulletin('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
+  else if (reason === 'dead') bulletin('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
   else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
@@ -5619,13 +5631,13 @@ function plusKill(e, src) {
   const byMe = src === P || (src && src.follow);
   const j = S.jobs.act;
   if (j && j.status === 'active') {
-    if (j.k === 'hunt' && byMe && e.kind === j.kind) { j.got++; msg('Заказ: ' + Math.min(j.got, j.n) + ' из ' + j.n + (j.got >= j.n ? '. Возвращайся к Сидоровичу.' : '.'), 'good'); }
-    if (j.k === 'clear' && e.jobTag === j.id) { j.got++; if (j.got >= j.n) { msg('Зачистка выполнена. Возвращайся к Сидоровичу.', 'good'); news('Заказ: бандиты ' + j.where + ' уничтожены.'); } }
+    if (j.k === 'hunt' && byMe && e.kind === j.kind) { j.got++; bulletin('Заказ: ' + Math.min(j.got, j.n) + ' из ' + j.n + (j.got >= j.n ? '. Возвращайся к Сидоровичу.' : '.')); }
+    if (j.k === 'clear' && e.jobTag === j.id) { j.got++; if (j.got >= j.n) { bulletin('Заказ: бандиты ' + j.where + ' уничтожены. Возвращайся к Сидоровичу.'); } }
   }
   const a = S.sos.act;
   if (a && e.sosFoe === a.id && byMe) a.pk = (a.pk || 0) + 1;
-  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.'); }
-  if (e.follow) { msg('Напарник погиб: ' + e.name + '.', 'bad'); news('Погиб напарник ' + e.name + '.'); }
+  if (e.kind === 'sucker') { S.q3.sucker = 2; bulletin('Кровосос в хлеву убит. Возвращайся к Волку.'); }
+  if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
   const d = dst(P.x, P.y, FIRE.x, FIRE.y);
@@ -5655,12 +5667,12 @@ function wolfPlusOpts() {
   const o = wolfRC1Opts();
   if (S.q.flash >= 2 && S.q3.sucker === 0) o.push({ t: 'Говорят, люди пропадают?', fn: () => {
     say('Пропадают. Двое наших пошли к старому хлеву за фермой, на северо-востоке, и с концами. Хомяк клянётся, что видел там, как воздух сам по себе дышит. Сходи, только не ночью. Принесёшь доказательство, что тварь мертва, деревня скинется: две тысячи и аптечки.');
-    S.q3.sucker = 1; news('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
+    S.q3.sucker = 1; bulletin('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
   } });
   if (S.q3.sucker === 2) o.push({ t: 'С тварью в хлеву покончено', k: 'key', fn: () => {
     S.money += 2000; give('medkit', 3); S.q3.sucker = 3; S.stats.q++; S.rep += 15;
     say('Сам ходил смотреть: лежит. Ну и мерзость. Держи, как обещали, и спасибо от всей деревни.');
-    sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); news('Выполнено: Ночной гость.'); save(true);
+    sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); bulletin('Выполнено: Ночной гость.'); save(true);
   } });
   return o;
 }
@@ -6124,7 +6136,7 @@ function pickUp(o) {
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
   play('pick');
   const q = q5();
-  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; news('Предохранитель и топливо у тебя. Неси к генератору у костра.'); }
+  if (q.st === 'collecting' && has('fuse') && has('fuel')) { q.st = 'ready'; bulletin('Предохранитель и топливо у тебя. Неси к генератору у костра.'); }
   else if (q.st === 'not_started') news('Нашёл ' + ITEMS[o.pick].n.toLowerCase() + '. Кому-то в деревне это может пригодиться.');
 }
 /* разговор с Волком */
@@ -6133,13 +6145,13 @@ function wolfRC1Opts() {
   const o = [], q = q5(), c = q3c();
   if (q.st === 'not_started' && S.q.flash >= 1) o.push({ t: 'Что с генератором у костра?', fn: () => {
     say('Стоит без дела с весны. Мотор целый, сгорел предохранитель, и бензина ни капли. Предохранитель поищи на старой водокачке к северу, там щиток был. Канистры видели на АТП, у бандитов. Принесёшь — вечером будет свет, и верстак заработает.');
-    q.st = has('fuse') && has('fuel') ? 'ready' : 'collecting'; news('Задание: Свет в деревне. Предохранитель — водокачка, топливо — АТП.');
+    q.st = has('fuse') && has('fuel') ? 'ready' : 'collecting'; bulletin('Задание: Свет в деревне. Предохранитель — водокачка, топливо — АТП.');
   } });
   if (q.st === 'completed') o.push({ t: 'Как вам со светом?', fn: () => say('Живём как люди. Вечером у костра видно, кто пришёл, а не только кто стреляет. И верстак теперь твой, пользуйся.') });
   if (S.q3.sucker >= 1 && S.q3.sucker < 3 && !c.story) o.push({ t: 'Расскажи подробнее про хлев', fn: () => {
     c.story = 1;
     say('Хомяк ночью шёл мимо фермы и видел следы босых ног, будто человек, только пальцы длинные. От фермы они уходят к хлеву на востоке. Если пойдёшь — бинты возьми побольше: кого оно цепляет, тот кровью истекает.');
-    news('Ночной гость: следы у фермы ведут к хлеву. Возьми бинты.');
+    bulletin('Ночной гость: следы у фермы ведут к хлеву. Возьми бинты.');
   } });
   if (S.q3.sucker === 3) o.push({ t: 'Ферма теперь спокойная?', fn: () => say('Лис говорит, по ночам больше никто не скребётся в стену. Спасибо тебе от всех, кто туда ходит.') });
   return o;
@@ -6159,7 +6171,7 @@ function gensetUse() {
   take('fuse', 1); take('fuel', 1); q.st = 'completed';
   if (!q.rewarded) { q.rewarded = 1; S.money += 600; S.rep += 10; S.stats.q++; }
   play('reload'); msg('Генератор заработал. Вечером в деревне будет свет.', 'good');
-  news('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
+  bulletin('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
@@ -6182,11 +6194,11 @@ function targetsRC1(out) {
 function cluesTick() {
   if (MAP_ID !== 'rc1' || !P || !P.alive || S.q3.sucker !== 1) return;
   const c = q3c();
-  if (!c.tracks && dst(P.x, P.y, locPt('farm', 'tracks').x, locPt('farm', 'tracks').y) < 70) { c.tracks = 1; msg('Следы босых ног с длинными пальцами. Уходят на восток, к хлеву.', 'say'); news('Ночной гость: следы у фермы ведут к хлеву.'); }
+  if (!c.tracks && dst(P.x, P.y, locPt('farm', 'tracks').x, locPt('farm', 'tracks').y) < 70) { c.tracks = 1; msg('Следы босых ног с длинными пальцами. Уходят на восток, к хлеву.', 'say'); bulletin('Ночной гость: следы у фермы ведут к хлеву.'); }
   const porch = locPt('lair', 'porch');
   if (!c.warned && dst(P.x, P.y, porch.x, porch.y) < 160) { c.warned = 1; msg('Внутри что-то дышит. Тварь невидима, пока не кинется; её удар вызывает кровотечение. Держи бинты под рукой.', 'bad'); }
   const ins = locPt('lair', 'inside');
-  if (!c.barn && dst(P.x, P.y, ins.x, ins.y) < 90) { c.barn = 1; news('Ночной гость: в хлеву кости и обрывки курток. Тварь где-то рядом.'); }
+  if (!c.barn && dst(P.x, P.y, ins.x, ins.y) < 90) { c.barn = 1; bulletin('Ночной гость: в хлеву кости и обрывки курток. Тварь где-то рядом.'); }
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
@@ -7423,7 +7435,7 @@ function talk(e) {
     const o = [];
     if (S.q2.fox === 3) o.push({ t: 'Что знаешь про Стрелка?', k: 'key', fn: () => {
       say('Стрелок? Слышал. Ходил на север дальше всех и возвращался. Лично не знал. А вот брат мой, Серый, с его группой пересекался. Он на Свалке, в ангаре. Скажешь, что от Лиса.');
-      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); news('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
+      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); bulletin('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
     } });
     o.push({ t: 'Бывай', close: 1 });
     return o;
@@ -7471,16 +7483,16 @@ function talkWolf(e) {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
       give('w_pm', 1); give('a9', 16); S.mag.w_pm = 8; setWeapon('w_pm'); S.q.flash = 2;
       sys('Получено: ПМ, Патроны 9×18 ×24. Задание обновлено.');
-      news('Волк выдал ПМ. Цель: АТП на востоке.');
+      bulletin('Волк выдал ПМ. Цель: АТП на востоке.');
     } });
     if (S.q.flash >= 2 && S.q.pack === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
       say('Есть. В лесу на северо-западе завелась стая слепых псов, уже двоих наших порвали. Перебьёшь, отдам обрез и патроны к нему.');
-      S.q.pack = 1; news('Задание: перебить стаю слепых псов в северо-западном лесу.');
+      S.q.pack = 1; bulletin('Задание: перебить стаю слепых псов в северо-западном лесу.');
     } });
     if (S.q.pack === 2) o.push({ t: 'Стаи больше нет', k: 'key', fn: () => {
       if (!has('w_obrez')) { give('w_obrez', 1); give('a12', 12); sys('Получено: Обрез, Дробь ×12.'); } else { give('a12', 12); S.money += 500; sys('Получено: Дробь ×12, 500 RU.'); }
       say('Уважаю. Слово держу. И людям расскажу, что ты наш.');
-      S.q.pack = 3; S.stats.q++; S.rep += 10; news('Выполнено: Стая у леса.'); save(true);
+      S.q.pack = 3; S.stats.q++; S.rep += 10; bulletin('Выполнено: Стая у леса.'); save(true);
     } });
     wolfPlusOpts().forEach(x => o.push(x));
     o.push({ t: 'Что посоветуешь?', fn: () => say('Не стой на открытом, двигайся. Кидай болты, где воздух дрожит. Ночью включай голову: псы в темноте видят лучше тебя. И считай патроны, магазин кончается всегда не вовремя.') });
@@ -7494,7 +7506,7 @@ function talkTrader() {
     return dialog(SIDCARD(), ['Очухался, Меченый? Тебя сняли с грузовика смерти, с таких живыми не возвращаются. Ты первый на моей памяти.', 'В КПК у тебя одна запись: «Убить Стрелка». Имени не помнишь, так и будешь Меченым, по наколке. Я тебе жизнь спас, за тобой должок.'], () => [
       { t: 'Что за работа?', k: 'key', fn: () => {
         say('Мой курьер, Шустрый, пропал вместе с флешкой. Говорят, его взяли бандиты. Иди к Волку в деревню новичков, он поможет. Флешку принесёшь мне, остальное потом.');
-        S.q.flash = 1; news('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
+        S.q.flash = 1; bulletin('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
         sys('Задание: Флешка Шустрого. Метка на миникарте.');
         panel.opts = traderOpts;
       } }
@@ -7507,19 +7519,19 @@ function traderOpts() {
   if (S.q.flash === 3 && has('flash')) o.push({ t: 'Отдать флешку Шустрого', k: 'key', fn: () => {
     take('flash', 1); S.money += 1500; S.q.flash = 4; S.flags.flashDone = 1; S.stats.q++; S.rep += 15;
     say('Вот это дело. Держи полторы тысячи, заработал.');
-    sys('Получено: 1500 RU. Задание выполнено.'); news('Выполнено: Флешка Шустрого.'); save(true);
+    sys('Получено: 1500 RU. Задание выполнено.'); bulletin('Выполнено: Флешка Шустрого.'); save(true);
   } });
   if (S.q.flash === 4 && S.flags.flashDone && S.q2.fox === 0) o.push({ t: 'Что со Стрелком?', k: 'key', fn: () => {
     say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры.');
-    S.q2.fox = 1; news('Задание: Найти Лиса за насыпью.');
+    S.q2.fox = 1; bulletin('Задание: Найти Лиса за насыпью.');
   } });
   if (S.q.medusa === 1 && has('art_medusa')) o.push({ t: 'Отдать «Медузу» за 1000 RU', k: 'key', fn: () => {
     take('art_medusa', 1); S.money += 1000; S.q.medusa = 2; S.stats.q++;
-    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); news('Выполнено: «Медуза» для Сидоровича.');
+    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); bulletin('Выполнено: «Медуза» для Сидоровича.');
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     say('Нужна «Медуза». Ищи на поле аномалий за ржавым автобусом у дороги. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
-    S.q.medusa = 1; news('Задание: «Медуза» для Сидоровича.');
+    S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
   if (S.rep <= -30) o.push({ t: 'Уладить с одиночками · 2000 RU', k: 'key', d: S.money < 2000, fn: () => {

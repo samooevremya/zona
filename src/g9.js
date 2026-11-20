@@ -74,7 +74,7 @@ function jobTake(j) {
   S.jobs.act = a;
   S.jobs.offer = S.jobs.offer.filter(o => o !== j);
   if (a.k === 'clear') spawnClear(a);
-  news('Заказ взят: ' + a.n_ + '.');
+  bulletin('Заказ взят: ' + a.n_ + '.');
 }
 function spawnClear(j) {
   const have = ents.filter(e => e.alive && e.jobTag === j.id).length;
@@ -89,7 +89,7 @@ function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag 
 function jobCancel() {
   const j = S.jobs.act; if (!j) return;
   j.status = 'cancelled'; releaseGroup(j.id); S.jobs.act = null; S.rep -= 2;
-  news('Заказ отменён: ' + j.n_ + '.');
+  bulletin('Заказ отменён: ' + j.n_ + '.');
 }
 function jobTurnIn(artId) {
   const j = S.jobs.act;
@@ -108,7 +108,7 @@ function jobTurnIn(artId) {
   S.money += pay; S.jobs.done = (S.jobs.done || 0) + 1; S.rep += 4; S.stats.q++;
   if (S.jobs.done % 5 === 0) { give('medkit', 2); give('grenade', 1); sys('Премия за постоянство: аптечка ×2, граната.'); }
   say(['Вот это я понимаю, работа. Держи.', 'Без обмана. Деньги твои.', 'Нормально. Заходи ещё, заказы будут.'][S.jobs.done % 3]);
-  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); news('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
+  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); bulletin('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
   return true;
 }
 const artPay = id => Math.round(sellPrice(id) * 1.5 / 10) * 10;
@@ -311,10 +311,10 @@ function finishEncounter(reason) {
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
     msg('Благодарность: ' + pay + ' RU, ' + ITEMS[gift].n + '.', 'good');
-    news('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
+    bulletin('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
     S.sos.saved = (S.sos.saved || []).concat([{ name: lead, t: S.min, where: a.where }]).slice(-10);
-  } else if (reason === 'self') news('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
-  else if (reason === 'dead') news('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
+  } else if (reason === 'self') bulletin('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
+  else if (reason === 'dead') bulletin('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
   else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
@@ -607,13 +607,13 @@ function plusKill(e, src) {
   const byMe = src === P || (src && src.follow);
   const j = S.jobs.act;
   if (j && j.status === 'active') {
-    if (j.k === 'hunt' && byMe && e.kind === j.kind) { j.got++; msg('Заказ: ' + Math.min(j.got, j.n) + ' из ' + j.n + (j.got >= j.n ? '. Возвращайся к Сидоровичу.' : '.'), 'good'); }
-    if (j.k === 'clear' && e.jobTag === j.id) { j.got++; if (j.got >= j.n) { msg('Зачистка выполнена. Возвращайся к Сидоровичу.', 'good'); news('Заказ: бандиты ' + j.where + ' уничтожены.'); } }
+    if (j.k === 'hunt' && byMe && e.kind === j.kind) { j.got++; bulletin('Заказ: ' + Math.min(j.got, j.n) + ' из ' + j.n + (j.got >= j.n ? '. Возвращайся к Сидоровичу.' : '.')); }
+    if (j.k === 'clear' && e.jobTag === j.id) { j.got++; if (j.got >= j.n) { bulletin('Заказ: бандиты ' + j.where + ' уничтожены. Возвращайся к Сидоровичу.'); } }
   }
   const a = S.sos.act;
   if (a && e.sosFoe === a.id && byMe) a.pk = (a.pk || 0) + 1;
-  if (e.kind === 'sucker') { S.q3.sucker = 2; msg('Тварь мертва. Возвращайся к Волку.', 'good'); news('Кровосос в хлеву убит.'); }
-  if (e.follow) { msg('Напарник погиб: ' + e.name + '.', 'bad'); news('Погиб напарник ' + e.name + '.'); }
+  if (e.kind === 'sucker') { S.q3.sucker = 2; bulletin('Кровосос в хлеву убит. Возвращайся к Волку.'); }
+  if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
   const d = dst(P.x, P.y, FIRE.x, FIRE.y);
@@ -643,12 +643,12 @@ function wolfPlusOpts() {
   const o = wolfRC1Opts();
   if (S.q.flash >= 2 && S.q3.sucker === 0) o.push({ t: 'Говорят, люди пропадают?', fn: () => {
     say('Пропадают. Двое наших пошли к старому хлеву за фермой, на северо-востоке, и с концами. Хомяк клянётся, что видел там, как воздух сам по себе дышит. Сходи, только не ночью. Принесёшь доказательство, что тварь мертва, деревня скинется: две тысячи и аптечки.');
-    S.q3.sucker = 1; news('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
+    S.q3.sucker = 1; bulletin('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
   } });
   if (S.q3.sucker === 2) o.push({ t: 'С тварью в хлеву покончено', k: 'key', fn: () => {
     S.money += 2000; give('medkit', 3); S.q3.sucker = 3; S.stats.q++; S.rep += 15;
     say('Сам ходил смотреть: лежит. Ну и мерзость. Держи, как обещали, и спасибо от всей деревни.');
-    sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); news('Выполнено: Ночной гость.'); save(true);
+    sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); bulletin('Выполнено: Ночной гость.'); save(true);
   } });
   return o;
 }
