@@ -808,5 +808,16 @@ Tt('M3_walk_the_western_road', () => {
   return {ok:p===P() && s===S() && maxStep<7 && p.y>260*T && walked>120*T,
     walkedTiles:Math.round(walked/T),maxStepPx:+maxStep.toFixed(2)};
 });
+Tt('M4_roadside_signs_and_barge_loot', () => {
+  reset();
+  const tiles=window.__bigTiles(), village=M.LOC.zalissya.bounds;
+  const signs=M.objs.filter(o=>o.k==='signpost' && o.village);
+  const tileAt=o=>tiles[Math.floor((o.y+o.h/2)/T)*M.MW+Math.floor((o.x+o.w/2)/T)];
+  const verges=signs.length===2 && signs.every(o=>o.solid && tileAt(o)===0)
+    && signs.some(o=>o.x/T<village[0]) && signs.some(o=>(o.x+o.w/2)/T>village[2]);
+  const cargo=M.objs.find(o=>o.stash==='lz_barge');
+  const reach=cargo && tileAt(cargo)!==3 && !!z.findPath(46*T,297*T,cargo.x+T,cargo.y);
+  return {ok:!!(verges && reach),verges,reach:!!reach};
+});
 return JSON.stringify(R);
 })()

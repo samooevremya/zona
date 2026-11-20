@@ -11,7 +11,7 @@ const lesserPlaces = [
   ['cowsheds','Коровники',[111,17,132,33],[123,26]],
   ['tower_lz','Водонапорная башня',[73,25,81,32],[78,31]],
   ['sphere','Комплекс «Сфера»',[152,37,176,54],[155,48]],
-  ['barge','Баржа в старице',[25,78,37,88],[34,81]],
+  ['barge','Баржа в старице',[25,78,42,88],[40,80]],
   ['survey','Пост замеров',[67,73,80,85],[74,81]],
   ['bulge','Бульба',[118,65,133,78],[126,75]],
   ['postal','Почтовое отделение',[54,37,64,47],[60,44]],
@@ -84,7 +84,7 @@ function makeLesserZone() {
   lane([[127,-13],[118,-8],[111,-3],[111,3],[104,11],[94,23],[89,35],[90,46]],1.4);
   lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[155,48],[172,50],[190,58],[191,69]],2);
   lane([[48,27],[39,29],[32,38],[29,51],[38,59],[55,69],[67,61],[82,56],[88,51],[90,46]],1.1);
-  lane([[55,69],[46,77],[34,81]],1.2);
+  lane([[55,69],[46,77],[40,80]],1.2);
   lane([[55,69],[64,75],[74,81],[92,77],[107,75],[126,75],[144,69],[154,55],[155,48]],1.2);
   lane([[78,31],[88,33],[94,23],[108,24],[123,26],[138,30],[155,48]],1.35);
   lane([[191,69],[182,82],[164,85],[146,81],[126,75]],1.1);
@@ -130,6 +130,12 @@ function makeLesserZone() {
     [47,61,TR],[55,68,BU],[155,37,BU],[168,46,TR],[77,27,BU]]) {
     if(tAt(x,Y+y)===GR) setT(x,Y+y,t);
   }
+  for (const sign of trailSigns) {
+    const span=sign.village?40:6;
+    addObj({k:'signpost',village:!!sign.village,x:sign.x*T-span/2,y:sign.y*T-3,w:span,h:6,solid:1});
+  }
+  // The hull rests across the reed line. Boxes and sleepers are ashore.
+  addObj({k:'bargeHull',x:37*T-76,y:(Y+82)*T-20,w:152,h:40,solid:1});
   for (const l of lesserLandmarks) {
     const x=l.x*T,y=(Y+l.y)*T,r=l.radius*(l.kind==='antenna'?.38:.78);
     addObj({k:'installation',x:x-r,y:y-r,w:r*2,h:r*2,solid:1,opaque:1});
@@ -138,17 +144,17 @@ function makeLesserZone() {
   addObj({k:'locker',baseName:'Залесье',x:92*T,y:(Y+41)*T,w:26,h:18,solid:true});
   for(const [stash,x,y,loot] of [
     ['lz_mill',51,65,{bandage:2,energy:1}], ['lz_sphere',157,41,{a9:16,medkit:1}],
-    ['lz_post',58,39,{bread:1,antirad:1}], ['lz_barge',34,83,{money:75,cans:1}]
+    ['lz_post',58,39,{bread:1,antirad:1}], ['lz_barge',42,81,{money:75,cans:1}]
   ]) addObj({k:'crate',stash,x:x*T+3,y:(Y+y)*T+3,w:26,h:26,solid:1,loot});
   CORDON_DETAILS.push(...[
-    ['c1_trace_boat',29,84,168,-.52],['c1_trace_reel',53,71,44,.25],
+    ['c1_trace_reel',53,71,44,.25],
     ['c1_trace_pipes',208,31,65,.1],['c1_trace_reel',143,81,41,.3],
     ['c1_rock1',99,84,98,-.68],['c1_rock0',101,83.7,68,-.64],
     ['c1_rock1',102.7,84.2,76,-.57],['c1_rock0',104.7,85,52,-.51],
     ['c1_tractor',114,25,80,-.38],['c1_trace_churn',124,28,25,-.16],
     ['c1_trace_pipes',160,47,72,.57],['c1_sandbags',152,46,52,.08],
     ['c1_barrel',95,46,25,.06],['c1_tires',62,44,39,.17],
-    ['c1_trace_wheel',46,69,45,-.2],['c1_trace_sleepers',35,81,65,.55],
+    ['c1_trace_wheel',46,69,45,-.2],['c1_trace_sleepers',41.6,83.4,61,-.28],
     ['c1_crate_army',69,82,37,.04],['c1_trace_stump',39,25,35,.8],
     ['c1_yard_car',83,46,69,-.56],['c1_trace_pipes',195,70,75,.2]
   ].map(([id,x,y,width,a])=>[id,x,Y+y,width,a]));
@@ -171,21 +177,33 @@ async function loadLesserSprites() {
     try { await sprite.decode(); lesserSprites[name]=sprite; } catch { /* Render the baked map and the simple landmark silhouettes if decoding fails. */ }
   }));
 }
+// Foot positions, in world tiles. Lettering stays on the face as the board turns.
 const trailSigns = [
-  [13.5,126.3,'МАЛАЯ ЗОНА  ↓'],[24.4,230.2,'ЗАЛЕСЬЕ  →'],
-  [60,264.9,'←  МЕЛЬНИЦА'],[91.3,267.1,'ЗАЛЕСЬЕ'],[104,268.8,'СФЕРА  →']
+  {x:13.45,y:126.45,label:'МАЛАЯ ЗОНА ↓',angle:-.18},
+  {x:25.45,y:228.65,label:'ЗАЛЕСЬЕ →',angle:.13},
+  {x:58.6,y:265.75,label:'← МЕЛЬНИЦА',angle:-.12},
+  {x:112.5,y:270.45,label:'СФЕРА →',angle:.14},
+  {x:75.5,y:263.45,village:true,angle:-.22},
+  {x:104.35,y:271.35,village:true,angle:.18}
 ];
 function drawTrailSigns(g) {
   if (!BIG) return;
-  for (const [tx,ty,label] of trailSigns) {
-    const x=tx*T,y=ty*T;
-    if(x+60<GWP.x0 || x-60>GWP.x1 || y+22<GWP.y0 || y-22>GWP.y1) continue;
-    g.save();g.translate(x,y);g.rotate(-.06);
-    g.fillStyle='#524532';g.fillRect(-23,-5,4,14);g.fillRect(19,-5,4,13);
-    g.shadowColor='rgba(25,22,17,.45)';g.shadowOffsetX=3;g.shadowOffsetY=3;
-    g.fillStyle='#695847';g.fillRect(-34,-10,68,13);g.shadowColor='transparent';
-    g.fillStyle='#4a5042';g.fillRect(-32,-9,64,10);g.fillStyle='#d1cbb1';
-    g.textAlign='center';g.font='bold 8px sans-serif';g.fillText(label,0,-1);g.restore();
+  for (const sign of trailSigns) {
+    const x=sign.x*T, y=sign.y*T, width=sign.village?75:66;
+    if (x+width<GWP.x0 || x-width>GWP.x1 || y+width<GWP.y0 || y-width>GWP.y1) continue;
+    const sprite=lesserSprites[sign.village?'village-sign':'fingerpost'];
+    if (!sprite) continue;
+    const height=width*sprite.height/sprite.width;
+    g.save(); g.translate(x,y); g.rotate(sign.angle);
+    g.save(); spriteShadow(g,5,2);
+    g.drawImage(sprite,-width/2,-height,width,height);
+    g.restore();
+    if (sign.label) {
+      g.fillStyle='#d2c6a7'; g.textAlign='center'; g.textBaseline='middle';
+      g.font='bold 8px sans-serif';
+      g.fillText(sign.label,0,-height*.78,width*.84);
+    }
+    g.restore();
   }
 }
 // Окраска соцветий, рёбра оболочек и тени попадают в те же кэшированные
@@ -206,6 +224,12 @@ function drawLesserDetails(g) {
         g.drawImage(sprite,-size/2,-size/2,size,size);g.restore();
       }
     }
+  const bx=37*T, by=(top+82)*T, hull=lesserSprites.barge;
+  if (hull && bx+96>=GWP.x0 && bx-96<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
+    const h=182*hull.height/hull.width;
+    g.save(); g.translate(bx,by); spriteShadow(g,3,2);
+    g.drawImage(hull,-91,-h/2,182,h); g.restore();
+  }
   drawLesserInstallations(g,GWP);
 }
 function drawLesserInstallations(g,win) {
@@ -213,8 +237,7 @@ function drawLesserInstallations(g,win) {
     const x=l.x*T,y=(CORDON_ROWS+l.y)*T,r=l.radius;
     if(win && (x+r*2<win.x0 || x-r>win.x1 || y+r*2<win.y0 || y-r>win.y1)) continue;
     g.save();g.translate(x,y);
-    g.fillStyle=l.kind==='antenna'?'rgba(24,19,13,.16)':'rgba(24,19,13,.28)';
-    g.beginPath();g.ellipse(r*.39,r*.54,r*1.02,r*.87,.4,0,2*Math.PI);g.fill();
+    spriteShadow(g,l.kind==='antenna'?5:r*.42,r*.16);
     const sprite=lesserSprites[l.kind];
     if(sprite) {
       const scale=2*r/Math.max(sprite.width,sprite.height), w=sprite.width*scale,h=sprite.height*scale;

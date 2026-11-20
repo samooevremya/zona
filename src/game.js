@@ -2569,6 +2569,16 @@ async function prepareShopGate() {
 }
 function drawStaticObj(g, o) {
   if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
+  if (o.k==='trafo' && lesserSprites.transformer) {
+    g.save(); spriteShadow(g,6,2);
+    g.drawImage(lesserSprites.transformer,o.x-2,o.y-3,o.w+4,o.h+4);
+    g.restore(); return;
+  }
+  if (BIG && o.k==='blocks' && !o.roadblock) {
+    const count=Math.max(1,Math.round(o.w/54)), stride=o.w/count;
+    for (let i=0;i<count;i++) drawRoadblock(g,{x:o.x+i*stride,y:o.y+3,w:stride-2,h:o.h-3});
+    return;
+  }
   if (o.roadblock) { drawRoadblock(g, o); return; }
   if (ART && artStatic(g, o)) return;
   if (o.k === 'genset') { if (!(G3.on && G3.pack && G3.pack.manifest.props && G3.pack.manifest.props.generator)) gensetProc(g, o); return; }   // растр G4 рисуется в динамическом слое
@@ -2677,7 +2687,6 @@ function crateDraw(o) {
   ctx.fillStyle = o.stash ? '#5d4a2a' : '#4f4430'; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.restore();
   ctx.strokeStyle = '#2a2316'; ctx.lineWidth = 2; ctx.strokeRect(o.x + 1, o.y + 1, o.w - 2, o.h - 2);
   ctx.beginPath(); ctx.moveTo(o.x + 2, o.y + 2); ctx.lineTo(o.x + o.w - 2, o.y + o.h - 2); ctx.stroke(); ctx.lineWidth = 1;
-  if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
 function buildCanopy() {
   if (ART) artCanopy(); else for (let v = 0; v < 8; v++) {
@@ -3563,7 +3572,6 @@ function drawCaches() {
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(o.x + 2, o.y + 4, 9, 5, 0, 0, 6.28); ctx.fill();
     ctx.fillStyle = '#5a4a30'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 8, 7, 0, 0, 6.28); ctx.fill();
     ctx.fillStyle = '#3a2e1c'; ctx.fillRect(o.x - 2, o.y - 9, 4, 4);
-    const p = 0.5 + 0.5 * Math.sin(S.min * 5); ctx.fillStyle = 'rgba(220,170,80,' + (0.3 + p * 0.4) + ')'; ctx.fillRect(o.x - 2, o.y - 16, 4, 4);
   }
 }
 
@@ -3841,7 +3849,7 @@ function* artGround(g, R) {
     const t = tiles[y * MW + x], px = x * T, py = y * T;
     let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
     if (C1 && t === SW) {
-      id = BIG && (x >= 224 || y >= CORDON_ROWS) ? 'water' : 'swamp';
+      id = shoulders && y >= CORDON_ROWS ? 'grass' : BIG && x >= 224 ? 'water' : 'swamp';
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
@@ -3889,6 +3897,7 @@ function* artGround(g, R) {
   yield;
   // 3. Мягкие края грунта и асфальта: маска 4 точки на клетку, размытая и с шумом, только поверх травы
   const surfaces = [[DI, shoulders ? 'bare_soil' : 'dirt'], [AS, 'asphalt']];
+  if (shoulders && GW.y1>=CORDON_ROWS) surfaces.push([SW,'water']);
   for (const [tt, id] of surfaces) {
     // Гравий заходит под полотно и выступает за его края.
     const coverage = t => t === tt || (shoulders && tt === DI && t === AS);
@@ -3904,9 +3913,10 @@ function* artGround(g, R) {
     const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
     for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
       const t = tiles[(y / K | 0) * MW + (x / K | 0)];
-      if (!GROUNDISH(t) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
+      if (tt === SW && y < CORDON_ROWS*K) continue;
+      if (!GROUNDISH(t) && !(tt === SW && t === SW) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
       const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
-      const alpha = shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
+      const alpha = tt === SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
       id2.data[(y * mw + x) * 4 + 3] = Math.round(alpha);
     }
     mg2.putImageData(id2, 0, 0); ARTM[id] = mk;
@@ -4046,7 +4056,10 @@ function c1Scatter(g) {
   const M = 5;
   for (let y = Math.max(3, GW.y0 - M); y <= Math.min(MH - 4, GW.y1 + M); y++) for (let x = Math.max(3, GW.x0 - M); x <= Math.min(PW - 4, GW.x1 + M); x++) {
     const t0 = map[y * MW + x];
-    if (t0 === SW && !(BIG && x >= 224)) {   // болото: лужи воды и камыш
+    if (t0 === SW) {   // Камыш и лужи у кромки воды.
+      if (BIG && x>=224) continue;
+      if (BIG && y>=CORDON_ROWS && tAt(x-1,y)===SW && tAt(x+1,y)===SW &&
+          tAt(x,y-1)===SW && tAt(x,y+1)===SW) continue;
       const q = hash2(x * 5 + 3, y * 3 + 1);
       if (q < 0.3) { const q2 = hash2(y + 9, x + 4); ART.draw(g, 'c1_pool' + Math.floor(q2 * 3), x * T + 16, y * T + 16, 70 + q2 * 50, 60 + q * 120, q2 * 6.28); }
       else if (q < 0.4) ART.draw(g, 'c1_bush3', x * T + 16, y * T + 16, 34, 34, q * 60);
@@ -4284,13 +4297,13 @@ function artStatic0(g, o) {
     g.restore();
     return true;
   }
-  if (C1 && o.k === 'bus') { const w = o.w * 1.25, s = ART.m.sprites.c1_bus, h = w * s.rect[3] / s.rect[2]; g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - w / 2 + 6, cy - h / 2 + 7, w, h); c1Draw(g, 'c1_bus', cx, cy, w); return true; }
+  if (C1 && o.k === 'bus') { const w = o.w * 1.25; c1Draw(g, 'c1_bus', cx, cy, w); return true; }
   if (C1 && o.k === 'car' && o.sprite) {
     c1Draw(g, o.sprite, cx, cy, o.w + 4, 0, 1, 5); return true;
   }
   if (C1 && o.k === 'car') {
     const id = o.seed >= 10 ? 'c1_army' + (o.seed % 3) : ['c1_car0', 'c1_car1', 'c1_car2', 'c1_tractor'][o.seed % 4], w = o.seed >= 10 ? 84 : 70, a = o.seed % 2 ? Math.PI : 0;
-    g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx + 4, cy + 5, w * 0.48, w * 0.22, 0, 0, 6.28); g.fill(); c1Draw(g, id, cx, cy, w, a); return true;
+    c1Draw(g, id, cx, cy, w, a); return true;
   }
   if (C1 && o.k === 'hatch') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 2, cy + 3, 22, 0, 6.28); g.fill(); c1Draw(g, 'c1_hatch', cx, cy, 46); return true; }
   if (C1 && o.k === 'fire') {
@@ -4300,7 +4313,7 @@ function artStatic0(g, o) {
     else c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
     g.restore(); return true;
   }
-  if (C1 && o.k === 'pylon') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 3, cy + 4, 9, 0, 6.28); g.fill(); c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
+  if (C1 && o.k === 'pylon') { c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
   if (o.k === 'bus') {
     const s = Math.min(o.w / 292, o.h / 133), bw = 292 * s, bh = 133 * s;
     g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - bw / 2 + 6, cy - bh / 2 + 7, bw, bh);
@@ -4628,12 +4641,10 @@ function artCrate(o) {
   const id = C1 ? (o.sprite || (o.stash ? 'c1_crate_army' : 'c1_crate')) : 'crate';
   ART.draw(ctx, id, o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, o.sprite ? 0 : ((o.x + o.y) % 4) * Math.PI / 2);
   ctx.restore();
-  if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
 function artCache(o) {
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(o.x + 2, o.y + 4, 9, 5, 0, 0, 6.28); ctx.fill();
   ART.draw(ctx, 'stash', o.x, o.y, 16, 14);
-  const p = 0.5 + 0.5 * Math.sin(S.min * 5); ctx.fillStyle = 'rgba(220,170,80,' + (0.3 + p * 0.4) + ')'; ctx.fillRect(o.x - 2, o.y - 16, 4, 4);
 }
 /* пакет C1 (графика Кордона от GPT): дополняет и заменяет материалы и спрайты деревни; #c1-off — прежняя графика */
 const C1 = !!(window.C1_MANIFEST && !/c1-off/.test(location.hash));
@@ -5901,7 +5912,6 @@ function drawPick(o) {   // растр G4 (gg7.js: g7Pick); ниже — пре�
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-7, -4, 16, 12);
   if (o.pick === 'fuel') { ctx.fillStyle = '#9b2a1c'; ctx.fillRect(-8, -7, 15, 14); ctx.fillStyle = '#5a160e'; ctx.fillRect(-4, -10, 6, 4); }
   else { ctx.fillStyle = '#c9b88a'; ctx.fillRect(-6, -4, 12, 8); ctx.fillStyle = '#6a5a3a'; ctx.fillRect(-2, -6, 4, 12); }
-  const t = (S.min * 2) % 1; ctx.strokeStyle = 'rgba(255,220,140,' + (0.5 - t * 0.5) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 10 + t * 10, 0, 6.28); ctx.stroke();
   ctx.restore();
 }
 function pickUp(o) {
@@ -6779,7 +6789,7 @@ const lesserPlaces = [
   ['cowsheds','Коровники',[111,17,132,33],[123,26]],
   ['tower_lz','Водонапорная башня',[73,25,81,32],[78,31]],
   ['sphere','Комплекс «Сфера»',[152,37,176,54],[155,48]],
-  ['barge','Баржа в старице',[25,78,37,88],[34,81]],
+  ['barge','Баржа в старице',[25,78,42,88],[40,80]],
   ['survey','Пост замеров',[67,73,80,85],[74,81]],
   ['bulge','Бульба',[118,65,133,78],[126,75]],
   ['postal','Почтовое отделение',[54,37,64,47],[60,44]],
@@ -6852,7 +6862,7 @@ function makeLesserZone() {
   lane([[127,-13],[118,-8],[111,-3],[111,3],[104,11],[94,23],[89,35],[90,46]],1.4);
   lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[155,48],[172,50],[190,58],[191,69]],2);
   lane([[48,27],[39,29],[32,38],[29,51],[38,59],[55,69],[67,61],[82,56],[88,51],[90,46]],1.1);
-  lane([[55,69],[46,77],[34,81]],1.2);
+  lane([[55,69],[46,77],[40,80]],1.2);
   lane([[55,69],[64,75],[74,81],[92,77],[107,75],[126,75],[144,69],[154,55],[155,48]],1.2);
   lane([[78,31],[88,33],[94,23],[108,24],[123,26],[138,30],[155,48]],1.35);
   lane([[191,69],[182,82],[164,85],[146,81],[126,75]],1.1);
@@ -6898,6 +6908,12 @@ function makeLesserZone() {
     [47,61,TR],[55,68,BU],[155,37,BU],[168,46,TR],[77,27,BU]]) {
     if(tAt(x,Y+y)===GR) setT(x,Y+y,t);
   }
+  for (const sign of trailSigns) {
+    const span=sign.village?40:6;
+    addObj({k:'signpost',village:!!sign.village,x:sign.x*T-span/2,y:sign.y*T-3,w:span,h:6,solid:1});
+  }
+  // The hull rests across the reed line. Boxes and sleepers are ashore.
+  addObj({k:'bargeHull',x:37*T-76,y:(Y+82)*T-20,w:152,h:40,solid:1});
   for (const l of lesserLandmarks) {
     const x=l.x*T,y=(Y+l.y)*T,r=l.radius*(l.kind==='antenna'?.38:.78);
     addObj({k:'installation',x:x-r,y:y-r,w:r*2,h:r*2,solid:1,opaque:1});
@@ -6906,17 +6922,17 @@ function makeLesserZone() {
   addObj({k:'locker',baseName:'Залесье',x:92*T,y:(Y+41)*T,w:26,h:18,solid:true});
   for(const [stash,x,y,loot] of [
     ['lz_mill',51,65,{bandage:2,energy:1}], ['lz_sphere',157,41,{a9:16,medkit:1}],
-    ['lz_post',58,39,{bread:1,antirad:1}], ['lz_barge',34,83,{money:75,cans:1}]
+    ['lz_post',58,39,{bread:1,antirad:1}], ['lz_barge',42,81,{money:75,cans:1}]
   ]) addObj({k:'crate',stash,x:x*T+3,y:(Y+y)*T+3,w:26,h:26,solid:1,loot});
   CORDON_DETAILS.push(...[
-    ['c1_trace_boat',29,84,168,-.52],['c1_trace_reel',53,71,44,.25],
+    ['c1_trace_reel',53,71,44,.25],
     ['c1_trace_pipes',208,31,65,.1],['c1_trace_reel',143,81,41,.3],
     ['c1_rock1',99,84,98,-.68],['c1_rock0',101,83.7,68,-.64],
     ['c1_rock1',102.7,84.2,76,-.57],['c1_rock0',104.7,85,52,-.51],
     ['c1_tractor',114,25,80,-.38],['c1_trace_churn',124,28,25,-.16],
     ['c1_trace_pipes',160,47,72,.57],['c1_sandbags',152,46,52,.08],
     ['c1_barrel',95,46,25,.06],['c1_tires',62,44,39,.17],
-    ['c1_trace_wheel',46,69,45,-.2],['c1_trace_sleepers',35,81,65,.55],
+    ['c1_trace_wheel',46,69,45,-.2],['c1_trace_sleepers',41.6,83.4,61,-.28],
     ['c1_crate_army',69,82,37,.04],['c1_trace_stump',39,25,35,.8],
     ['c1_yard_car',83,46,69,-.56],['c1_trace_pipes',195,70,75,.2]
   ].map(([id,x,y,width,a])=>[id,x,Y+y,width,a]));
@@ -6939,21 +6955,33 @@ async function loadLesserSprites() {
     try { await sprite.decode(); lesserSprites[name]=sprite; } catch { /* Render the baked map and the simple landmark silhouettes if decoding fails. */ }
   }));
 }
+// Foot positions, in world tiles. Lettering stays on the face as the board turns.
 const trailSigns = [
-  [13.5,126.3,'МАЛАЯ ЗОНА  ↓'],[24.4,230.2,'ЗАЛЕСЬЕ  →'],
-  [60,264.9,'←  МЕЛЬНИЦА'],[91.3,267.1,'ЗАЛЕСЬЕ'],[104,268.8,'СФЕРА  →']
+  {x:13.45,y:126.45,label:'МАЛАЯ ЗОНА ↓',angle:-.18},
+  {x:25.45,y:228.65,label:'ЗАЛЕСЬЕ →',angle:.13},
+  {x:58.6,y:265.75,label:'← МЕЛЬНИЦА',angle:-.12},
+  {x:112.5,y:270.45,label:'СФЕРА →',angle:.14},
+  {x:75.5,y:263.45,village:true,angle:-.22},
+  {x:104.35,y:271.35,village:true,angle:.18}
 ];
 function drawTrailSigns(g) {
   if (!BIG) return;
-  for (const [tx,ty,label] of trailSigns) {
-    const x=tx*T,y=ty*T;
-    if(x+60<GWP.x0 || x-60>GWP.x1 || y+22<GWP.y0 || y-22>GWP.y1) continue;
-    g.save();g.translate(x,y);g.rotate(-.06);
-    g.fillStyle='#524532';g.fillRect(-23,-5,4,14);g.fillRect(19,-5,4,13);
-    g.shadowColor='rgba(25,22,17,.45)';g.shadowOffsetX=3;g.shadowOffsetY=3;
-    g.fillStyle='#695847';g.fillRect(-34,-10,68,13);g.shadowColor='transparent';
-    g.fillStyle='#4a5042';g.fillRect(-32,-9,64,10);g.fillStyle='#d1cbb1';
-    g.textAlign='center';g.font='bold 8px sans-serif';g.fillText(label,0,-1);g.restore();
+  for (const sign of trailSigns) {
+    const x=sign.x*T, y=sign.y*T, width=sign.village?75:66;
+    if (x+width<GWP.x0 || x-width>GWP.x1 || y+width<GWP.y0 || y-width>GWP.y1) continue;
+    const sprite=lesserSprites[sign.village?'village-sign':'fingerpost'];
+    if (!sprite) continue;
+    const height=width*sprite.height/sprite.width;
+    g.save(); g.translate(x,y); g.rotate(sign.angle);
+    g.save(); spriteShadow(g,5,2);
+    g.drawImage(sprite,-width/2,-height,width,height);
+    g.restore();
+    if (sign.label) {
+      g.fillStyle='#d2c6a7'; g.textAlign='center'; g.textBaseline='middle';
+      g.font='bold 8px sans-serif';
+      g.fillText(sign.label,0,-height*.78,width*.84);
+    }
+    g.restore();
   }
 }
 // Окраска соцветий, рёбра оболочек и тени попадают в те же кэшированные
@@ -6974,6 +7002,12 @@ function drawLesserDetails(g) {
         g.drawImage(sprite,-size/2,-size/2,size,size);g.restore();
       }
     }
+  const bx=37*T, by=(top+82)*T, hull=lesserSprites.barge;
+  if (hull && bx+96>=GWP.x0 && bx-96<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
+    const h=182*hull.height/hull.width;
+    g.save(); g.translate(bx,by); spriteShadow(g,3,2);
+    g.drawImage(hull,-91,-h/2,182,h); g.restore();
+  }
   drawLesserInstallations(g,GWP);
 }
 function drawLesserInstallations(g,win) {
@@ -6981,8 +7015,7 @@ function drawLesserInstallations(g,win) {
     const x=l.x*T,y=(CORDON_ROWS+l.y)*T,r=l.radius;
     if(win && (x+r*2<win.x0 || x-r>win.x1 || y+r*2<win.y0 || y-r>win.y1)) continue;
     g.save();g.translate(x,y);
-    g.fillStyle=l.kind==='antenna'?'rgba(24,19,13,.16)':'rgba(24,19,13,.28)';
-    g.beginPath();g.ellipse(r*.39,r*.54,r*1.02,r*.87,.4,0,2*Math.PI);g.fill();
+    spriteShadow(g,l.kind==='antenna'?5:r*.42,r*.16);
     const sprite=lesserSprites[l.kind];
     if(sprite) {
       const scale=2*r/Math.max(sprite.width,sprite.height), w=sprite.width*scale,h=sprite.height*scale;
@@ -7602,7 +7635,6 @@ function g7Pick(o) {
   const sz = PICK_SIZE[o.pick] || [14, 14], cx = o.x + o.w / 2, cy = o.y + o.h / 2;
   ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(cx + 1, cy + sz[1] / 2 - 1, sz[0] / 2 + 1, 3, 0, 0, 6.28); ctx.fill();
   ctx.drawImage(im, cx - sz[0] / 2, cy - sz[1] / 2, sz[0], sz[1]);
-  const t = (S.min * 2) % 1; ctx.strokeStyle = 'rgba(255,220,140,' + (0.5 - t * 0.5) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, 10 + t * 10, 0, 6.28); ctx.stroke(); ctx.lineWidth = 1;
   return true;
 }
 /* встроенные изображения пакета, которых нет среди кадров актёров (props, предметы на земле): загружаются один раз */
@@ -7920,7 +7952,9 @@ function drawGroundItems(o) {
   const flight=o.scatterStart==null?1:clamp((performance.now()-o.scatterStart)/240,0,1);
   const remaining=(1-flight)**2;
   for(const drop of groundItems(o)) {
-    const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop), frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
+    const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop);
+    const frame=G3.pack?.manifest.items?.[id];
+    const im=detectorImages[id] || lesserSprites[id] || (frame && packImage(frame.file));
     ctx.save(); ctx.translate(x-dx*remaining,y-dy*remaining-5*Math.sin(Math.PI*flight));
     if (G.near?.drop===drop) {
       ctx.strokeStyle='rgba(234,207,143,.85)'; ctx.lineWidth=1.2; ctx.beginPath();
@@ -7929,8 +7963,10 @@ function drawGroundItems(o) {
       }
       ctx.stroke();
     }
-    if(im) {
-      const scale=(isGun(id)?30:22)/Math.max(im.naturalWidth,im.naturalHeight);
+    if(im?.complete && im.naturalWidth) {
+      const size=id==='energy'?13:id==='money'?15:isGun(id)?30:22;
+      const scale=size/Math.max(im.naturalWidth,im.naturalHeight);
+      spriteShadow(ctx,1.5,1);
       const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
       ctx.drawImage(im,-w/2,-h/2,w,h);
     } else {
@@ -7944,7 +7980,13 @@ function drawGroundItems(o) {
 function containerDraw(o){
   const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
   g.save(); g.translate(x,y);
-  if(o.k==='crate'){
+  const sprite=o.k==='crate'?lesserSprites.splinters:o.k==='safe'?lesserSprites.safe:null;
+  if(sprite){
+    const width=o.k==='crate'?36:26, height=width*sprite.height/sprite.width;
+    if(o.k==='crate') g.rotate((hash2(Math.floor(x),Math.floor(y))-.5)*1.8);
+    spriteShadow(g,o.k==='crate'?1.5:3,1);
+    g.drawImage(sprite,-width/2,-height/2,width,height);
+  }else if(o.k==='crate'){
     for(const [dx,dy,len,angle] of [[-8,-7,19,-.48],[2,-5,21,.23],[-5,4,16,.68],[5,8,15,-.19]]){
       g.save();g.translate(dx,dy);g.rotate(angle);g.fillStyle='#32291f';g.fillRect(-len/2,-2,len,5);
       g.fillStyle='#806343';g.fillRect(-len/2,-2,len-1,2);g.restore();
@@ -7952,9 +7994,10 @@ function containerDraw(o){
   }else if(o.k==='locker'){
     if(ART) ART.draw(g,C1?'c1_crate_army':'crate',0,0,29,22);
     else {g.fillStyle='#63624b';g.fillRect(-13,-9,26,18);}
-    g.fillStyle='#365856';g.fillRect(-5,-5,10,9);
-    g.strokeStyle='#c1d2bd';g.lineWidth=1;g.strokeRect(-3.5,-3,7,5);
-    g.fillStyle='#cad8c1';g.fillRect(-1,-1.5,2,2);
+    // Small green padlock hangs from the front clasp.
+    g.strokeStyle='#777866';g.lineWidth=1.2;g.beginPath();g.arc(0,4,1.6,Math.PI,2*Math.PI);g.stroke();
+    g.fillStyle='#485443';g.fillRect(-2.4,4,4.8,4);
+    g.fillStyle='#b0a582';g.fillRect(-1.8,4,3.1,.7);
   }else if(o.k==='safe'){
     g.fillStyle='#242522';g.fillRect(-11,-8,23,19);
     const metal=g.createLinearGradient(0,-9,0,8);metal.addColorStop(0,'#76766a');metal.addColorStop(1,'#41433c');

@@ -281,7 +281,6 @@ function g7Pick(o) {
   const sz = PICK_SIZE[o.pick] || [14, 14], cx = o.x + o.w / 2, cy = o.y + o.h / 2;
   ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(cx + 1, cy + sz[1] / 2 - 1, sz[0] / 2 + 1, 3, 0, 0, 6.28); ctx.fill();
   ctx.drawImage(im, cx - sz[0] / 2, cy - sz[1] / 2, sz[0], sz[1]);
-  const t = (S.min * 2) % 1; ctx.strokeStyle = 'rgba(255,220,140,' + (0.5 - t * 0.5) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, 10 + t * 10, 0, 6.28); ctx.stroke(); ctx.lineWidth = 1;
   return true;
 }
 /* встроенные изображения пакета, которых нет среди кадров актёров (props, предметы на земле): загружаются один раз */

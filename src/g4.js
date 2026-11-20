@@ -376,6 +376,16 @@ async function prepareShopGate() {
 }
 function drawStaticObj(g, o) {
   if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
+  if (o.k==='trafo' && lesserSprites.transformer) {
+    g.save(); spriteShadow(g,6,2);
+    g.drawImage(lesserSprites.transformer,o.x-2,o.y-3,o.w+4,o.h+4);
+    g.restore(); return;
+  }
+  if (BIG && o.k==='blocks' && !o.roadblock) {
+    const count=Math.max(1,Math.round(o.w/54)), stride=o.w/count;
+    for (let i=0;i<count;i++) drawRoadblock(g,{x:o.x+i*stride,y:o.y+3,w:stride-2,h:o.h-3});
+    return;
+  }
   if (o.roadblock) { drawRoadblock(g, o); return; }
   if (ART && artStatic(g, o)) return;
   if (o.k === 'genset') { if (!(G3.on && G3.pack && G3.pack.manifest.props && G3.pack.manifest.props.generator)) gensetProc(g, o); return; }   // растр G4 рисуется в динамическом слое
@@ -484,7 +494,6 @@ function crateDraw(o) {
   ctx.fillStyle = o.stash ? '#5d4a2a' : '#4f4430'; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.restore();
   ctx.strokeStyle = '#2a2316'; ctx.lineWidth = 2; ctx.strokeRect(o.x + 1, o.y + 1, o.w - 2, o.h - 2);
   ctx.beginPath(); ctx.moveTo(o.x + 2, o.y + 2); ctx.lineTo(o.x + o.w - 2, o.y + o.h - 2); ctx.stroke(); ctx.lineWidth = 1;
-  if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
 function buildCanopy() {
   if (ART) artCanopy(); else for (let v = 0; v < 8; v++) {

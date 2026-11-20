@@ -295,7 +295,9 @@ function drawGroundItems(o) {
   const flight=o.scatterStart==null?1:clamp((performance.now()-o.scatterStart)/240,0,1);
   const remaining=(1-flight)**2;
   for(const drop of groundItems(o)) {
-    const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop), frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
+    const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop);
+    const frame=G3.pack?.manifest.items?.[id];
+    const im=detectorImages[id] || lesserSprites[id] || (frame && packImage(frame.file));
     ctx.save(); ctx.translate(x-dx*remaining,y-dy*remaining-5*Math.sin(Math.PI*flight));
     if (G.near?.drop===drop) {
       ctx.strokeStyle='rgba(234,207,143,.85)'; ctx.lineWidth=1.2; ctx.beginPath();
@@ -304,8 +306,10 @@ function drawGroundItems(o) {
       }
       ctx.stroke();
     }
-    if(im) {
-      const scale=(isGun(id)?30:22)/Math.max(im.naturalWidth,im.naturalHeight);
+    if(im?.complete && im.naturalWidth) {
+      const size=id==='energy'?13:id==='money'?15:isGun(id)?30:22;
+      const scale=size/Math.max(im.naturalWidth,im.naturalHeight);
+      spriteShadow(ctx,1.5,1);
       const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
       ctx.drawImage(im,-w/2,-h/2,w,h);
     } else {
@@ -319,7 +323,13 @@ function drawGroundItems(o) {
 function containerDraw(o){
   const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
   g.save(); g.translate(x,y);
-  if(o.k==='crate'){
+  const sprite=o.k==='crate'?lesserSprites.splinters:o.k==='safe'?lesserSprites.safe:null;
+  if(sprite){
+    const width=o.k==='crate'?36:26, height=width*sprite.height/sprite.width;
+    if(o.k==='crate') g.rotate((hash2(Math.floor(x),Math.floor(y))-.5)*1.8);
+    spriteShadow(g,o.k==='crate'?1.5:3,1);
+    g.drawImage(sprite,-width/2,-height/2,width,height);
+  }else if(o.k==='crate'){
     for(const [dx,dy,len,angle] of [[-8,-7,19,-.48],[2,-5,21,.23],[-5,4,16,.68],[5,8,15,-.19]]){
       g.save();g.translate(dx,dy);g.rotate(angle);g.fillStyle='#32291f';g.fillRect(-len/2,-2,len,5);
       g.fillStyle='#806343';g.fillRect(-len/2,-2,len-1,2);g.restore();
@@ -327,9 +337,10 @@ function containerDraw(o){
   }else if(o.k==='locker'){
     if(ART) ART.draw(g,C1?'c1_crate_army':'crate',0,0,29,22);
     else {g.fillStyle='#63624b';g.fillRect(-13,-9,26,18);}
-    g.fillStyle='#365856';g.fillRect(-5,-5,10,9);
-    g.strokeStyle='#c1d2bd';g.lineWidth=1;g.strokeRect(-3.5,-3,7,5);
-    g.fillStyle='#cad8c1';g.fillRect(-1,-1.5,2,2);
+    // Small green padlock hangs from the front clasp.
+    g.strokeStyle='#777866';g.lineWidth=1.2;g.beginPath();g.arc(0,4,1.6,Math.PI,2*Math.PI);g.stroke();
+    g.fillStyle='#485443';g.fillRect(-2.4,4,4.8,4);
+    g.fillStyle='#b0a582';g.fillRect(-1.8,4,3.1,.7);
   }else if(o.k==='safe'){
     g.fillStyle='#242522';g.fillRect(-11,-8,23,19);
     const metal=g.createLinearGradient(0,-9,0,8);metal.addColorStop(0,'#76766a');metal.addColorStop(1,'#41433c');
