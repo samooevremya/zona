@@ -1,5 +1,6 @@
 /* ===================== состояние ===================== */
 let S = null, P = null, ents = [], decals = [], parts = [], tracers = [], flashes = [], bolts = [], nades = [], crows = [], anoms = [], arts = [];
+let bridgeBarrier;
 let armyAngry = false, nextId = 1, spawnT = 0, fogT = 0, saveT = 0, warnT = 0;
 const cnt = id => S.inv[id] || 0;
 const has = id => cnt(id) > 0;
@@ -172,7 +173,8 @@ function spawnWorld() {
   objs.push(...retiredFixedCrates); retiredFixedCrates.length = 0;
   objs.forEach(o => { if (o.stash) restoreContainer(o); });
   armyAngry = !!S.flags.armyAngry;
-  const bar = objs.find(o => o.key === 'bar'); if (bar) { bar.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }
+  bridgeBarrier = objs.find(o => o.key === 'bar');
+  if (bridgeBarrier) { bridgeBarrier.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }
   S.q2 = S.q2 || { fox: 0, tolik: 0 };
   P = mkPlayer(); ents.push(P);
   NPCDEF.forEach(d => {
@@ -230,6 +232,25 @@ function anger(e) {
     msg('Ты напал на своего. Одиночки этого не простят.', 'bad');
   }
   if (e.fac === 'army' && !armyAngry) { armyAngry = true; S.flags.armyAngry = 1; msg('Военные открывают огонь!', 'bad'); }
+}
+function checkBridgeCrossing(oldX, oldY) {
+  if (!bridgeBarrier?.solid || S.flags.bridgePaid || !P.alive) return;
+  const lineY = bridgeBarrier.y + bridgeBarrier.h / 2;
+  if ((oldY < lineY) === (P.y < lineY)) return;
+  const x = oldX + (P.x - oldX) * (lineY - oldY) / (P.y - oldY);
+  if (x < bridgeBarrier.x - P.r || x > bridgeBarrier.x + bridgeBarrier.w + P.r) return;
+  let alarm = false;
+  for (const guard of ents) {
+    if (guard.guard !== 'bridge' || !guard.alive || guard.angry) continue;
+    guard.angry = 1;
+    markAngry(guard);
+    guard.tgt = P;
+    guard.aw = 1;
+    guard.lastSeen = {x:P.x, y:P.y};
+    guard.mem = 6;
+    alarm = true;
+  }
+  if (alarm) msg('Часовой: — Нарушитель у шлагбаума! Огонь!', 'bad');
 }
 function markAngry(e) {
   const id = e.sid || e.uid;

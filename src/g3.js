@@ -150,6 +150,7 @@ function update(dt) {
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
   if (!cordonStage() && P.alive && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
   if (BIG && P.alive && !inBunker(P.x, P.y) && warnT <= 0 && (P.x < 5 * T || P.x > (PW - 5) * T)) { warnT = 6; msg(P.x < 5 * T ? 'Дальше Залесье. Эта часть Зоны появится в следующей версии.' : 'Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
   worldFx(dt);
@@ -186,6 +187,7 @@ function update(dt) {
   }
   updateBolts(dt);
   updateAnoms(dt);
+  checkBridgeCrossing(oldX, oldY);
   g7Tick(dt);
   // гранаты
   for (let i = nades.length - 1; i >= 0; i--) {
