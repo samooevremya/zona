@@ -768,10 +768,17 @@ function render() {
     const hide = P && roofHidden(h);
     h.a = lerp(h.a, hide ? 0 : 1, 0.2);
     if (h.a < 0.03 || !inView(h.x * T + h.w * T / 2, h.y * T + h.h * T / 2, h.w * T)) return;
-    if (C1 && SHADOWS) {   // тень дома вправо-вниз: две полосы, мягкий край; под крышей не видна
-      const x0 = h.x * T, y0 = h.y * T, w = h.w * T, hh = h.h * T;
-      ctx.fillStyle = 'rgba(6,8,4,' + 0.2 * h.a + ')'; ctx.fillRect(x0 + 6, y0 + 8, w + 16, hh + 18);
-      ctx.fillStyle = 'rgba(6,8,4,' + 0.22 * h.a + ')'; ctx.fillRect(x0 + 4, y0 + 6, w + 10, hh + 11);
+    if (C1 && SHADOWS) {
+      // Кэшируем мягкую тень один раз на дом в мировом разрешении.
+      if (!h.shadow) {
+        const w = h.w*T, height = h.h*T;
+        const c = document.createElement('canvas'); c.width = w + 44; c.height = height + 44;
+        const g = c.getContext('2d');
+        g.shadowColor = 'rgba(14,14,10,.34)'; g.shadowBlur = 12;
+        g.shadowOffsetX = c.width; g.fillRect(15 - c.width, 15, w, height);
+        h.shadow = c;
+      }
+      ctx.globalAlpha = h.a; ctx.drawImage(h.shadow, h.x*T-8, h.y*T-4);
     }
     ctx.globalAlpha = h.a; drawHouseRoof(ctx, h, i, 1); ctx.globalAlpha = 1;
   });

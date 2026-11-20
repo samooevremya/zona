@@ -549,7 +549,7 @@ function wornEntrance(width, seed) {
 }
 
 // В локальных координатах ось Y направлена из дома наружу.
-// Ступени выступают за свес даже у дальней стены. Вся площадка запекается в землю.
+// Следы и пороги остаются на земле при исчезновении крыши.
 function drawThresholds(g) {
   for (const h of HOUSES) {
     if (h.x > GW.x1 + 3 || h.y > GW.y1 + 3 || h.x + h.w < GW.x0 - 3 || h.y + h.h < GW.y0 - 3) continue;
@@ -558,24 +558,29 @@ function drawThresholds(g) {
       const w = door.width, left = -w / 2;
       g.save(); g.translate(h.x * T + door.x, h.y * T + door.y);
       g.rotate(Math.atan2(-door.nx, door.ny));
-      const style = hash2((h.x + door.x / T) * 2, (h.y + door.y / T) * 2);
-      if (!door.soil) door.soil = wornEntrance(w, Math.floor(style * 4096));
-      g.drawImage(door.soil, -door.soil.width / 2, -3);
-      const broken = h.ruin && door.breach, depth = broken ? 12 : 26;
-      g.fillStyle = 'rgba(39,30,21,.36)';
-      g.fillRect(left + 2, -2, w, depth + 4);
-      g.fillStyle = concrete ? '#59574d' : '#4b3b2c';
-      g.fillRect(left, -T / 2 - 4, w, T / 2 + depth);
-      for (let row = 0; row < (broken ? 2 : 4); row++) {
-        const y = row * 7, inset = row * 1.15, x = left + inset, width = w - 2*inset;
-        g.fillStyle = concrete ? '#918d7e' : '#947958'; g.fillRect(x, y, width, 6);
-        if (ART) {
-          g.globalAlpha = .54; artFill(g, concrete ? 'floor_concrete' : 'floor_wood', x, y, width, 6); g.globalAlpha = 1;
+      const seed = Math.floor(hash2(h.x * T + door.x, h.y * T + door.y) * 65535);
+      if (!door.soil) door.soil = wornEntrance(w + 12, seed);
+      g.drawImage(door.soil, -door.soil.width / 2, -7);
+      if (door.approach === 'rubble') {
+        const random = mulberry32(seed);
+        for (let i = 0; i < Math.ceil(w / 4); i++) {
+          const x = (i % 2 ? -1 : 1) * (w * (.29 + random() * .21));
+          const y = -9 + random() * 24, size = 1.4 + random() * 3.4;
+          g.fillStyle = '#514539';
+          g.beginPath(); g.moveTo(x-size,y); g.lineTo(x,y-size*.55);
+          g.lineTo(x+size*.8,y-.4); g.lineTo(x+size*.5,y+1); g.closePath(); g.fill();
+          g.fillStyle = i % 3 ? '#897769' : '#9a7057';
+          g.fillRect(x-size*.55,y-size*.4,size,size*.35);
         }
-        g.fillStyle = concrete ? '#b3ae9e' : '#b9a17c'; g.fillRect(x + 1, y + 4.7, width - 2, 1.3);
-        if (!concrete) {
-          g.fillStyle = '#504637'; g.fillRect(x + 3, y + 2, 1.4, 1.4); g.fillRect(x+width-4,y+2,1.4,1.4);
-        }
+      } else if (door.approach === 'slab') {
+        g.fillStyle = '#575449'; g.fillRect(left, -8, w, 18);
+        if (ART) artFill(g, 'floor_concrete', left, -8, w, 16);
+        g.fillStyle = 'rgba(192,184,157,.35)'; g.fillRect(left+1, 7, w-2, 1);
+      } else if (door.approach === 'porch') {
+        g.fillStyle = '#514336'; g.fillRect(left-2, -6, w+4, 25);
+        if (ART) artFill(g, 'floor_wood', left-2, -6, w+4, 23);
+        g.fillStyle = '#6e5942'; g.fillRect(left, 19, w, 5);
+        g.fillStyle = '#9d876c'; g.fillRect(left+1, 19, w-2, 1);
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
       g.fillStyle = concrete ? '#69695f' : '#68503a';
@@ -934,20 +939,25 @@ function hipEnd(g, image, sx, sy, sw, sh, width, height) {
   g.strokeStyle = '#756e61'; g.lineWidth = 1.6; g.beginPath();
   g.moveTo(left,-height/2); g.lineTo(left+depth,0); g.lineTo(left,height/2); g.stroke();
 }
-function drawPorch(g, h, id, y, depth) {
-  const door = h.entrances.find(d => d.ny === 1 && !d.breach);
-  if (!door) return;
-  const width = door.width + 18, left = door.x + 3 - width/2;
-  const plank = balancedGable(id);
-  g.save();
-  // Односкатный козырёк, выцветший лоб и два торца стоек. Передняя ступень открыта.
-  g.shadowColor = 'transparent';
-  g.fillStyle = '#514432'; g.fillRect(left+2,y+depth-2,3,8); g.fillRect(left+width-5,y+depth-2,3,8);
-  if (SHADOWS) { g.fillStyle = 'rgba(29,24,19,.35)'; g.fillRect(left+3,y+7,width,depth); }
-  g.drawImage(plank, plank.width*.28, plank.height*.67, plank.width*.38, plank.height*.22,
-    left,y-4,width,depth+6);
-  g.fillStyle = '#605342'; g.fillRect(left,y+depth,width,3);
-  g.fillStyle = '#b3a18a'; g.fillRect(left,y+depth,width,1);
+function drawPorch(g, door, eave, ground) {
+  const width = door.width + 16, left = door.x + 3 - width / 2;
+  const back = eave - 4, front = ground + 3;
+  const sheet = balancedGable('c1_roof_slate');
+  g.save(); g.shadowColor = 'transparent';
+  // Нижние концы стоек видны под передней кромкой; крыша перекрывает фасад.
+  for (const x of [left + 3, left + width - 6]) {
+    g.fillStyle = '#4d4031'; g.fillRect(x, front, 3, 11);
+    g.fillStyle = '#83715b'; g.fillRect(x, front + 1, 1, 9);
+  }
+  g.drawImage(sheet, sheet.width*.08, sheet.height*.59, sheet.width*.27, sheet.height*.22,
+    left, back, width, front-back);
+  const shade = g.createLinearGradient(0, back, 0, front);
+  shade.addColorStop(0, 'rgba(30,25,20,.52)'); shade.addColorStop(.32, 'rgba(46,38,31,.13)');
+  shade.addColorStop(1, 'rgba(99,76,54,.08)');
+  g.fillStyle = shade; g.fillRect(left, back, width, front-back);
+  g.fillStyle = '#6d6050'; g.fillRect(left, back, width, 1.5);
+  g.fillStyle = '#53493e'; g.fillRect(left, front-1, width, 3);
+  g.fillStyle = '#998a75'; g.fillRect(left, front-1, width, 1);
   g.restore();
 }
 function artRoof(h, idx) {
@@ -957,7 +967,8 @@ function artRoof(h, idx) {
   const W = h.w * T + 10, Hh = h.h * T + 10, c = document.createElement('canvas');
   const home = h.ok || (h.x + ',' + h.y);
   const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
-  h.porchDepth = BIG && gable && (home === '26,71' || home === '37,73') ? 13 : 0;
+  const porch = h.entrances.find(d => d.approach === 'porch');
+  h.porchDepth = porch ? 14 : 0;
   c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
@@ -1007,7 +1018,7 @@ function artRoof(h, idx) {
       g.shadowColor = 'transparent'; hipEnd(g, image, sx, sy, sw, sh, tw, th);
     }
     g.restore();
-    if (h.porchDepth) drawPorch(g, h, id, Hh - 10, h.porchDepth);
+    if (porch) drawPorch(g, porch, RH, Hh - 7);
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;
   }
