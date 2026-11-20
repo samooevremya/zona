@@ -429,6 +429,11 @@ function drawPda() {
   }
 }
 /* ---------- меню ---------- */
+function leavePauseSettings() {
+  delete panel.pausePage;
+  drawMenu();
+  document.querySelector('#pause-card .pause-settings').focus();
+}
 function drawMenu() {
   const card=$('pause-card'), nav=el('nav','start-nav');
   // The title mark is shared with the start screen, which retains its own node.
@@ -436,6 +441,18 @@ function drawMenu() {
   heading.id='pause-heading';
   nav.setAttribute('aria-labelledby',heading.id);
   card.replaceChildren(title.name.cloneNode(true),heading,nav);
+  if (panel.pausePage==='settings') {
+    heading.textContent='Настройки';
+    nav.appendChild(btn('','Настроить управление',openControlEditor));
+    const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
+    const sound=btn('',soundLabel(),()=>{
+      audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
+      sound.textContent=soundLabel();
+    });
+    nav.appendChild(sound);
+    nav.appendChild(btn('','Назад',leavePauseSettings));
+    return;
+  }
   if (panel.pausePage==='help') {
     heading.textContent='Управление и сохранения';
     nav.appendChild(el('p','pause-note',IN.touch
@@ -465,13 +482,10 @@ function drawMenu() {
     if (saved) {applyState(saved);closePanel();}
     else message.textContent='Сохранений пока нет.';
   }));
-  nav.appendChild(btn('','Настроить управление',openControlEditor));
-  const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
-  const sound=btn('',soundLabel(),()=>{
-    audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
-    sound.textContent=soundLabel();
-  });
-  nav.appendChild(sound);
+  nav.appendChild(btn('pause-settings','Настройки',()=>{
+    panel.pausePage='settings'; drawMenu();
+    card.querySelector('button').focus();
+  }));
   nav.appendChild(btn('restart','Начать заново',()=>{panel.pausePage='restart';drawMenu();card.querySelector('button').focus();}));
   card.appendChild(message);
   card.appendChild(btn('pause-help','Подсказки',()=>{panel.pausePage='help';drawMenu();card.querySelector('button').focus();}));
@@ -872,7 +886,7 @@ addEventListener('keydown', e => {
   const k = e.code;
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].indexOf(k) >= 0 && !panel) e.preventDefault();
   if (title.open) return;
-  if (k === 'Escape') { if (panel) closePanel(); else { openPanel('menu', 'Меню'); refresh(); } return; }
+  if (k === 'Escape') { if (panel?.pausePage==='settings') leavePauseSettings(); else if (panel) closePanel(); else { openPanel('menu', 'Меню'); refresh(); } return; }
   if (panel) { if ((k === 'KeyI' && panel.kind === 'inv') || (k === 'KeyM' && panel.kind === 'pda') || k === 'Tab') { e.preventDefault(); closePanel(); } return; }
   KEYS[k] = true;
   if (!P.alive) return;
