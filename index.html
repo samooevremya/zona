@@ -1923,7 +1923,7 @@ function spawnWorld() {
   rcSpawnObjs();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
   for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
-  anoms = ANOM0.map(a => Object.assign({}, a, { cd: 0, reveal: 0, fx: 0, arc: 0 }));
+  anoms = ANOM0.map(spawnAnomaly);
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
 }
 const byS = sid => ents.find(e => e.sid === sid && e.alive);
@@ -2622,6 +2622,133 @@ function spawnTick() {
   }
 }
 
+/* S.min advances by one game minute per second of unpaused play.
+   Absolute deadlines keep probes and gravity pulses in sync across reloads and rest. */
+const ELECTRA_WINDOW = 5, GRAVITY_PERIOD = 8, GRAVITY_CALM = 3.5, GRAVITY_WARNING = 1.25;
+
+function spawnAnomaly(site) {
+  const key = site.id || site.k+'_'+Math.round(site.x)+'_'+Math.round(site.y);
+  return {...site, key, until:S.flags.anomalyDischarges?.[key] || 0,
+    offset:((Math.floor(site.x/T)*17 + Math.floor(site.y/T)*31) % 80)/10,
+    hitUntil:new WeakMap(), reveal:0, fx:0, soundAt:0};
+}
+function gravityClock(a) { return (S.min + a.offset) % GRAVITY_PERIOD; }
+function anomalyPhase(a) {
+  if (a.k === 'e') {
+    const remaining = a.until - S.min;
+    return remaining <= 0 ? 'active' : remaining <= 1.25 ? 'warning' : 'quiet';
+  }
+  const t = gravityClock(a);
+  return t < GRAVITY_CALM ? 'quiet' : t < GRAVITY_CALM+GRAVITY_WARNING ? 'warning' : 'active';
+}
+function anomalyHint() {
+  let nearest = null, edge = 135;
+  for (const a of anoms) {
+    const d = dE(a,P) - a.r;
+    if (d < edge) { edge=d; nearest=a; }
+  }
+  if (!nearest) return '';
+  const phase = anomalyPhase(nearest);
+  if (nearest.k === 'g') {
+    if (nearest.reveal>0) {
+      const clock=gravityClock(nearest);
+      if (phase==='quiet') return 'Воронка · затишье ещё '+Math.ceil(GRAVITY_CALM-clock)+' с';
+      if (phase==='active') return 'Воронка · затишье через '+Math.ceil(GRAVITY_PERIOD-clock)+' с';
+    }
+    if (phase === 'quiet') return 'Воронка · пыль осела, проходи';
+    return phase === 'warning' ? 'Воронка · пыль поднимается!' : 'Воронка · пережди тягу';
+  }
+  if (phase === 'active') return 'Электра · брось болт';
+  const seconds = Math.ceil(nearest.until-S.min);
+  return phase === 'warning' ? 'Электра · заряд через '+seconds+' с' : 'Проход открыт · '+seconds+' с';
+}
+
+function anomalyBurst(a) {
+  a.fx=1;
+  play(a.k==='e'?'anomE':'anomG',a.x,a.y);
+  if (a.k==='e') flashes.push({x:a.x,y:a.y,a:0,life:.12,big:1,blue:1});
+  for(let i=0;i<12;i++){
+    const angle=rnd(0,2*Math.PI), speed=rnd(14,50);
+    parts.push({x:a.x+Math.cos(angle)*a.r*.7,y:a.y+Math.sin(angle)*a.r*.7,
+      vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rnd(.22,.52),
+      c:a.k==='e'?'#9dc0c8':'#9a805d',s:1.5});
+  }
+}
+function probeAnomaly(a,b,x,y) {
+  a.reveal=10;
+  b.x0=x; b.y0=y; b.hit=a; b.t=0; b.dur=.3;
+  if (a.k==='e') {
+    a.until=S.min+ELECTRA_WINDOW;
+    (S.flags.anomalyDischarges ||= {})[a.key]=a.until;
+    anomalyBurst(a);
+    b.x1=x; b.y1=y;
+  } else {
+    // The probe traces the pull and marks the perimeter, without resetting the cycle.
+    play('bolt',x,y);
+    const pull=anomalyPhase(a)==='active' ? .9 : .2;
+    b.x1=lerp(x,a.x,pull); b.y1=lerp(y,a.y,pull);
+  }
+}
+function updateBolts(dt) {
+  for (let i=bolts.length-1;i>=0;i--) {
+    const b=bolts[i], start=Math.min(1,b.t/b.dur);
+    b.t+=dt;
+    const end=Math.min(1,b.t/b.dur), dx=b.x1-b.x0, dy=b.y1-b.y0;
+    const length=Math.hypot(dx,dy), x=b.x0+dx*start,y=b.y0+dy*start;
+    if (!b.hit && length>0) {
+      let first=null, dist=(end-start)*length;
+      for (const a of anoms) {
+        if (a.k==='e' && a.until>S.min) continue;
+        const hit=rayCircle(x,y,dx/length,dy/length,a.x,a.y,a.r);
+        if (hit!==null && hit<=dist) { first=a; dist=hit; }
+      }
+      if (first) { probeAnomaly(first,b,x+dx/length*dist,y+dy/length*dist); continue; }
+    }
+    if (end===1) {
+      if (!b.hit) play('bolt',b.x1,b.y1);
+      bolts.splice(i,1);
+    }
+  }
+}
+
+function updateAnoms(dt) {
+  for (const a of anoms) {
+    a.reveal=Math.max(0,a.reveal-dt); a.fx=Math.max(0,a.fx-dt*2.8);
+    if (a.until && a.until<=S.min) {
+      a.until=0;
+      delete S.flags.anomalyDischarges[a.key];
+    }
+    if (anomalyPhase(a)!=='active') continue;
+    const electric=a.k==='e';
+    if (electric && S.min>=a.soundAt && dE(a,P)<160) {
+      play('zap',a.x,a.y,.35); a.soundAt=S.min+2+a.offset*.09;
+    }
+    for (const e of ents) {
+      if (!e.alive || e.captive) continue;
+      const d=dE(e,a);
+      if (d>=a.r+e.r*.5) continue;
+      // Electricity repels at the rim; the vortex pulls towards its damaging core.
+      const x=e.x-a.x,y=e.y-a.y, angle=d<1 ? e.ang+Math.PI : Math.atan2(y,x);
+      if (electric) { e.kx=Math.cos(angle)*330; e.ky=Math.sin(angle)*330; }
+      else {
+        e.kx-=x*dt*105; e.ky-=y*dt*105;
+        if (d>a.r*.72) continue;
+      }
+      if ((a.hitUntil.get(e)||0)>S.min) continue;
+      a.hitUntil.set(e,S.min+(electric ? 1.15 : GRAVITY_PERIOD-gravityClock(a)));
+      if (a.fx<=0) anomalyBurst(a);
+      if (!electric) { e.kx=Math.cos(angle)*390; e.ky=Math.sin(angle)*390; }
+      const dmg=electric ? (e===P && beltCount('art_bengal') ? 13 : 26) : 30;
+      hurt(e,dmg,'anom');
+    }
+  }
+}
+function cacheFieldQuiet(o) {
+  if (!o.anomalyId) return true;
+  const field=anoms.find(a=>a.id===o.anomalyId);
+  return !!field && anomalyPhase(field)==='quiet';
+}
+
 /* ===================== игрок и мир за кадр ===================== */
 const HURTDIR = [];
 let hurtFlash = 0, deathT = 0, shakeA = 0, geigerAcc = 0, radRate = 0, ambT = 0;
@@ -2808,15 +2935,9 @@ function update(dt) {
       }
     }
   }
+  updateBolts(dt);
   updateAnoms(dt);
-  g7Tick(dt);   // шаг/риг: от фактического пути за тик
-  // болты
-  for (let i = bolts.length - 1; i >= 0; i--) {
-    const b = bolts[i]; b.t += dt;
-    const k = Math.min(1, b.t / b.dur), x = lerp(b.x0, b.x1, k), y = lerp(b.y0, b.y1, k);
-    if (!b.hit) for (const a of anoms) if (dst(x, y, a.x, a.y) < a.r) { b.hit = a; triggerAnom(a, null); a.reveal = 12; b.x1 = x + rnd(-60, 60); b.y1 = y + rnd(-60, 60); b.x0 = x; b.y0 = y; b.t = 0; b.dur = 0.3; break; }
-    if (b.t >= b.dur) { if (!b.hit) play('bolt', x, y); bolts.splice(i, 1); }
-  }
+  g7Tick(dt);
   // гранаты
   for (let i = nades.length - 1; i >= 0; i--) {
     const n = nades[i];
@@ -2935,37 +3056,6 @@ function updatePlayer(dt) {
 }
 function screenToWorld(sx, sy) { return { x: cam.x + (sx - VW / 2) / Z, y: cam.y + (sy - VH / 2) / Z }; }
 
-/* ===================== аномалии ===================== */
-function triggerAnom(a, victim) {
-  a.fx = 1; a.reveal = Math.max(a.reveal, 8); a.cd = 1.1;
-  play(a.k === 'g' ? 'anomG' : 'anomE', a.x, a.y);
-  if (a.k === 'e') flashes.push({ x: a.x, y: a.y, a: 0, life: 0.15, big: 1, blue: 1 });
-  for (let i = 0; i < 14; i++) { const ang = rnd(0, 6.28); parts.push({ x: a.x + Math.cos(ang) * a.r, y: a.y + Math.sin(ang) * a.r, vx: -Math.cos(ang) * rnd(40, 120) * (a.k === 'g' ? 1 : -1), vy: -Math.sin(ang) * rnd(40, 120) * (a.k === 'g' ? 1 : -1), life: rnd(0.3, 0.7), c: a.k === 'g' ? '#7a6a4a' : '#bfe6ff', s: a.k === 'g' ? 2.5 : 1.5 }); }
-}
-function updateAnoms(dt) {
-  for (const a of anoms) {
-    a.cd -= dt; a.reveal = Math.max(0, a.reveal - dt); a.fx = Math.max(0, a.fx - dt * 1.6);
-    a.arc -= dt;
-    for (const e of ents) {
-      if (!e.alive || e.captive) continue;
-      const d = dE(e, a);
-      if (d < a.r + e.r * 0.5) {
-        if (a.k === 'g') { e.kx += (a.x - e.x) * 4 * dt * 60; e.ky += (a.y - e.y) * 4 * dt * 60; }
-        if (a.cd <= 0) {
-          triggerAnom(a, e);
-          let dmg = a.k === 'g' ? 30 : 26;
-          if (e === P && a.k === 'e' && beltCount('art_bengal')) dmg /= 2;
-          const out = Math.atan2(e.y - a.y, e.x - a.x) + (d < 2 ? rnd(0, 6.28) : 0);
-          e.kx = Math.cos(out) * (a.k === 'g' ? 420 : 260); e.ky = Math.sin(out) * (a.k === 'g' ? 420 : 260);
-          if (e === P) msg(a.k === 'g' ? 'Гравитационная аномалия! Кидай болты перед собой.' : 'Электра! Обходи голубые вспышки.', 'bad');
-          hurt(e, dmg, 'anom');
-          if (!e.alive && e !== P) { /* смерть в аномалии уже учтена */ }
-        }
-      }
-    }
-  }
-}
-
 /* ===================== взаимодействие ===================== */
 const G = { near: null };
 function findInteract() {
@@ -3000,7 +3090,10 @@ function findInteract() {
     if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
-        cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+        if (o.anomalyId) {
+          const quiet=cacheFieldQuiet(o);
+          cand(d,{k:'loot',o,label:quiet?'Обыскать схрон путейца':'Схрон путейца · дождись затишья'});
+        } else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
       }
     }
   }
@@ -3708,31 +3801,66 @@ function drawBody(o) {
 }
 const TINT = { art_medusa: [220, 147, 48], art_bengal: [140, 200, 255], art_blood: [214, 69, 65] };
 function drawAnoms() {
-  const t = S.min;
+  const t=S.min;
   for (const a of anoms) {
-    const pd = dst(a.x, a.y, P.x, P.y);
-    if (a.k === 'g') {
-      const vis = Math.max(a.reveal > 0 ? 0.9 : 0, clamp(1 - pd / 150, 0, 0.6), a.fx);
-      if (vis > 0.02) {
-        ctx.strokeStyle = 'rgba(230,210,170,' + (0.12 * vis) + ')'; ctx.lineWidth = 1;
-        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(a.x, a.y, a.r * (0.4 + i * 0.3) + Math.sin(t * 3 + i) * 2, 0, 6.28); ctx.stroke(); }
-        for (let i = 0; i < 9; i++) {
-          const ang = t * (1.5 + i * 0.1) + i * 0.7, r = (a.r - 2) * ((i * 37 % 10) / 10);
-          ctx.fillStyle = 'rgba(' + (i % 2 ? '90,75,50' : '140,120,70') + ',' + (0.8 * vis) + ')';
-          ctx.fillRect(a.x + Math.cos(ang) * r, a.y + Math.sin(ang) * r, 2.5, 1.5);
+    if (Math.abs(a.x-cam.x)>VW/(2*Z)+2*a.r || Math.abs(a.y-cam.y)>VH/(2*Z)+2*a.r) continue;
+    const phase=anomalyPhase(a), electric=a.k==='e';
+    const vis=Math.max(a.reveal>0 ? .92 : 0, clamp(1-(dE(a,P)-a.r)/225,0,.85),a.fx);
+    if (!vis) continue;
+    ctx.save(); ctx.translate(a.x,a.y); ctx.globalAlpha*=vis;
+    if (electric) {
+      const live=phase==='active', warning=phase==='warning';
+      const glow=ctx.createRadialGradient(0,0,2,0,0,a.r*1.22);
+      const light=live ? .34 : warning ? .14 : .035;
+      glow.addColorStop(0,'rgba(154,202,220,'+(light+a.fx*.18)+')');
+      glow.addColorStop(.70,'rgba(129,179,205,'+light*.65+')');
+      glow.addColorStop(1,'rgba(118,171,202,0)');
+      ctx.fillStyle=glow; ctx.fillRect(-a.r*1.22,-a.r*1.22,a.r*2.44,a.r*2.44);
+      if (live || warning || a.fx>.3) {
+        const frame=Math.floor(t*(live?8:4))+a.offset;
+        const radius=a.r*(live ? .96 : .52);
+        ctx.strokeStyle=live?'#b7e7ff':'#8daeb5'; ctx.lineWidth=live?1.35:.9;
+        for (let arm=0;arm<(live?3:1);arm++) {
+          const angle=arm*2.29+frame*1.37, cos=Math.cos(angle),sin=Math.sin(angle);
+          ctx.beginPath(); ctx.moveTo(-cos*radius*.18,-sin*radius*.18);
+          for (let j=1;j<=6;j++){
+            const along=radius*j/6, side=Math.sin(frame*4.1+j*2.63+arm)*radius*.18;
+            const x=cos*along-sin*side,y=sin*along+cos*side;
+            ctx.lineTo(x,y);
+            if (j===3 && live) { ctx.lineTo(x+cos*7+sin*9,y+sin*7-cos*9); ctx.moveTo(x,y); }
+          }
+          ctx.stroke();
         }
       }
-      if (a.fx > 0) { ctx.strokeStyle = 'rgba(255,220,160,' + a.fx * 0.6 + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(a.x, a.y, a.r * (1.6 - a.fx), 0, 6.28); ctx.stroke(); ctx.lineWidth = 1; }
     } else {
-      const glow = 0.18 + a.fx * 0.6 + (a.reveal > 0 ? 0.15 : 0);
-      const gr = ctx.createRadialGradient(a.x, a.y, 2, a.x, a.y, a.r * 1.4);
-      gr.addColorStop(0, 'rgba(150,210,255,' + glow + ')'); gr.addColorStop(1, 'rgba(150,210,255,0)');
-      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(a.x, a.y, a.r * 1.4, 0, 6.28); ctx.fill();
-      if (a.arc <= 0) { a.arc = rnd(0.05, 0.7); a.arcPts = []; let x = a.x, y = a.y; for (let i = 0; i < 6; i++) { x = a.x + rnd(-a.r, a.r); y = a.y + rnd(-a.r, a.r); a.arcPts.push([x, y]); } a.arcLife = 0.08; if (pd < 300 && chance(0.3)) play('zap', a.x, a.y); }
-      a.arcLife = (a.arcLife || 0) - 1 / 60;
-      if (a.arcLife > 0 || a.fx > 0.3) { ctx.strokeStyle = 'rgba(210,240,255,0.85)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(a.x, a.y); a.arcPts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.stroke(); ctx.lineWidth = 1; }
+      const pulse=gravityClock(a), quiet=phase==='quiet', warning=phase==='warning';
+      // Grains have a ground shadow. During the calm they stay on the ground;
+      // then lift and spiral inward before the grab.
+      for (let i=0;i<18;i++) {
+        const seed=i*2.399+a.offset;
+        const motion=quiet ? 0 : warning ? (pulse-GRAVITY_CALM)*.65 : GRAVITY_WARNING*.65+(pulse-GRAVITY_CALM-GRAVITY_WARNING)*2.8;
+        const angle=seed+motion, r=a.r*(.26+.70*((i*17%19)/19));
+        const x=Math.cos(angle)*r,y=Math.sin(angle)*r;
+        const lift=quiet ? 0 : warning ? (pulse-GRAVITY_CALM)*3 : 4+Math.sin(t*5+seed)*2;
+        ctx.fillStyle='rgba(32,26,18,.55)'; ctx.fillRect(x+1,y+1,3,1.4);
+        ctx.fillStyle=i%3?'#997e58':'#c3aa7e'; ctx.fillRect(x,y-lift,i%3?2.6:3.8,1.5);
+      }
+      if (!quiet || a.fx>0) {
+        ctx.lineWidth=1.2; ctx.strokeStyle=warning?'rgba(220,192,146,.55)':'rgba(211,190,149,.38)';
+        for(let i=0;i<3;i++) {
+          const radius=a.r*(.26+.69*(1-((t*1.2+i/3)%1)));
+          ctx.beginPath();ctx.arc(0,0,radius,t+i*2,t+i*2+2.3);ctx.stroke();
+        }
+      }
     }
+    if (a.reveal>0) {
+      ctx.setLineDash([4,7]);ctx.lineWidth=1;
+      ctx.strokeStyle=electric?'rgba(162,207,215,.48)':'rgba(208,180,133,.55)';
+      ctx.beginPath();ctx.arc(0,0,a.r,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.restore();
   }
+
   for (const a of arts) {
     const d = dst(a.x, a.y, P.x, P.y); if (d > 90) continue;
     const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = clamp(1 - d / 90, 0, 1);
@@ -3982,7 +4110,7 @@ function render() {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
-    for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
+    for (const a of anoms) if (a.k === 'e' && (anomalyPhase(a)==='active' || a.fx>.3)) hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);
     ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
@@ -6889,7 +7017,7 @@ function rc1Gen() {
   for (let y = 27; y <= 31; y++) for (let x = 103; x <= 104; x++) setT(x, y, CF);
   rcClear(101, 17, 106, 35);
   rcPath([[103.5, 35], [103.5, 31]]); rcPath([[103.5, 27], [103.5, 18], [105, 17]]);
-  ANOM0.push({ x: 103.6 * T, y: 26.3 * T, r: 22, k: 'g' });
+  ANOM0.push({ id:'ditch-electra', x:104*T, y:29.5*T, r:43, k:'e' });
   rads.push({ x: 103.5 * T, y: 29 * T, r: 60, p: 3.5 });
   // хлев за фермой
   rcClear(101, 6, 114, 18);
@@ -7170,10 +7298,14 @@ function bigNewObjects(R) {
   bigLoc('exit_e', { name: 'Дорога на Затон', gen: 'дороги на Затон', type: 'story', bounds: [232, 86, 239, 98], entrances: [[233, 92]], anchors: { gate: [237, 92] } });
   SOS_SPOTS.push([38, 137, 'hutor'], [224, 99, 'ford'], [133, 22, 'column']);
   CLEAR_SPOTS.push([33, 131, 'у хутора', 'hutor'], [226, 97, 'у брода', 'ford'], [122, 25, 'у разбитой колонны', 'column']);
+  // Небольшая поляна соединяет схрон с обочиной.
+  rcClear(123,24,128,28);
   // колонна техники у дороги на Свалку
   [[120, 19, 0], [123, 23, 1], [121.5, 27.5, 0], [131, 21, 1]].forEach((c, i) => addObj({ k: 'car', x: c[0] * T, y: c[1] * T + 4, w: 2 * T, h: T - 8, solid: 1, opaque: 0, seed: 10 + i }));
   addObj({ k: 'crate', x: 125 * T + 3, y: 23 * T + 3, w: 26, h: 26, solid: 1, stash: 'st8', loot: { a545: 30, medkit: 1, money: 240 } });
-  ANOM0.push({ x: 125.5 * T, y: 26.5 * T, r: 26, k: 'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
+  ANOM0.push({ id:'column-vortex', x:125.5*T, y:26.5*T, r:54, k:'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
+  addObj({k:'hiding',stash:'column_wayman',anomalyId:'column-vortex',x:125.5*T-11,y:26.5*T-9,
+    w:22,h:18,solid:false,loot:{medkit:1,antirad:2,money:240}});
   rads.push({ x: 123 * T, y: 24 * T, r: 110, p: 2.2 });
   DECOR.push(['ford', STREAM_X(92) + .5, 92.5, 0]);
 
@@ -8747,7 +8879,7 @@ function traderOpts() {
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
-    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болты кидай, а то соберёшь тебя потом по частям.');
+    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болт покажет границу. К артефакту иди, когда пыль осядет.');
     S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
@@ -8775,9 +8907,13 @@ function openTrade(e) {
 }
 function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefined ? Math.floor(it.sell * (toNpc ? 0.8 : 1)) : Math.max(1, Math.floor((it.price || 0) * (toNpc ? 0.5 : 0.35))); }
 function openLoot(o) {
+  if (!cacheFieldQuiet(o)) {
+    msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
+    return;
+  }
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
   if (o.k === 'crate') return;
-  openPanel('loot', o.k === 'cache' || o.k === 'hiding' ? 'Тайник' : o.k === 'safe' ? 'Сейф' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
+  openPanel('loot', o.anomalyId ? 'Схрон путейца' : o.k === 'cache' || o.k === 'hiding' ? 'Тайник' : o.k === 'safe' ? 'Сейф' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
 }
 function drawLoot() {
   const o = panel.o, keys = Object.keys(o.loot).filter(k => k !== '__tip');
@@ -8823,6 +8959,9 @@ function drawPda() {
     S.news.slice().reverse().forEach(n => { const r = el('div', 'row'), g = el('div', 'grow'); g.appendChild(el('div', 'tm', clockStr(n.t))); g.appendChild(el('div', 'ds lite', n.x)); r.appendChild(g); pbody.appendChild(r); });
   } else {
     pbody.appendChild(person(meCard()));
+    pbody.appendChild(el('h3','','Полевые заметки'));
+    pbody.appendChild(el('p','note','Электра гаснет на пять секунд от болта. Первые искры предупреждают о возврате заряда.' + (MAP_ID==='rc1'?' Так можно пройти Восточную канаву справа от военного моста.':'')));
+    pbody.appendChild(el('p','note','Воронку выдаёт пыль: кружащийся мусор тянет к центру, осевший оставляет время пройти. Болт показывает границу.' + (BIG?' У разбитой колонны путеец спрятал вещи прямо под воронкой.':'')));
     const st = el('div', 'stat');
     [['Убито людей', S.stats.kS], ['Убито мутантов', S.stats.kM], ['Выполнено заданий', S.stats.q], ['Найдено артефактов', S.stats.art], ['Очки рейтинга', score()], ['Отношение одиночек', S.rep]].forEach(x => { st.appendChild(el('span', '', x[0])); st.appendChild(el('b', '', String(x[1]))); });
     pbody.appendChild(st);
@@ -9139,7 +9278,7 @@ function hud(dt) {
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
   const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
-  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint(), P.detD < 280 ? 'артефакт ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;

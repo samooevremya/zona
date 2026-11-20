@@ -115,7 +115,7 @@ function rc1Gen() {
   for (let y = 27; y <= 31; y++) for (let x = 103; x <= 104; x++) setT(x, y, CF);
   rcClear(101, 17, 106, 35);
   rcPath([[103.5, 35], [103.5, 31]]); rcPath([[103.5, 27], [103.5, 18], [105, 17]]);
-  ANOM0.push({ x: 103.6 * T, y: 26.3 * T, r: 22, k: 'g' });
+  ANOM0.push({ id:'ditch-electra', x:104*T, y:29.5*T, r:43, k:'e' });
   rads.push({ x: 103.5 * T, y: 29 * T, r: 60, p: 3.5 });
   // хлев за фермой
   rcClear(101, 6, 114, 18);

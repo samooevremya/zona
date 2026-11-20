@@ -616,31 +616,66 @@ function drawBody(o) {
 }
 const TINT = { art_medusa: [220, 147, 48], art_bengal: [140, 200, 255], art_blood: [214, 69, 65] };
 function drawAnoms() {
-  const t = S.min;
+  const t=S.min;
   for (const a of anoms) {
-    const pd = dst(a.x, a.y, P.x, P.y);
-    if (a.k === 'g') {
-      const vis = Math.max(a.reveal > 0 ? 0.9 : 0, clamp(1 - pd / 150, 0, 0.6), a.fx);
-      if (vis > 0.02) {
-        ctx.strokeStyle = 'rgba(230,210,170,' + (0.12 * vis) + ')'; ctx.lineWidth = 1;
-        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(a.x, a.y, a.r * (0.4 + i * 0.3) + Math.sin(t * 3 + i) * 2, 0, 6.28); ctx.stroke(); }
-        for (let i = 0; i < 9; i++) {
-          const ang = t * (1.5 + i * 0.1) + i * 0.7, r = (a.r - 2) * ((i * 37 % 10) / 10);
-          ctx.fillStyle = 'rgba(' + (i % 2 ? '90,75,50' : '140,120,70') + ',' + (0.8 * vis) + ')';
-          ctx.fillRect(a.x + Math.cos(ang) * r, a.y + Math.sin(ang) * r, 2.5, 1.5);
+    if (Math.abs(a.x-cam.x)>VW/(2*Z)+2*a.r || Math.abs(a.y-cam.y)>VH/(2*Z)+2*a.r) continue;
+    const phase=anomalyPhase(a), electric=a.k==='e';
+    const vis=Math.max(a.reveal>0 ? .92 : 0, clamp(1-(dE(a,P)-a.r)/225,0,.85),a.fx);
+    if (!vis) continue;
+    ctx.save(); ctx.translate(a.x,a.y); ctx.globalAlpha*=vis;
+    if (electric) {
+      const live=phase==='active', warning=phase==='warning';
+      const glow=ctx.createRadialGradient(0,0,2,0,0,a.r*1.22);
+      const light=live ? .34 : warning ? .14 : .035;
+      glow.addColorStop(0,'rgba(154,202,220,'+(light+a.fx*.18)+')');
+      glow.addColorStop(.70,'rgba(129,179,205,'+light*.65+')');
+      glow.addColorStop(1,'rgba(118,171,202,0)');
+      ctx.fillStyle=glow; ctx.fillRect(-a.r*1.22,-a.r*1.22,a.r*2.44,a.r*2.44);
+      if (live || warning || a.fx>.3) {
+        const frame=Math.floor(t*(live?8:4))+a.offset;
+        const radius=a.r*(live ? .96 : .52);
+        ctx.strokeStyle=live?'#b7e7ff':'#8daeb5'; ctx.lineWidth=live?1.35:.9;
+        for (let arm=0;arm<(live?3:1);arm++) {
+          const angle=arm*2.29+frame*1.37, cos=Math.cos(angle),sin=Math.sin(angle);
+          ctx.beginPath(); ctx.moveTo(-cos*radius*.18,-sin*radius*.18);
+          for (let j=1;j<=6;j++){
+            const along=radius*j/6, side=Math.sin(frame*4.1+j*2.63+arm)*radius*.18;
+            const x=cos*along-sin*side,y=sin*along+cos*side;
+            ctx.lineTo(x,y);
+            if (j===3 && live) { ctx.lineTo(x+cos*7+sin*9,y+sin*7-cos*9); ctx.moveTo(x,y); }
+          }
+          ctx.stroke();
         }
       }
-      if (a.fx > 0) { ctx.strokeStyle = 'rgba(255,220,160,' + a.fx * 0.6 + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(a.x, a.y, a.r * (1.6 - a.fx), 0, 6.28); ctx.stroke(); ctx.lineWidth = 1; }
     } else {
-      const glow = 0.18 + a.fx * 0.6 + (a.reveal > 0 ? 0.15 : 0);
-      const gr = ctx.createRadialGradient(a.x, a.y, 2, a.x, a.y, a.r * 1.4);
-      gr.addColorStop(0, 'rgba(150,210,255,' + glow + ')'); gr.addColorStop(1, 'rgba(150,210,255,0)');
-      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(a.x, a.y, a.r * 1.4, 0, 6.28); ctx.fill();
-      if (a.arc <= 0) { a.arc = rnd(0.05, 0.7); a.arcPts = []; let x = a.x, y = a.y; for (let i = 0; i < 6; i++) { x = a.x + rnd(-a.r, a.r); y = a.y + rnd(-a.r, a.r); a.arcPts.push([x, y]); } a.arcLife = 0.08; if (pd < 300 && chance(0.3)) play('zap', a.x, a.y); }
-      a.arcLife = (a.arcLife || 0) - 1 / 60;
-      if (a.arcLife > 0 || a.fx > 0.3) { ctx.strokeStyle = 'rgba(210,240,255,0.85)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(a.x, a.y); a.arcPts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.stroke(); ctx.lineWidth = 1; }
+      const pulse=gravityClock(a), quiet=phase==='quiet', warning=phase==='warning';
+      // Grains have a ground shadow. During the calm they stay on the ground;
+      // then lift and spiral inward before the grab.
+      for (let i=0;i<18;i++) {
+        const seed=i*2.399+a.offset;
+        const motion=quiet ? 0 : warning ? (pulse-GRAVITY_CALM)*.65 : GRAVITY_WARNING*.65+(pulse-GRAVITY_CALM-GRAVITY_WARNING)*2.8;
+        const angle=seed+motion, r=a.r*(.26+.70*((i*17%19)/19));
+        const x=Math.cos(angle)*r,y=Math.sin(angle)*r;
+        const lift=quiet ? 0 : warning ? (pulse-GRAVITY_CALM)*3 : 4+Math.sin(t*5+seed)*2;
+        ctx.fillStyle='rgba(32,26,18,.55)'; ctx.fillRect(x+1,y+1,3,1.4);
+        ctx.fillStyle=i%3?'#997e58':'#c3aa7e'; ctx.fillRect(x,y-lift,i%3?2.6:3.8,1.5);
+      }
+      if (!quiet || a.fx>0) {
+        ctx.lineWidth=1.2; ctx.strokeStyle=warning?'rgba(220,192,146,.55)':'rgba(211,190,149,.38)';
+        for(let i=0;i<3;i++) {
+          const radius=a.r*(.26+.69*(1-((t*1.2+i/3)%1)));
+          ctx.beginPath();ctx.arc(0,0,radius,t+i*2,t+i*2+2.3);ctx.stroke();
+        }
+      }
     }
+    if (a.reveal>0) {
+      ctx.setLineDash([4,7]);ctx.lineWidth=1;
+      ctx.strokeStyle=electric?'rgba(162,207,215,.48)':'rgba(208,180,133,.55)';
+      ctx.beginPath();ctx.arc(0,0,a.r,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.restore();
   }
+
   for (const a of arts) {
     const d = dst(a.x, a.y, P.x, P.y); if (d > 90) continue;
     const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = clamp(1 - d / 90, 0, 1);
@@ -890,7 +925,7 @@ function render() {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
-    for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
+    for (const a of anoms) if (a.k === 'e' && (anomalyPhase(a)==='active' || a.fx>.3)) hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);
     ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
