@@ -173,5 +173,146 @@ Tt('K13_pda_quest_bulletin', () => {
   const order = B.msgs();
   return { ok: shown && sosFirst && /приближается выброс/i.test(order[0]) && order[1]?.startsWith('SOS!') && order.includes(report.x), shown, sosFirst };
 });
+Tt('K14_break_loot_search', () => {
+  reset();
+  const box = M.objs.find(o => o.stash === 'st9');
+  const left = o => {
+    for (const e of z.ents) if (e !== P()) e.alive = false;
+    P().x = o.x + o.w/2 - 34; P().y = o.y + o.h/2;
+    P().ang = 0; z.IN.touch = true; step(1);
+  };
+  const attack = weapon => {
+    S().weapon = weapon; P().ang = 0; P().cool = P().reload = 0;
+    z.IN.fire = true; step(1); z.IN.fire = false;
+  };
+  left(box);
+  const sealed = box.solid && z.near?.o !== box;
+  attack('knife');
+  const knife = box.broken && !box.solid && z.near?.k === 'pickupLoot';
+  z.save(true); z.applyState(z.loadSave()); left(box);
+  const before = S().money, amount = box.loot.money;
+  z.interact(); step(1); z.interact();
+  const takenOnce = S().money === before + amount && box.looted && !Object.keys(box.loot).length;
+  z.save(true); z.applyState(z.loadSave());
+  const emptyOnLoad = box.looted && box.broken && !box.solid;
+  reset(); left(box); S().mag.w_pm = 6; attack('w_pm');
+  const bullet = box.broken && S().mag.w_pm === 5 && box.loot.money === amount;
+  const search = {};
+  for (const kind of ['safe','hiding']) {
+    const o = M.objs.find(o => o.k === kind);
+    left(o); attack('knife'); z.interact();
+    const opens = z.panel?.kind === 'loot' && z.panel.o === o;
+    const take = [...document.querySelectorAll('button')].find(b => b.textContent === 'Взять' && b.offsetWidth);
+    if (opens && take) take.click();
+    z.closePanel();
+    const remaining = JSON.stringify(o.loot);
+    z.save(true); z.applyState(z.loadSave());
+    search[kind] = !!(opens && take && !o.broken && Object.keys(o.loot).length === 1 && JSON.stringify(o.loot) === remaining);
+  }
+  return {ok: sealed && knife && takenOnce && emptyOnLoad && bullet && search.safe && search.hiding, sealed, knife, takenOnce, emptyOnLoad, bullet, search};
+});
+Tt('K15_all_prop_colliders_and_containers', () => {
+  reset();
+  const start = M.LOC.village.anchors.safe.map(v => v*T);
+  const unchecked = [], unreachable = [];
+  for (const p of M.fieldProps) {
+    const n = p.vertices.length;
+    const x = p.vertices.reduce((sum,v) => sum+v[0],0)/n;
+    const y = p.vertices.reduce((sum,v) => sum+v[1],0)/n;
+    const probe = {x,y,r:11};
+    M.collide(probe);
+    if (Math.hypot(probe.x-x,probe.y-y)<.01) unchecked.push(p.id);
+  }
+  for (const o of M.objs.filter(o=>o.stash)) {
+    const cx=o.x+o.w/2, cy=o.y+o.h/2;
+    let reachable=false;
+    for(let i=0;i<16 && !reachable;i++){
+      const x=cx+35*Math.cos(i*Math.PI/8), y=cy+35*Math.sin(i*Math.PI/8);
+      if(!M.nav[Math.floor(y/T)*M.MW+Math.floor(x/T)] || !M.los(x,y,cx,cy)) continue;
+      const probe={x,y,r:11}; M.collide(probe);
+      reachable=Math.hypot(probe.x-x,probe.y-y)<.1 && !!z.findPath(...start,x,y);
+    }
+    if(!reachable) unreachable.push(o.stash);
+  }
+  const count=M.fieldProps.length, kinds=new Set(M.fieldProps.map(p=>p.id));
+  const covered=['c1_trace_pipes','c1_sandbags','c1_barrel','c1_trace_reel'].every(id=>kinds.has(id));
+  return {ok:covered && !unchecked.length && !unreachable.length,count,unchecked,unreachable};
+});
+Tt('K16_roaming_field_crates', () => {
+  reset();
+  const stock = () => S().flags.fieldCrates;
+  const intact = () => M.objs.filter(o => o.fieldTile != null && !o.broken);
+  const sector = tile => Math.floor((tile%M.MW)*3/B.PW()) + (Math.floor(tile/M.MW)>=B.MH()/2 ? 3 : 0);
+  const initial = intact(), sectors = [0,0,0,0,0,0];
+  for (const o of initial) sectors[sector(o.fieldTile)]++;
+  const oldSites = initial.map(o=>o.fieldTile);
+  for (const o of initial) {
+    for (const e of z.ents) if (e !== P()) e.alive = false;
+    P().x=o.x-20; P().y=o.y+o.h/2; P().ang=0; P().cool=0;
+    z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
+  }
+  const timers = stock().slots.map(s=>s.due);
+  const broken = !intact().length && timers.every(t=>t>=S().min+118 && t<=S().min+240);
+  const first = initial[0], originalLoot = JSON.stringify(stock().drops[first.fieldTile]);
+  // Забираем второй ящик. Содержимое первого ждёт игрока на старом месте даже после замены.
+  const second=initial[1]; P().x=second.x-19; P().y=second.y+13; step(1); z.interact();
+  const picked = !Object.keys(stock().drops[second.fieldTile]||{}).length;
+  z.save(true); z.applyState(z.loadSave());
+  S().min=Math.min(...timers)-1; step(1);
+  const waiting = !intact().length && JSON.stringify(stock().slots.map(s=>s.due))===JSON.stringify(timers);
+  S().food=100; z.plus.advanceWorldTime(180,{});
+  const newSites=stock().slots.map(s=>s.tile);
+  const renewed = intact().length===24 && new Set(newSites).size===24 &&
+    newSites.every((t,i)=>sector(t)!==sector(oldSites[i]) && Math.hypot(t%M.MW-oldSites[i]%M.MW,Math.floor(t/M.MW)-Math.floor(oldSites[i]/M.MW))>=32);
+  const saved=JSON.stringify(stock());
+  z.save(true); z.applyState(z.loadSave());
+  const restored=JSON.stringify(stock())===saved && intact().length===24;
+  const drops=M.objs.filter(o=>o.fieldTile===first.fieldTile && o.broken);
+  const kept=drops.length===1 && JSON.stringify(drops[0].loot)===originalLoot && !Object.keys(stock().drops[second.fieldTile]).length;
+  if (drops.length) {
+    P().x=drops[0].x-18; P().y=drops[0].y+13; step(1); z.interact();
+  }
+  const collected=!Object.keys(stock().drops[first.fieldTile]).length;
+  return {ok:sectors.every(n=>n===4) && broken && waiting && renewed && restored && picked && kept && collected,
+    sectors,broken,waiting,renewed,restored,picked,kept,collected};
+});
+Tt('K17_crate_remains_expire', () => {
+  reset();
+  const flags = () => S().flags;
+  const loose = () => M.objs.filter(o => o.fieldTile != null);
+  const fixed = M.objs.find(o => o.stash === 'st9');
+  const [full, empty] = loose().filter(o => !o.broken);
+  const hit = o => {
+    for (const e of z.ents) if (e !== P()) e.alive = false;
+    P().x=o.x-20; P().y=o.y+13; P().ang=0; P().cool=0;
+    z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
+  };
+  hit(fixed); hit(full); hit(empty); z.interact();
+  const end = flags().crateCleanup[fixed.stash];
+  const fullEnd = flags().crateCleanup[full.stash], emptyEnd = flags().crateCleanup[empty.stash];
+  const snapshot = () => { z.save(true); return z.loadSave(); };
+  const brokenSave = snapshot();
+  const lookup = o => M.objs.find(b => b.stash === o.stash && b.broken);
+  S().min = end-.2; step(1);
+  z.applyState(snapshot());
+  const before = !!lookup(fixed) && Object.keys(lookup(full).loot).length > 0 && !Object.keys(lookup(empty).loot).length;
+  const sameDeadline = flags().crateCleanup[fixed.stash] === end;
+  S().min = end; step(1);
+  const firstOnly = !lookup(fixed) && !!lookup(empty);
+  S().food=100; z.plus.advanceWorldTime(60,'sleep');
+  const isClean = () => !flags().crateCleanup && !Object.keys(flags().fieldCrates.drops).length &&
+    flags()['st_'+fixed.stash]===2 && !('contents_'+fixed.stash in flags()) && !('broken_'+fixed.stash in flags()) &&
+    !lookup(fixed) && !lookup(full) && !lookup(empty) && loose().filter(o=>!o.broken).length === 24;
+  const rested = isClean(); z.applyState(snapshot()); const reloaded = isClean();
+  const overdue = JSON.parse(JSON.stringify(brokenSave)); overdue.min = emptyEnd+1; z.applyState(overdue);
+  const cleanedOnLoad = isClean();
+  const old = JSON.parse(JSON.stringify(brokenSave)); delete old.flags.crateCleanup; z.applyState(old);
+  const migrated = flags().crateCleanup[full.stash] === old.min+360 && !!lookup(full);
+  S().min += 361; step(1); const oldClean = isClean();
+  reset();
+  const fresh = !!M.objs.find(o=>o.stash===fixed.stash && o.solid && !o.broken && Object.keys(o.loot).length);
+  return {ok:before && sameDeadline && firstOnly && rested && reloaded && cleanedOnLoad && migrated && oldClean && fresh && fullEnd<=emptyEnd,
+    before,sameDeadline,firstOnly,rested,reloaded,cleanedOnLoad,migrated,oldClean,fresh};
+});
 return JSON.stringify(R);
 })()

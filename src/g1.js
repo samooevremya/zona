@@ -304,6 +304,10 @@ function buildGrids() {
         nav[y * MW + x] = 0; if (o.opaque) opq[y * MW + x] = 1;
       }
   });
+  for (const [key,props] of propCells) {
+    const center={x:(key%MW+.5)*T, y:(Math.floor(key/MW)+.5)*T, r:10};
+    if(props.some(p=>touchesProp(p,center))) nav[key]=0;
+  }
   ANOM0.forEach(a => {
     for (let y = Math.floor((a.y - a.r - 14) / T); y <= Math.floor((a.y + a.r + 14) / T); y++)
       for (let x = Math.floor((a.x - a.r - 14) / T); x <= Math.floor((a.x + a.r + 14) / T); x++)

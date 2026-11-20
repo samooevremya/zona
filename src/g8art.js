@@ -460,6 +460,18 @@ function scatterAutumnPlants(g, x, y, terrain) {
 }
 
 /* разброс C1: брёвна, пни, камни, пятна. Место выбирается по хешу клетки, так что соседние куски рисуют одно и то же */
+function scatterObject(x,y) {
+    const h = hash2(x * 3 + 11, y * 7 + 5); if (h > 0.03) return null;
+    let road = false; for (let dy = -2; dy <= 2 && !road; dy++) for (let dx = -2; dx <= 2; dx++) { const t = tAt(x + dx, y + dy); if (t === DI || t === AS || t === BR || t === CO || t === FL || t === CF || t === RA) { road = true; break; } }
+    if (road) return null;
+    const h2 = hash2(y + 31, x + 17), cx = x * T + 16, cy = y * T + 16, a = h2 * 6.28;
+    let id, w, hh, al = 1;
+    if (h < 0.007) { id = 'c1_log' + Math.floor(h2 * 3); w = 110; hh = 36; }
+    else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
+    else if (h < 0.018) { id = 'c1_rock' + Math.floor(h2 * 3); w = hh = 28 + h2 * 10; }
+    else { id = 'c1_decal' + [0, 1, 3, 4][Math.floor(h2 * 4)]; w = hh = 90 + h2 * 50; al = 0.7; }
+    return {id,w,hh,al,cx,cy,a};
+}
 function c1Scatter(g) {
   const terrain = BIG && autumnTerrain();
   const M = 5;
@@ -473,15 +485,8 @@ function c1Scatter(g) {
     }
     if (t0 !== GR) continue;
     if (terrain) scatterAutumnPlants(g, x, y, terrain);
-    const h = hash2(x * 3 + 11, y * 7 + 5); if (h > 0.03) continue;
-    let road = false; for (let dy = -2; dy <= 2 && !road; dy++) for (let dx = -2; dx <= 2; dx++) { const t = tAt(x + dx, y + dy); if (t === DI || t === AS || t === BR || t === CO || t === FL || t === CF || t === RA) { road = true; break; } }
-    if (road) continue;
-    const h2 = hash2(y + 31, x + 17), cx = x * T + 16, cy = y * T + 16, a = h2 * 6.28;
-    let id, w, hh, al = 1;
-    if (h < 0.007) { id = 'c1_log' + Math.floor(h2 * 3); w = 110; hh = 36; }
-    else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
-    else if (h < 0.018) { id = 'c1_rock' + Math.floor(h2 * 3); w = hh = 28 + h2 * 10; }
-    else { id = 'c1_decal' + [0, 1, 3, 4][Math.floor(h2 * 4)]; w = hh = 90 + h2 * 50; al = 0.7; }
+    const prop = scatterObject(x,y); if (!prop) continue;
+    const {id,w,hh,al,cx,cy,a} = prop;
     if (id.startsWith('c1_log')) {
       groundShadow(g, cx, cy, w * .48, hh * .26, a, 3);
       ART.draw(g, id, cx, cy, w, hh, a);
@@ -723,7 +728,7 @@ function drawCordonDetails(g) {
   }
   g.restore();
 }
-/* декор деревни: без коллизии, вне дорожек и дверей */
+/* декор деревни: координаты для рисунка и коллизии */
 const DECOR = [
   ...YARD_SEATS.filter(s => s.log).map(s => {
     const [kind, dx, dy, angle] = s.log;
