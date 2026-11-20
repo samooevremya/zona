@@ -39,7 +39,8 @@ function g3Draw(e, extra, target = ctx) {
   if (sw) { target.save(); target.translate(e.x + sw.dx, e.y + sw.dy); target.scale(sw.k, sw.k); target.translate(-e.x, -e.y); }
   const sh = e.kind === 'human' && BIG && window.CORDON_G8_ON;   // контраст с землёй: мягкая тень-обводка вправо-вниз, как у остальных объектов
   if (sh) { const k = Math.abs(target.getTransform().a); target.save(); target.shadowColor = 'rgba(8,8,4,0.6)'; target.shadowBlur = 2.6 * k; target.shadowOffsetX = 1.6 * k; target.shadowOffsetY = 2.2 * k; }
-  const ok = CordonG3.draw(target, man, G3.images, a, e.kind === 'human' ? (c2 => {
+  const images = jacketFor(e)?.images || G3.images;
+  const ok = CordonG3.draw(target, man, images, a, e.kind === 'human' ? (c2 => {
     if (e === P && window.CORDON_G8_ON) {
       const roll = packImage('assets/g8/player_bedroll.webp');
       if (roll) {
@@ -49,7 +50,7 @@ function g3Draw(e, extra, target = ctx) {
     }
     const w = weaponLocal(e); if (window.__g7tap) window.__g7tap(e, g3Base, c2.getTransform(), w); drawWeaponLocal(c2, w); }) : null);
   if (sh) target.restore();
-  if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(target, man, G3.images, Object.assign({}, a, { shadow: false }), null); target.restore(); }
+  if (ok && e.flash > 0) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); CordonG3.draw(target, man, images, Object.assign({}, a, { shadow: false }), null); target.restore(); }
   if (sw) target.restore();
   return ok;
 }
@@ -78,7 +79,7 @@ function g3Body(o) {
   const f = f2 || (A && A.dead); if (!f || !G3.images[f.file]) return false;
   bloodPool(o, 1); ctx.save(); ctx.translate(o.x, o.y);
   ctx.rotate((o.ang || 0) - Math.PI / 2); if (v & 2 && o.kind === 'human') ctx.scale(-1, 1);   // G8: 2 позы × зеркало — трупы не повторяются
-  ctx.drawImage(G3.images[f.file], -f.width / 2, -f.height / 2, f.width, f.height); ctx.restore();
+  ctx.drawImage((jacketFor(o)?.images || G3.images)[f.file], -f.width / 2, -f.height / 2, f.width, f.height); ctx.restore();
   return true;
 }
 

@@ -461,6 +461,8 @@ function dropBody(e) {
   }
   if (e.kind === 'human' && (e.fac === 'loner' || e.fac === 'bandit') && chance(0.3)) loot.__tip = 1;
   const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, t: S.min };
+  // Младший остаток визуального seed хранит расцветку и после загрузки тела.
+  if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   objs.push(body); g7Fresh(body);   // визуальный переход падения (только в памяти, не в сейве)
   const bodies = objs.filter(o => o.k === 'body');
   if (bodies.length > 30) objs.splice(objs.indexOf(bodies[0]), 1);
@@ -532,10 +534,14 @@ function aiHuman(e, dt) {
   e.react = 0.5;
   if (e.campRise != null) {
     const target = e.sit ? 0 : 1;
-    e.campRise = clamp(e.campRise + (e.sit ? -dt : dt) / 0.68, 0, 1);
+    e.campRise = clamp(e.campRise + (e.sit ? -dt : dt) / 0.82, 0, 1);
     if (e.sit) {
       const towardFire = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
       e.ang += angD(e.ang, towardFire) * Math.min(1, dt * 5);
+    } else if (e.campRise > 0.72 && (e.trip || e.follow)) {
+      // Перенёс вес на стопу: первые сантиметры шага идут по реальному пути.
+      const stride = (e.campRise - 0.72) / 0.28;
+      idleHuman(e, dt * stride);
     }
     if (e.campRise === target) e.campRise = null;
     return;
