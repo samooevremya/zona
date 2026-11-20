@@ -187,10 +187,11 @@ T_('G_fence_cover', () => {
   const p = P(), y = 201.5 * T, x = 124 * T;
   place(p, x, y + 20); const guard = tgt(x, y - 80, 'army');
   const trace = (from, to) => G.shotTrace(from, Math.atan2(to.y - from.y, to.x - from.x), G.WP.w_pm);
-  const cases = {};
+  const cases = { concreteAtCheckpoint: M.objs.some(o => o.material === 'concreteWire' &&
+    x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h) };
   p.crouch = 0; cases.standing = trace(guard, p).best === p;
   p.crouch = 1; const impact = trace(guard, p);
-  cases.stoppedAtWire = !impact.best && impact.wall && Math.abs(guard.y + impact.t - (y - 4)) < .01;
+  cases.stoppedAtConcrete = !impact.best && impact.wall && Math.abs(guard.y + impact.t - (y - 4)) < .01;
   cases.returnFireBlocked = trace(p, guard).wall;
   guard.x += 45; cases.diagonal = trace(guard, p).wall;
   place(guard, x + 75, p.y); cases.flank = trace(guard, p).best === p;

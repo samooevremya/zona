@@ -349,6 +349,53 @@ function drawThresholds(g) {
   }
 }
 function artBush(g, x, y) { const h = hash2(x, y); ART.draw(g, C1 ? (tAt(x, y + 1) === SW || tAt(x, y - 1) === SW ? 'c1_bush3' : 'c1_bush' + Math.floor(hash2(y, x + 7) * 3)) : 'bush', x * T + 16 + (h - 0.5) * 6, y * T + 16 + (hash2(y, x) - 0.5) * 6, 36 * (0.85 + h * 0.3), 36 * (0.85 + h * 0.3), h * 6.28); }
+// Бетонная панель опирается на коллайдер. Верх всех секций смещён на (-5, -12)
+// в мировых координатах, поэтому крышки и проволока сходятся на углах периметра.
+function drawCheckpointWall(g, length, bays, upright) {
+  const bay = length / bays, topX = upright ? -12 : -5, topY = upright ? 5 : -12;
+  const edge = upright ? -4 : 4;
+  // Видимая грань от основания до крышки; рисунок бетона проходит через весь пролёт.
+  g.save();
+  g.transform(1, 0, topX / 12, topY / 12, 0, edge);
+  artFill(g, 'wall_concrete', 0, 0, length, 12);
+  g.fillStyle = 'rgba(47,43,35,.27)'; g.fillRect(0, 0, length, 12);
+  g.fillStyle = 'rgba(37,34,28,.48)'; g.fillRect(0, 0, length, 2);
+  for (let i = 0; i <= bays; i++) {
+    const x = i * bay;
+    g.fillStyle = '#534f46'; g.fillRect(x - 2, 0, 4, 12);
+    g.fillStyle = '#878477'; g.fillRect(x - 2, 0, 2, 12);
+  }
+  g.restore();
+  // Торец у проезда виден и при взгляде вдоль плиты.
+  g.fillStyle = '#676358'; g.beginPath();
+  g.moveTo(length, -4); g.lineTo(length, 4); g.lineTo(length + topX, topY + 4);
+  g.lineTo(length + topX, topY - 4); g.closePath(); g.fill();
+  g.translate(topX, topY);
+  artFill(g, 'floor_concrete', 0, -4, length, 8);
+  g.fillStyle = 'rgba(186,183,163,.47)'; g.fillRect(0, -4, length, 8);
+  g.fillStyle = '#b3af9c'; g.fillRect(0, -edge, length, 1);
+  for (let i = 0; i <= bays; i++) {
+    const x = i * bay;
+    g.fillStyle = '#514c44'; g.fillRect(x - 2.5, -5, 5, 10);
+    g.fillStyle = '#9a9788'; g.fillRect(x - 2.5, -5, 4, 8.5);
+  }
+  // Опоры и натяжной трос расположены на крышке; витки слегка выступают над ней.
+  g.translate(topX / 4, topY / 4);
+  g.fillStyle = '#5b4e42'; g.fillRect(0, -.75, length, 1.5);
+  const turns = Math.ceil(length / 7), pitch = length / turns;
+  g.strokeStyle = '#443b35'; g.lineWidth = 1.8; g.beginPath();
+  for (let i = 0; i < turns; i++) {
+    const x = (i + .5) * pitch;
+    g.moveTo(x + 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, 0, 2 * Math.PI);
+  }
+  g.stroke(); g.beginPath(); g.lineWidth = 1; g.strokeStyle = '#b4aaa0';
+  for (let i = 0; i < turns; i++) {
+    const x = (i + .5) * pitch;
+    g.moveTo(x - 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, Math.PI, Math.PI * 1.8);
+    if (i % 2 === 0) { g.moveTo(x - 1, 2); g.lineTo(x + 2, 6); }
+  }
+  g.stroke();
+}
 // Секции рисуются один раз на кусок земли, по оси того же препятствия, что и коллизия.
 function drawFenceRun(g, o) {
   const upright = o.h > o.w, length = Math.max(o.w, o.h);
@@ -365,6 +412,9 @@ function drawFenceRun(g, o) {
   }
   if (upright) g.rotate(Math.PI / 2);
   g.translate(-length / 2, 0);
+  if (o.material === 'concreteWire') {
+    drawCheckpointWall(g, length, bays, upright); g.restore(); return;
+  }
   if (o.material === 'picket') {
     for (let x = 2; x < length - 2; x += 5) {
       const wear = hash2(o.x + x, o.y), h = 5 + 3 * wear;
@@ -372,21 +422,6 @@ function drawFenceRun(g, o) {
       g.fillRect(x, 3 - h, 3.8, h);
       g.fillStyle = '#ae9c80'; g.fillRect(x, 3 - h, 3, 1);
     }
-  } else if (o.material === 'wire') {
-    // Витки лежат вдоль нижней натяжной проволоки; узлы ловят свет через виток.
-    const turns = Math.ceil(length / 7), pitch = length / turns;
-    g.strokeStyle = '#443b35'; g.lineWidth = 1.8; g.beginPath();
-    for (let i = 0; i < turns; i++) {
-      const x = (i + .5) * pitch;
-      g.moveTo(x + 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, 0, 2 * Math.PI);
-    }
-    g.stroke(); g.beginPath(); g.lineWidth = 1; g.strokeStyle = '#b4aaa0';
-    for (let i = 0; i < turns; i++) {
-      const x = (i + .5) * pitch;
-      g.moveTo(x - 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, Math.PI, Math.PI * 1.8);
-      if (i % 2 === 0) { g.moveTo(x - 1, 2); g.lineTo(x + 2, 6); }
-    }
-    g.stroke();
   } else if (!wood) {
     g.beginPath();
     for (let x = 0; x < length - 5; x += 5) {
