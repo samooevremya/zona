@@ -228,6 +228,41 @@ function attWord(e) {
   if (rel === 'friend') return 'друг';
   return e.fac === 'loner' && S.rep < 0 ? 'не доверяет' : 'нейтрал';
 }
+function lonerWitnesses(victim) {
+  return ents.filter(o => {
+    if (o === victim || o.fac !== 'loner' || !o.alive || o.captive) return false;
+    const range = sight(o);
+    return [P, victim].every(target =>
+      dE(o, target) < range && seesActor(o, target) &&
+      Math.abs(angD(o.ang, Math.atan2(target.y - o.y, target.x - o.x))) < 1.0);
+  });
+}
+function rememberAttacker(e) {
+  if (!e.sid && !e.uid) e.uid = dynId();
+  e.angry = 1;
+  markAngry(e);
+}
+function witnessLonerAttack(victim, fatal, witnesses = lonerWitnesses(victim)) {
+  witnesses.forEach(rememberAttacker);
+  if (!fatal) { rememberAttacker(victim); return; }
+  if (!witnesses.length) return;
+  const reports = S.flags.lonerReports || (S.flags.lonerReports = []);
+  reports.push({ victim: victim.name, due: S.min + 3, witnesses: witnesses.map(e => e.sid || e.uid) });
+}
+function deliverLonerReports() {
+  const reports = S.flags.lonerReports;
+  if (!reports) return;
+  S.flags.lonerReports = reports.filter(report => {
+    if (report.due > S.min) return true;
+    const sender = ents.find(e => e.alive && !e.captive && report.witnesses.includes(e.sid || e.uid));
+    if (sender) {
+      S.rep -= 35;
+      bulletin(sender.name + ' в эфире: «Видел, как Меченый убил одиночку. Погиб ' + report.victim + '».');
+    }
+    return false;
+  });
+  if (!S.flags.lonerReports.length) delete S.flags.lonerReports;
+}
 function anger(e) {
   if (e.fac === 'loner' && !e.angry) {
     ents.forEach(o => { if (o.fac === 'loner' && o.alive && !o.captive && dE(o, e) < 450 && los(o.x, o.y, e.x, e.y)) { o.angry = 1; markAngry(o); } });
@@ -489,7 +524,8 @@ function hurt(e, dmg, src, ang) {
   const n = Math.min(6, 2 + Math.floor(dmg / 8));
   for (let i = 0; i < n; i++) parts.push({ x: e.x, y: e.y, vx: Math.cos((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), vy: Math.sin((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), life: rnd(0.2, 0.4), c: '#7a1d14', s: 2, blood: 1 });
   if (e !== P && src && src.alive !== undefined) {
-    if (src === P && !hostile(e, P) && (e.fac === 'loner' || e.fac === 'army')) anger(e);
+    if (src === P && e.fac === 'loner' && e.hp > 0) witnessLonerAttack(e, false);
+    if (src === P && e.fac === 'army' && !hostile(e, P)) anger(e);
     if (hostile(e, src)) { e.tgt = src; e.lastSeen = { x: src.x, y: src.y }; e.mem = 6; e.react = Math.min(e.react, 0.15); }
   }
   if (e.hp <= 0) kill(e, src);
@@ -498,14 +534,15 @@ function kill(e, src) {
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
   if (e.sid) S.dead[e.sid] = 1;
-  ents.forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
+  const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e) : null;
+  (witnesses || ents).forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
   decals.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), r: rnd(10, 16), a: 0.75 });
   if (decals.length > 140) decals.shift();
   dropBody(e);
   const byPlayer = src === P;
   if (byPlayer) {
     if (e.kind !== 'human') S.stats.kM++; else S.stats.kS++;
-    if (e.fac === 'loner') { S.rep -= 35; msg('Убит одиночка. Слух разойдётся по всему Кордону.', 'bad'); }
+    if (witnesses) witnessLonerAttack(e, true, witnesses);
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
     const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
@@ -583,7 +620,7 @@ function findTarget(e) {
   return best;
 }
 function aiHuman(e, dt) {
-  if (e.storyMan) { cordonAI(e,dt); return; }
+  if (e.storyMan && !hostile(e, P)) { cordonAI(e,dt); return; }
   if (SID_SHOP && e.sid === 'sid') {
     e.ang = Math.PI / 2;
     e.deskTime = (e.deskTime || 0) + dt;

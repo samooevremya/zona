@@ -134,9 +134,12 @@ function worldFx(dt) {
 }
 const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей. Ближайшее укрытие отмечено на карте.';
 // One flood from all usable doorways gives each reachable tile its closest shelter.
-let shelterRevision = -1;
-const shelterOwner = new Int16Array(MW * MH), shelterDoors = [];
-function rebuildShelterRoutes() {
+function shelterRoutes(includeHatch) {
+  return { includeHatch, revision: -1, owner: new Int16Array(MW * MH), doors: [] };
+}
+const playerShelters = shelterRoutes(true), lonerShelters = shelterRoutes(false);
+function rebuildShelterRoutes(routes) {
+  const { owner: shelterOwner, doors: shelterDoors } = routes;
   shelterOwner.fill(-1);
   shelterDoors.length = 0;
   let head = 0, tail = 0;
@@ -158,7 +161,7 @@ function rebuildShelterRoutes() {
       }
     }
   }
-  seed(HATCH.x, HATCH.y + (SID_SHOP ? 27 : -30));
+  if (routes.includeHatch) seed(HATCH.x, HATCH.y + (SID_SHOP ? 27 : -30));
   while (head < tail) {
     const i = bfsQ[head++], x = i % MW, y = Math.floor(i / MW);
     for (let k = 0; k < DIRS.length; k++) {
@@ -168,13 +171,43 @@ function rebuildShelterRoutes() {
       bfsQ[tail++] = j;
     }
   }
-  shelterRevision = navRevision;
+  routes.revision = navRevision;
+}
+function routeToShelter(actor, routes) {
+  if (routes.revision !== navRevision) rebuildShelterRoutes(routes);
+  const cell = nearestNav(Math.floor(actor.x / T), Math.floor(actor.y / T));
+  return routes.doors[routes.owner[cell]] || null;
 }
 function blowShelterTarget() {
   if (!P || !P.alive || !S.blow?.stage || sheltered(P.x, P.y)) return null;
-  if (shelterRevision !== navRevision) rebuildShelterRoutes();
-  const cell = nearestNav(Math.floor(P.x / T), Math.floor(P.y / T));
-  return shelterDoors[shelterOwner[cell]] || null;
+  return routeToShelter(P, playerShelters);
+}
+function lonerBlowoutAI(e, dt) {
+  if (e.fac !== 'loner' || e.captive || e.wounded) return false;
+  if (!S.blow?.stage) {
+    if (e.evacuating) {
+      e.evacuating = false;
+      e.path = null;
+      if (e.seat && !e.sit && !e.trip && !e.follow) e.trip = { stage: 2 };
+    }
+    return false;
+  }
+  if (!e.evacuating) {
+    e.evacuating = true;
+    e.path = null;
+    e.cover = e.role = null;
+    e.inCover = 0;
+    if (e.trip?.shelter) e.trip = null;
+  }
+  e.tgt = e.lastSeen = null;
+  e.mem = e.aw = 0;
+  if (sheltered(e.x, e.y)) return true;
+  if (e.sit) e.seat = 1;
+  e.sit = e.crouch = 0;
+  e.campRise = null;
+  const door = routeToShelter(e, lonerShelters);
+  if (door) goTo(e, door.x, door.y, 122, dt);
+  return true;
 }
 function blowout(dt) {
   const B = S.blow;
@@ -182,7 +215,7 @@ function blowout(dt) {
     B.stage = 1; B.t = 80;
     radioNews(BLOW_WARNING, true);
     ents.forEach(e => {
-      if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
+      if (!e.alive || e === P || e.kind !== 'human' || e.fac === 'loner' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
       HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
       if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
