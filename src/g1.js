@@ -244,7 +244,14 @@ function gen() {
   addObj({ k: 'bus', x: 67 * T, y: 47 * T, w: 4 * T, h: 2 * T, solid: 1, opaque: 1 });
   addObj({ k: 'trafo', x: 32 * T, y: 33 * T, w: 2 * T, h: 2 * T, solid: 1, opaque: 1 });
   addObj({ k: 'barrier', key: 'bar', x: (roadX[31] - 1) * T, y: 30 * T + 8, w: 3 * T, h: 16, solid: 1 });
-  addObj({ k: 'blocks', x: (roadX[104] - 4) * T, y: 104 * T, w: 9 * T, h: T, solid: 1 });
+  if (BIG && C1) {
+    // Южный КПП. Два отдельных отбойника на краях дороги с проходом между ними.
+    const road = roadX[104] * T;
+    addObj({ k: 'blocks', roadblock: true, x: road - 3 * T, y: 104 * T + 4, w: 64, h: 16, solid: 1 });
+    addObj({ k: 'blocks', roadblock: true, x: road + 1.7 * T, y: 105 * T + 6, w: 54, h: 16, solid: 1 });
+  } else {
+    addObj({ k: 'blocks', x: (roadX[104] - 4) * T, y: 104 * T, w: 9 * T, h: T, solid: 1 });
+  }
   addObj({ k: 'blocks', x: (roadX[3] - 4) * T, y: 3 * T, w: 9 * T, h: T, solid: 1 });
   addObj({ k: 'hatch', x: 12 * T, y: 98 * T, w: T, h: T });
   addObj({ k: 'fire', x: FIRE.x - 10, y: FIRE.y - 10, w: 20, h: 20, solid: 1 });
