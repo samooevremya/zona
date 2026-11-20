@@ -552,7 +552,7 @@ function buildBigMini() {
     if (h.x >= PW) return;
     g.fillStyle = '#36372e'; g.fillRect(h.x - 0.2, h.y - 0.2, h.w + 0.5, h.h + 0.6);
     g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
-    if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
+    if (ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
@@ -580,7 +580,7 @@ async function buildMini() {
     const K = 4; miniC.width = PW * K; miniC.height = MH * K;
     const g = miniC.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.drawImage(groundC, 0, 0, PW * T, WH, 0, 0, PW * K, MH * K);
-    HOUSES.forEach((h, i) => { if (h.x < PW && ROOFS[i]) g.drawImage(ROOFS[i], (h.x * T - 3) * K / T, (h.y * T - 3) * K / T, (h.w * T + 10) * K / T, (h.h * T + 10) * K / T); });
+    HOUSES.forEach((h, i) => { if (h.x < PW && ROOFS[i]) drawHouseRoof(g, h, i, K/T); });
     for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) if (map[y * MW + x] === TR) { g.fillStyle = 'rgba(30,42,22,0.75)'; g.beginPath(); g.arc(x * K + K / 2, y * K + K / 2, K * 0.9, 0, 6.28); g.fill(); }
     return;
   }

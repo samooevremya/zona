@@ -7,7 +7,7 @@
 const RC1 = {
   locations: {
     village: { name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [14, 70, 46, 98], entrances: [[33, 70], [46, 83], [24, 98]],
-      anchors: { fire: [30.5, 84.5], shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
+      anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
       anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [124.5, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },

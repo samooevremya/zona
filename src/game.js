@@ -117,26 +117,31 @@ function house(x, y, w, h, doors, wall, broken, roof) {
   if (roof !== 'none') HOUSES.push({ x: x, y: y, w: w, h: h, doors, mat: roof || (wall === CO ? 'conc' : 'slate'), ruin: broken > 0.2, a: 1 });
 }
 
-// doors хранит клетки относительно дома. После переноса штампов объединяем
-// соседние клетки на одной стене и сверяем проход с окончательной картой.
+// Штамп дома может оставить пролом помимо заданных дверей. Обход конечной
+// сетки покрывает оба случая и объединяет смежные клетки в один проход.
 function buildEntrances(h) {
   h.entrances = [];
   for (const [nx, ny] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
-    const edge = nx > 0 ? h.w - 1 : ny > 0 ? h.h - 1 : 0;
-    const offsets = h.doors.filter(([x, y]) =>
-      (nx ? x : y) === edge && isFloor(tAt(h.x + x, h.y + y)) &&
-      !SOLID[tAt(h.x + x + nx, h.y + y + ny)]
-    ).map(([x, y]) => nx ? y : x).sort((a, b) => a - b);
-    for (let i = 0; i < offsets.length;) {
-      const start = offsets[i++];
-      let end = start;
-      while (i < offsets.length && offsets[i] === end + 1) end = offsets[i++];
+    const length = nx ? h.h : h.w;
+    let start = 0, declared = false;
+    for (let i = 1; i < length; i++) {
+      const col = nx ? (nx > 0 ? h.w - 1 : 0) : i;
+      const row = ny ? (ny > 0 ? h.h - 1 : 0) : i;
+      const x = h.x + col, y = h.y + row;
+      if (i < length - 1 && isFloor(tAt(x, y)) && !SOLID[tAt(x - nx, y - ny)] && !SOLID[tAt(x + nx, y + ny)]) {
+        if (!start) start = i;
+        declared ||= h.doors.some(([dx, dy]) => dx === col && dy === row);
+        continue;
+      }
+      if (!start) continue;
+      const end = i - 1;
       const mid = (start + end + 1) * T / 2;
       h.entrances.push({
         x: nx ? (nx > 0 ? h.w * T : 0) : mid,
         y: ny ? (ny > 0 ? h.h * T : 0) : mid,
-        nx, ny, width: (end - start + 1) * T - 4
+        nx, ny, breach: !declared, width: (end - start + 1) * T - 4
       });
+      start = 0; declared = false;
     }
   }
 }
@@ -146,7 +151,8 @@ const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
 const STAIRS = { x: 124.5 * T, y: 11.4 * T };
-const FIRE = { x: 30.5 * T, y: 84.5 * T };
+const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
+const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
 const BUNK = { x0: 121 * T, y0: 1 * T, x1: 132 * T, y1: 13 * T };
 const inBunker = (x, y) => x > BUNK.x0;
@@ -262,10 +268,10 @@ function gen() {
   for (let i = 0; i < 9; i++) { const x = 6 + i * 13, y = 36 + i * 7; if (x < PW - 4) addObj({ k: 'pylon', x: x * T + 6, y: y * T + 6, w: 20, h: 20, solid: 1 }); }
   [[92, 64], [93, 64], [108, 66], [108, 67], [87, 79], [100, 70], [101, 70], [96, 78]].forEach(c => addObj({ k: 'crate', x: c[0] * T + 3, y: c[1] * T + 3, w: 26, h: 26, solid: 1 }));
   // мебель и тайники в домах
-  [[16, 73], [21, 73], [27, 72], [38, 74], [43, 74], [16, 88], [40, 88], [26, 94], [31, 94]].forEach((c, i) => addObj({ k: i % 3 ? 'bed' : 'table', x: c[0] * T + 2, y: c[1] * T + 4, w: i % 3 ? 28 : 26, h: i % 3 ? 20 : 22, solid: 1 }));
+  [[16, 73], [21, 73], [27, 72], [40, 74], [43, 74], [16, 88], [40, 88], [26, 94], [31, 94]].forEach((c, i) => addObj({ k: i % 3 ? 'bed' : 'table', x: c[0] * T + 2, y: c[1] * T + 4, w: i % 3 ? 28 : 26, h: i % 3 ? 20 : 22, solid: 1 }));
   addObj({ k: 'crate', x: 104 * T + 3, y: 63 * T + 3, w: 26, h: 26, solid: 1, stash: 'st1', loot: { money: 250, a9: 16, medkit: 1 } });
-  addObj({ k: 'crate', x: 85 * T + 3, y: 11 * T + 3, w: 26, h: 26, solid: 1, stash: 'st2', loot: { money: 400, antirad: 2, a12: 10 } });
-  addObj({ k: 'crate', x: 21 * T + 3, y: 76 * T + 3, w: 26, h: 26, solid: 1, stash: 'st3', loot: { a9: 10, bandage: 1 } });
+  addObj({ k: 'crate', x: 87 * T + 3, y: 12 * T + 3, w: 26, h: 26, solid: 1, stash: 'st2', loot: { money: 400, antirad: 2, a12: 10 } });
+  addObj({ k: 'crate', x: 19 * T + 3, y: 75 * T + 3, w: 26, h: 26, solid: 1, stash: 'st3', loot: { a9: 10, bandage: 1 } });
   addObj({ k: 'crate', x: 44 * T + 3, y: 91 * T + 3, w: 26, h: 26, solid: 1, stash: 'st4', loot: { vodka: 1, cans: 1, money: 120 } });
   addObj({ k: 'crate', x: 11 * T + 3, y: 9 * T + 3, w: 26, h: 26, solid: 1, stash: 'st5', loot: { a545: 30, grenade: 1, money: 300 } });
   addObj({ k: 'crate', x: 107 * T + 3, y: 78 * T + 3, w: 26, h: 26, solid: 1, stash: 'st6', loot: { a12: 8, sausage: 2 } });
@@ -353,7 +359,7 @@ const MAP_ID = (typeof window !== 'undefined' && window.ZONA_MAP) || 'k07';
 const MAP_VERSION = (typeof window !== 'undefined' && window.ZONA_BIG === 1) ? 'kordon-big' : MAP_ID === 'rc1' ? 'kordon-rc1' : 'kordon-0.7';
 const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
-    anchors: { fire: [30.5, 84.5], shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
+    anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
   { id: 'sid', name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
     anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [124.5, 11.4], spawn: [126.5, 8.6] } },
   { id: 'atp', name: 'АТП', gen: 'АТП', type: 'danger', bounds: [84, 58, 112, 84], entrances: [[86, 70], [104, 84]],
@@ -450,7 +456,7 @@ const YARD_SEATS = [
   { sid: 'l2', x: 31.05, y: 82.60, wpn: 'w_obrez', log: ['bench', 0.16, -0.36, 0.24] },
   { sid: 'l3', x: 32.15, y: 84.45, wpn: 'w_pm' },
   { sid: 'l4', x: 29.82, y: 86.33, wpn: 'w_pm', log: ['logs', -0.15, 0.35, 0.43] }
-];
+].map(s => ({ ...s, x: s.x + CAMP_TILE[0] - 30.5, y: s.y + CAMP_TILE[1] - 84.5 }));
 const NPCDEF = [
   { sid: 'sid', fac: 'trader', name: 'Сидорович', x: 126.5, y: 4.6, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
   { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
@@ -2132,6 +2138,11 @@ function buildRoofs() {
     ROOFS.push(c);
   });
 }
+// Единый размер для мира, мини-карты и запекаемой аэрофотокарты.
+function drawHouseRoof(g, h, i, scale) {
+  g.drawImage(ROOFS[i], (h.x*T-3)*scale, (h.y*T-3)*scale,
+    (h.w*T+10)*scale, (h.h*T+10+(h.porchDepth || 0))*scale);
+}
 function roofHidden(h) {
   const px = P.x / T, py = P.y / T;
   return px > h.x + 0.6 && px < h.x + h.w - 0.6 && py > h.y + 0.6 && py < h.y + h.h - 0.6;
@@ -2386,7 +2397,7 @@ function render() {
       ctx.fillStyle = 'rgba(6,8,4,' + 0.2 * h.a + ')'; ctx.fillRect(x0 + 6, y0 + 8, w + 16, hh + 18);
       ctx.fillStyle = 'rgba(6,8,4,' + 0.22 * h.a + ')'; ctx.fillRect(x0 + 4, y0 + 6, w + 10, hh + 11);
     }
-    ctx.globalAlpha = h.a; ctx.drawImage(ROOFS[i], h.x * T - 3, h.y * T - 3, h.w * T + 10, h.h * T + 10); ctx.globalAlpha = 1;
+    ctx.globalAlpha = h.a; drawHouseRoof(ctx, h, i, 1); ctx.globalAlpha = 1;
   });
   // провода ЛЭП
   const py0 = objs.filter(o => o.k === 'pylon');
@@ -3023,6 +3034,92 @@ function drawFordWater(g) {
   g.drawImage(ARTM.fordWater, left, top * T);
 }
 
+// Небольшие пятна вынесены в кэш. Поворот и размер меняются вдоль тропы,
+// но для обоих соседних кусков земли последовательность одинакова.
+const trailPrints = new Map();
+function trailPrint(wet, variant) {
+  const key = variant + (wet ? 4 : 0);
+  if (trailPrints.has(key)) return trailPrints.get(key);
+  const c = document.createElement('canvas'); c.width = 92; c.height = 64;
+  const g = c.getContext('2d');
+  g.translate(-variant * 31, -variant * 17);
+  artFill(g, 'bare_soil', variant * 31, variant * 17, c.width, c.height);
+  const image = g.getImageData(0, 0, c.width, c.height), d = image.data;
+  const tint = wet ? [49,45,37] : [166,143,111];
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const grit = hash2(x + variant * 57, y) - .5, grain = vnoise(x, y + 25 * variant, 6) - .5;
+    const falloff = 1 - Math.hypot((x - 46) / 44, (y - 32) / 29) + grain * .22;
+    const i = (y * c.width + x) * 4;
+    for (let channel = 0; channel < 3; channel++) {
+      d[i + channel] = d[i + channel] * .54 + tint[channel] * .46 + 19 * grain + 12 * grit;
+    }
+    d[i + 3] = 255 * clamp(falloff * (wet ? 1.3 : 1.05), 0, 1);
+  }
+  g.putImageData(image, 0, 0); trailPrints.set(key, c); return c;
+}
+
+function drawVillageLanes(g) {
+  if (GWP.x1 < 40*T || GWP.x0 > 86*T || GWP.y1 < 159*T || GWP.y0 > 184*T) return;
+  g.save();
+  VILLAGE_LANES.forEach((lane, l) => {
+    for (let i = 1; i < lane.length; i++) {
+      const [ax, ay] = lane[i - 1], [bx, by] = lane[i];
+      const dx = (bx - ax) * T, dy = (by - ay) * T, len = Math.hypot(dx, dy);
+      for (let dist = 0, j = 0; dist < len; dist += 19, j++) {
+        const x = ax*T + dx*dist/len, y = ay*T + dy*dist/len;
+        if (x < GWP.x0-55 || x > GWP.x1+55 || y < GWP.y0-55 || y > GWP.y1+55) continue;
+        const n = hash2(l * 13 + i, j);
+        g.save(); g.translate(x, y); g.rotate(Math.atan2(dy, dx) + (n - .5) * .23);
+        const w = 56 + n * 16, h = (l === 0 || l === 3 || l === 6 ? 42 : 29) + n * 7;
+        g.globalAlpha = .65; g.drawImage(trailPrint(false, j % 4), -w/2, -h/2, w, h); g.restore();
+      }
+    }
+  });
+  g.restore();
+}
+
+function drawSurfaceEdges(g, tiles) {
+  for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
+    const t = tiles[y * MW + x];
+    if (t !== CF && t !== AS && t !== DI) continue;
+    for (const [nx, ny] of [[1,0],[0,1],[-1,0],[0,-1]]) {
+      const other = inb(x + nx, y + ny) ? tiles[(y + ny) * MW + x + nx] : VO;
+      if (!GROUNDISH(other) && !(t !== DI && other === DI)) continue;
+      const r = mulberry32(1423 + (y * MW + x) * 13 + nx * 3 + ny);
+      g.save();
+      g.translate((x + .5 + nx*.5)*T, (y + .5 + ny*.5)*T);
+      g.rotate(Math.atan2(-nx, ny));  // +Y указывает на внешнюю сторону кромки
+      if (t === CF) {
+        // Заход грунта на плиту, скол и короткий шов среди гравия.
+        g.save(); g.beginPath(); g.moveTo(-16, 0);
+        for (let u = -16; u <= 16; u += 4) {
+          const worldX = (x + .5 + nx*.5)*T + ny*u, worldY = (y + .5 + ny*.5)*T - nx*u;
+          const depth = 1 + 13 * vnoise(worldX+9, worldY, 17) + 3 * hash2(worldX, worldY);
+          g.lineTo(u, -depth);
+        }
+        g.lineTo(16, 2); g.lineTo(-16, 2); g.closePath(); g.clip();
+        artFill(g, 'bare_soil', -16, -14, 32, 18); g.restore();
+        if (r() < .32) {
+          const u = r()*18-9;
+          g.strokeStyle = 'rgba(50,44,35,.53)'; g.lineWidth = .9; g.beginPath();
+          g.moveTo(u,-5); g.lineTo(u+3,-11); g.lineTo(u+2,-15-r()*8); g.stroke();
+        }
+      }
+      const stones = Math.floor((t === CF ? 24 : 11) * r());
+      for (let j = 0; j < stones; j++) {
+        const u = (r()-.5)*T, v = (r()-.47)*(t === DI ? 19 : 14), size = .65+r()*1.7;
+        g.fillStyle = j % 3 ? 'rgba(78,69,52,.54)' : 'rgba(168,152,125,.58)';
+        g.beginPath(); g.ellipse(u,v,size,size*.57,r()*3,0,2*Math.PI); g.fill();
+      }
+      if (other !== DI && r() < .17) {
+        const size = 8 + r()*9;
+        ART.draw(g, 'c1_tuft'+Math.floor(r()*6), r()*18-9, 4+r()*4, size, size*.86, r()*6, .84);
+      }
+      g.restore();
+    }
+  }
+}
+
 function* artGround(g, R) {
   const shoulders = BIG && C1, tiles = surfaceTiles();
   // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
@@ -3133,13 +3230,24 @@ function* artGround(g, R) {
   yield;
   if (C1) {
     c1ForestFloor(g);
-    if (BIG) drawFordWater(g);
+    if (BIG) {
+      drawSurfaceEdges(g, tiles);
+      drawFordWater(g);
+    }
     yield;
     c1Scatter(g); yield;
     const [w, h] = ART.m.sprites.camp_yard.logicalSize;
     if (Math.abs(FIRE.x - (GWP.x0 + GWP.x1) / 2) < (w + GWP.x1 - GWP.x0) / 2 &&
-        Math.abs(FIRE.y - (GWP.y0 + GWP.y1) / 2) < (h + GWP.y1 - GWP.y0) / 2)
-      ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h);
+        Math.abs(FIRE.y - (GWP.y0 + GWP.y1) / 2) < (h + GWP.y1 - GWP.y0) / 2) {
+      g.save(); g.beginPath(); g.rect(FIRE.x-w/2, FIRE.y-h/2, w, h);
+      for (const house of HOUSES) {
+        if (house.x*T >= FIRE.x+w/2 || house.y*T >= FIRE.y+h/2 ||
+            (house.x+house.w)*T <= FIRE.x-w/2 || (house.y+house.h)*T <= FIRE.y-h/2) continue;
+        g.rect(house.x*T, house.y*T, house.w*T, house.h*T);
+      }
+      g.clip('evenodd'); ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h); g.restore();
+    }
+    if (BIG) drawVillageLanes(g);
   }
   // 4. Растительность группами: у стен, заборов, деревьев и насыпи; середина проходов свободна
   const RT = mulberry32(4242 + GW.x0 * 97 + GW.y0 * 13);
@@ -3268,7 +3376,7 @@ function artWall(g, x, y) {
 // зависит от координат двери и сохраняется при перестроении соседних кусков.
 function wornEntrance(width, seed) {
   const c = document.createElement('canvas');
-  c.width = Math.ceil(width + 16); c.height = 43;
+  c.width = Math.ceil(width + 24); c.height = 63;
   const g = c.getContext('2d');
   g.fillStyle = '#a18461'; g.fillRect(0, 0, c.width, c.height);
   if (ART) {
@@ -3280,7 +3388,7 @@ function wornEntrance(width, seed) {
     const depth = y / c.height;
     const center = c.width / 2 + Math.sin(depth * 3 + seed) * 3;
     const lateral = (x - center) / (width * (.53 - .16 * depth));
-    const rim = Math.hypot(lateral, (y - 5) / 32);
+    const rim = Math.hypot(lateral, (y - 9) / 53);
     const tuft = vnoise(x + seed, y, 5) - .5;
     const grit = hash2(x + seed, y) - .5, i = (y * c.width + x) * 4;
     data[i + 3] = 235 * clamp((1 - rim + tuft * .32 + grit * .10) * 3.8, 0, 1);
@@ -3294,34 +3402,29 @@ function wornEntrance(width, seed) {
 // Ступени выступают за свес даже у дальней стены. Вся площадка запекается в землю.
 function drawThresholds(g) {
   for (const h of HOUSES) {
-    if (h.x > GW.x1 + 1 || h.y > GW.y1 + 1 || h.x + h.w < GW.x0 - 1 || h.y + h.h < GW.y0 - 1) continue;
+    if (h.x > GW.x1 + 3 || h.y > GW.y1 + 3 || h.x + h.w < GW.x0 - 3 || h.y + h.h < GW.y0 - 3) continue;
     const concrete = h.mat === 'conc';
     for (const door of h.entrances) {
       const w = door.width, left = -w / 2;
       g.save(); g.translate(h.x * T + door.x, h.y * T + door.y);
       g.rotate(Math.atan2(-door.nx, door.ny));
       const style = hash2((h.x + door.x / T) * 2, (h.y + door.y / T) * 2);
-      if (!concrete && (h.ruin || style < .40)) {
-        if (!door.soil) door.soil = wornEntrance(w, Math.floor(style * 4096));
-        g.drawImage(door.soil, -door.soil.width / 2, -3);
-      } else {
-        g.fillStyle = 'rgba(39,30,21,.23)';
-        g.beginPath(); g.ellipse(0, 14, w * .60, 14, 0, 0, 2 * Math.PI); g.fill();
-        g.fillStyle = concrete ? '#59574d' : '#4b3b2c';
-        g.fillRect(left, -T / 2 - 4, w, T / 2 + 26);
-        for (let row = 0; row < 3; row++) {
-          const y = row * 7, inset = row * 1.3, x = left + inset, width = w - inset * 2;
-          g.fillStyle = concrete ? '#9b998b' : '#a38a66'; g.fillRect(x, y, width, 6);
-          if (ART) {
-            g.globalAlpha = .55;
-            artFill(g, concrete ? 'floor_concrete' : 'floor_wood', x, y, width, 6);
-            g.globalAlpha = 1;
-          }
-          g.fillStyle = concrete ? '#b4b0a0' : '#b49a77'; g.fillRect(x, y + 5, width, 1);
-          if (!concrete) {
-            g.fillStyle = '#524635'; g.fillRect(x + 3, y + 2, 1.4, 1.4);
-            g.fillRect(x + width - 4, y + 2, 1.4, 1.4);
-          }
+      if (!door.soil) door.soil = wornEntrance(w, Math.floor(style * 4096));
+      g.drawImage(door.soil, -door.soil.width / 2, -3);
+      const broken = h.ruin && door.breach, depth = broken ? 12 : 26;
+      g.fillStyle = 'rgba(39,30,21,.36)';
+      g.fillRect(left + 2, -2, w, depth + 4);
+      g.fillStyle = concrete ? '#59574d' : '#4b3b2c';
+      g.fillRect(left, -T / 2 - 4, w, T / 2 + depth);
+      for (let row = 0; row < (broken ? 2 : 4); row++) {
+        const y = row * 7, inset = row * 1.15, x = left + inset, width = w - 2*inset;
+        g.fillStyle = concrete ? '#918d7e' : '#947958'; g.fillRect(x, y, width, 6);
+        if (ART) {
+          g.globalAlpha = .54; artFill(g, concrete ? 'floor_concrete' : 'floor_wood', x, y, width, 6); g.globalAlpha = 1;
+        }
+        g.fillStyle = concrete ? '#b3ae9e' : '#b9a17c'; g.fillRect(x + 1, y + 4.7, width - 2, 1.3);
+        if (!concrete) {
+          g.fillStyle = '#504637'; g.fillRect(x + 3, y + 2, 1.4, 1.4); g.fillRect(x+width-4,y+2,1.4,1.4);
         }
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
@@ -3487,7 +3590,7 @@ const DECOR = [
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
   ['rubble', 34.3, 92.4, 0.5], ['rubble', 11.6, 90.4, 2.1], ['rubble', 25.6, 18.6, 1], ['rubble', 95.5, 18.2, 0.3],
   ['fence', 16.5, 70.7, 0], ['fence', 18.5, 70.7, 0], ['fence', 20.5, 70.7, 0.04],
-  ['fence', 38.5, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
+  ['fence', 44.45, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
   ['fence', 12.6, 75.5, Math.PI / 2], ['fence', 12.6, 77.5, Math.PI / 2], ['fence', 12.6, 89.5, Math.PI / 2]
 ];
 // Контуры трёх плит в исходном атласе брода, в пикселях спрайта.
@@ -3498,6 +3601,21 @@ const FORD_SLABS = [
 ];
 function drawFord(g, x, y) {
   const slabScale = .37, sp = ART.m.sprites.c1_ford;
+  if (Math.abs(x - (GWP.x0 + GWP.x1)/2) > (GWP.x1 - GWP.x0)/2 + 155 ||
+      Math.abs(y - (GWP.y0 + GWP.y1)/2) > (GWP.y1 - GWP.y0)/2 + 65) return;
+  for (const side of [-1, 1]) {
+    for (let j = 0; j < 4; j++) {
+      g.save(); g.translate(x + side*(55 + j*17), y + Math.sin(j+side)*4);
+      g.rotate(side*.16); g.globalAlpha = .8 - j*.13;
+      g.drawImage(trailPrint(true, j), -32,-18,64,36);
+      g.restore();
+    }
+    for (let j = 0; j < 8; j++) {
+      const n = hash2(side*31+j, 194), m = hash2(j, side*19);
+      const size = 3 + 5*n;
+      ART.draw(g, 'c1_rock'+(j%3), x+side*(68 + m*47), y+(n-.5)*40, size, size*.75, m*6, .9);
+    }
+  }
   g.save(); g.translate(x, y); g.scale(slabScale, slabScale); g.translate(-249, -252);
   for (const points of FORD_SLABS) {
     const outline = new Path2D();
@@ -3626,8 +3744,8 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
   if (BIG && !h.ok && h.x === 15 && h.y === 28) return 'c1_tower';
-  if (h.ruin) return big <= 16 ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
-  if (h.mat === 'conc') return big >= 110 ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
+  if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
+  if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (long > 2.1 && big > 40) return 'c1_roof_barn';
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
   return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
@@ -3654,15 +3772,47 @@ function balancedGable(id) {
   gableMaterials.set(id, tile);
   return tile;
 }
+// Вальма замыкает короткий торец другим направлением волн того же шифера.
+function hipEnd(g, image, sx, sy, sw, sh, width, height) {
+  const left = -width/2, depth = Math.min(width*.26, height*.53);
+  g.save(); g.beginPath(); g.moveTo(left,-height/2); g.lineTo(left+depth,0);
+  g.lineTo(left,height/2); g.closePath(); g.clip();
+  g.translate(left + depth/2, 0); g.rotate(-Math.PI/2);
+  g.drawImage(image, sx, sy, sw, sh*.46, -height/2, -depth/2, height, depth);
+  g.fillStyle = 'rgba(55,47,36,.14)'; g.fillRect(-height/2,-depth/2,height,depth);
+  g.restore();
+  g.strokeStyle = '#756e61'; g.lineWidth = 1.6; g.beginPath();
+  g.moveTo(left,-height/2); g.lineTo(left+depth,0); g.lineTo(left,height/2); g.stroke();
+}
+function drawPorch(g, h, id, y, depth) {
+  const door = h.entrances.find(d => d.ny === 1 && !d.breach);
+  if (!door) return;
+  const width = door.width + 18, left = door.x + 3 - width/2;
+  const plank = balancedGable(id);
+  g.save();
+  // Односкатный козырёк, выцветший лоб и два торца стоек. Передняя ступень открыта.
+  g.shadowColor = 'transparent';
+  g.fillStyle = '#514432'; g.fillRect(left+2,y+depth-2,3,8); g.fillRect(left+width-5,y+depth-2,3,8);
+  if (SHADOWS) { g.fillStyle = 'rgba(29,24,19,.35)'; g.fillRect(left+3,y+7,width,depth); }
+  g.drawImage(plank, plank.width*.28, plank.height*.67, plank.width*.38, plank.height*.22,
+    left,y-4,width,depth+6);
+  g.fillStyle = '#605342'; g.fillRect(left,y+depth,width,3);
+  g.fillStyle = '#b3a18a'; g.fillRect(left,y+depth,width,1);
+  g.restore();
+}
 function artRoof(h, idx) {
   let id = ROOF_AT[h.ok || (h.x + ',' + h.y)] || (h.ruin ? 'roof_broken' : h.mat === 'conc' ? null : ['roof_slate', 'roof_rust', 'roof_patch'][idx % 3]);
   if (C1) id = c1RoofId(h, idx, id);
   if (!id) return null;
   const W = h.w * T + 10, Hh = h.h * T + 10, c = document.createElement('canvas');
-  c.width = W * 2; c.height = Hh * 2;
+  const home = h.ok || (h.x + ',' + h.y);
+  const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
+  h.porchDepth = BIG && gable && (home === '26,71' || home === '37,73') ? 13 : 0;
+  c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
-  const along = h.w >= h.h, sp = ART.m.sprites[id];
+  const crossRidge = BIG && gable && (home === '15,87' || home === '26,71');
+  const along = crossRidge ? false : h.w >= h.h, sp = ART.m.sprites[id];
   if (C1 && id.startsWith('c1_')) {   // крыша C1: вырезать середину под пропорции дома, не растягивать
     // объём: снизу видна полоса передней стены, крыша над ней чуть короче и бросает тень на стену
     const flat = id === 'c1_tower' || id.startsWith('c1_booth');
@@ -3697,13 +3847,17 @@ function artRoof(h, idx) {
     }
     const tw = along ? RW : RH, th = along ? RH : RW, r = sp.rect, ka = tw / th;
     let sw = r[2], sh = r[3]; if (sw / sh > ka) sw = sh * ka; else sh = sw / ka;
-    const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
     const image = gable ? balancedGable(id) : ART.images[sp.atlas];
     const sx = (gable ? 0 : r[0]) + (r[2] - sw) * (sp.cropFocusX ?? 0.5);
     const sy = (gable ? 0 : r[1]) + (r[3] - sh) / 2;
     g.save(); g.translate(RW / 2, RH / 2);
     if (!along) g.rotate(gable ? -Math.PI / 2 : Math.PI / 2);
-    g.drawImage(image, sx, sy, sw, sh, -tw / 2, -th / 2, tw, th); g.restore();
+    g.drawImage(image, sx, sy, sw, sh, -tw / 2, -th / 2, tw, th);
+    if (BIG && gable && (home === '15,72' || home === '39,87' || home === '28,128')) {
+      g.shadowColor = 'transparent'; hipEnd(g, image, sx, sy, sw, sh, tw, th);
+    }
+    g.restore();
+    if (h.porchDepth) drawPorch(g, h, id, Hh - 10, h.porchDepth);
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;
   }
@@ -4948,7 +5102,7 @@ function interactRC1(cand) {
 const RC1 = {
   locations: {
     village: { name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [14, 70, 46, 98], entrances: [[33, 70], [46, 83], [24, 98]],
-      anchors: { fire: [30.5, 84.5], shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
+      anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
       anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [124.5, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
@@ -5239,6 +5393,8 @@ function bigWorld() {
     if (y > 196 && y < 214 && x > 112 && x < 142) p = 0.01;           // у блокпоста открыто
     const r = srnd(); if (r < p) map[i] = TR; else if (r < p + 0.05) map[i] = BU;
   }
+  // У западного выхода из малого сарая оставляем свободный подход к порогу.
+  if (tAt(199, 42) === TR) setT(199, 42, GR);
   bigNewObjects(RH);
 }
 
@@ -5273,9 +5429,21 @@ function bigRemap() {
 function bigLoc(id, l) { l.id = id; LOCATIONS.push(l); LOC[id] = l; }
 // Индексы посаженных в деревне сухих деревьев для кроны в мире и на карте.
 const yardTreeCells = new Set();
+// Координаты осей троп в большой деревне. Развилка огибает посадочные места.
+const VILLAGE_LANES = [
+  [[42,181],[46,180],[50,179],[53,177],[54,173],[54,169],[55.4,166.2],[56.0,164.2],[57.2,162.2],[59,161]],
+  [[56.0,164.2],[54.5,163.7],[52,163.3],[51,162]],
+  [[54,173],[52,174]],
+  [[55.4,166.2],[58,168],[62,168.6],[65.5,167],[68,164.2],[69,163]],
+  [[62,168.6],[64.3,170.7],[66.5,173.4],[69,174]],
+  [[62,168.6],[60,172],[59,175],[59,177]],
+  [[65.5,167],[74,166],[84,166]],
+  [[49.5,177],[49.9,178.5],[50,179]]
+];
 function bigVillageYards() {
-  // Северо-западный двор: машина стоит за обочиной, сбоку от южной двери избы.
-  addObj({ k: 'car', x: 48 * T - 37, y: 164.5 * T - 17, w: 74, h: 34, solid: 1, seed: 0, sprite: 'c1_yard_car' });
+  // Машина у западной кромки двора оставляет проход между костром и домом.
+  for (const lane of VILLAGE_LANES) bigPath(lane, .6);
+  addObj({ k: 'car', x: 53 * T - 37, y: 165.4 * T - 17, w: 74, h: 34, solid: 1, seed: 0, sprite: 'c1_yard_car' });
   // Ящики без добычи пользуются обычной коллизией и правилами прыжка.
   for (const [x, y] of [[46.5, 163.6], [73.5, 163.7], [74.5, 163.8]]) {
     addObj({ k: 'crate', x: x * T - 14, y: y * T - 12, w: 28, h: 24, solid: 1, sprite: 'c1_yard_crate' });
@@ -5325,12 +5493,13 @@ function bigNewObjects(R) {
 // Ось каждого пролёта в клетках уже перенесённой карты. Разрывы — настоящие проходы.
 const CORDON_FENCES = [
   // Деревня новичков. Небольшие палисадники у южного ряда изб.
+  ['picket', 51.2, 165.1, 51.2, 167.2],
   ['picket', 45.5, 178.5, 49, 178.5], ['picket', 51.5, 178.5, 53.5, 178.5],
   ['picket', 53.5, 175, 53.5, 178.5],
   ['picket', 67.5, 174.5, 67.5, 177.5], ['picket', 67.5, 177.5, 70, 177.5],
   // Западный хутор. Изгородь вокруг огорода с выходом к избам.
   ['rail', 34.5, 135.5, 34.5, 139.5], ['rail', 34.5, 139.5, 41.5, 139.5],
-  ['rail', 41.5, 135.5, 41.5, 139.5], ['rail', 38, 135.5, 41.5, 135.5],
+  ['rail', 41.5, 135.5, 41.5, 139.5], ['rail', 39.5, 135.5, 41.5, 135.5],
   // Северная ферма. Загон у хлева открыт со стороны двора и южной тропы.
   ['rail', 169.5, 33.5, 169.5, 36.5], ['rail', 169.5, 36.5, 174.5, 36.5],
   ['rail', 178.5, 36.5, 183.5, 36.5], ['rail', 183.5, 33.5, 183.5, 36.5],
@@ -6467,7 +6636,7 @@ function buildBigMini() {
     if (h.x >= PW) return;
     g.fillStyle = '#36372e'; g.fillRect(h.x - 0.2, h.y - 0.2, h.w + 0.5, h.h + 0.6);
     g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
-    if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
+    if (ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
@@ -6495,7 +6664,7 @@ async function buildMini() {
     const K = 4; miniC.width = PW * K; miniC.height = MH * K;
     const g = miniC.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.drawImage(groundC, 0, 0, PW * T, WH, 0, 0, PW * K, MH * K);
-    HOUSES.forEach((h, i) => { if (h.x < PW && ROOFS[i]) g.drawImage(ROOFS[i], (h.x * T - 3) * K / T, (h.y * T - 3) * K / T, (h.w * T + 10) * K / T, (h.h * T + 10) * K / T); });
+    HOUSES.forEach((h, i) => { if (h.x < PW && ROOFS[i]) drawHouseRoof(g, h, i, K/T); });
     for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) if (map[y * MW + x] === TR) { g.fillStyle = 'rgba(30,42,22,0.75)'; g.beginPath(); g.arc(x * K + K / 2, y * K + K / 2, K * 0.9, 0, 6.28); g.fill(); }
     return;
   }

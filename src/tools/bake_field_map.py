@@ -27,7 +27,7 @@ window.bakeFieldMap = () => {
       g.drawImage(groundChunk(x, y), x * step, y * step, step, step);
   g.scale(k, k);
   HOUSES.forEach((h, i) => {
-    if (h.x < PW && ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3/T, h.y - 3/T, h.w + 10/T, h.h + 10/T);
+    if (h.x < PW && ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     if (map[y * MW + x] !== TR) continue;
