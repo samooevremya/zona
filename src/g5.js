@@ -741,7 +741,7 @@ function interact() {
     if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
   }
   else if (n.k === 'kill') takedown(n.e);
-  else if (n.k === 'pickupLoot' && n.o.broken) lootAll(n.o);
+  else if (n.k === 'groundItem') pickGroundItem(n);
   else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();

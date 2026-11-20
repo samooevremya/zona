@@ -1833,12 +1833,14 @@ function findInteract() {
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if (d<49 && los(P.x,P.y,x,y)) cand(d,{k:'locker',o,label:'Открыть личный ящик'});
     }
+    if ((o.k==='crate' && o.broken && !o.looted) || o.kind==='sack') {
+      nearbyGroundItems(o,cand); continue;
+    }
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
-    if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
+    if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
-        if(o.k==='crate') cand(d,{k:'pickupLoot',o,label:'Подобрать добычу'});
-        else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+        cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
       }
     }
   }
@@ -2658,7 +2660,9 @@ function render() {
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
-    if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
+    if (o.k === 'body' && inView(o.x,o.y,48)) {
+      if(o.kind==='sack') drawGroundItems(o); else drawBody(o);
+    }
     if (o.k === 'barrier' && inView(o.x, o.y, o.w) && !drawBridgeGate(ctx, o)) {
       ctx.fillStyle = '#4b4a42'; ctx.fillRect(o.x - 6, o.y, 8, o.h); ctx.fillRect(o.x + o.w - 2, o.y, 8, o.h);
       ctx.save(); ctx.translate(o.x, o.y + o.h / 2); if (!o.solid) ctx.rotate(-1.35);
@@ -5126,8 +5130,8 @@ function drawInv2() {
     if (id !== 'knife' && !it.quest && (id!==S.armor || copy) && (id!==S.weapon || copy) && cnt(id)>beltCount(id)) row.appendChild(btn('wide','Выбросить',()=>{
       const q=isGun(id)||it.armor?1:Math.min(stackLimit(id),cnt(id)-beltCount(id));
       const gun=removePacked(id,q,copy);
-      const sack={k:'body',kind:'sack',x:P.x,y:P.y+12,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min};
-      putStock(sack,id,q,gun); objs.push(sack);
+      const sack={k:'body',kind:'sack',x:P.x,y:P.y,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min,scatterStart:performance.now()};
+      putStock(sack,id,q,gun); objs.push(sack); groundItems(sack);
       panel.sel=null; panel.copy=0; refresh();
     }));
     dv.appendChild(row);
@@ -6701,6 +6705,7 @@ function placeSearchContainers(){
 
 }
 function restoreContainer(o){
+  o.scatterStart = null;
   if(!o.initialLoot) o.initialLoot={...o.loot};
   o.looted=!!S.flags['st_'+o.stash];
   o.loot=o.looted?{}:{...(S.flags['contents_'+o.stash]||o.initialLoot)};
@@ -6727,7 +6732,7 @@ function breakCrate(o){
   if(o.broken || o.k!=='crate' || !o.stash) return;
   if(o.fieldTile != null) breakFieldBox(o);
   else S.flags['broken_'+o.stash]=1;
-  o.broken=true; o.solid=false; scheduleCrateCleanup(o); buildGrids();
+  o.broken=true; o.solid=false; scheduleCrateCleanup(o); buildGrids(); groundItems(o); o.scatterStart=performance.now();
   play('hit',o.x,o.y);
   for(let i=0;i<8;i++) parts.push({x:o.x+o.w/2,y:o.y+o.h/2,vx:rnd(-50,50),vy:rnd(-45,45),life:rnd(.15,.4),c:i%2?'#947349':'#59402a',s:2});
 }
@@ -6746,6 +6751,7 @@ function scheduleCrateCleanup(o) {
 function clearCrateRemains(index) {
   const o = objs[index];
   if (G.near?.o === o) G.near = null;
+  forgetGroundItems(o);
   o.loot = {}; o.looted = true;
   objs.splice(index, 1);
   if (o.fieldTile != null) {
@@ -6796,6 +6802,105 @@ function containerOnRay(sh,ca,sa,limit){
   }
   return {o,d};
 }
+// Количество хранится в обычном loot. План запоминает место каждой отдельной вещи.
+const GROUND_REACH = 34;
+const groundBundle = id => id === 'money' || ITEMS[id]?.ammo;
+function scatterGroundItems(o) {
+  const ids=[];
+  for (const [id,count] of Object.entries(o.loot)) {
+    for (let i=0;i<(groundBundle(id)?1:count);i++) ids.push(id);
+  }
+  const cx=o.x+(o.w||0)/2, cy=o.y+(o.h||0)/2;
+  const turn=hash2(cx,cy)*Math.PI*2, drops=[], occupied=[];
+  for(const other of objs) {
+    if (other===o || Math.hypot(other.x-cx,other.y-cy)>110) continue;
+    const existing=other.groundItems || (other.broken && S.flags.groundItems?.[other.stash]);
+    if(existing) for(const item of existing) occupied.push(groundPosition(other,item));
+  }
+  for (const [i,id] of ids.entries()) {
+    let best=null, score=-Infinity;
+    const reach=22+Math.round(hash2(cx+i+7,cy)*6);
+    candidates: for (const radius of [reach,34,16,8,0]) for (let j=0;j<12;j++) {
+      const a=turn+2*Math.PI*(i/ids.length+j/12);
+      const x=Math.round(cx+Math.cos(a)*radius), y=Math.round(cy+Math.sin(a)*radius);
+      const probe={x,y,r:11}; collide(probe);
+      if (Math.hypot(probe.x-x,probe.y-y)>.1 || !los(cx,cy,x,y)) continue;
+      const spacing=occupied.reduce((gap,p)=>Math.min(gap,Math.hypot(x-p.x,y-p.y)),40);
+      const value=Math.min(spacing,25)-.14*Math.abs(radius-reach)-j*.03;
+      if (value>score) { best={id,dx:x-cx,dy:y-cy}; score=value; }
+      if (value===25) break candidates;
+    }
+    const drop=best || {id,dx:0,dy:0};
+    drops.push(drop); occupied.push(groundPosition(o,drop));
+  }
+  return drops;
+}
+function groundItems(o) {
+  if (o.kind==='sack') return o.groundItems ||= scatterGroundItems(o);
+  const layouts=S.flags.groundItems ||= {};
+  return layouts[o.stash] ||= scatterGroundItems(o);
+}
+function forgetGroundItems(o) {
+  const layouts=S.flags.groundItems;
+  if (layouts && o.stash) {
+    delete layouts[o.stash];
+    if (!Object.keys(layouts).length) delete S.flags.groundItems;
+  }
+}
+function groundPosition(o,drop) {
+  return {x:o.x+(o.w||0)/2+drop.dx, y:o.y+(o.h||0)/2+drop.dy};
+}
+function nearbyGroundItems(o,cand) {
+  if (Math.hypot(P.x-o.x-(o.w||0)/2,P.y-o.y-(o.h||0)/2)>GROUND_REACH+35) return;
+  for(const drop of groundItems(o)) {
+    const {x,y}=groundPosition(o,drop), d=dst(P.x,P.y,x,y);
+    if(d>GROUND_REACH || !los(P.x,P.y,x,y)) continue;
+    const id=drop.id, count=o.loot[id];
+    const name=id==='money'?count+' RU':ITEMS[id].n+(groundBundle(id)?' ×'+count:'');
+    cand(d,{k:'groundItem',o,drop,label:'Подобрать: '+name});
+  }
+}
+function pickGroundItem({o,drop}) {
+  const id=drop.id, {x,y}=groundPosition(o,drop);
+  if (!objs.includes(o) || !o.loot[id] || dst(P.x,P.y,x,y)>GROUND_REACH || !los(P.x,P.y,x,y)) return;
+  const drops=groundItems(o), index=drops.indexOf(drop);
+  if (index<0) return;
+  const moved=collectStock(o,id,groundBundle(id)?o.loot[id]:1);
+  if (!moved) { msg(receiveError(id,1,lootGun(o,id)),'bad'); return; }
+  if (!groundBundle(id) || !o.loot[id]) drops.splice(index,1);
+  if (o.stash) recordContents(o);
+  if (!drops.length) {
+    if (o.kind==='sack') objs.splice(objs.indexOf(o),1);
+    else forgetGroundItems(o);
+  }
+  play('pick'); G.near=findInteract();
+}
+function drawGroundItems(o) {
+  if (o.looted || !Object.keys(o.loot).length) return;
+  const flight=o.scatterStart==null?1:clamp((performance.now()-o.scatterStart)/240,0,1);
+  const remaining=(1-flight)**2;
+  for(const drop of groundItems(o)) {
+    const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop), frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
+    ctx.save(); ctx.translate(x-dx*remaining,y-dy*remaining-5*Math.sin(Math.PI*flight));
+    if (G.near?.drop===drop) {
+      ctx.strokeStyle='rgba(234,207,143,.85)'; ctx.lineWidth=1.2; ctx.beginPath();
+      for (const sx of [-1,1]) for(const sy of [-1,1]) {
+        ctx.moveTo(sx*8,sy*11); ctx.lineTo(sx*12,sy*11); ctx.lineTo(sx*12,sy*7);
+      }
+      ctx.stroke();
+    }
+    if(im) {
+      const scale=(isGun(id)?30:22)/Math.max(im.naturalWidth,im.naturalHeight);
+      const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+      ctx.drawImage(im,-w/2,-h/2,w,h);
+    } else {
+      ctx.fillStyle=id==='money'?'#83816a':'#ada389'; ctx.fillRect(-5,-3,10,6);
+      ctx.fillStyle='#534b39'; ctx.fillRect(-1,-3,2,6);
+    }
+    ctx.restore();
+  }
+}
+
 function containerDraw(o){
   const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
   g.save(); g.translate(x,y);
@@ -6804,17 +6909,6 @@ function containerDraw(o){
       g.save();g.translate(dx,dy);g.rotate(angle);g.fillStyle='#32291f';g.fillRect(-len/2,-2,len,5);
       g.fillStyle='#806343';g.fillRect(-len/2,-2,len-1,2);g.restore();
     }
-    Object.keys(o.loot).forEach((id,i)=>{
-      const drops=[[15,-4],[5,13],[-13,6],[-4,-13]];
-      const [px,py]=drops[i%drops.length];
-      const frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
-      if(im){
-        const scale=15/Math.max(im.naturalWidth,im.naturalHeight);
-        const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
-        g.drawImage(im,px-w/2,py-h/2,w,h);
-      }
-      else {g.fillStyle=id==='money'?'#83816a':'#ada389';g.fillRect(px-4,py-3,8,6);g.fillStyle='#534b39';g.fillRect(px-1,py-3,2,6);}
-    });
   }else if(o.k==='locker'){
     if(ART) ART.draw(g,C1?'c1_crate_army':'crate',0,0,29,22);
     else {g.fillStyle='#63624b';g.fillRect(-13,-9,26,18);}
@@ -6830,6 +6924,7 @@ function containerDraw(o){
   }else if(ART){ART.draw(g,'stash',0,0,22,18);}
   else{g.fillStyle='#55513a';g.fillRect(-10,-6,20,12);g.fillStyle='#322d21';g.fillRect(-8,-1,16,2);}
   g.restore();
+  if(o.k==='crate') drawGroundItems(o);
 }
 
 // Оставляем персонажа как можно ближе к его исходному месту у костра или поста.
@@ -7738,7 +7833,7 @@ function interact() {
     if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
   }
   else if (n.k === 'kill') takedown(n.e);
-  else if (n.k === 'pickupLoot' && n.o.broken) lootAll(n.o);
+  else if (n.k === 'groundItem') pickGroundItem(n);
   else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();

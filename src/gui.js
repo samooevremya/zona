@@ -207,8 +207,8 @@ function drawInv2() {
     if (id !== 'knife' && !it.quest && (id!==S.armor || copy) && (id!==S.weapon || copy) && cnt(id)>beltCount(id)) row.appendChild(btn('wide','Выбросить',()=>{
       const q=isGun(id)||it.armor?1:Math.min(stackLimit(id),cnt(id)-beltCount(id));
       const gun=removePacked(id,q,copy);
-      const sack={k:'body',kind:'sack',x:P.x,y:P.y+12,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min};
-      putStock(sack,id,q,gun); objs.push(sack);
+      const sack={k:'body',kind:'sack',x:P.x,y:P.y,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min,scatterStart:performance.now()};
+      putStock(sack,id,q,gun); objs.push(sack); groundItems(sack);
       panel.sel=null; panel.copy=0; refresh();
     }));
     dv.appendChild(row);

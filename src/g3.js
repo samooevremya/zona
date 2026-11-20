@@ -369,12 +369,14 @@ function findInteract() {
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if (d<49 && los(P.x,P.y,x,y)) cand(d,{k:'locker',o,label:'Открыть личный ящик'});
     }
+    if ((o.k==='crate' && o.broken && !o.looted) || o.kind==='sack') {
+      nearbyGroundItems(o,cand); continue;
+    }
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
-    if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
+    if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
-        if(o.k==='crate') cand(d,{k:'pickupLoot',o,label:'Подобрать добычу'});
-        else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+        cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
       }
     }
   }
