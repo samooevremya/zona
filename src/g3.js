@@ -116,6 +116,7 @@ function takedown(e) {
 function solidPx(x, y, skipFences = false) {
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
   if (!inb(tx, ty) || SOLID[map[ty * MW + tx]]) return true;
+  if(propCells.get(ty*MW+tx)?.some(p=>touchesProp(p,{x,y,r:0}))) return true;
   return objs.some(o => o.solid && !(skipFences && o.k === 'fence') && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h);
 }
 function throwNade() {
@@ -142,6 +143,8 @@ function explode(n) {
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
+  cleanExpiredCrates();
+  renewFieldCrates();
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
@@ -362,7 +365,13 @@ function findInteract() {
   if (ds < 56) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
-    if (o.stash && !o.looted) { const d = dst(P.x, P.y, o.x + 13, o.y + 13); if (d < 46) cand(d, { k: 'loot', o: o, label: 'Обыскать ящик' }); }
+    if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
+      const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
+      if(d<46 && los(P.x,P.y,x,y)){
+        if(o.k==='crate') cand(d,{k:'pickupLoot',o,label:'Подобрать добычу'});
+        else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+      }
+    }
   }
   for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
@@ -381,7 +390,7 @@ function lootAll(o) {
   });
   o.loot = left;
   if (Object.keys(left).length) msg('Оставлено: такой ствол уже есть (' + Object.keys(left).map(k => ITEMS[k].n).join(', ') + ').', 'bad');
-  if (o.stash && !Object.keys(o.loot).length) { o.looted = true; S.flags['st_' + o.stash] = 1; }
+  recordContents(o);
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
@@ -440,6 +449,7 @@ function applyState(d) {
   fogDirty = true;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
+  loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);

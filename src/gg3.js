@@ -149,7 +149,7 @@ body.is-touch .joy{background:${url('joy')} center/contain no-repeat;border:0;bo
 .hud.zh .zh-top button::after{inset:-16px -4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:180px;height:58px;padding:3px 8px 3px 4px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am{font-size:16px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire{width:100px;height:100px}body.is-touch .joy{width:112px;height:112px}.joy b{width:46px;height:46px;margin:-23px}
-.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
+.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:calc(44px / var(--hz, 1));font-size:13px}
 }
 @media (orientation:landscape){
 .hud.zh .rust{border-width:4px}
@@ -170,7 +170,7 @@ body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 122px - var(-
 body.is-touch .touch.zt .c1{top:calc(114px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(114px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(114px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(114px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(114px + var(--sat) + var(--st) * 4)}
 body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar))}body.is-touch .touch.zt .fire svg{width:50px;height:50px}
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
-.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
+.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:calc(44px / var(--hz, 1));font-size:13px}
 }
 /* стелс-кнопка, счётчики аптечек, выбор бинт/аптечка */
 .hud.zh .zh-p.kill{border-color:#a8321f;box-shadow:0 0 12px rgba(200,40,20,.55);color:#ffd9cf}.hud.zh .zh-p.kill .pi{background:#b3271a;border-radius:50%;width:10px;height:10px;display:inline-block;margin-right:8px}

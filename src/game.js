@@ -151,6 +151,7 @@ const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
 const SID_SHOP = !!window.SID_SHOP_IMAGE && !/sid-shop-off/.test(location.hash);
+const SID_DESK_Y = SID_SHOP ? 5.32 : 4.6;
 const SID_STAIR_X = SID_SHOP ? 126.5 : 124.5;
 const STAIRS = { x: SID_STAIR_X * T, y: 11.4 * T };
 const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
@@ -280,9 +281,9 @@ function gen() {
   [[60, 32], [66, 32]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   [[59, 102], [69, 102]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   // бункер: прилавок, полки, лестница
-  addObj({ k: 'counter', x: 122 * T, y: 6 * T + 4, w: 9 * T, h: 22, solid: 1, opaque: 0 });
+  addObj({ k: 'counter', x: 122 * T, y: SID_SHOP ? 5.69*T : 6*T+4, w: 9*T, h: SID_SHOP ? .95*T : 22, solid: 1, opaque: 0 });
   [[122, 2], [125, 2], [128, 2]].forEach(c => addObj({ k: 'shelf', x: c[0] * T + 2, y: c[1] * T + 2, w: 2 * T + 28, h: 20, solid: 1 }));
-  if (SID_SHOP) addObj({ k: 'crate', x: 129.55 * T, y: 6.98 * T, w: 1.28 * T, h: 2.12 * T, solid: 1 });
+  if (SID_SHOP) addObj({ k: 'crate', shopStack: true, x: 130.02*T, y: 7.16*T, w: .94*T, h: 1.82*T, solid: 1 });
   else [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
   addObj({ k: 'stairs', x: (SID_STAIR_X - 1) * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
   // аномалии и артефакты
@@ -309,6 +310,10 @@ function buildGrids() {
         nav[y * MW + x] = 0; if (o.opaque) opq[y * MW + x] = 1;
       }
   });
+  for (const [key,props] of propCells) {
+    const center={x:(key%MW+.5)*T, y:(Math.floor(key/MW)+.5)*T, r:10};
+    if(props.some(p=>touchesProp(p,center))) nav[key]=0;
+  }
   ANOM0.forEach(a => {
     for (let y = Math.floor((a.y - a.r - 14) / T); y <= Math.floor((a.y + a.r + 14) / T); y++)
       for (let x = Math.floor((a.x - a.r - 14) / T); x <= Math.floor((a.x + a.r + 14) / T); x++)
@@ -364,7 +369,7 @@ const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
     anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
   { id: 'sid', name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-    anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6] } },
+    anchors: { hatch: [12.5, 98.5], trader: [126.5, SID_DESK_Y], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6] } },
   { id: 'atp', name: 'АТП', gen: 'АТП', type: 'danger', bounds: [84, 58, 112, 84], entrances: [[86, 70], [104, 84]],
     anchors: { garage: [94.5, 64.6], petr: [93, 71.5], petr2: [97, 71.5], approach: [66, 37], sos: [[96, 96]] } },
   { id: 'field', name: 'Поле аномалий', gen: 'поля аномалий', type: 'anomaly', bounds: [66, 46, 84, 60], entrances: [[70, 60]],
@@ -492,7 +497,7 @@ const YARD_SEATS = [
   { sid: 'l4', x: 29.82, y: 86.33, wpn: 'w_pm', log: ['logs', -0.15, 0.35, 0.43] }
 ].map(s => ({ ...s, x: s.x + CAMP_TILE[0] - 30.5, y: s.y + CAMP_TILE[1] - 84.5 }));
 const NPCDEF = [
-  { sid: 'sid', fac: 'trader', name: 'Сидорович', x: 126.5, y: 4.6, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
+  { sid: 'sid', fac: 'trader', name: 'Сидорович', x: 126.5, y: SID_DESK_Y, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
   { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
   { sid: 'petr', fac: 'loner', name: 'Петруха', x: 74, y: 63.5, wpn: 'w_pm', hp: 150, rank: 1, stay: 1, named: 1 },
   { sid: 'petr2', fac: 'loner', name: 'Хомяк', x: 74, y: 79, wpn: 'w_obrez', hp: 130, rank: 0, stay: 1, named: 1 },
@@ -588,7 +593,8 @@ function mkPlayer() {
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
-  objs.forEach(o => { if (o.stash) o.looted = !!S.flags['st_' + o.stash]; });
+  objs.push(...retiredFixedCrates); retiredFixedCrates.length = 0;
+  objs.forEach(o => { if (o.stash) restoreContainer(o); });
   armyAngry = !!S.flags.armyAngry;
   const bar = objs.find(o => o.key === 'bar'); if (bar) { bar.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }
   S.q2 = S.q2 || { fox: 0, tolik: 0 };
@@ -606,6 +612,7 @@ function spawnWorld() {
   DOGDEF.forEach(d => { if (!S.dead[d.sid]) ents.push(mkDog(d)); });
   rcSpawnObjs();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
+  for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
   anoms = ANOM0.map(a => Object.assign({}, a, { cd: 0, reveal: 0, fx: 0, arc: 0 }));
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
 }
@@ -668,6 +675,10 @@ function collide(e) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!inb(x, y) || SOLID[map[y * MW + x]]) pushOut(e, x * T, y * T, T, T);
   const hop = e.jumpT > 0;   // в прыжке низкие препятствия не держат
   for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && LOW_K.has(o.k)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    const nearby=propCells.get(y*MW+x);
+    if(nearby) for(const p of nearby) touchesProp(p,e,true);
+  }
   e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r);
 }
 function moveE(e, dx, dy) { e.x += dx; e.y += dy; collide(e); collide(e); }
@@ -736,24 +747,27 @@ function rayCircle(sx, sy, ca, sa, cx, cy, rr) {
 }
 // Высота забора имеет значение в пределах полутора клеток от присевшей фигуры.
 const FENCE_REACH = 1.5 * T;
-function rayFence(x, y, dx, dy, near, far) {
-  let hit = Infinity;
-  for (const f of fences) {
+function rayBox(f,x,y,dx,dy,near,far) {
     // Интервал луча внутри каждой из двух осевых полос прямоугольника.
     let enter = near, exit = far;
     if (Math.abs(dx) < 1e-9) {
-      if (x < f.x || x > f.x + f.w) continue;
+      if (x < f.x || x > f.x + f.w) return Infinity;
     } else {
       const a = (f.x - x) / dx, b = (f.x + f.w - x) / dx;
       enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
     }
     if (Math.abs(dy) < 1e-9) {
-      if (y < f.y || y > f.y + f.h) continue;
+      if (y < f.y || y > f.y + f.h) return Infinity;
     } else {
       const a = (f.y - y) / dy, b = (f.y + f.h - y) / dy;
       enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
     }
-    if (enter <= exit) hit = Math.min(hit, enter);
+    return enter <= exit ? enter : Infinity;
+}
+function rayFence(x, y, dx, dy, near, far) {
+  let hit = Infinity;
+  for (const f of fences) {
+    hit = Math.min(hit,rayBox(f,x,y,dx,dy,near,far));
   }
   return hit;
 }
@@ -784,6 +798,8 @@ function shotTrace(sh, a, W) {   // чистая функция исхода о�
     const fence = rayFence(sh.x, sh.y, ca, sa, Math.max(0, centerT - FENCE_REACH), bt);
     if (fence <= bt) { bt = fence; best = null; }
   }
+  const box=containerOnRay(sh,ca,sa,bt);
+  if(box.o) return {t:box.d,best:null,box:box.o,wall:true,ca,sa};
   return { t: bt, best: best, wall: !best && bt < reach, ca: ca, sa: sa };
 }
 function fire(sh, ang, W, spread) {
@@ -795,6 +811,7 @@ function fire(sh, ang, W, spread) {
     const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
+    if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
     if (best && coverBlocks(best, sh.x, sh.y) && chance(best === P ? 0.6 : 0.5)) {
       const cx = best.x - ca * 22, cy = best.y - sa * 22;
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
@@ -844,6 +861,12 @@ function melee(sh, W) {
     if (d < W.range + e.r + sh.r && Math.abs(angD(sh.ang, Math.atan2(e.y - sh.y, e.x - sh.x))) < 0.9 && d < bd) { hit = e; bd = d; }
   });
   play('knife', sh.x, sh.y);
+  if(sh===P){
+    const ca=Math.cos(sh.ang),sa=Math.sin(sh.ang);
+    const reach=Math.min(W.range+sh.r, hit?Math.max(0,bd-hit.r):Infinity);
+    const box=containerOnRay(sh,ca,sa,shotBarrier(sh,ca,sa,reach));
+    if(box.o){breakCrate(box.o);return;}
+  }
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
@@ -1407,6 +1430,7 @@ function takedown(e) {
 function solidPx(x, y, skipFences = false) {
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
   if (!inb(tx, ty) || SOLID[map[ty * MW + tx]]) return true;
+  if(propCells.get(ty*MW+tx)?.some(p=>touchesProp(p,{x,y,r:0}))) return true;
   return objs.some(o => o.solid && !(skipFences && o.k === 'fence') && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h);
 }
 function throwNade() {
@@ -1433,6 +1457,8 @@ function explode(n) {
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
+  cleanExpiredCrates();
+  renewFieldCrates();
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
@@ -1653,7 +1679,13 @@ function findInteract() {
   if (ds < 56) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
-    if (o.stash && !o.looted) { const d = dst(P.x, P.y, o.x + 13, o.y + 13); if (d < 46) cand(d, { k: 'loot', o: o, label: 'Обыскать ящик' }); }
+    if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
+      const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
+      if(d<46 && los(P.x,P.y,x,y)){
+        if(o.k==='crate') cand(d,{k:'pickupLoot',o,label:'Подобрать добычу'});
+        else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+      }
+    }
   }
   for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
@@ -1672,7 +1704,7 @@ function lootAll(o) {
   });
   o.loot = left;
   if (Object.keys(left).length) msg('Оставлено: такой ствол уже есть (' + Object.keys(left).map(k => ITEMS[k].n).join(', ') + ').', 'bad');
-  if (o.stash && !Object.keys(o.loot).length) { o.looted = true; S.flags['st_' + o.stash] = 1; }
+  recordContents(o);
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
@@ -1731,6 +1763,7 @@ function applyState(d) {
   fogDirty = true;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
+  loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
@@ -2369,37 +2402,38 @@ function drawAnoms() {
 }
 
 /* ---------- кадр ---------- */
-const shopImage = new Image();
-if (SID_SHOP) shopImage.src = window.SID_SHOP_IMAGE;
+const shopImage = new Image(), deskPoses = new Image();
+function shopCamera(center, start, span, view) {
+  return view >= span ? start+span/2 : clamp(center, start+view/2, start+span-view/2);
+}
+if (SID_SHOP) {
+  shopImage.src = window.SID_SHOP_IMAGE;
+  deskPoses.src = window.SID_DESK_POSES;
+}
 
-// Coordinates below use the illustration's 345 × 410 layout.
-function drawSidShop() {
+// Маски кистей в координатах трёх кадров. Колени и табурет скрывает столешница.
+const deskHands = [
+  [[63,88,21,13]],
+  [[42,73,13,12],[82,89,10,13]],
+  [[54,99,13,22],[80,87,10,13]]
+];
+function drawDeskTrader(e) {
+  const talking = panel && panel.kind === 'trader';
+  const trading = panel && panel.kind === 'trade' && !panel.e;
+  const pose = trading ? 2 : (talking || e.deskLook > .65 ? 1 : 0);
+  const breath = Math.sin((e.deskTime || 0)*1.8)*.25;
+  // Общая опора у всех трёх поз. Локти и свёрток заходят на край прилавка.
   ctx.save();
-  ctx.translate(BUNK.x0 + .75 * T, 1.25 * T);
-  ctx.scale(9.5 * T / 345, 10.25 * T / 410);
-  ctx.drawImage(shopImage, 0, 0, 345, 410);
-  const sid = byS('sid');
-  if (sid) {
-    const t = sid.deskTime || 0, look = sid.deskLook || 0;
-    const sx = shopImage.naturalWidth / 345, sy = shopImage.naturalHeight / 410;
-    // The chair and shoulders stay fixed as he lifts his head from the ledger.
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(171, 129, 10, 13, 0, 0, Math.PI * 2); ctx.clip();
-    const lift = look * 2 + Math.sin(t * 1.7) * .25;
-    ctx.drawImage(shopImage, 159 * sx, 113 * sy, 24 * sx, 32 * sy, 159, 113 - lift, 24, 32 + lift);
-    ctx.restore();
-    const turn = (t % 11 - 7) / 1.3;
-    if (turn > 0 && turn < 1) {
-      const angle = turn * Math.PI, fold = Math.sin(angle);
-      // One hand slides from the desk edge to the corner of the sheet.
-      ctx.drawImage(shopImage, 165 * sx, 156 * sy, 15 * sx, 17 * sy,
-        165, 156, 15, 17 + 7 * fold);
-      ctx.save(); ctx.translate(173, 178);
-      ctx.transform(Math.cos(angle), -.22 * fold, 0, 1, 0, 0);
-      ctx.drawImage(shopImage, 174 * sx, 178 * sy, 20 * sx, 20 * sy, 0, 0, 20, 20);
-      ctx.restore();
-    }
+  ctx.translate(e.x-16, e.y-10+breath);
+  ctx.scale(.25,.25);
+  ctx.beginPath();
+  ctx.rect(0,0,128,(5.69*T-e.y+10-breath)*4);
+  for(const [x,y,rx,ry] of deskHands[pose]) {
+    ctx.moveTo(x+rx,y); ctx.ellipse(x,y,rx,ry,0,0,2*Math.PI);
   }
+  ctx.clip();
+  spriteShadow(ctx, 2, 1.4);
+  ctx.drawImage(deskPoses, pose*128,0,128,128, 0,0,128,128);
   ctx.restore();
 }
 function render() {
@@ -2411,8 +2445,8 @@ function render() {
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
   if (SID_SHOP && P && inBunker(P.x, P.y)) {
-    if (VW / Z >= 9.5 * T) cam.x = BUNK.x0 + 5.5 * T;
-    if (VH / Z >= 10.25 * T) cam.y = 6.375 * T;
+    cam.x = shopCamera(cam.x, BUNK.x0+.75*T, 9.5*T, VW/Z);
+    cam.y = shopCamera(cam.y, 1.25*T, 10.25*T, VH/Z);
   }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2424,7 +2458,7 @@ function render() {
   if (shopVisible) {
     ctx.save();
     ctx.beginPath(); ctx.rect(BUNK.x0 + .75 * T, 1.25 * T, 9.5 * T, 10.25 * T); ctx.clip();
-    drawSidShop();
+    ctx.drawImage(shopImage, BUNK.x0 + .75*T, 1.25*T, 9.5*T, 10.25*T);
   }
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
@@ -2439,7 +2473,8 @@ function render() {
   // костёр
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if (o.k === 'crate' && !(shopVisible && inBunker(o.x, o.y) && o.static) && inView(o.x, o.y, 40)) crateDraw(o);
+    if ((o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
+    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
@@ -2460,8 +2495,8 @@ function render() {
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
-    if (shopVisible && e.sid === 'sid') continue;
-    if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
+    if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
+    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -2585,7 +2620,9 @@ function render() {
     hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
     hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
-    if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
+    if (shopVisible) {
+      hole(BUNK.x0+9.25*T, 5.95*T, 95, .8);
+    } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);
@@ -2882,7 +2919,7 @@ function survDefaults() {
 function ensureCaches() {
   CACHES.forEach((c, i) => {
     if (objs.some(o => o.cacheId === i)) return;
-    objs.push({ k: 'cache', cacheId: i, x: c.x * T, y: c.y * T, loot: S.caches[i] === 2 ? {} : Object.assign({}, c.loot), name: 'Тайник' });
+    objs.push({ k: 'cache', cacheId: i, x: c.x * T, y: c.y * T, loot: S.caches[i] === 2 ? {} : Object.assign({}, S.flags['cache_contents_'+i] || c.loot), name: 'Тайник' });
   });
 }
 function revealCache(fromName, idx) {
@@ -2927,7 +2964,7 @@ function survival(dt) {
 }
 function cacheNear() {
   let best = null, bd = 44;
-  for (const o of objs) if (o.k === 'cache' && S.caches[o.cacheId] === 1 && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < bd) { bd = d; best = o; } }
+  for (const o of objs) if (o.k === 'cache' && S.caches[o.cacheId] === 1 && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < bd && los(P.x,P.y,o.x,o.y)) { bd = d; best = o; } }
   return best;
 }
 function drawCaches() {
@@ -3403,6 +3440,18 @@ function scatterAutumnPlants(g, x, y, terrain) {
 }
 
 /* разброс C1: брёвна, пни, камни, пятна. Место выбирается по хешу клетки, так что соседние куски рисуют одно и то же */
+function scatterObject(x,y) {
+    const h = hash2(x * 3 + 11, y * 7 + 5); if (h > 0.03) return null;
+    let road = false; for (let dy = -2; dy <= 2 && !road; dy++) for (let dx = -2; dx <= 2; dx++) { const t = tAt(x + dx, y + dy); if (t === DI || t === AS || t === BR || t === CO || t === FL || t === CF || t === RA) { road = true; break; } }
+    if (road) return null;
+    const h2 = hash2(y + 31, x + 17), cx = x * T + 16, cy = y * T + 16, a = h2 * 6.28;
+    let id, w, hh, al = 1;
+    if (h < 0.007) { id = 'c1_log' + Math.floor(h2 * 3); w = 110; hh = 36; }
+    else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
+    else if (h < 0.018) { id = 'c1_rock' + Math.floor(h2 * 3); w = hh = 28 + h2 * 10; }
+    else { id = 'c1_decal' + [0, 1, 3, 4][Math.floor(h2 * 4)]; w = hh = 90 + h2 * 50; al = 0.7; }
+    return {id,w,hh,al,cx,cy,a};
+}
 function c1Scatter(g) {
   const terrain = BIG && autumnTerrain();
   const M = 5;
@@ -3416,15 +3465,8 @@ function c1Scatter(g) {
     }
     if (t0 !== GR) continue;
     if (terrain) scatterAutumnPlants(g, x, y, terrain);
-    const h = hash2(x * 3 + 11, y * 7 + 5); if (h > 0.03) continue;
-    let road = false; for (let dy = -2; dy <= 2 && !road; dy++) for (let dx = -2; dx <= 2; dx++) { const t = tAt(x + dx, y + dy); if (t === DI || t === AS || t === BR || t === CO || t === FL || t === CF || t === RA) { road = true; break; } }
-    if (road) continue;
-    const h2 = hash2(y + 31, x + 17), cx = x * T + 16, cy = y * T + 16, a = h2 * 6.28;
-    let id, w, hh, al = 1;
-    if (h < 0.007) { id = 'c1_log' + Math.floor(h2 * 3); w = 110; hh = 36; }
-    else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
-    else if (h < 0.018) { id = 'c1_rock' + Math.floor(h2 * 3); w = hh = 28 + h2 * 10; }
-    else { id = 'c1_decal' + [0, 1, 3, 4][Math.floor(h2 * 4)]; w = hh = 90 + h2 * 50; al = 0.7; }
+    const prop = scatterObject(x,y); if (!prop) continue;
+    const {id,w,hh,al,cx,cy,a} = prop;
     if (id.startsWith('c1_log')) {
       groundShadow(g, cx, cy, w * .48, hh * .26, a, 3);
       ART.draw(g, id, cx, cy, w, hh, a);
@@ -3666,7 +3708,7 @@ function drawCordonDetails(g) {
   }
   g.restore();
 }
-/* декор деревни: без коллизии, вне дорожек и дверей */
+/* декор деревни: координаты для рисунка и коллизии */
 const DECOR = [
   ...YARD_SEATS.filter(s => s.log).map(s => {
     const [kind, dx, dy, angle] = s.log;
@@ -4225,6 +4267,8 @@ function advanceWorldTime(minutes, ctx) {
   const r = simRest(minutes, ctx, { food: S.food, hp: P.hp, bleed: S.bleed });
   S.food = r.food; P.hp = r.hp; if (r.minutes > 0) P.st = 100;
   S.min += r.minutes;
+  cleanExpiredCrates();
+  renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
   const done = r.minutes;
   // события, у которых прошёл срок, закрываются сразу и честно
@@ -5195,7 +5239,7 @@ const RC1 = {
       anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-      anchors: { hatch: [12.5, 98.5], trader: [126.5, 4.6], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
+      anchors: { hatch: [12.5, 98.5], trader: [126.5, SID_DESK_Y], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
     bus: { name: 'Автобус у дороги', gen: 'автобуса', type: 'story', bounds: [44, 72, 53, 80], entrances: [[48, 80], [44, 75]],
       anchors: { bus: [47, 75], tolik: [49.5, 77.5], safe: [47, 79] } },
     pump: { name: 'Старая водокачка', gen: 'старой водокачки', type: 'story', bounds: [32, 57, 42, 67], entrances: [[36, 67], [42, 62]],
@@ -5583,7 +5627,7 @@ function bigNewObjects(R) {
   CLEAR_SPOTS.push([33, 131, 'у хутора', 'hutor'], [226, 97, 'у брода', 'ford'], [122, 25, 'у разбитой колонны', 'column']);
   // колонна техники у дороги на Свалку
   [[120, 19, 0], [123, 23, 1], [121.5, 27.5, 0], [131, 21, 1]].forEach((c, i) => addObj({ k: 'car', x: c[0] * T, y: c[1] * T + 4, w: 2 * T, h: T - 8, solid: 1, opaque: 0, seed: 10 + i }));
-  addObj({ k: 'crate', x: 122 * T + 3, y: 21 * T + 3, w: 26, h: 26, solid: 1, stash: 'st8', loot: { a545: 30, medkit: 1, money: 240 } });
+  addObj({ k: 'crate', x: 125 * T + 3, y: 23 * T + 3, w: 26, h: 26, solid: 1, stash: 'st8', loot: { a545: 30, medkit: 1, money: 240 } });
   ANOM0.push({ x: 125.5 * T, y: 26.5 * T, r: 26, k: 'g' }, { x: 119.5 * T, y: 23.5 * T, r: 22, k: 'e' });
   rads.push({ x: 123 * T, y: 24 * T, r: 110, p: 2.2 });
   DECOR.push(['ford', STREAM_X(92) + .5, 92.5, 0]);
@@ -5879,7 +5923,7 @@ body.is-touch .joy{background:${url('joy')} center/contain no-repeat;border:0;bo
 .hud.zh .zh-top button::after{inset:-16px -4px}
 .hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:180px;height:58px;padding:3px 8px 3px 4px}.zh-w #wico,.zh-w #wico img{width:64px;height:38px}.hud.zh .zh-w .am,body.is-touch .hud.zh .zh-w .am{font-size:16px}
 body.is-touch .touch.zt .rb{width:46px;height:46px}body.is-touch .touch.zt .fire{width:100px;height:100px}body.is-touch .joy{width:112px;height:112px}.joy b{width:46px;height:46px;margin:-23px}
-.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
+.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:calc(44px / var(--hz, 1));font-size:13px}
 }
 @media (orientation:landscape){
 .hud.zh .rust{border-width:4px}
@@ -5900,7 +5944,7 @@ body.is-touch .touch.zt{--st:min(50px,calc((100vh / var(--hz, 1) - 122px - var(-
 body.is-touch .touch.zt .c1{top:calc(114px + var(--sat))}body.is-touch .touch.zt .c2{top:calc(114px + var(--sat) + var(--st))}body.is-touch .touch.zt .c3{top:calc(114px + var(--sat) + var(--st) * 2)}body.is-touch .touch.zt .c4{top:calc(114px + var(--sat) + var(--st) * 3)}body.is-touch .touch.zt .c5{top:calc(114px + var(--sat) + var(--st) * 4)}
 body.is-touch .touch.zt .fire{width:96px;height:96px;right:calc(62px + var(--sar))}body.is-touch .touch.zt .fire svg{width:50px;height:50px}
 body.is-touch .joy{width:110px;height:110px}.joy b{width:46px;height:46px;margin:-23px}
-.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:34px;font-size:13px}
+.hud.zh .zh-p,body.is-touch .hud.zh .zh-p{min-height:calc(44px / var(--hz, 1));font-size:13px}
 }
 /* стелс-кнопка, счётчики аптечек, выбор бинт/аптечка */
 .hud.zh .zh-p.kill{border-color:#a8321f;box-shadow:0 0 12px rgba(200,40,20,.55);color:#ffd9cf}.hud.zh .zh-p.kill .pi{background:#b3271a;border-radius:50%;width:10px;height:10px;display:inline-block;margin-right:8px}
@@ -6202,6 +6246,376 @@ function qaRig(e, dist, fps, state) {
   for (let i = 0; i < n; i++) CordonRig.update(r.rig, { state: state || rigState(e, dist > 0), distance: dist ? dist / n : 0 }, dt);
   if (dist) { g.dist += dist; g.moveT = 1; }
   e.qaRig = 1; return { phase: r.rig.phase, step: r.rig.step, state: r.rig.state };
+}
+
+/* Контуры наземного декора. Та же точка, угол и масштаб, что у рисунка.
+   Выпуклый контур берём с альфа-канала до добавления падающей тени. */
+const propCells = new Map(), propHulls = new Map(), fieldProps = [];
+function spriteHull(id) {
+  if (propHulls.has(id)) return propHulls.get(id);
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const g = c.getContext('2d'); ART.draw(g, id, 16, 16, 32, 32);
+  const rgba = g.getImageData(0, 0, 32, 32).data, points = [];
+  for (let x = 0; x < 32; x++) {
+    let lo = 32, hi = -1;
+    for (let y = 0; y < 32; y++) if (rgba[(y*32+x)*4+3] >= 144) { lo = Math.min(lo,y); hi = y; }
+    if (hi >= 0) { points.push([x+.5,lo+.5]); if (hi > lo) points.push([x+.5,hi+.5]); }
+  }
+  const half = ordered => {
+    const edge = [];
+    for (const p of ordered) {
+      while (edge.length >= 2) {
+        const a = edge[edge.length-2], b = edge[edge.length-1];
+        if ((b[0]-a[0])*(p[1]-a[1]) > (b[1]-a[1])*(p[0]-a[0])) break;
+        edge.pop();
+      }
+      edge.push(p);
+    }
+    edge.pop(); return edge;
+  };
+  const hull = half(points).concat(half(points.reverse()));
+  propHulls.set(id,hull); return hull;
+}
+function addFootprint(id,x,y,w,h,angle=0) {
+  const ca=Math.cos(angle), sa=Math.sin(angle);
+  const vertices=spriteHull(id).map(([u,v]) => {
+    const dx=(u/32-.5)*w, dy=(v/32-.5)*h;
+    return [x+ca*dx-sa*dy,y+sa*dx+ca*dy];
+  });
+  if (vertices.length < 3) return;
+  const xs=vertices.map(p=>p[0]), ys=vertices.map(p=>p[1]);
+  const p={id,vertices}; fieldProps.push(p);
+  for(let ty=Math.floor(Math.min(...ys)/T);ty<=Math.floor(Math.max(...ys)/T);ty++)
+    for(let tx=Math.floor(Math.min(...xs)/T);tx<=Math.floor(Math.max(...xs)/T);tx++) {
+      if (!inb(tx,ty)) continue;
+      const key=ty*MW+tx;
+      if (!propCells.has(key)) propCells.set(key,[]);
+      propCells.get(key).push(p);
+    }
+}
+function touchesProp(p,e,push=false) {
+  let inside=true, best=Infinity, ox=0, oy=0, nx=0, ny=0;
+  for(let i=0;i<p.vertices.length;i++){
+    const a=p.vertices[i], b=p.vertices[(i+1)%p.vertices.length], dx=b[0]-a[0],dy=b[1]-a[1];
+    const u=e.x-a[0],v=e.y-a[1], length=dx*dx+dy*dy;
+    if(dx*v-dy*u<0) inside=false;
+    const t=clamp((u*dx+v*dy)/length,0,1), qx=u-t*dx,qy=v-t*dy, ds=qx*qx+qy*qy;
+    if(ds<best){best=ds;ox=qx;oy=qy;nx=dy/Math.sqrt(length);ny=-dx/Math.sqrt(length);}
+  }
+  if(!inside && best>=e.r*e.r) return false;
+  if(push){
+    const d=Math.sqrt(best);
+    if(d>.0001){nx=ox/d*(inside?-1:1);ny=oy/d*(inside?-1:1);}
+    const shift=e.r+(inside?d:-d); e.x+=shift*nx; e.y+=shift*ny;
+  }
+  return true;
+}
+function buildFieldProps(){
+  propCells.clear(); fieldProps.length=0;
+  if(!ART) return;
+  for(const [kind,tx,ty,angle] of DECOR){
+    if(kind==='ford'||(kind==='fence' && BIG && C1)) continue;
+    const art=C1 && C1DECOR[kind], id=art?art[0]:kind, sp=ART.m.sprites[id];
+    if(!sp) continue;
+    const w=art?art[1]:sp.logicalSize[0], h=art?w*sp.rect[3]/sp.rect[2]:sp.logicalSize[1];
+    addFootprint(id,tx*T,ty*T,w,h,angle);
+  }
+  if(!C1) return;
+  if(BIG) for(const [id,tx,ty,w,a] of CORDON_DETAILS){
+    if(id==='c1_trace_apples') continue;
+    const r=ART.m.sprites[id].rect;
+    addFootprint(id,tx*T,ty*T,w,w*r[3]/r[2],a);
+  }
+  for(let y=3;y<=MH-4;y++) for(let x=3;x<=PW-4;x++){
+    if(tAt(x,y)!==GR) continue;
+    const p=scatterObject(x,y);
+    if(p && !p.id.startsWith('c1_decal')) addFootprint(p.id,p.cx,p.cy,p.w,p.hh,p.a);
+  }
+}
+
+/* Сейфы и схроны привязаны к тем же местам, что ящики во всех версиях карты. */
+function placeSearchContainers(){
+  for(const [anchor,kind,loot] of [
+    ['st1','safe',{money:180,a9:12}], ['st7','safe',{antirad:1,money:90}],
+    ['st3','hiding',{bandage:2,bread:1}], ['st5','hiding',{a12:6,medkit:1}]
+  ]){
+    const ref=objs.find(o=>o.stash===anchor); if(!ref) continue;
+    const tx=Math.floor(ref.x/T), ty=Math.floor(ref.y/T);
+    let placed=false;
+    for(let r=1;r<=5&&!placed;r++) for(let dy=-r;dy<=r&&!placed;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const x=tx+dx,y=ty+dy;
+      const cx=(x+.5)*T, cy=(y+.5)*T;
+      if(HOUSES.some(h=>h.entrances.some(d=>Math.hypot(cx-h.x*T-d.x,cy-h.y*T-d.y)<72))) continue;
+      if(NPCDEF.some(n=>Math.hypot(cx-n.x*T,cy-n.y*T)<32)) continue;
+      if(!inb(x,y)||!nav[y*MW+x] || ![[1,0],[-1,0],[0,1],[0,-1]].every(([i,j])=>nav[(y+j)*MW+x+i])) continue;
+      addObj({k:kind,stash:kind+'_'+anchor,x:(x+.5)*T-11,y:(y+.5)*T-9,w:22,h:18,solid:kind==='safe',loot});
+      placed=true; break;
+    }
+  }
+}
+function restoreContainer(o){
+  if(!o.initialLoot) o.initialLoot={...o.loot};
+  o.looted=!!S.flags['st_'+o.stash];
+  o.loot=o.looted?{}:{...(S.flags['contents_'+o.stash]||o.initialLoot)};
+  if(o.k==='crate'){
+    o.broken=o.looted||!!S.flags['broken_'+o.stash];
+    o.solid=!o.broken;
+  }
+}
+function recordContents(o){
+  const empty=!Object.keys(o.loot).length;
+  if(o.fieldTile != null){
+    const stock = S.flags.fieldCrates;
+    stock.drops[o.fieldTile] = o.loot;
+    o.looted = empty;
+  }else if(o.stash){
+    S.flags['contents_'+o.stash]={...o.loot}; o.looted=empty;
+    if(empty) S.flags['st_'+o.stash]=1;
+  }else if(o.k==='cache'){
+    S.flags['cache_contents_'+o.cacheId]={...o.loot};
+    if(empty) S.caches[o.cacheId]=2;
+  }
+}
+function breakCrate(o){
+  if(o.broken || o.k!=='crate' || !o.stash) return;
+  if(o.fieldTile != null) breakFieldBox(o);
+  else S.flags['broken_'+o.stash]=1;
+  o.broken=true; o.solid=false; scheduleCrateCleanup(o); buildGrids();
+  play('hit',o.x,o.y);
+  for(let i=0;i<8;i++) parts.push({x:o.x+o.w/2,y:o.y+o.h/2,vx:rnd(-50,50),vy:rnd(-45,45),life:rnd(.15,.4),c:i%2?'#947349':'#59402a',s:2});
+}
+// Игровые минуты, отсчитываются от удара, а не от подбора или загрузки.
+const CRATE_LIFETIME = 6 * 60;
+let nextCrateCleanup = Infinity;
+const retiredFixedCrates = [];
+
+function scheduleCrateCleanup(o) {
+  const times = S.flags.crateCleanup || (S.flags.crateCleanup = {});
+  // У старых сохранений нет времени разрушения. Даём срок от первой загрузки.
+  const end = times[o.stash] ?? (times[o.stash] = S.min + CRATE_LIFETIME);
+  nextCrateCleanup = Math.min(nextCrateCleanup, end);
+}
+
+function clearCrateRemains(index) {
+  const o = objs[index];
+  if (G.near?.o === o) G.near = null;
+  o.loot = {}; o.looted = true;
+  objs.splice(index, 1);
+  if (o.fieldTile != null) {
+    delete S.flags.fieldCrates.drops[o.fieldTile];
+  } else {
+    // В новой игре исходный ящик снова понадобится. В этом прохождении достаточно одной отметки.
+    retiredFixedCrates.push(o);
+    S.flags['st_'+o.stash] = 2;
+    delete S.flags['contents_'+o.stash];
+    delete S.flags['broken_'+o.stash];
+  }
+}
+
+function cleanExpiredCrates() {
+  if (S.min < nextCrateCleanup) return;
+  const times = S.flags.crateCleanup;
+  nextCrateCleanup = Infinity;
+  for (let i = objs.length-1; i >= 0; i--) {
+    const o = objs[i];
+    if (!o.broken || o.k !== 'crate') continue;
+    if (times[o.stash] <= S.min) {
+      delete times[o.stash];
+      clearCrateRemains(i);
+    } else {
+      nextCrateCleanup = Math.min(nextCrateCleanup, times[o.stash]);
+    }
+  }
+  if (!Object.keys(times).length) delete S.flags.crateCleanup;
+}
+
+function restoreCrateCleanup() {
+  nextCrateCleanup = Infinity;
+  for (let i = objs.length-1; i >= 0; i--) {
+    const o = objs[i];
+    if (!o.broken || o.k !== 'crate') continue;
+    if (o.fieldTile == null && S.flags['st_'+o.stash] === 2) clearCrateRemains(i);
+    else scheduleCrateCleanup(o);
+  }
+  cleanExpiredCrates();
+}
+
+function containerOnRay(sh,ca,sa,limit){
+  let o=null,d=limit;
+  for(const box of objs){
+    if(!(box.stash && box.solid)) continue;
+    const t=rayBox(box,sh.x,sh.y,ca,sa,0,d);
+    if(t<d){o=box;d=t;}
+  }
+  return {o,d};
+}
+function containerDraw(o){
+  const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
+  g.save(); g.translate(x,y);
+  if(o.k==='crate'){
+    for(const [dx,dy,len,angle] of [[-8,-7,19,-.48],[2,-5,21,.23],[-5,4,16,.68],[5,8,15,-.19]]){
+      g.save();g.translate(dx,dy);g.rotate(angle);g.fillStyle='#32291f';g.fillRect(-len/2,-2,len,5);
+      g.fillStyle='#806343';g.fillRect(-len/2,-2,len-1,2);g.restore();
+    }
+    Object.keys(o.loot).forEach((id,i)=>{
+      const drops=[[15,-4],[5,13],[-13,6],[-4,-13]];
+      const [px,py]=drops[i%drops.length];
+      const frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
+      if(im){
+        const scale=15/Math.max(im.naturalWidth,im.naturalHeight);
+        const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+        g.drawImage(im,px-w/2,py-h/2,w,h);
+      }
+      else {g.fillStyle=id==='money'?'#83816a':'#ada389';g.fillRect(px-4,py-3,8,6);g.fillStyle='#534b39';g.fillRect(px-1,py-3,2,6);}
+    });
+  }else if(o.k==='safe'){
+    g.fillStyle='#242522';g.fillRect(-11,-8,23,19);
+    const metal=g.createLinearGradient(0,-9,0,8);metal.addColorStop(0,'#76766a');metal.addColorStop(1,'#41433c');
+    g.fillStyle=metal;g.fillRect(-11,-10,22,16);g.strokeStyle='#969081';g.strokeRect(-9,-8,18,12);
+    g.fillStyle='#2b2c28';g.fillRect(-7,-5,3,7);g.fillStyle='#aca38a';g.fillRect(-7,-5,5,2);
+    g.beginPath();g.arc(5,-2,2,0,Math.PI*2);g.stroke();
+  }else if(ART){ART.draw(g,'stash',0,0,22,18);}
+  else{g.fillStyle='#55513a';g.fillRect(-10,-6,20,12);g.fillStyle='#322d21';g.fillRect(-8,-1,16,2);}
+  g.restore();
+}
+
+// Оставляем персонажа как можно ближе к его исходному месту у костра или поста.
+function clearPropSpawn(e) {
+  const tx=Math.floor(e.x/T), ty=Math.floor(e.y/T);
+  if(!propCells.has(ty*MW+tx)) return;
+  for(let distance=0;distance<=2*T;distance+=3){
+    for(let i=0;i<16;i++){
+      const a=i*Math.PI/8, x=e.x+Math.cos(a)*distance, y=e.y+Math.sin(a)*distance;
+      if(!nav[Math.floor(y/T)*MW+Math.floor(x/T)]) continue;
+      const probe={x,y,r:e.r}; collide(probe);
+      if(Math.hypot(probe.x-x,probe.y-y)>.01) continue;
+      e.x=e.home.x=x; e.y=e.home.y=y;
+      return;
+    }
+  }
+}
+
+// На большом Кордоне 24 сменных ящика. В сохранении хранятся клетки, добыча и
+// абсолютные сроки по игровым часам. Обломки с вещами существуют независимо от замены.
+const FIELD_CRATE_COUNT = 24;
+const fieldCrateSites = [];
+let nextFieldCrateAt = Infinity;
+
+function buildFieldCrateSites() {
+  if (!BIG) return;
+  const start = locPt('village', 'safe');
+  const root = nearestNav(Math.floor(start.x / T), Math.floor(start.y / T));
+  const reachable = new Uint8Array(MW * MH), queue = [root];
+  reachable[root] = 1;
+  for (let i = 0; i < queue.length; i++) {
+    for (const adjacent of [queue[i]-1, queue[i]+1, queue[i]-MW, queue[i]+MW]) {
+      if (nav[adjacent] && !reachable[adjacent]) {
+        reachable[adjacent] = 1;
+        queue.push(adjacent);
+      }
+    }
+  }
+  // Между точками остаётся не менее шести клеток. Вокруг каждой свободен
+  // квадрат 3×3, поэтому поставленный ящик можно обойти с четырёх сторон.
+  fieldCrateSites.length = 0;
+  for (let y = 4; y < MH-4; y += 6) for (let x = 4; x < PW-4; x += 6) {
+    const tile = y*MW+x, cx = (x+.5)*T, cy = (y+.5)*T;
+    if (map[tile] !== GR || !reachable[tile] || DIRS.some(([dx,dy]) => !nav[tile+dx+dy*MW])) continue;
+    const clearance = {x:cx, y:cy, r:20};
+    if ([[0,0],...DIRS].some(([dx,dy]) =>
+      propCells.get(tile+dx+dy*MW)?.some(prop => touchesProp(prop,clearance)))) continue;
+    if (HOUSES.some(h => x >= h.x-2 && x < h.x+h.w+2 && y >= h.y-2 && y < h.y+h.h+2)) continue;
+    if (objs.some(o => Math.hypot(o.x+(o.w||0)/2-cx,o.y+(o.h||0)/2-cy) < 65)) continue;
+    if (NPCDEF.some(n => Math.hypot(n.x*T-cx,n.y*T-cy) < 70)) continue;
+    if (CACHES.some(c => Math.hypot(c.x*T-cx,c.y*T-cy) < 48)) continue;
+    fieldCrateSites.push(tile);
+  }
+}
+
+function fieldSector(tile) {
+  return Math.floor((tile%MW)*3/PW) + (Math.floor(tile/MW) >= MH/2 ? 3 : 0);
+}
+
+function chooseFieldSite(stock, previous) {
+  const used = new Set(stock.slots.map(slot => slot.tile)), counts = [0,0,0,0,0,0];
+  for (const slot of stock.slots) if (!slot.due) counts[fieldSector(slot.tile)]++;
+  const candidates = [], questItems = objs.filter(o => o.pick);
+  let best = Infinity;
+  for (const tile of fieldCrateSites) {
+    if (used.has(tile) || stock.drops[tile] || (previous != null && fieldSector(tile) === fieldSector(previous))) continue;
+    if (previous != null && Math.hypot(tile%MW-previous%MW,Math.floor(tile/MW)-Math.floor(previous/MW)) < 32) continue;
+    const cx = (tile%MW+.5)*T, cy = (Math.floor(tile/MW)+.5)*T;
+    if (previous != null && Math.abs(cx-P.x) < VW/(2*Z)+2*T && Math.abs(cy-P.y) < VH/(2*Z)+2*T) continue;
+    const score = counts[fieldSector(tile)];
+    if (score > best || !nav[tile]) continue;
+    if (ents.some(e => e.alive && Math.hypot(e.x-cx,e.y-cy) < 60)) continue;
+    if (questItems.some(o => Math.hypot(o.x-cx,o.y-cy) < 50)) continue;
+    if (score < best) { best = score; candidates.length = 0; }
+    candidates.push(tile);
+  }
+  return candidates.length ? candidates[ri(0,candidates.length-1)] : null;
+}
+
+function fieldCrateLoot() {
+  const ammo = ['a9','a12','a545'][ri(0,2)];
+  const supplies = ['bandage','bread','cans','antirad','medkit'][ri(0,4)];
+  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12), [supplies]: 1 };
+  if (ri(1,4) === 1) loot.money = ri(15,65);
+  return loot;
+}
+
+function fieldBox(tile, loot, broken) {
+  return {k:'crate', stash:'field_'+tile, fieldTile:tile,
+    x:(tile%MW+.5)*T-13, y:(Math.floor(tile/MW)+.5)*T-13,
+    w:26, h:26, loot, broken, solid:!broken, looted:broken && !Object.keys(loot).length};
+}
+
+function loadFieldCrates() {
+  nextFieldCrateAt = Infinity;
+  if (!BIG) return;
+  const stock = S.flags.fieldCrates || (S.flags.fieldCrates = {slots:[], drops:{}});
+  while (stock.slots.length < FIELD_CRATE_COUNT) {
+    const tile = chooseFieldSite(stock, null);
+    if (tile == null) break;
+    stock.slots.push({tile, loot:fieldCrateLoot(), due:0});
+  }
+  for (const slot of stock.slots) {
+    if (!slot.due) objs.push(fieldBox(slot.tile,slot.loot,false));
+    else nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due);
+  }
+  for (const [tile,loot] of Object.entries(stock.drops)) objs.push(fieldBox(Number(tile),loot,true));
+  buildGrids();
+}
+
+function breakFieldBox(o) {
+  const stock = S.flags.fieldCrates, tile = o.fieldTile;
+  const slot = stock.slots.find(s => s.tile === tile && !s.due);
+  stock.drops[tile] = o.loot;
+  slot.loot = {};
+  slot.due = S.min + ri(120,240);
+  nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due);
+}
+
+function renewFieldCrates() {
+  if (S.min < nextFieldCrateAt) return;
+  const stock = S.flags.fieldCrates;
+  let changed = false;
+  nextFieldCrateAt = Infinity;
+  for (const slot of stock.slots) {
+    if (!slot.due) continue;
+    if (slot.due <= S.min) {
+      const tile = chooseFieldSite(stock,slot.tile);
+      if (tile != null) {
+        slot.tile = tile; slot.due = 0; slot.loot = fieldCrateLoot();
+        objs.push(fieldBox(tile,slot.loot,false));
+        changed = true;
+        continue;
+      }
+    }
+    nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due > S.min ? slot.due : S.min+1);
+  }
+  if (changed) buildGrids();
 }
 
 /* ===================== звук ===================== */
@@ -6643,8 +7057,8 @@ function drawInv() {
 /* ---------- обыск ---------- */
 function openLoot(o) {
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
-  if (o.k === 'cache') { S.caches[o.cacheId] = 2; }
-  openPanel('loot', o.k === 'cache' ? 'Тайник' : o.stash ? 'Ящик' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
+  if (o.k === 'crate') return;
+  openPanel('loot', o.k === 'cache' || o.k === 'hiding' ? 'Тайник' : o.k === 'safe' ? 'Сейф' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
 }
 function drawLoot() {
   const o = panel.o, keys = Object.keys(o.loot).filter(k => k !== '__tip');
@@ -6658,7 +7072,7 @@ function drawLoot() {
       // правило одного ствола каждого типа: дубликат не берётся, состояние брошенного ствола возвращается при подборе
       if (k === 'money') S.money += o.loot[k]; else { give(k, o.loot[k]); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); }
       delete o.loot[k]; play('pick');
-      if (!Object.keys(o.loot).length && o.stash) { o.looted = true; S.flags['st_' + o.stash] = 1; }
+      recordContents(o);
       refresh();
     }, dupW));
     pbody.appendChild(r);
@@ -7044,6 +7458,7 @@ function interact() {
     if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
   }
   else if (n.k === 'kill') takedown(n.e);
+  else if (n.k === 'pickupLoot' && n.o.broken) lootAll(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);
@@ -7209,7 +7624,7 @@ async function boot() {
   bootStep('мир'); gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); bigFences();
+  bootStep('графика'); await loadArt(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {
@@ -7227,7 +7642,7 @@ window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
 window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 /* мост: тип открытой панели для стилей */
 (function(){ const oldHUD = hud; hud = function(dt){ oldHUD(dt); ov.dataset.kind = panel ? panel.kind : ''; }; })();
 

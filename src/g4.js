@@ -631,37 +631,38 @@ function drawAnoms() {
 }
 
 /* ---------- кадр ---------- */
-const shopImage = new Image();
-if (SID_SHOP) shopImage.src = window.SID_SHOP_IMAGE;
+const shopImage = new Image(), deskPoses = new Image();
+function shopCamera(center, start, span, view) {
+  return view >= span ? start+span/2 : clamp(center, start+view/2, start+span-view/2);
+}
+if (SID_SHOP) {
+  shopImage.src = window.SID_SHOP_IMAGE;
+  deskPoses.src = window.SID_DESK_POSES;
+}
 
-// Coordinates below use the illustration's 345 × 410 layout.
-function drawSidShop() {
+// Маски кистей в координатах трёх кадров. Колени и табурет скрывает столешница.
+const deskHands = [
+  [[63,88,21,13]],
+  [[42,73,13,12],[82,89,10,13]],
+  [[54,99,13,22],[80,87,10,13]]
+];
+function drawDeskTrader(e) {
+  const talking = panel && panel.kind === 'trader';
+  const trading = panel && panel.kind === 'trade' && !panel.e;
+  const pose = trading ? 2 : (talking || e.deskLook > .65 ? 1 : 0);
+  const breath = Math.sin((e.deskTime || 0)*1.8)*.25;
+  // Общая опора у всех трёх поз. Локти и свёрток заходят на край прилавка.
   ctx.save();
-  ctx.translate(BUNK.x0 + .75 * T, 1.25 * T);
-  ctx.scale(9.5 * T / 345, 10.25 * T / 410);
-  ctx.drawImage(shopImage, 0, 0, 345, 410);
-  const sid = byS('sid');
-  if (sid) {
-    const t = sid.deskTime || 0, look = sid.deskLook || 0;
-    const sx = shopImage.naturalWidth / 345, sy = shopImage.naturalHeight / 410;
-    // The chair and shoulders stay fixed as he lifts his head from the ledger.
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(171, 129, 10, 13, 0, 0, Math.PI * 2); ctx.clip();
-    const lift = look * 2 + Math.sin(t * 1.7) * .25;
-    ctx.drawImage(shopImage, 159 * sx, 113 * sy, 24 * sx, 32 * sy, 159, 113 - lift, 24, 32 + lift);
-    ctx.restore();
-    const turn = (t % 11 - 7) / 1.3;
-    if (turn > 0 && turn < 1) {
-      const angle = turn * Math.PI, fold = Math.sin(angle);
-      // One hand slides from the desk edge to the corner of the sheet.
-      ctx.drawImage(shopImage, 165 * sx, 156 * sy, 15 * sx, 17 * sy,
-        165, 156, 15, 17 + 7 * fold);
-      ctx.save(); ctx.translate(173, 178);
-      ctx.transform(Math.cos(angle), -.22 * fold, 0, 1, 0, 0);
-      ctx.drawImage(shopImage, 174 * sx, 178 * sy, 20 * sx, 20 * sy, 0, 0, 20, 20);
-      ctx.restore();
-    }
+  ctx.translate(e.x-16, e.y-10+breath);
+  ctx.scale(.25,.25);
+  ctx.beginPath();
+  ctx.rect(0,0,128,(5.69*T-e.y+10-breath)*4);
+  for(const [x,y,rx,ry] of deskHands[pose]) {
+    ctx.moveTo(x+rx,y); ctx.ellipse(x,y,rx,ry,0,0,2*Math.PI);
   }
+  ctx.clip();
+  spriteShadow(ctx, 2, 1.4);
+  ctx.drawImage(deskPoses, pose*128,0,128,128, 0,0,128,128);
   ctx.restore();
 }
 function render() {
@@ -673,8 +674,8 @@ function render() {
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
   if (SID_SHOP && P && inBunker(P.x, P.y)) {
-    if (VW / Z >= 9.5 * T) cam.x = BUNK.x0 + 5.5 * T;
-    if (VH / Z >= 10.25 * T) cam.y = 6.375 * T;
+    cam.x = shopCamera(cam.x, BUNK.x0+.75*T, 9.5*T, VW/Z);
+    cam.y = shopCamera(cam.y, 1.25*T, 10.25*T, VH/Z);
   }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -686,7 +687,7 @@ function render() {
   if (shopVisible) {
     ctx.save();
     ctx.beginPath(); ctx.rect(BUNK.x0 + .75 * T, 1.25 * T, 9.5 * T, 10.25 * T); ctx.clip();
-    drawSidShop();
+    ctx.drawImage(shopImage, BUNK.x0 + .75*T, 1.25*T, 9.5*T, 10.25*T);
   }
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
@@ -701,7 +702,8 @@ function render() {
   // костёр
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if (o.k === 'crate' && !(shopVisible && inBunker(o.x, o.y) && o.static) && inView(o.x, o.y, 40)) crateDraw(o);
+    if ((o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
+    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
@@ -722,8 +724,8 @@ function render() {
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
-    if (shopVisible && e.sid === 'sid') continue;
-    if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
+    if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
+    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -847,7 +849,9 @@ function render() {
     hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
     hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
-    if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
+    if (shopVisible) {
+      hole(BUNK.x0+9.25*T, 5.95*T, 95, .8);
+    } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);

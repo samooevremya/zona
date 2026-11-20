@@ -149,6 +149,7 @@ const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
 const SID_SHOP = !!window.SID_SHOP_IMAGE && !/sid-shop-off/.test(location.hash);
+const SID_DESK_Y = SID_SHOP ? 5.32 : 4.6;
 const SID_STAIR_X = SID_SHOP ? 126.5 : 124.5;
 const STAIRS = { x: SID_STAIR_X * T, y: 11.4 * T };
 const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
@@ -278,9 +279,9 @@ function gen() {
   [[60, 32], [66, 32]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   [[59, 102], [69, 102]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   // бункер: прилавок, полки, лестница
-  addObj({ k: 'counter', x: 122 * T, y: 6 * T + 4, w: 9 * T, h: 22, solid: 1, opaque: 0 });
+  addObj({ k: 'counter', x: 122 * T, y: SID_SHOP ? 5.69*T : 6*T+4, w: 9*T, h: SID_SHOP ? .95*T : 22, solid: 1, opaque: 0 });
   [[122, 2], [125, 2], [128, 2]].forEach(c => addObj({ k: 'shelf', x: c[0] * T + 2, y: c[1] * T + 2, w: 2 * T + 28, h: 20, solid: 1 }));
-  if (SID_SHOP) addObj({ k: 'crate', x: 129.55 * T, y: 6.98 * T, w: 1.28 * T, h: 2.12 * T, solid: 1 });
+  if (SID_SHOP) addObj({ k: 'crate', shopStack: true, x: 130.02*T, y: 7.16*T, w: .94*T, h: 1.82*T, solid: 1 });
   else [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
   addObj({ k: 'stairs', x: (SID_STAIR_X - 1) * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
   // аномалии и артефакты
@@ -307,6 +308,10 @@ function buildGrids() {
         nav[y * MW + x] = 0; if (o.opaque) opq[y * MW + x] = 1;
       }
   });
+  for (const [key,props] of propCells) {
+    const center={x:(key%MW+.5)*T, y:(Math.floor(key/MW)+.5)*T, r:10};
+    if(props.some(p=>touchesProp(p,center))) nav[key]=0;
+  }
   ANOM0.forEach(a => {
     for (let y = Math.floor((a.y - a.r - 14) / T); y <= Math.floor((a.y + a.r + 14) / T); y++)
       for (let x = Math.floor((a.x - a.r - 14) / T); x <= Math.floor((a.x + a.r + 14) / T); x++)
