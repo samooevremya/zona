@@ -88,7 +88,8 @@ function weaponLocal(e) {
     return { mode: 'rig', id: id, W: W, grip: grip, main: s.main, support: s.support, muzzle: [s.main[0], s.main[1] + W.len] };
   }
   if (!G3_READY() || e.sit || e.wounded || e.captive) return null;
-  const main = [G3_GRIP[0], G3_GRIP[1] + (e.crouch ? -1 : 0)];
+  const hand = e === P && window.CORDON_G8_ON && grip === 'one' ? [3.5, 10] : G3_GRIP;
+  const main = [hand[0], hand[1] + (e.crouch ? -1 : 0)];
   return { mode: 'g3', id: id, W: W, grip: grip, main: main, support: [main[0], main[1] + 8], muzzle: [main[0], main[1] + W.len] };
 }
 /* единственное преобразование локальной точки в мир (рендер поворачивает на ang − π/2) */
@@ -105,7 +106,7 @@ function drawWeaponLocal(c2, w) {
   const W = w.W, x = w.main[0], y = w.main[1];
   const H8 = window.CORDON_G8_ON && CORDON_G8.hand[w.id], him = H8 && packImage(H8.file);
   if (him) {   // G8: нарисованный вид сверху; хват в той же точке, конец ствола = muzzle (геометрия выстрела не меняется)
-    const gf = W.blade ? 0.3 : 0.22, L = W.len / (1 - gf) + (W.blade ? 2 : 0), wd = L * H8.aspect;
+    const gf = W.blade ? 0.3 : 0.22, L = W.len / (1 - gf) + (W.blade ? 2 : 0), wd = W.blade ? Math.max(1.9, L * H8.aspect) : L * H8.aspect;
     c2.drawImage(him, x - wd / 2, y - L * gf, wd, L); return;
   }
   if (W.blade) { c2.fillStyle = '#a9aca8'; c2.fillRect(x - 1, y, W.w, W.len); c2.fillStyle = '#3a2e24'; c2.fillRect(x - 1.5, y - 3, 3, 3); return; }
@@ -113,6 +114,34 @@ function drawWeaponLocal(c2, w) {
   if (W.mag) { c2.fillStyle = '#5a3a22'; c2.fillRect(x + W.w / 2 - 0.5, y + 4, 3, 4); }
   c2.fillStyle = 'rgba(255,255,255,0.12)'; c2.fillRect(x - W.w / 2, y - 2, 1, W.len + 2);
   if (w.grip === 'two') { c2.fillStyle = '#3b2c20'; c2.fillRect(x - W.w / 2 - 0.4, w.support[1] - 1.5, W.w + 0.8, 3.5); }   // цевьё под второй кистью
+}
+
+/* G8. У постоянных жителей Кордона sid стабилен и в старых сохранениях. */
+const JACKET_COLORS = ['white', 'beige', 'brown'];
+const JACKET_POSES = ['idle', 'walk_left', 'walk_pass_left', 'walk_right', 'walk_pass_right',
+  'crouch', 'captive', 'wounded', 'fall_start', 'fall_mid', 'dead', 'dead2'];
+const jacketSets = [];
+function jacketIndex(e) {
+  if (e.k === 'body') return (e.seed || 0) % JACKET_COLORS.length;
+  const identity = e.sid || e.name || '';
+  return Array.from(identity).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % JACKET_COLORS.length;
+}
+function jacketFor(e) {
+  if (!window.CORDON_G8_ON || G7.rigOn || e === P || e.fac !== 'loner' || e.kind !== 'human') return null;
+  const index = jacketIndex(e);
+  if (jacketSets[index]) return jacketSets[index];
+  const sheet = packImage('assets/g8/jacket_' + JACKET_COLORS[index] + '.webp');
+  if (!sheet || !G3.images) return null;
+  const images = Object.create(G3.images);
+  JACKET_POSES.forEach((pose, i) => {
+    const f = g7PoseFrame('loner', pose);
+    if (!f) return;
+    const original = G3.images[f.file], cell = document.createElement('canvas');
+    cell.width = original.naturalWidth; cell.height = original.naturalHeight;
+    cell.getContext('2d').drawImage(sheet, i * 192, 168, cell.width, cell.height, 0, 0, cell.width, cell.height);
+    images[f.file] = cell;
+  });
+  return jacketSets[index] = { sheet, images };
 }
 
 /* ---------- отрисовка людей ---------- */
@@ -127,14 +156,14 @@ function g7Human(e, extra, target) {
   }
   if (e.captive && !e.wounded && G7.poseOn) {   // связанный пленник: цельный кадр, без модульных рук/ствола
     const skin = rigSkin(e), f = skin && g7PoseFrame(skin, 'captive');
-    if (f) { drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K, target); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K, target); return true; }
+    if (f) { drawFrameAt(e.x, e.y, e.ang, f, opacity, CAPTIVE_K, target, jacketFor(e)?.images); if (e.flash > 0) flashFrame(e, f, CAPTIVE_K, target); return true; }
   }
   if (window.CORDON_G8_ON && (e.sit || e.campRise != null) && !e.wounded && !e.captive && rigSkin(e) === 'loner') {
-    const sheet = packImage('assets/g8/camp_rise.webp');
+    const sheet = jacketFor(e)?.sheet || packImage('assets/g8/camp_rise.webp');
     if (sheet) {
       // 17 кадров с готовым смешиванием в premultiplied alpha: силуэт сохраняет плотность.
       const rise = e.campRise || 0, frame = Math.round(rise * 16);
-      const sw = sheet.naturalWidth / 17, sh = sheet.naturalHeight;
+      const sw = sheet.naturalWidth / 17, sh = 168;
       target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
       const alpha = target.globalAlpha * opacity;
       target.globalAlpha = alpha;
@@ -161,11 +190,11 @@ function g7Human(e, extra, target) {
   return ok;
 }
 const CAPTIVE_K = 0.86;   // кадр 64×72: голова/плечи сверены с соседним idle (48×56) — без этого пленник крупнее стоящих
-function drawFrameAt(x, y, ang, f, opacity, k, target = ctx) {
+function drawFrameAt(x, y, ang, f, opacity, k, target = ctx, images = G3.images) {
   target.save(); target.translate(x, y); target.rotate((ang || 0) - Math.PI / 2); target.globalAlpha *= opacity == null ? 1 : opacity; if (k) target.scale(k, k);
-  target.drawImage(G3.images[f.file], -f.width * f.pivot[0], -f.height * f.pivot[1], f.width, f.height); target.restore();
+  target.drawImage(images[f.file], -f.width * f.pivot[0], -f.height * f.pivot[1], f.width, f.height); target.restore();
 }
-function flashFrame(e, f, k, target) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); drawFrameAt(e.x, e.y, e.ang, f, 1, k, target); target.restore(); }
+function flashFrame(e, f, k, target) { target.save(); target.globalCompositeOperation = 'lighter'; target.globalAlpha = Math.min(0.5, e.flash * 4); drawFrameAt(e.x, e.y, e.ang, f, 1, k, target, jacketFor(e)?.images); target.restore(); }
 
 /* ---------- мутанты: подготовка только в существующем wind кабана, отдача — на событие попадания ---------- */
 function g7Mutant(e, a) {
@@ -188,7 +217,7 @@ function g7Body(o) {
   const skin = o.kind === 'human' ? ({ bandit: 'bandit', army: 'army' }[o.fac] || 'loner') : o.kind;
   if (G7.poseOn && window.CordonPoseKeys) {
     const pose = CordonPoseKeys.sample(skin, 'death_transition', age);
-    if (pose && pose !== 'dead') { const f = g7PoseFrame(skin, pose); if (f) { bloodPool(o, Math.min(1, age / 0.34)); drawFrameAt(o.x, o.y, o.ang, f, 1); return true; } }
+    if (pose && pose !== 'dead') { const f = g7PoseFrame(skin, pose); if (f) { bloodPool(o, Math.min(1, age / 0.34)); drawFrameAt(o.x, o.y, o.ang, f, 1, 1, ctx, jacketFor(o)?.images); return true; } }
     if (pose === 'dead') return false;
   }
   if (b.rig && G7.img && G7.skins[b.skin]) {   // запасной путь G5: наклон и смешивание к кадру трупа

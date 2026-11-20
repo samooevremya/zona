@@ -19,6 +19,12 @@ _b2m=__import__('json').load(open('art/b2/manifest.json',encoding='utf8'))
 art+='\n'+open('art/b2/items.inline.js',encoding='utf8').read()+'\nwindow.CORDON_ITEMS_B2_SIZE='+__import__('json').dumps({k:v['logicalSize'] for k,v in _b2m['items'].items()})+';'
 art+='\n'+'\n'.join(open('art/g7/'+f,encoding='utf8').read() for f in ['assets.inline.js','renderer.js','portraits.js','rig.inline.nodead.js','rig.js','pose-keys.js'])
 art+='\n'+open('art/g8/g8.inline.js',encoding='utf8').read()
+jackets = {}
+for color in ('white', 'beige', 'brown'):
+    file = 'jacket_' + color + '.webp'
+    with open('art/g8/src/' + file, 'rb') as sprite:
+        jackets['assets/g8/' + file] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
+art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__('json').dumps(jackets) + ');'
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
 if BIGF:
     aerial = _b64.b64encode(open('art/cordon-aerial.webp', 'rb').read()).decode()
