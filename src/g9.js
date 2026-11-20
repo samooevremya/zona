@@ -302,6 +302,9 @@ function finishEncounter(reason) {
   const lead = a.names && a.names[0] || (allies[0] && allies[0].name) || 'сталкеров';
   if (reason === 'helped' && !a.rewarded) {
     a.rewarded = 1;
+    if (a.pk > 0 || S.flags.sosAssist === a.id) {
+      for (const e of allies) if (e.uid) S.flags['sosFriend_' + e.uid] = 1;
+    }
     const pay = a.pay, gift = a.gift;
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
@@ -314,6 +317,7 @@ function finishEncounter(reason) {
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
+  delete S.flags.sosAssist;
   S.sos.last = { reason: reason, where: a.where, t: S.min };
   S.sos.act = null; S.sos.next = S.min + rnd(SOS_GAP[0], SOS_GAP[1]);
 }
@@ -339,7 +343,7 @@ function sosTick() {
       return;
     }
     if (!allies.length) finishEncounter('dead');
-    else if (!foes.length) finishEncounter(a.pk > 0 || dst(P.x, P.y, a.x * T, a.y * T) < 420 ? 'helped' : 'self');
+    else if (!foes.length) finishEncounter(a.pk > 0 || S.flags.sosAssist === a.id || dst(P.x, P.y, a.x * T, a.y * T) < 420 ? 'helped' : 'self');
     else if (S.min > a.until) finishEncounter('timeout');
     return;
   }
@@ -477,6 +481,7 @@ function dynRestore() {
     }
     Object.assign(e, { uid: r.uid, x: r.x, y: r.y, hp: r.hp, maxhp: r.maxhp || e.maxhp, follow: r.follow, wait: r.wait, waitAt: r.waitAt, hireEnd: r.hireEnd, hirePaid: r.hirePaid,
       sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, ringPt: r.ringPt });
+    if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.traded) { if (r.inv) e.inv = r.inv; if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; }
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;

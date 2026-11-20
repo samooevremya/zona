@@ -584,12 +584,19 @@ function hostile(a, b) {
   if (pair('loner', 'player')) { const l = fa === 'loner' ? a : b; return S.rep <= -30 || !!l.angry; }
   return false;
 }
+function playerRelation(e) {
+  if (hostile(e, P)) return 'enemy';
+  if (e.fac !== 'loner') return 'neutral';
+  if (e.follow || (e.uid && S.flags['sosFriend_' + e.uid])) return 'friend';
+  if ((e.sid === 'tolik' && S.flags.tolikUp) || (e.sid === 'fox' && S.flags.foxUp) ||
+      (e.sid === 'shust' && S.flags.shustFree) || (e.sid === 'wolf' && S.q.pack === 3)) return 'friend';
+  return 'neutral';
+}
 function attWord(e) {
-  if (e.fac === 'trader') return 'нейтрал';
-  if (e.fac === 'mutant' || e.fac === 'bandit') return 'враг';
-  if (hostile(e, P)) return 'враг';
-  if (e.fac === 'army') return 'нейтрал';
-  return S.rep >= 20 ? 'друг' : S.rep < 0 ? 'не доверяет' : 'нейтрал';
+  const rel = playerRelation(e);
+  if (rel === 'enemy') return 'враг';
+  if (rel === 'friend') return 'друг';
+  return e.fac === 'loner' && S.rep < 0 ? 'не доверяет' : 'нейтрал';
 }
 function anger(e) {
   if (e.fac === 'loner' && !e.angry) {
@@ -600,7 +607,10 @@ function anger(e) {
   }
   if (e.fac === 'army' && !armyAngry) { armyAngry = true; S.flags.armyAngry = 1; msg('Военные открывают огонь!', 'bad'); }
 }
-function markAngry(e) { if (e.sid) { S.flags.angry = S.flags.angry || {}; S.flags.angry[e.sid] = 1; } }
+function markAngry(e) {
+  const id = e.sid || e.uid;
+  if (id) { S.flags.angry = S.flags.angry || {}; S.flags.angry[id] = 1; }
+}
 
 /* ===================== движение и столкновения ===================== */
 function pushOut(e, rx, ry, rw, rh) {
@@ -799,7 +809,10 @@ function melee(sh, W) {
 }
 function hurt(e, dmg, src, ang) {
   if (!e.alive) return;
-  if (src && (src === P || src.follow)) e.hitByP = 1;
+  if (src && (src === P || src.follow)) {
+    e.hitByP = 1;
+    if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
+  }
   if (e === P) {
     dmg *= 1 - def(); hurtFlash = Math.min(0.6, hurtFlash + 0.35); play('hurt'); shake(4);
     if (src && src.x !== undefined) { HURTDIR.push({ a: Math.atan2(src.y - P.y, src.x - P.x), life: 1.2 }); if (HURTDIR.length > 6) HURTDIR.shift(); }
@@ -4040,6 +4053,9 @@ function finishEncounter(reason) {
   const lead = a.names && a.names[0] || (allies[0] && allies[0].name) || 'сталкеров';
   if (reason === 'helped' && !a.rewarded) {
     a.rewarded = 1;
+    if (a.pk > 0 || S.flags.sosAssist === a.id) {
+      for (const e of allies) if (e.uid) S.flags['sosFriend_' + e.uid] = 1;
+    }
     const pay = a.pay, gift = a.gift;
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
@@ -4052,6 +4068,7 @@ function finishEncounter(reason) {
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
+  delete S.flags.sosAssist;
   S.sos.last = { reason: reason, where: a.where, t: S.min };
   S.sos.act = null; S.sos.next = S.min + rnd(SOS_GAP[0], SOS_GAP[1]);
 }
@@ -4077,7 +4094,7 @@ function sosTick() {
       return;
     }
     if (!allies.length) finishEncounter('dead');
-    else if (!foes.length) finishEncounter(a.pk > 0 || dst(P.x, P.y, a.x * T, a.y * T) < 420 ? 'helped' : 'self');
+    else if (!foes.length) finishEncounter(a.pk > 0 || S.flags.sosAssist === a.id || dst(P.x, P.y, a.x * T, a.y * T) < 420 ? 'helped' : 'self');
     else if (S.min > a.until) finishEncounter('timeout');
     return;
   }
@@ -4215,6 +4232,7 @@ function dynRestore() {
     }
     Object.assign(e, { uid: r.uid, x: r.x, y: r.y, hp: r.hp, maxhp: r.maxhp || e.maxhp, follow: r.follow, wait: r.wait, waitAt: r.waitAt, hireEnd: r.hireEnd, hirePaid: r.hirePaid,
       sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, ringPt: r.ringPt });
+    if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.traded) { if (r.inv) e.inv = r.inv; if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; }
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;
@@ -4457,7 +4475,10 @@ function drawPda2() {
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);
-  const focusPt = () => panel.focus === 'target' && selT[0] ? selT[0] : (inBunker(P.x, P.y) ? HATCH : P);
+  const focusPt = () => {
+    const p = panel.focus === 'target' && selT[0] ? selT[0] : P;
+    return inBunker(p.x, p.y) ? HATCH : p;
+  };
   requestAnimationFrame(() => {
     if (!cv2.isConnected) return;
     const fit = Math.min(w.clientWidth / PW, w.clientHeight / MH);      // ×1: вся карта влезает
@@ -4473,9 +4494,7 @@ function drawPda2() {
     const f = focusPt();
     w.scrollLeft = f.x / (PW * T) * cssW - w.clientWidth / 2; w.scrollTop = f.y / (MH * T) * cssH - w.clientHeight / 2;
   });
-  const lg = el('div', 'legend');
-  [['#e6dcb4', 'Ты'], ['#ffb347', 'Выбранное задание'], ['#dc9330', 'Другие цели'], ['#e0573a', 'SOS'], ['#d9c25a', 'Одиночки'], ['#d64541', 'Враги рядом'], ['#e8c070', 'Тайник']].forEach(x => { const s = el('span'); const i = el('i'); i.style.background = x[0]; s.appendChild(i); s.appendChild(document.createTextNode(x[1])); lg.appendChild(s); });
-  mapc.appendChild(lg);
+  mapc.appendChild(mapLegend());
   box.appendChild(mapc);
   // задания
   const qc = el('div', 'kpk-q');
@@ -6341,10 +6360,7 @@ function drawPda() {
     w.appendChild(c); pbody.appendChild(w);
     drawMapTo(c.getContext('2d'), 6, true);
     if (panel.zoom) requestAnimationFrame(() => { const pp = inBunker(P.x, P.y) ? HATCH : P; w.scrollLeft = pp.x / (PW * T) * w.scrollWidth - w.clientWidth / 2; w.scrollTop = pp.y / (MH * T) * w.scrollHeight - w.clientHeight / 2; });
-    const lg = el('div', 'legend');
-    [['#e6dcb4', 'Ты'], ['#dc9330', 'Цель задания'], ['#d9c25a', 'Одиночки'], ['#d64541', 'Враги рядом'], ['#6fa35c', 'Военные'], ['#7fb0c4', 'Сидорович']].forEach(x => { const s = el('span'); const p = el('i', 'pip'); p.style.background = x[0]; s.appendChild(p); s.appendChild(document.createTextNode(x[1])); lg.appendChild(s); });
-    pbody.appendChild(lg);
-    pbody.appendChild(el('p', 'note', 'Карта открывается там, где ты прошёл. КПК показывает людей и зверьё только в радиусе нескольких сотен метров.'));
+    pbody.appendChild(mapLegend());
   } else if (panel.tab === 'tasks') {
     const L = qList();
     if (!L.length) pbody.appendChild(el('p', 'note', 'Заданий нет. Поговори с Сидоровичем в бункере.'));
@@ -6384,6 +6400,7 @@ const TCOL = ['#3f4628', '#5a4b34', '#3c3c37', '#26332c', '#7a7a6d', '#1f2a17', 
 const miniC = document.createElement('canvas'), fogC = document.createElement('canvas');
 // Четыре пикселя на клетку. Каналы маски хранят покрытие всех дорог и асфальта
 // отдельно: после интерполяции узкая тропа, широкий двор и развилка сохраняют форму.
+const MAP_ATLAS = /(?:#|&)map-atlas(?:&|$)/.test(location.hash);
 function buildBigMini() {
   const K = 4;
   miniC.width = PW * K; miniC.height = MH * K;
@@ -6391,11 +6408,16 @@ function buildBigMini() {
   const base = document.createElement('canvas');
   base.width = PW; base.height = MH;
   const bg = base.getContext('2d'), terrain = bg.createImageData(PW, MH), roads = bg.createImageData(PW, MH);
-  const palette = [0x514738, 0x514738, 0x514738, 0x3f4843, 0x746e63, 0x3a392c,
-    0x584a3b, 0x695348, 0x464432, 0x60584b, 0x68655a, 0x10130e];
+  const palette = MAP_ATLAS
+    ? [0xada284, 0xada284, 0xada284, 0x71918a, 0x999784, 0x7a8465,
+       0x98896f, 0x8d806b, 0x8d9374, 0x716e60, 0xa09b87, 0x373930]
+    : [0x655a46, 0x655a46, 0x655a46, 0x405653, 0x817e71, 0x484735,
+       0x6b5d4b, 0x726152, 0x58573e, 0x655e51, 0x797465, 0x24251e];
+  const tiles = surfaceTiles();
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
-    const t = map[y * MW + x], c = palette[t], i = (y * PW + x) * 4;
-    const k = 0.65 + vnoise(x, y, 5) * 0.42 + hash2(x, y) * 0.26;
+    const t = tiles[y * MW + x], c = palette[t], i = (y * PW + x) * 4;
+    const k = MAP_ATLAS ? 0.91 + vnoise(x, y, 7) * 0.10 + hash2(x, y) * 0.035
+      : 0.69 + vnoise(x, y, 6) * 0.37 + hash2(x, y) * 0.24;
     terrain.data[i] = (c >> 16) * k;
     terrain.data[i + 1] = ((c >> 8) & 255) * k;
     terrain.data[i + 2] = (c & 255) * k;
@@ -6412,6 +6434,11 @@ function buildBigMini() {
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     if (map[y * MW + x] !== TR) continue;
     const n = hash2(x, y), crown = yardTreeCrown && yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[Math.floor(n * CANOPY.length)];
+    if (MAP_ATLAS) {
+      g.fillStyle = 'rgba(72,87,57,.34)'; g.beginPath();
+      g.arc(x + 0.5, y + 0.5, 1.2 + n * 0.65, 0, 2 * Math.PI); g.fill();
+      continue;
+    }
     const width = (2.8 + n * 0.9) * CAN_PAD;
     g.drawImage(crown, x + 0.5 - width / 2, y + 0.4 - width / 2, width, width);
   }
@@ -6423,26 +6450,38 @@ function buildBigMini() {
     const asphalt = clamp((mask.data[i + 1] - 80) / 80, 0, 1);
     const pixel = i / 4, x = pixel % miniC.width, y = Math.floor(pixel / miniC.width);
     const grain = (hash2(x, y) - 0.5) * 13 + (vnoise(x, y, 7) - 0.5) * 22;
-    mask.data[i] = 128 - asphalt * 26 + grain;
-    mask.data[i + 1] = 105 - asphalt * 4 + grain;
-    mask.data[i + 2] = 84 + asphalt * 14 + grain;
+    const tone = MAP_ATLAS ? grain * 0.17 : grain;
+    mask.data[i] = (MAP_ATLAS ? 215 - asphalt * 130 : 148 - asphalt * 32) + tone;
+    mask.data[i + 1] = (MAP_ATLAS ? 195 - asphalt * 110 : 128 - asphalt * 15) + tone;
+    mask.data[i + 2] = (MAP_ATLAS ? 155 - asphalt * 73 : 103 + asphalt * 5) + tone;
     mask.data[i + 3] = clamp((coverage - 35 + grain) * 1.45, 0, 238);
   }
   // putImageData не смешивает прозрачность. Переиспользуем временный холст для наложения.
   base.width = miniC.width; base.height = miniC.height;
   bg.putImageData(mask, 0, 0); g.drawImage(base, 0, 0);
-  if (ART) {
+  if (ART && !MAP_ATLAS) {
     // Фактура сухой травы смягчает переход между грунтом и обочиной в масштабе HUD.
     g.save(); g.scale(0.4, 0.4); g.globalCompositeOperation = 'soft-light';
     artFill(g, 'grass_dry', 0, 0, miniC.width / 0.4, miniC.height / 0.4);
     g.restore();
   }
   g.scale(K, K); g.imageSmoothingQuality = 'high';
+  if (BIG && C1 && ART) {
+    g.strokeStyle = MAP_ATLAS ? '#776e59' : '#473e31'; g.lineWidth = 0.32;
+    g.beginPath();
+    for (const [, x1, y1, x2, y2] of CORDON_FENCES) {
+      g.moveTo(x1, y1); g.lineTo(x2, y2);
+    }
+    g.stroke();
+  }
   HOUSES.forEach((h, i) => {
     if (h.x >= PW) return;
     g.fillStyle = '#36372e'; g.fillRect(h.x - 0.2, h.y - 0.2, h.w + 0.5, h.h + 0.6);
     g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
-    if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
+    if (MAP_ATLAS) {
+      g.fillStyle = '#645c4f'; g.fillRect(h.x, h.y, h.w, h.h);
+      g.fillStyle = '#8a7c66'; g.fillRect(h.x + 0.25, h.y + 0.25, h.w - 0.5, h.h / 2);
+    } else if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
   });
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
@@ -6450,9 +6489,28 @@ function buildBigMini() {
       g.fillRect(o.x / T, o.y / T, Math.max(1, o.w / T), Math.max(1, o.h / T));
     }
   });
+  if (MAP_ATLAS) {
+    g.strokeStyle = 'rgba(57,62,48,.29)'; g.lineWidth = 0.22;
+    g.beginPath();
+    for (let x = 0; x < PW; x += 12) { g.moveTo(x, 0); g.lineTo(x, MH); }
+    for (let y = 0; y < MH; y += 12) { g.moveTo(0, y); g.lineTo(PW, y); }
+    g.stroke();
+  }
 }
-function buildMini() {
+async function buildMini() {
   fogC.width = PW; fogC.height = MH;
+  if (BIG && ART && C1 && !MAP_ATLAS && window.CORDON_AERIAL) {
+    const photo = new Image();
+    photo.src = window.CORDON_AERIAL;
+    try {
+      await photo.decode();
+      if (photo.width === PW * 4 && photo.height === MH * 4) {
+        miniC.width = photo.width; miniC.height = photo.height;
+        miniC.getContext('2d').drawImage(photo, 0, 0);
+        return;
+      }
+    } catch (e) { /* Старый браузер использует карту из клеток мира. */ }
+  }
   if (BIG) { buildBigMini(); return; }
   if (ART) {
     const K = 4; miniC.width = PW * K; miniC.height = MH * K;
@@ -6471,10 +6529,48 @@ function buildMini() {
 function updateFog() {
   if (!fogDirty) return; fogDirty = false;
   const g = fogC.getContext('2d'), id = g.createImageData(PW, MH);
-  for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) { const i = y * PW + x; id.data[i * 4] = 10; id.data[i * 4 + 1] = 12; id.data[i * 4 + 2] = 9; id.data[i * 4 + 3] = fog[y * MW + x] ? 0 : 235; }
+  for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) { const i = y * PW + x; id.data[i * 4] = 10; id.data[i * 4 + 1] = 12; id.data[i * 4 + 2] = 9; id.data[i * 4 + 3] = fog[y * MW + x] ? 0 : 60; }
   g.putImageData(id, 0, 0);
 }
-function entColor(e) { if (e.fac === 'mutant' || hostile(e, P)) return '#d64541'; if (e.fac === 'army') return '#6fa35c'; return '#d9c25a'; }
+const MAP_INK = {
+  player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
+  cache: '#e7bd79', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
+};
+function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
+  const color = MAP_INK[kind];
+  g.save(); g.translate(x, y); g.scale(u, u);
+  g.lineJoin = 'round'; g.fillStyle = color; g.strokeStyle = '#252823'; g.lineWidth = 1.3;
+  g.beginPath();
+  if (kind === 'player') {
+    g.rotate(angle); g.moveTo(7, 0); g.lineTo(-4.7, -4.9); g.lineTo(-2.7, 0); g.lineTo(-4.7, 4.9); g.closePath();
+  } else if (kind === 'hatch' || kind === 'cache') {
+    g.rect(-2.8, -2.8, 5.6, 5.6);
+  } else {
+    const target = kind === 'target' || kind === 'sos';
+    const r = target ? 4.8 : 2.9;
+    g.arc(0, 0, r, 0, 2 * Math.PI);
+    g.fillStyle = '#252823'; if (!ringOnly) g.fill(); g.lineWidth = 2.2; g.stroke();
+    g.strokeStyle = color; g.lineWidth = 1.25; g.stroke();
+    if (!ringOnly && (target || kind === 'friend')) {
+      g.beginPath(); g.arc(0, 0, target ? 2.35 : 1.05, 0, 2 * Math.PI); g.fillStyle = color; g.fill();
+    }
+    g.restore(); return;
+  }
+  g.fill(); g.stroke(); g.restore();
+}
+function mapLegend() {
+  const legend = el('div', 'legend map-key');
+  for (const [kind, name] of [['player','Вы'], ['neutral','Нейтрал'], ['enemy','Враг'], ['friend','Друг'],
+      ['target','Цель'], ['sos','SOS'], ['cache','Тайник'], ['hatch','Бункер']]) {
+    const item = el('span'), icon = el('canvas'); icon.width = icon.height = 32;
+    mapSymbol(icon.getContext('2d'), kind, 16, 16, 2);
+    item.append(icon, document.createTextNode(name)); legend.appendChild(item);
+  }
+  return legend;
+}
+function visibleContact(e) {
+  return e !== P && e.alive && !inBunker(e.x, e.y) && !(e.cloak > 0.7) && dE(e, P) <= 520;
+}
 /* карта КПК: o.u — сколько пикселей холста в одном CSS-пикселе (маркеры и подписи одного экранного размера при любом масштабе);
    подписи раскладываются без наложения: сначала выбранная цель, потом места; не влезла ни в одну позицию — не рисуется */
 function drawMapTo(g, s, full, o) {
@@ -6486,16 +6582,26 @@ function drawMapTo(g, s, full, o) {
   g.drawImage(fogC, 0, 0, PW * s, MH * s);
   const busy = [];   // занятые прямоугольники: маркеры и подписи
   const mark = (x, y, r) => busy.push([x - r, y - r, x + r, y + r]);
-  g.fillStyle = '#7fb0c4'; g.fillRect(HATCH.x / T * s - 4 * u, HATCH.y / T * s - 4 * u, 8 * u, 8 * u); mark(HATCH.x / T * s, HATCH.y / T * s, 5 * u);
-  if (o.ppl) ents.forEach(e => { if (!e.alive || e === P || dE(e, P) > 520 || inBunker(e.x, e.y) || e.cloak > 0.7) return; g.fillStyle = entColor(e); g.beginPath(); g.arc(e.x / T * s, e.y / T * s, 3.2 * u, 0, 6.28); g.fill(); });
-  if (o.cache) objs.forEach(c => { if (c.k === 'cache' && S.caches[c.cacheId] === 1) { const x = c.x / T * s, y = c.y / T * s; g.fillStyle = '#e8c070'; g.fillRect(x - 4 * u, y - 4 * u, 8 * u, 8 * u); g.strokeStyle = '#000'; g.lineWidth = u; g.strokeRect(x - 4 * u, y - 4 * u, 8 * u, 8 * u); mark(x, y, 5 * u); } });
-  const selQ = o.sel || [], trq = trackedTarget(), labs = [];
+  const hx = HATCH.x / T * s, hy = HATCH.y / T * s;
+  mapSymbol(g, 'hatch', hx, hy, u); mark(hx, hy, 5 * u);
+  if (o.ppl) ents.forEach(e => {
+    if (visibleContact(e)) mapSymbol(g, playerRelation(e), e.x / T * s, e.y / T * s, u);
+  });
+  if (o.cache) objs.forEach(c => {
+    if (c.k !== 'cache' || S.caches[c.cacheId] !== 1) return;
+    const x = c.x / T * s, y = c.y / T * s;
+    mapSymbol(g, 'cache', x, y, u); mark(x, y, 5 * u);
+  });
+  const selQ = o.sel || [], tracked = trackedTarget(), labs = [];
   qTargets().forEach(q => {
-    const x = q.x / T * s, y = q.y / T * s, isSel = selQ.includes(q) || selQ.some(t => t.qid === q.qid && t.x === q.x), r = (isSel ? 9 : 6) * u;
-    g.fillStyle = q.qid === 'sos' ? '#e0573a' : isSel ? '#ffb347' : '#dc9330'; g.globalAlpha = isSel || q.qid === 'sos' || (trq && q.qid === trq.qid) ? 1 : 0.6;
-    g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r, y); g.lineTo(x, y + r); g.lineTo(x - r, y); g.closePath(); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1.5 * u; g.stroke(); g.globalAlpha = 1;
-    mark(x, y, r);
-    if (isSel) { g.strokeStyle = '#ffb347'; g.lineWidth = 2 * u; g.beginPath(); g.arc(x, y, 15 * u, 0, 6.28); g.stroke(); labs.push({ t: q.n, x: x, y: y, gap: 17 * u, pri: 0, font: '700 ' + Math.round(13 * u) + 'px Arial', c: '#ffe2b0' }); }
+    const point = inBunker(q.x, q.y) ? HATCH : q;
+    const x = point.x / T * s, y = point.y / T * s;
+    const selected = selQ.some(t => t.qid === q.qid && t.x === q.x && t.y === q.y);
+    g.globalAlpha = selected || q.qid === 'sos' || (tracked && q.qid === tracked.qid) ? 1 : 0.68;
+    const onContact = o.ppl && ents.some(e => e.x === q.x && e.y === q.y && visibleContact(e));
+    mapSymbol(g, q.qid === 'sos' ? 'sos' : 'target', x, y, (selected ? 1.45 : 1) * u, 0, onContact);
+    g.globalAlpha = 1; mark(x, y, (selected ? 9 : 6) * u);
+    if (selected) labs.push({ t: q.n, x, y, gap: 11 * u, pri: 0, font: '700 ' + Math.round(13 * u) + 'px Arial', c: '#c2f4f3' });
   });
   const pp = inBunker(P.x, P.y) ? HATCH : P;
   const px = pp.x / T * s, py = pp.y / T * s;
@@ -6521,13 +6627,13 @@ function drawMapTo(g, s, full, o) {
   });
   g.textBaseline = 'alphabetic'; g.lineWidth = 1;
   if (o.out) o.out.labels = labs.map(L => ({ t: L.t, placed: !!L.placed }));
-  g.save(); g.translate(px, py); g.rotate(P.ang); g.scale(u * 1.3, u * 1.3); g.fillStyle = '#f2ead0'; g.strokeStyle = '#000'; g.lineWidth = 1; g.beginPath(); g.moveTo(7, 0); g.lineTo(-4, -4.5); g.lineTo(-2, 0); g.lineTo(-4, 4.5); g.closePath(); g.fill(); g.stroke(); g.restore();
+  mapSymbol(g, 'player', px, py, u, P.ang);
 }
 const mini = $('mini'), mctx = mini.getContext('2d');
 function drawMini() {
   const W = mini.clientWidth || 128;
   if (mini.width !== W * 2) { mini.width = W * 2; mini.height = W * 2; }
-  const s = 7, size = mini.width;
+  const size = mini.width, s = size / 32;
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.fillStyle = '#0d120c'; mctx.fillRect(0, 0, size, size);
   if (inBunker(P.x, P.y)) { mctx.fillStyle = '#7fb0c4'; mctx.font = '600 22px "Russo One", sans-serif'; mctx.textAlign = 'center'; mctx.fillText('БУНКЕР', size / 2, size / 2 - 6); mctx.font = '500 16px "IBM Plex Mono", monospace'; mctx.fillStyle = '#8f8c74'; mctx.fillText('под землёй', size / 2, size / 2 + 20); mctx.textAlign = 'start'; return; }
   mctx.setTransform(1, 0, 0, 1, size / 2 - P.x / T * s, size / 2 - P.y / T * s);
@@ -6537,32 +6643,25 @@ function drawMini() {
     mctx.fillStyle = 'rgba(4,7,12,0.35)';
     mctx.fillRect(P.x / T * s - size / 2, P.y / T * s - size / 2, size, size);
   }
-  mctx.strokeStyle = '#29291f'; mctx.lineWidth = 2;
-  mctx.fillStyle = '#7fb0c4'; mctx.fillRect(HATCH.x / T * s - 5, HATCH.y / T * s - 5, 10, 10);
-  objs.forEach(o => { if (o.k === 'cache' && S.caches[o.cacheId] === 1) { mctx.fillStyle = '#e8c070'; mctx.fillRect(o.x / T * s - 5, o.y / T * s - 5, 10, 10); } });
+  mapSymbol(mctx, 'hatch', HATCH.x / T * s, HATCH.y / T * s, 1.65);
+  objs.forEach(o => {
+    if (o.k === 'cache' && S.caches[o.cacheId] === 1) mapSymbol(mctx, 'cache', o.x / T * s, o.y / T * s, 1.65);
+  });
   ents.forEach(e => {
-    if (!e.alive || e === P || dE(e, P) > 520 || inBunker(e.x, e.y) || e.cloak > 0.7) return;
-    mctx.fillStyle = '#20251d';
-    mctx.strokeStyle = hostile(e, P) || e.fac === 'mutant' ? '#ea6854' : '#99be65';
-    mctx.lineWidth = 2.2;
-    mctx.beginPath(); mctx.arc(e.x / T * s, e.y / T * s, 3.8, 0, 2 * Math.PI);
-    mctx.fill(); mctx.stroke();
+    if (visibleContact(e)) mapSymbol(mctx, playerRelation(e), e.x / T * s, e.y / T * s, 1.65);
   });
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   const tq = trackedTarget();
   qTargets().forEach(q => {
-    if (q !== tq && !(tq && q.qid === tq.qid && q.x === tq.x) && q.qid !== 'sos') mctx.globalAlpha = 0.45; else mctx.globalAlpha = 1;
+    if (q !== tq && !(tq && q.qid === tq.qid && q.x === tq.x && q.y === tq.y) && q.qid !== 'sos') mctx.globalAlpha = 0.45; else mctx.globalAlpha = 1;
     let x = size / 2 + (q.x - P.x) / T * s, y = size / 2 + (q.y - P.y) / T * s;
     const edge = x < 10 || y < 10 || x > size - 10 || y > size - 10;
     if (edge) { const a = Math.atan2(y - size / 2, x - size / 2); x = size / 2 + Math.cos(a) * (size / 2 - 12); y = size / 2 + Math.sin(a) * (size / 2 - 12); }
-    const color = q.qid === 'sos' ? '#ef7657' : '#5ac4cf';
-    mctx.beginPath(); mctx.arc(x, y, 8, 0, 2 * Math.PI);
-    mctx.fillStyle = '#1c2a29'; mctx.fill(); mctx.strokeStyle = color; mctx.lineWidth = 1.8; mctx.stroke();
-    mctx.beginPath(); mctx.arc(x, y, 4.5, 0, 2 * Math.PI); mctx.fillStyle = color; mctx.fill();
+    const onContact = !edge && ents.some(e => e.x === q.x && e.y === q.y && visibleContact(e));
+    mapSymbol(mctx, q.qid === 'sos' ? 'sos' : 'target', x, y, 1.8, 0, onContact);
   });
   mctx.globalAlpha = 1;
-  mctx.save(); mctx.translate(size / 2, size / 2); mctx.rotate(P.ang); mctx.fillStyle = '#5bbdc9'; mctx.strokeStyle = '#000'; mctx.lineWidth = 2;
-  mctx.beginPath(); mctx.moveTo(12, 0); mctx.lineTo(-7, -8); mctx.lineTo(-3, 0); mctx.lineTo(-7, 8); mctx.closePath(); mctx.fill(); mctx.stroke(); mctx.restore();
+  mapSymbol(mctx, 'player', size / 2, size / 2, 2, P.ang);
 }
 
 /* ===================== HUD ===================== */
@@ -6801,7 +6900,7 @@ async function boot() {
   HOUSES.forEach(buildEntrances);
   resize();
   bootStep('графика'); await loadArt(); bigFences();
-  bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); buildMini();
+  bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {
     console.error(e); try { localStorage.setItem('zona-broken-save', localStorage.getItem(KEY) || ''); } catch (e2) {}

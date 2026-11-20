@@ -233,5 +233,29 @@ T('18_weapon_condition_trade', () => {
   return { ok: /31%/.test(shownSell) && afterSell.has === 0 && afterSell.cond === undefined && afterSell.mag === undefined && /100%/.test(shownBuy) && afterBuy.has === 1 && afterBuy.cond === 100 && afterBuy.mag === 0,
     shownSell, afterSell, shownBuy, afterBuy };
 });
+T('19_personal_contacts', () => {
+  reset();
+  const bySid = sid => z.ents.find(e => e.sid === sid);
+  const att = e => z.cardOf(e).att;
+  S().rep = 40;
+  const neutral = att(bySid('wolf'));
+  const wounded = bySid('tolik');
+  P().x = wounded.x + 12; P().y = wounded.y;
+  step(1); z.interact(); z.closePanel(); saveLoad();
+  const healed = att(bySid('tolik'));
+  bySid('tolik').angry = 1;
+  const angry = att(bySid('tolik'));
+  const groups = [];
+  for (const joined of [false, true]) {
+    const event = forceSos();
+    const ids = z.ents.filter(e => e.sos === event.id).map(e => e.uid);
+    if (joined) event.pk = 1;
+    X.finishEncounter('helped'); saveLoad();
+    groups.push(ids.map(id => att(z.ents.find(e => e.uid === id))));
+  }
+  return { ok: neutral === 'нейтрал' && healed === 'друг' && angry === 'враг' &&
+    groups.every(g => g.length > 0) && groups[0].every(v => v === 'нейтрал') && groups[1].every(v => v === 'друг'),
+    neutral, healed, angry, groups };
+});
 return JSON.stringify(R);
 })()

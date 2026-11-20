@@ -127,3 +127,11 @@ body:not(.is-touch) .hud.zh .zh-p{bottom:calc(14px + var(--sab))}
 .hud.zh .zh-w .am{white-space:nowrap}
 @media (orientation:portrait){.hud.zh .zh-w,body.is-touch .hud.zh .zh-w{width:200px}.hud.zh .zh-w .am,.hud.zh .zh-w .am small{font-size:17px}.zh-w .cnd span{font-size:10px}.zh-w #wico{width:74px}.zh-w #wico svg{width:74px}}
 .hud.zh .zh-p:empty{display:none!important}
+
+/* Узкий обод оставляет больше места самой местности на мобильном экране. */
+body .hud.zh .zh-map.rust{border-width:4px;padding:0;background:#28251e}
+body .hud.zh .zh-map.rust .rv{display:block;width:4px;height:4px;border-color:#b4ab90;opacity:.48}
+body .hud.zh .zh-map .rv.a{left:3px;top:3px;border-width:1px 0 0 1px}
+body .hud.zh .zh-map .rv.b{right:3px;top:3px;border-width:1px 1px 0 0}
+body .hud.zh .zh-map .rv.c{left:3px;bottom:3px;border-width:0 0 1px 1px}
+body .hud.zh .zh-map .rv.d{right:3px;bottom:3px;border-width:0 1px 1px 0}
