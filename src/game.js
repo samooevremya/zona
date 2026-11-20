@@ -3619,6 +3619,28 @@ function c1RoofId(h, idx, old) {
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
   return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
 }
+// У шифера и досок освещение уже запечено в текстуру, конёк проходит
+// посередине исходного листа. Корректируем его до кадрирования и поворота.
+const gableMaterials = new Map();
+function balancedGable(id) {
+  if (gableMaterials.has(id)) return gableMaterials.get(id);
+  const sp = ART.m.sprites[id], tile = document.createElement('canvas');
+  tile.width = sp.rect[2]; tile.height = sp.rect[3];
+  const g = tile.getContext('2d');
+  g.drawImage(ART.images[sp.atlas], ...sp.rect, 0, 0, tile.width, tile.height);
+  const pixels = g.getImageData(0, 0, tile.width, tile.height), d = pixels.data;
+  for (let y = 0; y < tile.height; y++) {
+    const t = clamp(((y + .5) / tile.height - .485) / .05, 0, 1);
+    const gain = lerp(.89, 1.07, t * t * (3 - 2 * t));
+    const end = (y + 1) * tile.width * 4;
+    for (let i = y * tile.width * 4; i < end; i += 4) {
+      d[i] *= gain; d[i + 1] *= gain; d[i + 2] *= gain;
+    }
+  }
+  g.putImageData(pixels, 0, 0);
+  gableMaterials.set(id, tile);
+  return tile;
+}
 function artRoof(h, idx) {
   let id = ROOF_AT[h.ok || (h.x + ',' + h.y)] || (h.ruin ? 'roof_broken' : h.mat === 'conc' ? null : ['roof_slate', 'roof_rust', 'roof_patch'][idx % 3]);
   if (C1) id = c1RoofId(h, idx, id);
@@ -3638,8 +3660,6 @@ function artRoof(h, idx) {
       g.fillStyle = wood ? '#3b3026' : '#5a5853'; g.fillRect(2, wy, RW - 4, wallH + 2);
       g.globalAlpha = 0.5; artFill(g, wood ? 'floor_wood' : 'wall_concrete', 2, wy, RW - 4, wallH + 2); g.globalAlpha = 1;
       if (wood) { g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; for (let x = 6; x < RW - 4; x += 7) { g.beginPath(); g.moveTo(x, wy); g.lineTo(x, wy + wallH + 2); g.stroke(); } }
-      const gr = g.createLinearGradient(0, wy, 0, wy + wallH + 2); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.15)'); gr.addColorStop(1, 'rgba(0,0,0,0.35)');
-      g.fillStyle = gr; g.fillRect(2, wy, RW - 4, wallH + 2);
       // У южной стены с улицы видна ниша под карнизом. Смещение +3
       // компенсирует начало холста крыши в трёх пикселях левее дома.
       for (const door of h.entrances) {
@@ -3649,22 +3669,28 @@ function artRoof(h, idx) {
         g.fillStyle = '#292720'; g.fillRect(left + 3, wy, door.width - 6, wallH + 1);
         g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(left + 3, wy, door.width - 6, 5);
       }
-      g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 6; g.shadowOffsetX = 2; g.shadowOffsetY = 4;
+      // Контактная тень лежит на верхней части фасада, включая дверную нишу.
+      if (SHADOWS && !flat) {
+        const depth = Math.min(8, wallH * .55);
+        const shade = g.createLinearGradient(0, RH, 0, RH + depth);
+        shade.addColorStop(0, 'rgba(22,18,15,.74)');
+        shade.addColorStop(.32, 'rgba(22,18,15,.46)');
+        shade.addColorStop(1, 'rgba(22,18,15,0)');
+        g.fillStyle = shade; g.fillRect(2, RH, RW - 4, depth);
+      }
+      if (SHADOWS) {
+        g.shadowColor = 'rgba(0,0,0,.32)'; g.shadowBlur = 4; g.shadowOffsetX = 2; g.shadowOffsetY = 3;
+      }
     }
     const tw = along ? RW : RH, th = along ? RH : RW, r = sp.rect, ka = tw / th;
     let sw = r[2], sh = r[3]; if (sw / sh > ka) sw = sh * ka; else sh = sw / ka;
-    const sx = r[0] + (r[2] - sw) * (sp.cropFocusX ?? 0.5), sy = r[1] + (r[3] - sh) / 2;
+    const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
+    const image = gable ? balancedGable(id) : ART.images[sp.atlas];
+    const sx = (gable ? 0 : r[0]) + (r[2] - sw) * (sp.cropFocusX ?? 0.5);
+    const sy = (gable ? 0 : r[1]) + (r[3] - sh) / 2;
     g.save(); g.translate(RW / 2, RH / 2);
-    // На новом листе свет уже нарисован сверху. При повороте он должен оказаться на западном скате.
-    if (!along) g.rotate(id === 'c1_roof_slate' || id === 'c1_roof_plank' ? -Math.PI / 2 : Math.PI / 2);
-    g.drawImage(ART.images[sp.atlas], sx, sy, sw, sh, -tw / 2, -th / 2, tw, th); g.restore();
-    if (!flat) {   // скаты: свет с северо-запада, верхний скат светлее, нижний темнее, кромка свеса
-      g.shadowColor = 'transparent';
-      const sl = along ? g.createLinearGradient(0, 0, 0, RH) : g.createLinearGradient(0, 0, RW, 0);
-      sl.addColorStop(0, 'rgba(255,240,215,0.10)'); sl.addColorStop(0.49, 'rgba(255,240,215,0.04)'); sl.addColorStop(0.51, 'rgba(0,0,0,0.12)'); sl.addColorStop(1, 'rgba(0,0,0,0.22)');
-      g.fillStyle = sl; g.fillRect(0, 0, RW, RH);
-      g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(0, RH - 2, RW, 2);
-    }
+    if (!along) g.rotate(gable ? -Math.PI / 2 : Math.PI / 2);
+    g.drawImage(image, sx, sy, sw, sh, -tw / 2, -th / 2, tw, th); g.restore();
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;
   }
