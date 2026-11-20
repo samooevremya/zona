@@ -2529,7 +2529,7 @@ function render() {
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
-    if (o.k === 'barrier' && inView(o.x, o.y, 60)) {
+    if (o.k === 'barrier' && inView(o.x, o.y, o.w) && !drawBridgeGate(ctx, o)) {
       ctx.fillStyle = '#4b4a42'; ctx.fillRect(o.x - 6, o.y, 8, o.h); ctx.fillRect(o.x + o.w - 2, o.y, 8, o.h);
       ctx.save(); ctx.translate(o.x, o.y + o.h / 2); if (!o.solid) ctx.rotate(-1.35);
       for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#c8b440' : '#d9d4c4'; ctx.fillRect(i * o.w / 8, -3, o.w / 8, 6); }
@@ -3722,9 +3722,37 @@ function drawFenceRun(g, o) {
 }
 /* объекты на земле: центр = левый верх + половина размера */
 function artStatic(g, o) { C1SH = o.k !== 'fire'; try { return artStatic0(g, o); } finally { C1SH = 0; } }
+// Стойки остаются на обочинах, стрела поворачивается вокруг левого шарнира.
+function drawBridgeGate(g, o) {
+  const sp = c1('c1_checkpoint');
+  if (!sp) return false;
+  const [sx, sy] = sp.rect, sheet = ART.images[sp.atlas];
+  g.save();
+  g.translate(o.x, o.y + o.h / 2);
+  g.drawImage(sheet, sx, sy, 106, 129, -12, -11, 18, 22);
+  g.drawImage(sheet, sx + 382, sy, 103, 129, o.w - 6, -11, 18, 22);
+  g.translate(3, 0);
+  if (!o.solid) g.rotate(-1.35);
+  g.drawImage(sheet, sx + 106, sy + 53, 276, 16, 0, -2.5, o.w - 7, 5);
+  g.restore();
+  return true;
+}
 function artStatic0(g, o) {
   if (o.k === 'fence' && o.material) { drawFenceRun(g, o); return true; }
   const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+  if (C1 && o.k === 'sand') {
+    ART.draw(g, 'c1_sandbags', cx, cy, o.w + 2, o.h + 2);
+    return true;
+  }
+  if (C1 && (o.k === 'bed' || o.k === 'table')) {
+    const bed = o.k === 'bed';
+    g.save();
+    spriteShadow(g, 2, 1.5);
+    g.drawImage(ART.images.furniture, bed ? 0 : 64, 0, 64, bed ? 43 : 38,
+      o.x, o.y, o.w, o.h);
+    g.restore();
+    return true;
+  }
   if (C1 && o.k === 'bus') { const w = o.w * 1.25, s = ART.m.sprites.c1_bus, h = w * s.rect[3] / s.rect[2]; g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - w / 2 + 6, cy - h / 2 + 7, w, h); c1Draw(g, 'c1_bus', cx, cy, w); return true; }
   if (C1 && o.k === 'car' && o.sprite) {
     c1Draw(g, o.sprite, cx, cy, o.w + 4, 0, 1, 5); return true;
