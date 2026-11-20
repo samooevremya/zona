@@ -589,6 +589,7 @@ function mkPlayer() {
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
+  objs.push(...retiredFixedCrates); retiredFixedCrates.length = 0;
   objs.forEach(o => { if (o.stash) restoreContainer(o); });
   armyAngry = !!S.flags.armyAngry;
   const bar = objs.find(o => o.key === 'bar'); if (bar) { bar.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }
@@ -1445,6 +1446,7 @@ function explode(n) {
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
+  cleanExpiredCrates();
   renewFieldCrates();
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
@@ -1750,7 +1752,7 @@ function applyState(d) {
   fogDirty = true;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
-  loadFieldCrates();
+  loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
@@ -4205,6 +4207,7 @@ function advanceWorldTime(minutes, ctx) {
   const r = simRest(minutes, ctx, { food: S.food, hp: P.hp, bleed: S.bleed });
   S.food = r.food; P.hp = r.hp; if (r.minutes > 0) P.st = 100;
   S.min += r.minutes;
+  cleanExpiredCrates();
   renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
   const done = r.minutes;
@@ -6306,11 +6309,6 @@ function recordContents(o){
     const stock = S.flags.fieldCrates;
     stock.drops[o.fieldTile] = o.loot;
     o.looted = empty;
-    if (empty && !stock.slots.some(s => s.tile === o.fieldTile && s.due)) {
-      delete stock.drops[o.fieldTile];
-      const index = objs.indexOf(o);
-      if (index >= 0) objs.splice(index,1);
-    }
   }else if(o.stash){
     S.flags['contents_'+o.stash]={...o.loot}; o.looted=empty;
     if(empty) S.flags['st_'+o.stash]=1;
@@ -6323,10 +6321,66 @@ function breakCrate(o){
   if(o.broken || o.k!=='crate' || !o.stash) return;
   if(o.fieldTile != null) breakFieldBox(o);
   else S.flags['broken_'+o.stash]=1;
-  o.broken=true; o.solid=false; buildGrids();
+  o.broken=true; o.solid=false; scheduleCrateCleanup(o); buildGrids();
   play('hit',o.x,o.y);
   for(let i=0;i<8;i++) parts.push({x:o.x+o.w/2,y:o.y+o.h/2,vx:rnd(-50,50),vy:rnd(-45,45),life:rnd(.15,.4),c:i%2?'#947349':'#59402a',s:2});
 }
+// Игровые минуты, отсчитываются от удара, а не от подбора или загрузки.
+const CRATE_LIFETIME = 6 * 60;
+let nextCrateCleanup = Infinity;
+const retiredFixedCrates = [];
+
+function scheduleCrateCleanup(o) {
+  const times = S.flags.crateCleanup || (S.flags.crateCleanup = {});
+  // У старых сохранений нет времени разрушения. Даём срок от первой загрузки.
+  const end = times[o.stash] ?? (times[o.stash] = S.min + CRATE_LIFETIME);
+  nextCrateCleanup = Math.min(nextCrateCleanup, end);
+}
+
+function clearCrateRemains(index) {
+  const o = objs[index];
+  if (G.near?.o === o) G.near = null;
+  o.loot = {}; o.looted = true;
+  objs.splice(index, 1);
+  if (o.fieldTile != null) {
+    delete S.flags.fieldCrates.drops[o.fieldTile];
+  } else {
+    // В новой игре исходный ящик снова понадобится. В этом прохождении достаточно одной отметки.
+    retiredFixedCrates.push(o);
+    S.flags['st_'+o.stash] = 2;
+    delete S.flags['contents_'+o.stash];
+    delete S.flags['broken_'+o.stash];
+  }
+}
+
+function cleanExpiredCrates() {
+  if (S.min < nextCrateCleanup) return;
+  const times = S.flags.crateCleanup;
+  nextCrateCleanup = Infinity;
+  for (let i = objs.length-1; i >= 0; i--) {
+    const o = objs[i];
+    if (!o.broken || o.k !== 'crate') continue;
+    if (times[o.stash] <= S.min) {
+      delete times[o.stash];
+      clearCrateRemains(i);
+    } else {
+      nextCrateCleanup = Math.min(nextCrateCleanup, times[o.stash]);
+    }
+  }
+  if (!Object.keys(times).length) delete S.flags.crateCleanup;
+}
+
+function restoreCrateCleanup() {
+  nextCrateCleanup = Infinity;
+  for (let i = objs.length-1; i >= 0; i--) {
+    const o = objs[i];
+    if (!o.broken || o.k !== 'crate') continue;
+    if (o.fieldTile == null && S.flags['st_'+o.stash] === 2) clearCrateRemains(i);
+    else scheduleCrateCleanup(o);
+  }
+  cleanExpiredCrates();
+}
+
 function containerOnRay(sh,ca,sa,limit){
   let o=null,d=limit;
   for(const box of objs){
@@ -6429,11 +6483,11 @@ function chooseFieldSite(stock, previous) {
   const candidates = [], questItems = objs.filter(o => o.pick);
   let best = Infinity;
   for (const tile of fieldCrateSites) {
-    if (used.has(tile) || (previous != null && fieldSector(tile) === fieldSector(previous))) continue;
+    if (used.has(tile) || stock.drops[tile] || (previous != null && fieldSector(tile) === fieldSector(previous))) continue;
     if (previous != null && Math.hypot(tile%MW-previous%MW,Math.floor(tile/MW)-Math.floor(previous/MW)) < 32) continue;
     const cx = (tile%MW+.5)*T, cy = (Math.floor(tile/MW)+.5)*T;
     if (previous != null && Math.abs(cx-P.x) < VW/(2*Z)+2*T && Math.abs(cy-P.y) < VH/(2*Z)+2*T) continue;
-    const score = counts[fieldSector(tile)] + (stock.drops[tile] ? FIELD_CRATE_COUNT+1 : 0);
+    const score = counts[fieldSector(tile)];
     if (score > best || !nav[tile]) continue;
     if (ents.some(e => e.alive && Math.hypot(e.x-cx,e.y-cy) < 60)) continue;
     if (questItems.some(o => Math.hypot(o.x-cx,o.y-cy) < 50)) continue;
@@ -6472,17 +6526,11 @@ function loadFieldCrates() {
   }
   for (const [tile,loot] of Object.entries(stock.drops)) objs.push(fieldBox(Number(tile),loot,true));
   buildGrids();
-  renewFieldCrates();
 }
 
 function breakFieldBox(o) {
   const stock = S.flags.fieldCrates, tile = o.fieldTile;
   const slot = stock.slots.find(s => s.tile === tile && !s.due);
-  const old = objs.find(b => b !== o && b.fieldTile === tile && b.broken);
-  if (old) {
-    for (const [id,n] of Object.entries(old.loot)) o.loot[id] = (o.loot[id] || 0)+n;
-    objs.splice(objs.indexOf(old),1);
-  }
   stock.drops[tile] = o.loot;
   slot.loot = {};
   slot.due = S.min + ri(120,240);
@@ -6499,11 +6547,6 @@ function renewFieldCrates() {
     if (slot.due <= S.min) {
       const tile = chooseFieldSite(stock,slot.tile);
       if (tile != null) {
-        if (!Object.keys(stock.drops[slot.tile] || {}).length) {
-          const index = objs.findIndex(o => o.fieldTile === slot.tile && o.broken);
-          if (index >= 0) objs.splice(index,1);
-          delete stock.drops[slot.tile];
-        }
         slot.tile = tile; slot.due = 0; slot.loot = fieldCrateLoot();
         objs.push(fieldBox(tile,slot.loot,false));
         changed = true;

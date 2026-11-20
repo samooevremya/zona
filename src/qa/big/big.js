@@ -268,13 +268,51 @@ Tt('K16_roaming_field_crates', () => {
   z.save(true); z.applyState(z.loadSave());
   const restored=JSON.stringify(stock())===saved && intact().length===24;
   const drops=M.objs.filter(o=>o.fieldTile===first.fieldTile && o.broken);
-  const kept=drops.length===1 && JSON.stringify(drops[0].loot)===originalLoot && !(second.fieldTile in stock().drops);
+  const kept=drops.length===1 && JSON.stringify(drops[0].loot)===originalLoot && !Object.keys(stock().drops[second.fieldTile]).length;
   if (drops.length) {
     P().x=drops[0].x-18; P().y=drops[0].y+13; step(1); z.interact();
   }
-  const collected=!(first.fieldTile in stock().drops);
+  const collected=!Object.keys(stock().drops[first.fieldTile]).length;
   return {ok:sectors.every(n=>n===4) && broken && waiting && renewed && restored && picked && kept && collected,
     sectors,broken,waiting,renewed,restored,picked,kept,collected};
+});
+Tt('K17_crate_remains_expire', () => {
+  reset();
+  const flags = () => S().flags;
+  const loose = () => M.objs.filter(o => o.fieldTile != null);
+  const fixed = M.objs.find(o => o.stash === 'st9');
+  const [full, empty] = loose().filter(o => !o.broken);
+  const hit = o => {
+    for (const e of z.ents) if (e !== P()) e.alive = false;
+    P().x=o.x-20; P().y=o.y+13; P().ang=0; P().cool=0;
+    z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
+  };
+  hit(fixed); hit(full); hit(empty); z.interact();
+  const end = flags().crateCleanup[fixed.stash];
+  const fullEnd = flags().crateCleanup[full.stash], emptyEnd = flags().crateCleanup[empty.stash];
+  const snapshot = () => { z.save(true); return z.loadSave(); };
+  const brokenSave = snapshot();
+  const lookup = o => M.objs.find(b => b.stash === o.stash && b.broken);
+  S().min = end-.2; step(1);
+  z.applyState(snapshot());
+  const before = !!lookup(fixed) && Object.keys(lookup(full).loot).length > 0 && !Object.keys(lookup(empty).loot).length;
+  const sameDeadline = flags().crateCleanup[fixed.stash] === end;
+  S().min = end; step(1);
+  const firstOnly = !lookup(fixed) && !!lookup(empty);
+  S().food=100; z.plus.advanceWorldTime(60,'sleep');
+  const isClean = () => !flags().crateCleanup && !Object.keys(flags().fieldCrates.drops).length &&
+    flags()['st_'+fixed.stash]===2 && !('contents_'+fixed.stash in flags()) && !('broken_'+fixed.stash in flags()) &&
+    !lookup(fixed) && !lookup(full) && !lookup(empty) && loose().filter(o=>!o.broken).length === 24;
+  const rested = isClean(); z.applyState(snapshot()); const reloaded = isClean();
+  const overdue = JSON.parse(JSON.stringify(brokenSave)); overdue.min = emptyEnd+1; z.applyState(overdue);
+  const cleanedOnLoad = isClean();
+  const old = JSON.parse(JSON.stringify(brokenSave)); delete old.flags.crateCleanup; z.applyState(old);
+  const migrated = flags().crateCleanup[full.stash] === old.min+360 && !!lookup(full);
+  S().min += 361; step(1); const oldClean = isClean();
+  reset();
+  const fresh = !!M.objs.find(o=>o.stash===fixed.stash && o.solid && !o.broken && Object.keys(o.loot).length);
+  return {ok:before && sameDeadline && firstOnly && rested && reloaded && cleanedOnLoad && migrated && oldClean && fresh && fullEnd<=emptyEnd,
+    before,sameDeadline,firstOnly,rested,reloaded,cleanedOnLoad,migrated,oldClean,fresh};
 });
 return JSON.stringify(R);
 })()

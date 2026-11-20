@@ -172,6 +172,7 @@ function mkPlayer() {
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
+  objs.push(...retiredFixedCrates); retiredFixedCrates.length = 0;
   objs.forEach(o => { if (o.stash) restoreContainer(o); });
   armyAngry = !!S.flags.armyAngry;
   const bar = objs.find(o => o.key === 'bar'); if (bar) { bar.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }

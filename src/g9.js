@@ -232,6 +232,7 @@ function advanceWorldTime(minutes, ctx) {
   const r = simRest(minutes, ctx, { food: S.food, hp: P.hp, bleed: S.bleed });
   S.food = r.food; P.hp = r.hp; if (r.minutes > 0) P.st = 100;
   S.min += r.minutes;
+  cleanExpiredCrates();
   renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
   const done = r.minutes;

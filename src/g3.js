@@ -143,6 +143,7 @@ function explode(n) {
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
+  cleanExpiredCrates();
   renewFieldCrates();
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
@@ -448,7 +449,7 @@ function applyState(d) {
   fogDirty = true;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
-  loadFieldCrates();
+  loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
