@@ -188,6 +188,16 @@ function drawDialog() {
   pbody.appendChild(O);
 }
 function talk(e) {
+  if (e.storyMan) return cordonSurvivor(e);
+  if (cordonStage()==='voice' && e.sid==='shust') {
+    cordonSet('confirm','Шустрый узнал свой голос, но такого приказа не давал. Сверь позывные у Волка.');
+    return cordonMessage('Шустрый',['«Слушай. Это мой голос, даже кашель мой. Только в тот день я сидел в гараже, а рацию у меня отобрали».',
+      'С записи доносится: «Катушка, Мел, жду у колонны». Потом другой голос: «Приняли, выходим». Волк ведёт вахтенный журнал у костра.']);
+  }
+  if (BIG && e.sid==='shust' && S.flags.shustFree && S.q.flash>0 && S.q.flash<3) {
+    give('flash',1); S.q.flash=3;
+    return cordonMessage('Шустрый',['«Флешка в подкладке. Отнеси Сидоровичу, пока он зря людей не послал».']);
+  }
   if (e.sid === 'wolf') return talkWolf(e);
   if (e.fac === 'army') {
     const south = e.guard === 'south';
@@ -251,6 +261,7 @@ function robNpc(e) {
 function talkWolf(e) {
   dialog(cardOf(e), [S.q.flash === 1 ? 'Меченый? Сидорович по рации предупредил. Про Шустрого знаешь?' : 'Здорово, Меченый.'], () => {
     const o = [];
+    if (cordonStage()==='confirm') o.push({t:'Кто ушёл к разбитой колонне?',k:'key',fn:cordonConfirm});
     if (S.q.flash === 1) o.push({ t: 'Я насчёт Шустрого', k: 'key', fn: () => {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
       const equipped=give('w_pm',1,{cond:85,mag:8}); give('a9',16); if (equipped) selectGun('w_pm',cnt('w_pm')-1); S.q.flash = 2;
@@ -273,7 +284,7 @@ function talkWolf(e) {
   }, 'dialog', e);
 }
 function talkTrader() {
-  if (!S.flags.intro) {
+  if (!S.flags.intro || !S.q.flash) {
     S.flags.intro = 1;
     return dialog(SIDCARD(), ['Очухался, Меченый? Тебя сняли с грузовика смерти, с таких живыми не возвращаются. Ты первый на моей памяти.', 'В КПК у тебя одна запись: «Убить Стрелка». Имени не помнишь, так и будешь Меченым, по наколке. Я тебе жизнь спас, за тобой должок.'], () => [
       { t: 'Что за работа?', k: 'key', fn: () => {
@@ -288,13 +299,20 @@ function talkTrader() {
 }
 function traderOpts() {
   const o = [{ t: 'Торговать', k: 'key', fn: () => openTrade(null) }];
+  if (cordonStage()==='decode') o.push({t:'Прочитать память КПК Шустрого',k:'key',fn:()=>{
+    S.flags.courierDecoded=1;
+    if (!S.q2.fox) S.q2.fox=1;
+    cordonSet('waitFox','Память прочитана. Ищи Лиса на ферме за насыпью.');
+    say('Память жива. Слышишь два позывных? Сохрани копию. А про Стрелка спроси Лиса. Он на ферме за насыпью. За живого курьера я бы заплатил, за эту весть платить нечем.');
+    cordonStart();
+  }});
   if (S.q.flash === 3 && has('flash')) o.push({ t: 'Отдать флешку Шустрого', k: 'key', fn: () => {
     take('flash', 1); S.money += 1500; S.q.flash = 4; S.flags.flashDone = 1; S.stats.q++; S.rep += 15;
     say('Вот это дело. Держи полторы тысячи, заработал.');
     sys('Получено: 1500 RU. Задание выполнено.'); bulletin('Выполнено: Флешка Шустрого.'); save(true);
   } });
   if (S.q.flash === 4 && S.flags.flashDone && S.q2.fox === 0) o.push({ t: 'Что со Стрелком?', k: 'key', fn: () => {
-    say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры.');
+    say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры. Справа есть канава: брось болт в разряд и проходи, пока тихо.');
     S.q2.fox = 1; bulletin('Задание: Найти Лиса за насыпью.');
   } });
   if (S.q.medusa === 1 && has('art_medusa')) o.push({ t: 'Отдать «Медузу» за 1000 RU', k: 'key', fn: () => {
@@ -333,6 +351,11 @@ function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefin
 function openLoot(o) {
   if (!cacheFieldQuiet(o)) {
     msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
+    return;
+  }
+  if (cordonStage()==='cache' && o.stash==='column_wayman') {
+    cordonSet('tracks','Записка в схроне: «Ногу Мелу зажало. Тащу его к машине». Осмотри след у крышки.');
+    cordonMessage('Записка в схроне',['«Ногу Мелу зажало. Руки заняты, лишнее оставлю здесь. Тащу его к машине. Катушка». Под крышкой прилип клочок мокрой лямки.']);
     return;
   }
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
@@ -770,6 +793,7 @@ function interact() {
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);
   else if (n.k === 'genset') gensetUse();
+  else if (n.k === 'story') cordonUse(n.stage);
   else if (n.k === 'exit') exitUse();
   else if (n.k === 'art') takeArt(n.a);
   else if (n.k === 'free') {

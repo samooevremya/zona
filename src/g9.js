@@ -602,7 +602,7 @@ function plusTick(dt) {
   S._plusT = (S._plusT || 0) - dt;
   if (S._plusT > 0) return;
   S._plusT = 1;
-  sosTick(); suckerTick(); cluesTick();
+  sosTick(); suckerTick(); cluesTick(); cordonTick();
 }
 function plusKill(e, src) {
   plusDefaults();
