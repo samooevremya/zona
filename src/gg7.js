@@ -80,15 +80,17 @@ function g7PoseFrame(skin, pose) {
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
   const id = e === P ? S.weapon : e.wpn, W = G3W[id]; if (!W) return null;
-  const grip = id === 'w_pm' || id === 'knife' ? 'one' : 'two';
+  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' ? 'one' : 'two';
   const r = rigActive(e);
   if (r) {
     const s = CordonRig.sockets(r.rig.pose, grip);
     if (!s.hasEquipment || ['seated', 'captive', 'wounded', 'dead'].includes(r.rig.state)) return null;
     return { mode: 'rig', id: id, W: W, grip: grip, main: s.main, support: s.support, muzzle: [s.main[0], s.main[1] + W.len] };
   }
-  if (!G3_READY() || e.sit || e.wounded || e.captive) return null;
-  const hand = e === P && window.CORDON_G8_ON && grip === 'one' ? [3.5, 10] : G3_GRIP;
+  const seated = e.sit && !(window.CORDON_G8_ON && e.campRise > 0.75);
+  if (!G3_READY() || !e.alive || seated || e.wounded || e.captive) return null;
+  if (window.CORDON_G8_ON) return frameWeapon(e,id,W,grip);
+  const hand = G3_GRIP;
   const main = [hand[0], hand[1] + (e.crouch ? -1 : 0)];
   return { mode: 'g3', id: id, W: W, grip: grip, main: main, support: [main[0], main[1] + 8], muzzle: [main[0], main[1] + W.len] };
 }
@@ -97,17 +99,29 @@ function localToWorld(e, ang, lat, fwd) {
   return { x: e.x + Math.sin(ang) * lat + Math.cos(ang) * fwd, y: e.y - Math.cos(ang) * lat + Math.sin(ang) * fwd };
 }
 function g7Muzzle(e, ang) {
-  const w = weaponLocal(e); if (!w || w.W.blade) return null;
-  return localToWorld(e, ang, w.muzzle[0], w.muzzle[1]);
+  const w = weaponLocal(e); if (!w || w.W.blade || w.W.toss) return null;
+  const tip = localToWorld(e, ang, w.muzzle[0], w.muzzle[1]);
+  const motion = w.pose && e.campRise == null && actorFrameMotion(e,gaitOf(e).moving);
+  if (motion) {
+    tip.x = e.x + (tip.x-e.x)*motion.k + motion.dx;
+    tip.y = e.y + (tip.y-e.y)*motion.k + motion.dy;
+  }
+  return tip;
 }
 /* слой оружия: рукоять в main, ствол вдоль +y до muzzle. Тот же объект w, что и для дула */
 function drawWeaponLocal(c2, w) {
   if (!w) return;
   const W = w.W, x = w.main[0], y = w.main[1];
-  const H8 = window.CORDON_G8_ON && CORDON_G8.hand[w.id], him = H8 && packImage(H8.file);
-  if (him) {   // G8: нарисованный вид сверху; хват в той же точке, конец ствола = muzzle (геометрия выстрела не меняется)
-    const gf = W.blade ? 0.3 : 0.22, L = W.len / (1 - gf) + (W.blade ? 2 : 0), wd = W.blade ? Math.max(1.9, L * H8.aspect) : L * H8.aspect;
-    c2.drawImage(him, x - wd / 2, y - L * gf, wd, L); return;
+  if (window.CORDON_G8_ON) {
+    const shape = HELD_SPRITES[w.id], sprite = packImage(shape.file);
+    if (sprite) {
+      const length = W.toss ? 6.4 : W.len / (1-shape.grip);
+      c2.drawImage(sprite,x-shape.width/2,y-length*shape.grip,shape.width,length);
+      return;
+    }
+  }
+  if (W.toss) {
+    c2.fillStyle='#696347'; c2.beginPath(); c2.ellipse(x,y+1,2,2.6,0,0,Math.PI*2); c2.fill(); return;
   }
   if (W.blade) { c2.fillStyle = '#a9aca8'; c2.fillRect(x - 1, y, W.w, W.len); c2.fillStyle = '#3a2e24'; c2.fillRect(x - 1.5, y - 3, 3, 3); return; }
   c2.fillStyle = '#1c1c1a'; c2.fillRect(x - W.w / 2, y - 2, W.w, W.len + 2);        // рукоять чуть позади кисти, конец ствола = muzzle
@@ -166,18 +180,25 @@ function g7Human(e, extra, target) {
       const sw = sheet.naturalWidth / 17, sh = 168;
       target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
       const alpha = target.globalAlpha * opacity;
-      target.globalAlpha = alpha;
-      target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
-      if (e.flash > 0) {
-        target.save();
-        target.globalCompositeOperation = 'lighter';
-        target.globalAlpha = alpha * Math.min(0.5, e.flash * 4);
-        target.drawImage(sheet, frame * sw, 0, sw, sh, -24, -28, 48, 56);
-        target.restore();
+      const w = rise > 0.75 ? weaponLocal(e) : null;
+      const images = jacketFor(e)?.images || G3.images;
+      const model = w?.pose && equippedFrame(images,g7PoseFrame('loner',w.pose),w);
+      const blend = model ? rise*4-3 : 0;
+      target.globalAlpha = alpha*(1-blend);
+      target.drawImage(sheet, frame*sw, 0, sw, sh, -24, -28, 48, 56);
+      if (model) {
+        target.globalAlpha = alpha*blend;
+        target.drawImage(model.image,-24,-28,48,model.height);
       }
-      if (rise > 0.75 && !e.sit) {
-        target.globalAlpha = alpha * (rise * 4 - 3);
-        drawWeaponLocal(target, weaponLocal(e));
+      if (e.flash > 0) {
+        target.globalCompositeOperation = 'lighter';
+        const flash = alpha*Math.min(0.5,e.flash*4);
+        target.globalAlpha = flash*(1-blend);
+        target.drawImage(sheet, frame*sw, 0, sw, sh, -24, -28, 48, 56);
+        if (model) {
+          target.globalAlpha = flash*blend;
+          target.drawImage(model.image,-24,-28,48,model.height);
+        }
       }
       target.restore(); return true;
     }
