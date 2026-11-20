@@ -31,6 +31,12 @@ for color in ('white', 'beige', 'brown'):
 art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__('json').dumps(jackets) + ');'
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
 if BIGF:
+    shop = _b64.b64encode(open('art/sid-shop.webp', 'rb').read()).decode()
+    art += '\nwindow.SID_SHOP_IMAGE="data:image/webp;base64,' + shop + '";'
+    gate = _b64.b64encode(open('art/sid-gate.webp', 'rb').read()).decode()
+    art += '\nwindow.SID_GATE_IMAGE="data:image/webp;base64,' + gate + '";'
+    poses = _b64.b64encode(open('art/sid-desk-poses.webp', 'rb').read()).decode()
+    art += '\nwindow.SID_DESK_POSES="data:image/webp;base64,' + poses + '";'
     aerial = _b64.b64encode(open('art/cordon-aerial.webp', 'rb').read()).decode()
     art += '\nwindow.CORDON_AERIAL="data:image/webp;base64,' + aerial + '";'
 OUT = 'index_big.html' if BIGF else 'index.html' if MAPFLAG == 'rc1' else 'index_k07.html'

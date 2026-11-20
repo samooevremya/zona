@@ -697,6 +697,10 @@ function drawBridgeGate(g, o) {
 function artStatic0(g, o) {
   if (o.k === 'fence' && o.material) { drawFenceRun(g, o); return true; }
   const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+  if (C1 && o.k === 'sand') {
+    ART.draw(g, 'c1_sandbags', cx, cy, o.w + 2, o.h + 2);
+    return true;
+  }
   if (C1 && (o.k === 'bed' || o.k === 'table')) {
     const bed = o.k === 'bed';
     g.save();

@@ -314,5 +314,54 @@ Tt('K17_crate_remains_expire', () => {
   return {ok:before && sameDeadline && firstOnly && rested && reloaded && cleanedOnLoad && migrated && oldClean && fresh && fullEnd<=emptyEnd,
     before,sameDeadline,firstOnly,rested,reloaded,cleanedOnLoad,migrated,oldClean,fresh};
 });
+Tt('K18_trader_counter_and_stairs', () => {
+  reset();
+  const sid = z.ents.find(e => e.sid === 'sid'), counter = M.objs.find(o => o.k === 'counter');
+  const stack = M.objs.find(o => o.shopStack) || M.objs.find(o => o.k==='crate' && o.x>240*T);
+  const anchor = z.loc.locPt('sid','trader');
+  const aligned = Math.abs(sid.y-anchor.y)<1 && Math.abs(sid.x-anchor.x)<1;
+  P().x=sid.x; P().y=counter.y+counter.h+45;
+  z.IN.moveY=-1; step(30); z.resetInput();
+  const stopped = Math.abs(P().y-(counter.y+counter.h+P().r))<1;
+  const ready = z.near?.k==='trader' && (!stack.shopStack || sid.deskLook>.65);
+  z.interact();
+  const talking = z.panel?.kind==='trader'; z.closePanel();
+  P().x=stack.x-32; P().y=stack.y+stack.h/2;
+  z.IN.moveX=1; step(20); z.resetInput();
+  const cratesSolid=Math.abs(P().x-(stack.x-P().r))<1;
+  const stairs=z.loc.locPt('sid','stairs');
+  P().x=stairs.x; P().y=stairs.y; step(1);
+  const up=z.near?.k==='up'; z.interact(); step(30);
+  const down=z.near?.k==='down'; z.interact(); step(30);
+  const returned=P().x>240*T;
+  return {ok:aligned && stopped && ready && talking && cratesSolid && up && down && returned,
+    aligned,stopped,ready,talking,cratesSolid,up,down,returned};
+});
+Tt('K19_outer_gates_and_old_bunker_save', () => {
+  reset();
+  const hatch=z.loc.locPt('sid','hatch'), spawn=z.loc.locPt('sid','spawn');
+  const frames=M.objs.filter(o=>o.k==='gateFrame');
+  if (!frames.length) return {ok:location.hash.includes('sid-shop-off')};
+  let blocked=true;
+  for(const frame of frames.slice(0,2)){
+    P().x=frame.x+frame.w/2; P().y=frame.y+frame.h+P().r+10;
+    z.IN.moveY=-1; step(15); z.resetInput();
+    blocked=blocked && Math.abs(P().y-frame.y-frame.h-P().r)<1;
+  }
+  P().x=hatch.x; P().y=hatch.y+65;
+  z.IN.moveY=-1; step(16); z.resetInput();
+  const walkIn=z.near?.k==='down';
+  z.interact(); step(30);
+  const landed=Math.abs(P().x-spawn.x)<1 && P().y>spawn.y;
+  // Координаты у стены и у старой лестницы сохранены предыдущей версией подвала.
+  const oldPositions=[[spawn.x+4*T,8.8*T],[spawn.x,11.3*T]];
+  const migrated=oldPositions.every(([x,y])=>{
+    z.save(true); const save=z.loadSave(); save.x=x; save.y=y; z.applyState(save);
+    return Math.abs(P().x-spawn.x)<1 && Math.abs(P().y-spawn.y)<1;
+  });
+  const insideY=spawn.y+8; P().y=insideY; z.save(true); z.applyState(z.loadSave());
+  const kept=Math.abs(P().y-insideY)<1;
+  return {ok:frames.length===3 && blocked && walkIn && landed && migrated && kept,blocked,walkIn,landed,migrated,kept};
+});
 return JSON.stringify(R);
 })()

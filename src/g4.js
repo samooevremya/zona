@@ -352,7 +352,28 @@ function drawRoadblock(g, o) {
   }
   g.restore();
 }
+// Ворота и насыпь запекаются в тот же слой, что и окружающая земля.
+const gateWidth = 174, gateHeight = 131;
+let gateTerrain = null;
+async function prepareShopGate() {
+  if (!SID_SHOP) return;
+  const im=new Image(); im.src=window.SID_GATE_IMAGE;
+  try { await im.decode(); } catch { return; }
+  const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
+  const g=c.getContext('2d'); g.drawImage(im,0,0);
+  g.scale(c.width/2,c.height/2);
+  const fade=g.createRadialGradient(1,1,.74,1,1,1.04);
+  fade.addColorStop(0,'#fff'); fade.addColorStop(.85,'rgba(255,255,255,.15)'); fade.addColorStop(1,'transparent');
+  g.globalCompositeOperation='destination-in'; g.fillStyle=fade; g.fillRect(0,0,2,2);
+  gateTerrain=c;
+  const gate=objs.find(o=>o.k==='hatch');
+  gate.x=HATCH.x-gateWidth/2; gate.y=HATCH.y-gateHeight*.79; gate.w=gateWidth; gate.h=gateHeight;
+  for (const [left,top,w,h] of [[.13,.28,.19,.43],[.68,.28,.19,.43],[.32,.20,.36,.09]]) {
+    addObj({k:'gateFrame',x:gate.x+gate.w*left,y:gate.y+gate.h*top,w:gate.w*w,h:gate.h*h,solid:1});
+  }
+}
 function drawStaticObj(g, o) {
+  if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
   if (o.roadblock) { drawRoadblock(g, o); return; }
   if (ART && artStatic(g, o)) return;
   if (o.k === 'genset') { if (!(G3.on && G3.pack && G3.pack.manifest.props && G3.pack.manifest.props.generator)) gensetProc(g, o); return; }   // растр G4 рисуется в динамическом слое
@@ -631,6 +652,40 @@ function drawAnoms() {
 }
 
 /* ---------- кадр ---------- */
+const shopImage = new Image(), deskPoses = new Image();
+function shopCamera(center, start, span, view) {
+  return view >= span ? start+span/2 : clamp(center, start+view/2, start+span-view/2);
+}
+if (SID_SHOP) {
+  shopImage.src = window.SID_SHOP_IMAGE;
+  deskPoses.src = window.SID_DESK_POSES;
+}
+
+// Маски кистей в координатах трёх кадров. Колени и табурет скрывает столешница.
+const deskHands = [
+  [[63,88,21,13]],
+  [[42,73,13,12],[82,89,10,13]],
+  [[54,99,13,22],[80,87,10,13]]
+];
+function drawDeskTrader(e) {
+  const talking = panel && panel.kind === 'trader';
+  const trading = panel && panel.kind === 'trade' && !panel.e;
+  const pose = trading ? 2 : (talking || e.deskLook > .65 ? 1 : 0);
+  const breath = Math.sin((e.deskTime || 0)*1.8)*.25;
+  // Общая опора у всех трёх поз. Локти и свёрток заходят на край прилавка.
+  ctx.save();
+  ctx.translate(e.x-16, e.y-10+breath);
+  ctx.scale(.25,.25);
+  ctx.beginPath();
+  ctx.rect(0,0,128,(SHOP_ROOM.counterY*T-e.y+10-breath)*4);
+  for(const [x,y,rx,ry] of deskHands[pose]) {
+    ctx.moveTo(x+rx,y); ctx.ellipse(x,y,rx,ry,0,0,2*Math.PI);
+  }
+  ctx.clip();
+  spriteShadow(ctx, 2, 1.4);
+  ctx.drawImage(deskPoses, pose*128,0,128,128, 0,0,128,128);
+  ctx.restore();
+}
 function render() {
   const sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
   if (P) {
@@ -639,13 +694,24 @@ function render() {
     cam.x = lerp(cam.x, tx, 0.12); cam.y = lerp(cam.y, ty, 0.12);
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
+  if (SID_SHOP && P && inBunker(P.x, P.y)) {
+    cam.x = shopCamera(cam.x, STAIRS.x-SHOP_ROOM.width*T/2, SHOP_ROOM.width*T, VW/Z);
+    cam.y = shopCamera(cam.y, SHOP_ROOM.top*T, SHOP_ROOM.height*T, VH/Z);
+  }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#121410'; ctx.fillRect(0, 0, VW, VH);
   ctx.setTransform(DPR * Z, 0, 0, DPR * Z, DPR * (-vx * Z + sx), DPR * (-vy * Z + sy));
   const gx = clamp(Math.floor(vx), 0, WW), gy = clamp(Math.floor(vy), 0, WH);
   const gw = Math.min(WW - gx, Math.ceil(vw) + 2), gh = Math.min(WH - gy, Math.ceil(vh) + 2);
-  drawGround(vx, vy, vw, vh);
+  const shopVisible = SID_SHOP && P && inBunker(P.x, P.y) && shopImage.complete && shopImage.naturalWidth;
+  if (shopVisible) {
+    ctx.save();
+    const width=SHOP_ROOM.width*T, height=SHOP_ROOM.height*T, x=STAIRS.x-width/2, y=SHOP_ROOM.top*T;
+    ctx.beginPath(); ctx.rect(x,y,width,height); ctx.clip();
+    ctx.drawImage(shopImage,x,y,width,height);
+  }
+  else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
@@ -659,7 +725,7 @@ function render() {
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
     if ((o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
-    else if (o.k === 'crate' && inView(o.x, o.y, 40)) crateDraw(o);
+    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
@@ -680,7 +746,8 @@ function render() {
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
-    if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
+    if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
+    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -748,7 +815,8 @@ function render() {
   }
   // имена дружественных рядом
   ctx.textAlign = 'center';
-  for (const e of vis) {   // стелс: «?» — враг насторожился, «!» — заметил
+  for (const e of vis) {
+    // стелс: «?» — враг насторожился, «!» — заметил
     if (e === P || !e.alive || !hostile(e, P) || e.kind !== 'human' && e.kind !== 'dog') continue;
     const aw = e.tgt === P ? (e.alertT = (e.alertT == null ? 1.5 : e.alertT)) && 1 : (e.alertT = null, e.aw || 0);
     if (e.tgt === P) { e.alertT -= 1 / 60; if (e.alertT <= 0) continue; }
@@ -778,12 +846,13 @@ function render() {
     ctx.lineWidth = 1;
   }
   // свет, цвет, ночь
+  if (shopVisible) ctx.restore();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalCompositeOperation = 'multiply';
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
   const bunk = P && inBunker(P.x, P.y);
-  const dk = bunk ? 0.62 : darkness();
+  const dk = bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
@@ -802,11 +871,13 @@ function render() {
     hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
     hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
-    if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
+    if (shopVisible) {
+      hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
+    } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     for (const a of arts) hole(a.x, a.y, 40, 0.6);
-    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
+    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);
     // тёплый свет костра поверх

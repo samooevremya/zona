@@ -30,15 +30,15 @@ jobs:
            d.pop('default_browser_type')
            p=b.new_page(**d); p.on('pageerror',lambda e: print('ERROR',e))
            p.goto(Path('index_big.html').resolve().as_uri()+'#qa-seed=7');p.get_by_role('button',name='Новая игра').tap();p.wait_for_timeout(600)
-           print(p.evaluate("() => __z.map.objs.filter(o=>['barrier','bed','table'].includes(o.k)).map(o=>[o.k,o.x,o.y, __z.gfxSnap().HOUSES.findIndex(h=>o.x>=h.x*32 && o.x<(h.x+h.w)*32 && o.y>=h.y*32 && o.y<(h.y+h.h)*32)])"),flush=True)
-           for k in ['barrier','open','bed','table']:
+           print(p.evaluate("() => __z.map.objs.filter(o=>['barrier','bed','table','sand'].includes(o.k)).map(o=>[o.k,o.x,o.y, __z.gfxSnap().HOUSES.findIndex(h=>o.x>=h.x*32 && o.x<(h.x+h.w)*32 && o.y>=h.y*32 && o.y<(h.y+h.h)*32)])"),flush=True)
+           for k in ['barrier','open','bed','table','sand']:
             p.evaluate("""k=>{let z=__z,o=z.map.objs.find(o=>o.k===(k==='open'?'barrier':k)); if(k==='open')z.map.openBarrier();
              z.S.flags.intro=1; z.P.x=o.x+o.w/2;z.P.y=o.y+o.h+12;z.cam.x=z.P.x;z.cam.y=z.P.y;z.clearMsgs();z.closePanel();}""",k)
             p.wait_for_timeout(800)
             p.screenshot(path=f'qa/cordon-props/{k}-{sys.argv[1]}.jpg',quality=85)
            b.close()
           PY
-          git show abafccf5e3d188cb9a0a5bec4c2ed4b953f1b320:index.html > index_big.html
+          git show 87251ffc92a85dde6a6800eb12f20a2bb24be072:index.html > index_big.html
           python /tmp/frames.py before
           python3 build.py big
           cp index_big.html ../index.html
