@@ -165,7 +165,7 @@ function update(dt) {
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
   if (!cordonStage() && P.alive && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
-  if (BIG && P.alive && !inBunker(P.x, P.y) && warnT <= 0 && (P.x < 5 * T || P.x > (PW - 5) * T)) { warnT = 6; msg(P.x < 5 * T ? 'Дальше Залесье. Эта часть Зоны появится в следующей версии.' : 'Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
@@ -241,7 +241,7 @@ function update(dt) {
   spawnT -= dt; if (spawnT <= 0) { spawnT = 20; spawnTick(); }
   fogT -= dt; if (fogT <= 0 && P.alive) { fogT = 0.4; reveal(); }
   saveT -= dt;
-  if (saveT <= 0 && P.alive && (dE(P, FIRE) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
+  if (saveT <= 0 && P.alive && (dE(P, campOf(P)) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
   // штурм АТП с Петрухой
   if (S.q.flash >= 2 && !S.flags.assault && !S.flags.atpClear) {
     const p = byS('petr');
@@ -272,6 +272,7 @@ function updatePlayer(dt) {
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
+  if (BIG && P.y >= CORDON_ROWS*T && poppyBed(P.x/T, P.y/T-CORDON_ROWS)<.88 && tAt(Math.floor(P.x/T), Math.floor(P.y/T))===GR) P.st = Math.max(0,P.st-20*dt);
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }

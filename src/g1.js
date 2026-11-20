@@ -1,7 +1,8 @@
 /* ===================== основа ===================== */
 const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 /* BIG: большой Кордон 240×220 (+12 клеток под бункер). Старая карта генерируется в свои массивы 132×110, затем gbig.js переносит её по частям. */
-let MW = BIG ? 252 : 132, MH = BIG ? 220 : 110, PW = BIG ? 240 : 120, WW = MW * T, WH = MH * T;
+const CORDON_ROWS = BIG ? 220 : 110, WORLD_ROWS = CORDON_ROWS + (BIG ? 102 : 0);
+let MW = BIG ? 252 : 132, MH = WORLD_ROWS, PW = BIG ? 240 : 120, WW = MW * T, WH = MH * T;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
 const chance = p => Math.random() < p;
@@ -110,7 +111,7 @@ for (let y = 0; y < MH; y++) roadX[y] = 62 + Math.round(3 * Math.sin(y / 12));
 const OLD = BIG ? { MW: 132, MH: 110, PW: 120, map: new Uint8Array(132 * 110), keep: new Uint8Array(132 * 110), roadX: new Int16Array(110) } : null;
 if (BIG) for (let y = 0; y < 110; y++) OLD.roadX[y] = 62 + Math.round(3 * Math.sin(y / 12));
 /* переключение глобальной сетки: старая (для прежнего генератора) или большая */
-const BIGW = BIG ? { MW: MW, MH: MH, PW: PW, map: map, keep: keep, roadX: roadX } : null;
+const BIGW = BIG ? { MW: MW, MH: CORDON_ROWS, PW: PW, map: map, keep: keep, roadX: roadX } : null;
 function useGrid(g) { MW = g.MW; MH = g.MH; PW = g.PW; WW = MW * T; WH = MH * T; map = g.map; keep = g.keep; roadX = g.roadX; }
 const inb = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH;
 const tAt = (x, y) => inb(x, y) ? map[y * MW + x] : VO;
@@ -118,12 +119,12 @@ const setT = (x, y, v) => { if (inb(x, y)) map[y * MW + x] = v; };
 function reserve(x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) keep[y * MW + x] = 1; }
 function reserveC(cx, cy, r) { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (inb(x, y) && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) keep[y * MW + x] = 1; }
 const HOUSES = [];
-function house(x, y, w, h, doors, wall, broken, roof) {
+function house(x, y, w, h, doors, wall, broken, roof, random = srnd) {
   wall = wall === undefined ? BR : wall; broken = broken === undefined ? 0.04 : broken;
   for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
     const edge = xx === x || yy === y || xx === x + w - 1 || yy === y + h - 1;
     const corner = (xx === x || xx === x + w - 1) && (yy === y || yy === y + h - 1);
-    setT(xx, yy, edge && (corner || srnd() > broken) ? wall : (wall === CO ? CF : FL));
+    setT(xx, yy, edge && (corner || random() > broken) ? wall : (wall === CO ? CF : FL));
   }
   doors.forEach(d => setT(x + d[0], y + d[1], wall === CO ? CF : FL));
   reserve(x - 1, y - 1, x + w, y + h);

@@ -13,7 +13,7 @@ g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
 g5=g5[:pos]+bridge+'\n'+g5[pos:]
-js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gstory.js','gmap_rc1.js','gbig.js','ggrips.js','gg3.js','gg7.js','gprops.js','gcontrols.js'])+"\n"+g5+"\n})();\n"
+js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gstory.js','gmap_rc1.js','gbig.js','glesser.js','ggrips.js','gg3.js','gg7.js','gprops.js','gcontrols.js'])+"\n"+g5+"\n})();\n"
 open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os
@@ -44,6 +44,11 @@ for weapon in ('w_pm', 'w_obrez', 'grenade'):
 art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__('json').dumps(equipped_art) + ');'
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
 if BIGF:
+    lesser_art = {}
+    for name in ('dome', 'silo', 'tank', 'poppies', 'antenna', 'barge', 'village-sign', 'fingerpost', 'transformer', 'safe', 'splinters', 'energy', 'money'):
+        with open('art/lesser/' + name + '.webp', 'rb') as sprite:
+            lesser_art[name] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
+    art += '\nwindow.LESSER_ART=' + __import__('json').dumps(lesser_art) + ';'
     shop = _b64.b64encode(open('art/sid-shop.webp', 'rb').read()).decode()
     art += '\nwindow.SID_SHOP_IMAGE="data:image/webp;base64,' + shop + '";'
     gate = _b64.b64encode(open('art/sid-gate.webp', 'rb').read()).decode()

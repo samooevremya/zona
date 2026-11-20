@@ -242,7 +242,7 @@ function talk(e) {
   // обычный одиночка
   const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
   dialog(cardOf(e), lines, () => {
-    const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : LORE[(e.seed + e.talked * 5) % LORE.length]); } }];
+    const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
     if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
@@ -399,7 +399,7 @@ function drawLoot() {
 const PDA_TABS = [['map', 'Карта'], ['tasks', 'Задания'], ['log', 'Журнал'], ['stat', 'Данные']];
 function drawPda() {
   if (panel.tab === 'map') {
-    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Вся карта Кордона.'));
+    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Кордон и Малая Зона.'));
     bar.appendChild(btn('chip', panel.zoom ? 'Отдалить' : 'Приблизить', () => { panel.zoom = !panel.zoom; refresh(); }));
     pbody.appendChild(bar);
     const w = el('div', 'mapwrap' + (panel.zoom ? ' zoom' : '')), c = el('canvas'); c.id = 'bigmap'; c.width = PW * 6; c.height = MH * 6;
@@ -565,6 +565,13 @@ function buildBigMini() {
     g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
     if (ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
+  if (BIG) {
+    g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); g.restore();
+    g.fillStyle='rgba(134,61,44,.65)';
+    for(let y=16;y<31;y+=.5) for(let x=31;x<54;x+=.5)
+      if (poppyBed(x,y)<.9 && tAt(Math.floor(x),CORDON_ROWS+Math.floor(y))===GR)
+        g.fillRect(x, CORDON_ROWS+y,.32,.32);
+  }
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
       g.fillStyle = o.k === 'bus' ? '#8a6a2a' : '#6b6a5e';
@@ -580,8 +587,8 @@ async function buildMini() {
     try {
       await photo.decode();
       if (photo.width === PW * 4 && photo.height === MH * 4) {
-        miniC.width = photo.width; miniC.height = photo.height;
-        miniC.getContext('2d').drawImage(photo, 0, 0);
+        miniC.width=photo.width; miniC.height=photo.height;
+        miniC.getContext('2d').drawImage(photo,0,0);
         return;
       }
     } catch (e) { /* Старый браузер использует карту из клеток мира. */ }
@@ -716,8 +723,9 @@ function drawMapTo(g, s, full, o) {
   if (full) LOCATIONS.forEach(l => {
     if (l.id === 'sid') return;
     const cx = (l.bounds[0] + l.bounds[2]) / 2, cy = (l.bounds[1] + l.bounds[3]) / 2;
-    if (!fog[Math.min(MH - 1, Math.max(0, Math.round(cy))) * MW + Math.min(MW - 1, Math.round(cx))]) return;
-    labs.push({ t: l.name, x: cx * s, y: cy * s, gap: 0, pri: 1, font: '600 ' + Math.round(11.5 * u) + 'px Arial', c: 'rgba(232,222,186,0.95)' });
+    const villageHub = l.id === 'zalissya';
+    if (!villageHub && !fog[Math.min(MH - 1, Math.max(0, Math.round(cy))) * MW + Math.min(MW - 1, Math.round(cx))]) return;
+    labs.push({ t: l.name, x: cx * s, y: cy * s, gap: villageHub ? 12*u : 0, pri: villageHub ? .5 : 1, font: '600 ' + Math.round(11.5 * u) + 'px Arial', c: 'rgba(232,222,186,0.95)' });
   });
   // раскладка подписей
   const hit = (a) => busy.some(b => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]);
@@ -1069,10 +1077,10 @@ function frame(now) {
 /* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
 function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  bootStep('мир'); gen(); bigWorld(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); await prepareShopGate(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
+  bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {

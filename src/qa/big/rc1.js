@@ -86,7 +86,7 @@ T_('R8_weapon_copies_and_shared_lockers', () => {
   const equipped=s.mag.w_pm===6 && s.cond.w_pm===91;
   const lockers=M.objs.filter(o=>o.k==='locker');
   const visit=o=>{P().x=o.x+o.w/2;P().y=o.y+o.h+12;step(1);z.interact();return z.panel?.kind==='locker';};
-  if(lockers.length!==2 || !visit(lockers[0])) return {ok:false,lockers:lockers.length};
+  if(lockers.length!==3 || !visit(lockers[0])) return {ok:false,lockers:lockers.length};
   const gunRow=(side,percent)=>[...document.querySelectorAll('.locker-side.'+side+' .locker-row')].find(r=>r.textContent.includes(percent+'%'));
   gunRow('mine',44).querySelector('button').click(); z.closePanel(); saveLoad();
   if(!visit(lockers[1])) return {ok:false,reason:'second locker'};

@@ -272,7 +272,7 @@ function* artGround(g, R) {
     const t = tiles[y * MW + x], px = x * T, py = y * T;
     let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
     if (C1 && t === SW) {
-      id = BIG && x >= 224 ? 'water' : 'swamp';
+      id = shoulders && y >= CORDON_ROWS ? 'grass' : BIG && x >= 224 ? 'water' : 'swamp';
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
@@ -320,6 +320,7 @@ function* artGround(g, R) {
   yield;
   // 3. Мягкие края грунта и асфальта: маска 4 точки на клетку, размытая и с шумом, только поверх травы
   const surfaces = [[DI, shoulders ? 'bare_soil' : 'dirt'], [AS, 'asphalt']];
+  if (shoulders && GW.y1>=CORDON_ROWS) surfaces.push([SW,'water']);
   for (const [tt, id] of surfaces) {
     // Гравий заходит под полотно и выступает за его края.
     const coverage = t => t === tt || (shoulders && tt === DI && t === AS);
@@ -335,9 +336,10 @@ function* artGround(g, R) {
     const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
     for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
       const t = tiles[(y / K | 0) * MW + (x / K | 0)];
-      if (!GROUNDISH(t) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
+      if (tt === SW && y < CORDON_ROWS*K) continue;
+      if (!GROUNDISH(t) && !(tt === SW && t === SW) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
       const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
-      const alpha = shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
+      const alpha = tt === SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
       id2.data[(y * mw + x) * 4 + 3] = Math.round(alpha);
     }
     mg2.putImageData(id2, 0, 0); ARTM[id] = mk;
@@ -477,7 +479,10 @@ function c1Scatter(g) {
   const M = 5;
   for (let y = Math.max(3, GW.y0 - M); y <= Math.min(MH - 4, GW.y1 + M); y++) for (let x = Math.max(3, GW.x0 - M); x <= Math.min(PW - 4, GW.x1 + M); x++) {
     const t0 = map[y * MW + x];
-    if (t0 === SW && !(BIG && x >= 224)) {   // болото: лужи воды и камыш
+    if (t0 === SW) {   // Камыш и лужи у кромки воды.
+      if (BIG && x>=224) continue;
+      if (BIG && y>=CORDON_ROWS && tAt(x-1,y)===SW && tAt(x+1,y)===SW &&
+          tAt(x,y-1)===SW && tAt(x,y+1)===SW) continue;
       const q = hash2(x * 5 + 3, y * 3 + 1);
       if (q < 0.3) { const q2 = hash2(y + 9, x + 4); ART.draw(g, 'c1_pool' + Math.floor(q2 * 3), x * T + 16, y * T + 16, 70 + q2 * 50, 60 + q * 120, q2 * 6.28); }
       else if (q < 0.4) ART.draw(g, 'c1_bush3', x * T + 16, y * T + 16, 34, 34, q * 60);
@@ -715,13 +720,13 @@ function artStatic0(g, o) {
     g.restore();
     return true;
   }
-  if (C1 && o.k === 'bus') { const w = o.w * 1.25, s = ART.m.sprites.c1_bus, h = w * s.rect[3] / s.rect[2]; g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - w / 2 + 6, cy - h / 2 + 7, w, h); c1Draw(g, 'c1_bus', cx, cy, w); return true; }
+  if (C1 && o.k === 'bus') { const w = o.w * 1.25; c1Draw(g, 'c1_bus', cx, cy, w); return true; }
   if (C1 && o.k === 'car' && o.sprite) {
     c1Draw(g, o.sprite, cx, cy, o.w + 4, 0, 1, 5); return true;
   }
   if (C1 && o.k === 'car') {
     const id = o.seed >= 10 ? 'c1_army' + (o.seed % 3) : ['c1_car0', 'c1_car1', 'c1_car2', 'c1_tractor'][o.seed % 4], w = o.seed >= 10 ? 84 : 70, a = o.seed % 2 ? Math.PI : 0;
-    g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx + 4, cy + 5, w * 0.48, w * 0.22, 0, 0, 6.28); g.fill(); c1Draw(g, id, cx, cy, w, a); return true;
+    c1Draw(g, id, cx, cy, w, a); return true;
   }
   if (C1 && o.k === 'hatch') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 2, cy + 3, 22, 0, 6.28); g.fill(); c1Draw(g, 'c1_hatch', cx, cy, 46); return true; }
   if (C1 && o.k === 'fire') {
@@ -731,7 +736,7 @@ function artStatic0(g, o) {
     else c1Draw(g, 'c1_campfire', cx, cy, 30 * 192 / 72);
     g.restore(); return true;
   }
-  if (C1 && o.k === 'pylon') { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(cx + 3, cy + 4, 9, 0, 6.28); g.fill(); c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
+  if (C1 && o.k === 'pylon') { c1Draw(g, 'c1_pole_conc', cx, cy, 44, (o.x * 7 % 3) * 0.2); return true; }
   if (o.k === 'bus') {
     const s = Math.min(o.w / 292, o.h / 133), bw = 292 * s, bh = 133 * s;
     g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - bw / 2 + 6, cy - bh / 2 + 7, bw, bh);
@@ -1059,12 +1064,10 @@ function artCrate(o) {
   const id = C1 ? (o.sprite || (o.stash ? 'c1_crate_army' : 'c1_crate')) : 'crate';
   ART.draw(ctx, id, o.x + o.w / 2, o.y + o.h / 2, o.w, o.h, o.sprite ? 0 : ((o.x + o.y) % 4) * Math.PI / 2);
   ctx.restore();
-  if (o.stash && !o.looted) { const p = 0.5 + 0.5 * Math.sin(S.min * 4); ctx.fillStyle = 'rgba(220,170,80,' + (0.25 + p * 0.35) + ')'; ctx.fillRect(o.x + o.w / 2 - 2, o.y - 6, 4, 4); }
 }
 function artCache(o) {
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(o.x + 2, o.y + 4, 9, 5, 0, 0, 6.28); ctx.fill();
   ART.draw(ctx, 'stash', o.x, o.y, 16, 14);
-  const p = 0.5 + 0.5 * Math.sin(S.min * 5); ctx.fillStyle = 'rgba(220,170,80,' + (0.3 + p * 0.4) + ')'; ctx.fillRect(o.x - 2, o.y - 16, 4, 4);
 }
 /* пакет C1 (графика Кордона от GPT): дополняет и заменяет материалы и спрайты деревни; #c1-off — прежняя графика */
 const C1 = !!(window.C1_MANIFEST && !/c1-off/.test(location.hash));
