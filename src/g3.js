@@ -115,10 +115,10 @@ function takedown(e) {
   else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
   ents.forEach(o => { if (o !== e && o.alive && hostile(o, P) && o.tgt !== P && dE(o, e) < 150 && los(o.x, o.y, e.x, e.y)) o.aw = Math.max(o.aw || 0, 0.75); });   // кто рядом и видел — насторожился
 }
-function solidPx(x, y) {
+function solidPx(x, y, skipFences = false) {
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
   if (!inb(tx, ty) || SOLID[map[ty * MW + tx]]) return true;
-  return objs.some(o => o.solid && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h);
+  return objs.some(o => o.solid && !(skipFences && o.k === 'fence') && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h);
 }
 function throwNade() {
   if (!has('grenade')) { msg('Гранат нет.'); return; }
@@ -272,7 +272,7 @@ function updatePlayer(dt) {
       if (!e.alive || e === P || !hostile(P, e) || e.captive || e.cloak > 0.7) continue;
       const d = dE(P, e); if (d > 520) continue;
       const da = Math.abs(angD(aimDir, Math.atan2(e.y - P.y, e.x - P.x)));
-      if (da > cone || !los(P.x, P.y, e.x, e.y)) continue;
+      if (da > cone || !seesActor(P, e)) continue;
       const sc = da * 260 + d * 0.5 - (e === P.lock ? 120 : 0);
       if (sc < bs) { bs = sc; best = e; }
     }
