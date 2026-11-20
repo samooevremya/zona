@@ -69,6 +69,7 @@ function drawPda2() {
   bar.appendChild(btn('chip', 'К игроку', () => { panel.focus = 'me'; if (panel.zl < 2) panel.zl = 2; refresh(); }));
   bar.appendChild(btn('chip', 'К цели', () => { panel.focus = 'target'; if (panel.zl < 2) panel.zl = 2; refresh(); }, !selT.length));
   [['ppl', 'Люди'], ['cache', 'Тайники'], ['loc', 'Подписи']].forEach(f => bar.appendChild(btn('chip' + (panel.f[f[0]] ? ' on' : ''), f[1], () => { panel.f[f[0]] = !panel.f[f[0]]; refresh(); })));
+  if (BIG) bar.prepend(el('span','zl', P.y >= CORDON_ROWS*T ? 'Малая Зона' : 'Кордон'));
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);

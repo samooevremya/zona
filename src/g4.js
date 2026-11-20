@@ -296,6 +296,8 @@ function* paintGroundWin(g, R) {
   drawThresholds(g);
   yield;
   drawCordonDetails(g);
+  drawLesserDetails(g);
+  drawTrailSigns(g);
   // кусты и пни деревьев
   for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
     const t = map[y * MW + x], px = x * T + 16, py = y * T + 16;
@@ -766,7 +768,7 @@ function render() {
   }
   drawCordonTrail(inView);
   // костёр
-  for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
+  for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);

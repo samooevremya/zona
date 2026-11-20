@@ -246,8 +246,9 @@ function advanceWorldTime(minutes, ctx) {
 
 /* ---------- костёр ---------- */
 function fireTeller() {
+  const camp = campOf(P);
   let b = null, bd = 200;
-  for (const e of ents) if (e.alive && e.kind === 'human' && e.fac === 'loner' && !e.follow && !e.sos && dst(e.x, e.y, FIRE.x, FIRE.y) < bd) { bd = dst(e.x, e.y, FIRE.x, FIRE.y); b = e; }
+  for (const e of ents) if (e.alive && e.kind === 'human' && e.fac === 'loner' && !e.follow && !e.sos && dE(e,camp) < bd) { bd = dE(e,camp); b = e; }
   return b;
 }
 function nearestFreeCache(x, y) {
@@ -620,7 +621,7 @@ function plusKill(e, src) {
   if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
-  const d = dst(P.x, P.y, FIRE.x, FIRE.y);
+  const d = dE(P, campOf(P));
   if (d < 50 && !inBunker(P.x, P.y)) cand(d - 25, { k: 'rest', label: 'Посидеть у костра' });
   interactRC1(cand);
 }

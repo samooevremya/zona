@@ -3,7 +3,8 @@
 /* ===================== основа ===================== */
 const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 /* BIG: большой Кордон 240×220 (+12 клеток под бункер). Старая карта генерируется в свои массивы 132×110, затем gbig.js переносит её по частям. */
-let MW = BIG ? 252 : 132, MH = BIG ? 220 : 110, PW = BIG ? 240 : 120, WW = MW * T, WH = MH * T;
+const CORDON_ROWS = BIG ? 220 : 110, WORLD_ROWS = CORDON_ROWS + (BIG ? 102 : 0);
+let MW = BIG ? 252 : 132, MH = WORLD_ROWS, PW = BIG ? 240 : 120, WW = MW * T, WH = MH * T;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
 const chance = p => Math.random() < p;
@@ -112,7 +113,7 @@ for (let y = 0; y < MH; y++) roadX[y] = 62 + Math.round(3 * Math.sin(y / 12));
 const OLD = BIG ? { MW: 132, MH: 110, PW: 120, map: new Uint8Array(132 * 110), keep: new Uint8Array(132 * 110), roadX: new Int16Array(110) } : null;
 if (BIG) for (let y = 0; y < 110; y++) OLD.roadX[y] = 62 + Math.round(3 * Math.sin(y / 12));
 /* переключение глобальной сетки: старая (для прежнего генератора) или большая */
-const BIGW = BIG ? { MW: MW, MH: MH, PW: PW, map: map, keep: keep, roadX: roadX } : null;
+const BIGW = BIG ? { MW: MW, MH: CORDON_ROWS, PW: PW, map: map, keep: keep, roadX: roadX } : null;
 function useGrid(g) { MW = g.MW; MH = g.MH; PW = g.PW; WW = MW * T; WH = MH * T; map = g.map; keep = g.keep; roadX = g.roadX; }
 const inb = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH;
 const tAt = (x, y) => inb(x, y) ? map[y * MW + x] : VO;
@@ -120,12 +121,12 @@ const setT = (x, y, v) => { if (inb(x, y)) map[y * MW + x] = v; };
 function reserve(x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) keep[y * MW + x] = 1; }
 function reserveC(cx, cy, r) { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (inb(x, y) && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) keep[y * MW + x] = 1; }
 const HOUSES = [];
-function house(x, y, w, h, doors, wall, broken, roof) {
+function house(x, y, w, h, doors, wall, broken, roof, random = srnd) {
   wall = wall === undefined ? BR : wall; broken = broken === undefined ? 0.04 : broken;
   for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
     const edge = xx === x || yy === y || xx === x + w - 1 || yy === y + h - 1;
     const corner = (xx === x || xx === x + w - 1) && (yy === y || yy === y + h - 1);
-    setT(xx, yy, edge && (corner || srnd() > broken) ? wall : (wall === CO ? CF : FL));
+    setT(xx, yy, edge && (corner || random() > broken) ? wall : (wall === CO ? CF : FL));
   }
   doors.forEach(d => setT(x + d[0], y + d[1], wall === CO ? CF : FL));
   reserve(x - 1, y - 1, x + w, y + h);
@@ -802,7 +803,7 @@ function mkHuman(d) {
     wpn: d.wpn || 'w_pm', mag: W.mag || 0, cool: 0, reload: 0, think: Math.random() * 0.3, react: 0.5, mem: 0,
     home: { x: d.x * T, y: d.y * T }, sit: d.sit, stay: d.stay, guard: d.guard, captive: d.captive, named: d.named, rank: rank,
     money: (d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120, inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
-    wounded: d.wounded, fireRef: d.fire === 2 ? FIRE2 : FIRE,
+    wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null, score: [ri(2, 14), ri(15, 44), ri(45, 80)][Math.min(rank, 2)] };
   e.maxhp = e.hp;
   if (e.sit) e.ang = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
@@ -1900,7 +1901,7 @@ function update(dt) {
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
   if (!cordonStage() && P.alive && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
-  if (BIG && P.alive && !inBunker(P.x, P.y) && warnT <= 0 && (P.x < 5 * T || P.x > (PW - 5) * T)) { warnT = 6; msg(P.x < 5 * T ? 'Дальше Залесье. Эта часть Зоны появится в следующей версии.' : 'Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
@@ -1976,7 +1977,7 @@ function update(dt) {
   spawnT -= dt; if (spawnT <= 0) { spawnT = 20; spawnTick(); }
   fogT -= dt; if (fogT <= 0 && P.alive) { fogT = 0.4; reveal(); }
   saveT -= dt;
-  if (saveT <= 0 && P.alive && (dE(P, FIRE) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
+  if (saveT <= 0 && P.alive && (dE(P, campOf(P)) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
   // штурм АТП с Петрухой
   if (S.q.flash >= 2 && !S.flags.assault && !S.flags.atpClear) {
     const p = byS('petr');
@@ -2007,6 +2008,7 @@ function updatePlayer(dt) {
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
+  if (BIG && P.y >= CORDON_ROWS*T && poppyBed(P.x/T, P.y/T-CORDON_ROWS)<.88 && tAt(Math.floor(P.x/T), Math.floor(P.y/T))===GR) P.st = Math.max(0,P.st-20*dt);
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
@@ -2487,6 +2489,8 @@ function* paintGroundWin(g, R) {
   drawThresholds(g);
   yield;
   drawCordonDetails(g);
+  drawLesserDetails(g);
+  drawTrailSigns(g);
   // кусты и пни деревьев
   for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
     const t = map[y * MW + x], px = x * T + 16, py = y * T + 16;
@@ -2957,7 +2961,7 @@ function render() {
   }
   drawCordonTrail(inView);
   // костёр
-  for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
+  for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
@@ -3837,7 +3841,7 @@ function* artGround(g, R) {
     const t = tiles[y * MW + x], px = x * T, py = y * T;
     let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
     if (C1 && t === SW) {
-      id = BIG && x >= 224 ? 'water' : 'swamp';
+      id = BIG && (x >= 224 || y >= CORDON_ROWS) ? 'water' : 'swamp';
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
@@ -4905,8 +4909,9 @@ function advanceWorldTime(minutes, ctx) {
 
 /* ---------- костёр ---------- */
 function fireTeller() {
+  const camp = campOf(P);
   let b = null, bd = 200;
-  for (const e of ents) if (e.alive && e.kind === 'human' && e.fac === 'loner' && !e.follow && !e.sos && dst(e.x, e.y, FIRE.x, FIRE.y) < bd) { bd = dst(e.x, e.y, FIRE.x, FIRE.y); b = e; }
+  for (const e of ents) if (e.alive && e.kind === 'human' && e.fac === 'loner' && !e.follow && !e.sos && dE(e,camp) < bd) { bd = dE(e,camp); b = e; }
   return b;
 }
 function nearestFreeCache(x, y) {
@@ -5279,7 +5284,7 @@ function plusKill(e, src) {
   if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
-  const d = dst(P.x, P.y, FIRE.x, FIRE.y);
+  const d = dE(P, campOf(P));
   if (d < 50 && !inBunker(P.x, P.y)) cand(d - 25, { k: 'rest', label: 'Посидеть у костра' });
   interactRC1(cand);
 }
@@ -5387,6 +5392,7 @@ function drawPda2() {
   bar.appendChild(btn('chip', 'К игроку', () => { panel.focus = 'me'; if (panel.zl < 2) panel.zl = 2; refresh(); }));
   bar.appendChild(btn('chip', 'К цели', () => { panel.focus = 'target'; if (panel.zl < 2) panel.zl = 2; refresh(); }, !selT.length));
   [['ppl', 'Люди'], ['cache', 'Тайники'], ['loc', 'Подписи']].forEach(f => bar.appendChild(btn('chip' + (panel.f[f[0]] ? ' on' : ''), f[1], () => { panel.f[f[0]] = !panel.f[f[0]]; refresh(); })));
+  if (BIG) bar.prepend(el('span','zl', P.y >= CORDON_ROWS*T ? 'Малая Зона' : 'Кордон'));
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);
@@ -6351,7 +6357,7 @@ function rc1Gen() {
    Прежний генератор строит Кордон 132×110 в своих массивах (OLD). Здесь он переносится
    на карту 240×220 по частям ("штампам"): каждое место сдвигается целиком, без растяжения,
    так что дома, двери, якоря и задания внутри места остаются как были. Между местами
-   новая местность: дороги, лес, ручей на востоке, три выхода (Свалка, Залесье, Затон)
+   новая местность: дороги, лес, ручей на востоке, три дороги (Свалка, Малая Зона, Затон)
    и новые места. Все старые координаты (клетки и пиксели) пересчитываются одной функцией RM. */
 
 /* штампы: прямоугольник в старых клетках [x0,y0,x1,y1] и сдвиг [dx,dy] в клетках */
@@ -6477,7 +6483,7 @@ function bigWorld() {
   P2(VEHICLE_ROUTES[0], 0.8);                                // деревня → шоссе
   P2([[73, 129], [68, 141], [63, 153]], 0.7);                          // водокачка → деревня
   P2([[80, 123.5], [100, 122], [125, 121]], 0.7);                      // водокачка → шоссе
-  P2([[69, 123], [52, 125.5], [36, 127.5], [18, 121.5], [0, 118]], 0.8); // на Залесье
+  P2([[69, 123], [52, 125.5], [36, 127.5], [18, 121.5], [0, 118]], 0.8); // исходная колея, продолжается в makeLesserZone
   P2(VEHICLE_ROUTES[1], 0.8);                 // шоссе → АТП
   P2([[197.5, 128], [200, 110], [206, 92], [206.5, 74]], 0.7);         // АТП → релейная будка
   P2([[206, 90], [220, 92], [239, 92]], 0.8);                          // на Затон через брод
@@ -6605,7 +6611,7 @@ function bigNewObjects(R) {
     anchors: { clear: [122, 25], sos: [[133, 22]], wreck: [131.5,22.5] } });
   bigLoc('tower', { name: 'Охотничья вышка', gen: 'охотничьей вышки', type: 'story', bounds: [11, 24, 22, 35], entrances: [[19, 31]],
     anchors: { top: [16.5, 29.5], clear: [18, 33] } });
-  bigLoc('exit_w', { name: 'Дорога на Залесье', gen: 'дороги на Залесье', type: 'story', bounds: [0, 112, 8, 124], entrances: [[6, 118]], anchors: { gate: [3, 118] } });
+  bigLoc('exit_w', { name: 'Дорога в Малую Зону', gen: 'дороги в Малую Зону', type: 'story', bounds: [5, 119, 19, 130], entrances: [[11, 124]], anchors: { gate: [11, 124] } });
   bigLoc('exit_e', { name: 'Дорога на Затон', gen: 'дороги на Затон', type: 'story', bounds: [232, 86, 239, 98], entrances: [[233, 92]], anchors: { gate: [237, 92] } });
   SOS_SPOTS.push([38, 137, 'hutor'], [224, 99, 'ford'], [133, 22, 'column']);
   CLEAR_SPOTS.push([33, 131, 'у хутора', 'hutor'], [226, 97, 'у брода', 'ford'], [122, 25, 'у разбитой колонны', 'column']);
@@ -6723,7 +6729,7 @@ const CORDON_DETAILS = [
   // Поле аномалий
   ['c1_trace_reel', 145, 110, 29, -0.31],
   ['c1_trace_kettle', 146, 111, 24, 0.18],
-  // Дорога на Залесье
+  // Дорога в Малую Зону
   ['c1_trace_stump', 7, 117, 51, -0.12],
   ['c1_log0', 16, 122, 41, 0.55],
   // Хутор
@@ -6759,6 +6765,235 @@ const CORDON_DETAILS = [
   ['c1_sandbags', 131, 205, 51, 0.23],
   ['c1_trace_reel', 133, 204.5, 32, -0.32],
 ];
+
+/* Малая Зона продолжает общую сетку. Координаты старого Кордона и шаг строки
+   сохранений остаются прежними. Местные планы отсчитывают строки от границы. */
+const LESSER_FIRE = { x: 90.5*T, y: (CORDON_ROWS+49.5)*T };
+const campOf = e => BIG && e.y >= CORDON_ROWS*T ? LESSER_FIRE : FIRE;
+const WORLD_FIRES = BIG ? [FIRE, FIRE2, LESSER_FIRE] : [FIRE, FIRE2];
+const lesserPlaces = [
+  // id, название, границы, общедоступная точка подхода
+  ['zalissya','Залесье',[78,36,104,57],[91,49]],
+  ['poppies','Маковое поле',[31,16,54,31],[49,27]],
+  ['mill','Старая мельница',[43,62,60,74],[55,69]],
+  ['cowsheds','Коровники',[111,17,132,33],[123,26]],
+  ['tower_lz','Водонапорная башня',[73,25,81,32],[78,31]],
+  ['sphere','Комплекс «Сфера»',[152,37,176,54],[155,48]],
+  ['barge','Баржа в старице',[25,78,37,88],[34,81]],
+  ['survey','Пост замеров',[67,73,80,85],[74,81]],
+  ['bulge','Бульба',[118,65,133,78],[126,75]],
+  ['postal','Почтовое отделение',[54,37,64,47],[60,44]],
+  ['fuel_lz','Склад ГСМ',[183,62,199,76],[191,69]],
+  ['elevator_lz','Старый элеватор',[139,77,154,91],[146,82]],
+  ['ribs_lz','Рёбра',[97,76,108,88],[105,82]],
+  ['boiler_lz','Котельная',[197,22,214,35],[204,31]],
+  ['bunker_lz','Бункер наблюдений',[50,6,61,13],[56,11]],
+  ['north_lz','Лесной кордон',[18,2,32,13],[25,10]]
+];
+const lesserLore = {
+  lz_spool: 'Ящик с зелёным замком стоит в доме у костра. Сюда доходят вещи из твоего ящика на Кордоне.',
+  lz_sieve: 'Видишь старую водонапорку за крышами? От неё одна колея идёт к коровникам, другая возвращается в деревню.',
+  lz_meter: 'В старице маятник детектора тянет к воде. В самом центре завихрения лучше не задерживаться.',
+  lz_watch: 'Держись дороги мимо почты и выйдешь к костру в Залесье. Обратно на Кордон можно уйти и по южной тропе.',
+  lz_millhand: 'За красными цветами быстро кончаются силы. Иди по колее вдоль поля, если рюкзак тяжёлый.'
+};
+const poppyBed = (x,y) => ((x-42)/10)**2 + ((y-23)/6.8)**2 + .16*Math.sin(.83*x+.47*y);
+const lesserLandmarks = [
+  {kind:'tank', x:77, y:28, radius:36},
+  {kind:'antenna', x:85.6, y:44.6, radius:27},
+  {kind:'dome', x:166, y:43, radius:62},
+  {kind:'silo', x:128, y:20, radius:28},
+  {kind:'silo', x:131, y:20, radius:26},
+  {kind:'silo', x:151, y:80, radius:37},
+  {kind:'silo', x:151, y:83, radius:36},
+  {kind:'tank', x:193, y:64, radius:31},
+  {kind:'tank', x:196, y:64, radius:31}
+];
+const riverAt = y => 21 + 11*Math.sin((y-10)/17) + 6*Math.sin(y/8);
+function makeLesserZone() {
+  if (!BIG) return;
+  useGrid({ ...BIGW, MH: WORLD_ROWS });
+  const random = mulberry32(927731);
+  const Y = CORDON_ROWS;
+  for (let y=0; y<MH-Y; y++) {
+    roadX[Y+y] = -1;
+    for (let x=0; x<MW; x++) {
+      let tile = GR;
+      const stream = Math.abs(x-riverAt(y));
+      const backwater = ((x-30)/10)**2 + ((y-84)/7)**2 < 1;
+      const woodland = vnoise(x+73,y+31,12)*.6 + vnoise(x+306,y,5)*.4;
+      const roll = random();
+      if (x >= PW) tile = VO;
+      else if (x<2 || x>=PW-2 || y>=MH-Y-2) tile = TR;
+      else if (stream < 1.6 || backwater || ((x-214)/17)**2+((y-50)/29)**2<1) tile=SW;
+      else if (roll < Math.max(.012,(woodland-.42)*1.43)) tile=TR;
+      else if (roll > .91) tile=BU;
+      setT(x,Y+y,tile);
+    }
+  }
+  // Необитаемые участки старой южной опушки смыкаются с новым лесом.
+  // Западная колея огибает Кордон, вторая тропа ведёт от южного блокпоста.
+  const lane = (pts, width, tile=DI) => bigPath(pts.map(([x,y])=>[x,Y+y]),width,tile);
+  const clear = (x,y,w,h) => {
+    for (let i=x; i<x+w; i++) for (let j=y; j<y+h; j++) setT(i,Y+j,GR);
+    reserve(x,Y+y,x+w-1,Y+y+h-1);
+  };
+  lesserPlaces.forEach(([id,name,b,gate]) => {
+    if (id!=='barge' && id!=='poppies') clear(b[0],b[1],b[2]-b[0]+1,b[3]-b[1]+1);
+    bigLoc(id,{name,gen:name,type:id==='poppies'||id==='bulge'?'anomaly':'story',
+      bounds:[b[0],Y+b[1],b[2],Y+b[3]],entrances:[[gate[0],Y+gate[1]]],anchors:{approach:[gate[0],Y+gate[1]]}});
+  });
+  for(let y=64;y<=74;y++) for(let x=118;x<=130;x++)
+    if(((x-124)/5.5)**2+((y-69)/4.2)**2+vnoise(x,y,2)*.19<1) setT(x,Y+y,SW);
+  for(let y=15;y<=32;y++) for(let x=30;x<=54;x++) if(poppyBed(x+.5,y+.5)<1.2) setT(x,Y+y,GR);
+  for(let x=0;x<=16;x++) for(let y=115;y<=124;y++)
+    if(tAt(x,y)===DI) setT(x,y,x<2?TR:GR);
+  bigPath([[18,122],[11,124],[7,129],[9,139],[8,153],[15,167],[11,185],[17,202],[22,214],[25,Y+10]],1.55);
+  lane([[127,-13],[118,-8],[111,-3],[111,3],[104,11],[94,23],[89,35],[90,46]],1.4);
+  lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[155,48],[172,50],[190,58],[191,69]],2);
+  lane([[48,27],[39,29],[32,38],[29,51],[38,59],[55,69],[67,61],[82,56],[88,51],[90,46]],1.1);
+  lane([[55,69],[46,77],[34,81]],1.2);
+  lane([[55,69],[64,75],[74,81],[92,77],[107,75],[126,75],[144,69],[154,55],[155,48]],1.2);
+  lane([[78,31],[88,33],[94,23],[108,24],[123,26],[138,30],[155,48]],1.35);
+  lane([[191,69],[182,82],[164,85],[146,81],[126,75]],1.1);
+  lane([[36,13],[47,11],[56,11],[70,16],[78,31]],1.2);
+  lane([[172,50],[183,40],[191,36],[204,31],[222,32]],1.35);
+  lane([[204,31],[199,46],[190,58]],1.1);
+  lane([[92,77],[98,82],[105,82],[112,78]],1.15);
+  bigPath([[31,132],[25,134],[19,135],[9,139]],1.1);
+  // Два брода пересекают русло: оставляем мокрую кромку по обе стороны.
+  for (const y of [12,52]) {
+    const c=Math.round(riverAt(y));
+    for(let i=-4;i<=4;i++) for(let j=-1;j<=1;j++) setT(c+i,Y+y+j,DI);
+  }
+  const cottages = [
+    [78,37,7,5,'slate'],[89,38,7,6,'plank'],[98,41,6,5,'slate'],
+    [79,51,8,5,'plank'],[94,53,7,5,'slate'],[56,37,7,5,'plank'],
+    [42,17,5,4,'plank'],[45,63,10,5,'plank'],
+    [111,18,13,5,'slate'],[117,29,13,5,'slate'],
+    [153,39,8,5,'conc'],[168,50,9,5,'conc'],[67,75,7,5,'conc'],
+    [140,85,11,5,'slate'],[198,24,12,5,'conc'],[210,27,5,4,'conc'],[51,6,8,4,'conc'],
+    [183,63,8,5,'slate'],[187,72,12,5,'conc'],[19,4,6,4,'plank']
+  ];
+  for (const [x,y,w,h,roof] of cottages) {
+    clear(x-1,y-1,w+2,h+2);
+    house(x,Y+y,w,h,[[Math.floor(w/2),h-1]],roof==='conc'?CO:BR,0,roof,random);
+    const doorX=x+Math.floor(w/2);
+    for (let j=0;j<3;j++) setT(doorX,Y+y+h+j,DI);
+    HOUSES[HOUSES.length-1].ok = x+','+(Y+y);
+  }
+  // Open strips between the pens and yards are actual walkable gates.
+  for (const [kind,x1,y1,x2,y2] of [
+    ['picket',78,43.5,81,43.5],['picket',84.7,43.5,87,43.5],
+    ['picket',87,39,87,43.5],['picket',93,51.8,96,51.8],
+    ['picket',100,50,100,51.8],['picket',98.5,51.8,100,51.8],
+    ['rail',108.5,25.5,114,25.5],['rail',108.5,21,108.5,25.5],
+    ['rail',128,28.2,133,28.2],['rail',133,23,133,28.2],
+    ['mesh',151.5,37,168.5,37],['mesh',151.5,37,151.5,45],
+    ['mesh',151.5,51,151.5,56],['mesh',151.5,56,159.5,56],
+    ['mesh',176.8,39,176.8,48],['mesh',176.8,39,178.8,39]
+  ]) CORDON_FENCES.push([kind,x1,Y+y1,x2,Y+y2]);
+  for (const [x,y,t] of [[78,44,BU],[86,41,BU],[82,49,TR],[86,50,BU],[94,48,BU],
+    [98,38,TR],[101,39,BU],[88,53,BU],[76,53,TR],[111,24,BU],[132,29,TR],
+    [47,61,TR],[55,68,BU],[155,37,BU],[168,46,TR],[77,27,BU]]) {
+    if(tAt(x,Y+y)===GR) setT(x,Y+y,t);
+  }
+  for (const l of lesserLandmarks) {
+    const x=l.x*T,y=(Y+l.y)*T,r=l.radius*(l.kind==='antenna'?.38:.78);
+    addObj({k:'installation',x:x-r,y:y-r,w:r*2,h:r*2,solid:1,opaque:1});
+  }
+  addObj({k:'fire',x:LESSER_FIRE.x-10,y:LESSER_FIRE.y-10,w:20,h:20,solid:1});
+  addObj({k:'locker',baseName:'Залесье',x:92*T,y:(Y+41)*T,w:26,h:18,solid:true});
+  for(const [stash,x,y,loot] of [
+    ['lz_mill',51,65,{bandage:2,energy:1}], ['lz_sphere',157,41,{a9:16,medkit:1}],
+    ['lz_post',58,39,{bread:1,antirad:1}], ['lz_barge',34,83,{money:75,cans:1}]
+  ]) addObj({k:'crate',stash,x:x*T+3,y:(Y+y)*T+3,w:26,h:26,solid:1,loot});
+  CORDON_DETAILS.push(...[
+    ['c1_trace_boat',29,84,168,-.52],['c1_trace_reel',53,71,44,.25],
+    ['c1_trace_pipes',208,31,65,.1],['c1_trace_reel',143,81,41,.3],
+    ['c1_rock1',99,84,98,-.68],['c1_rock0',101,83.7,68,-.64],
+    ['c1_rock1',102.7,84.2,76,-.57],['c1_rock0',104.7,85,52,-.51],
+    ['c1_tractor',114,25,80,-.38],['c1_trace_churn',124,28,25,-.16],
+    ['c1_trace_pipes',160,47,72,.57],['c1_sandbags',152,46,52,.08],
+    ['c1_barrel',95,46,25,.06],['c1_tires',62,44,39,.17],
+    ['c1_trace_wheel',46,69,45,-.2],['c1_trace_sleepers',35,81,65,.55],
+    ['c1_crate_army',69,82,37,.04],['c1_trace_stump',39,25,35,.8],
+    ['c1_yard_car',83,46,69,-.56],['c1_trace_pipes',195,70,75,.2]
+  ].map(([id,x,y,width,a])=>[id,x,Y+y,width,a]));
+  ANOM0.push({id:'lz-ribs',k:'e',x:102*T,y:(Y+82)*T,r:31},{id:'lz-pool',k:'g',x:124*T,y:(Y+69)*T,r:70},
+    {id:'lz-yard',k:'e',x:162*T,y:(Y+51)*T,r:37});
+  ARTS0.push({key:'lz_pool',id:'art_medusa',x:126*T,y:(Y+69)*T},
+    {key:'lz_yard',id:'art_bengal',x:163*T,y:(Y+51)*T});
+  for(const [sid,name,x,y,wpn,fac] of [
+    ['lz_spool','Катушка',89,49,'w_pm','loner'],['lz_sieve','Сито',92,50,'w_obrez','loner'],
+    ['lz_millhand','Мельник',54,70,'w_pm','loner'],['lz_meter','Шкала',75,80,'w_pm','loner'],
+    ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
+    ['lz_rivet','Радист',170,48,'w_obrez','army']
+  ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,named:1,stay:1,sit:sid==='lz_spool'||sid==='lz_sieve',localFire:LESSER_FIRE});
+  DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
+}
+const lesserSprites = {};
+async function loadLesserSprites() {
+  await Promise.all(Object.entries(window.LESSER_ART || {}).map(async ([name,url]) => {
+    const sprite = new Image(); sprite.src=url;
+    try { await sprite.decode(); lesserSprites[name]=sprite; } catch { /* Render the baked map and the simple landmark silhouettes if decoding fails. */ }
+  }));
+}
+const trailSigns = [
+  [13.5,126.3,'МАЛАЯ ЗОНА  ↓'],[24.4,230.2,'ЗАЛЕСЬЕ  →'],
+  [60,264.9,'←  МЕЛЬНИЦА'],[91.3,267.1,'ЗАЛЕСЬЕ'],[104,268.8,'СФЕРА  →']
+];
+function drawTrailSigns(g) {
+  if (!BIG) return;
+  for (const [tx,ty,label] of trailSigns) {
+    const x=tx*T,y=ty*T;
+    if(x+60<GWP.x0 || x-60>GWP.x1 || y+22<GWP.y0 || y-22>GWP.y1) continue;
+    g.save();g.translate(x,y);g.rotate(-.06);
+    g.fillStyle='#524532';g.fillRect(-23,-5,4,14);g.fillRect(19,-5,4,13);
+    g.shadowColor='rgba(25,22,17,.45)';g.shadowOffsetX=3;g.shadowOffsetY=3;
+    g.fillStyle='#695847';g.fillRect(-34,-10,68,13);g.shadowColor='transparent';
+    g.fillStyle='#4a5042';g.fillRect(-32,-9,64,10);g.fillStyle='#d1cbb1';
+    g.textAlign='center';g.font='bold 8px sans-serif';g.fillText(label,0,-1);g.restore();
+  }
+}
+// Окраска соцветий, рёбра оболочек и тени попадают в те же кэшированные
+// куски земли, что и местные декорации. На мини-карте используется тот же план.
+function drawLesserDetails(g) {
+  if (!BIG || GW.y1<CORDON_ROWS) return;
+  const top=CORDON_ROWS;
+  for(let y=Math.max(15,GW.y0-top);y<=Math.min(31,GW.y1-top);y++)
+    for(let x=Math.max(30,GW.x0);x<=Math.min(54,GW.x1);x++) {
+      const density=1-poppyBed(x+.5,y+.5);
+      if(density<=0 || tAt(x,top+y)!==GR) continue;
+      const rand=mulberry32(x*9181+y*731);
+      const sprite=lesserSprites.poppies;
+      if(!sprite) continue;
+      for(let i=0;i<4*density;i++){
+        const px=(x+rand())*T, py=(top+y+rand())*T, size=13+rand()*17;
+        g.save();g.translate(px,py);g.rotate(rand()*Math.PI*2);
+        g.drawImage(sprite,-size/2,-size/2,size,size);g.restore();
+      }
+    }
+  drawLesserInstallations(g,GWP);
+}
+function drawLesserInstallations(g,win) {
+  for (const l of lesserLandmarks) {
+    const x=l.x*T,y=(CORDON_ROWS+l.y)*T,r=l.radius;
+    if(win && (x+r*2<win.x0 || x-r>win.x1 || y+r*2<win.y0 || y-r>win.y1)) continue;
+    g.save();g.translate(x,y);
+    g.fillStyle=l.kind==='antenna'?'rgba(24,19,13,.16)':'rgba(24,19,13,.28)';
+    g.beginPath();g.ellipse(r*.39,r*.54,r*1.02,r*.87,.4,0,2*Math.PI);g.fill();
+    const sprite=lesserSprites[l.kind];
+    if(sprite) {
+      const scale=2*r/Math.max(sprite.width,sprite.height), w=sprite.width*scale,h=sprite.height*scale;
+      g.drawImage(sprite,-w/2,-h/2,w,h);
+    }
+    else {
+      g.fillStyle='#79786b';g.beginPath();g.arc(0,0,r,0,Math.PI*2);g.fill();
+    }
+    g.restore();
+  }
+}
 
 /* Measured glove centres in the 48 × 56 south-facing G8 animation frames.
    The first glove is the character's right hand (left in the image). */
@@ -8279,7 +8514,7 @@ function talk(e) {
   // обычный одиночка
   const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
   dialog(cardOf(e), lines, () => {
-    const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : LORE[(e.seed + e.talked * 5) % LORE.length]); } }];
+    const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
     if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
@@ -8436,7 +8671,7 @@ function drawLoot() {
 const PDA_TABS = [['map', 'Карта'], ['tasks', 'Задания'], ['log', 'Журнал'], ['stat', 'Данные']];
 function drawPda() {
   if (panel.tab === 'map') {
-    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Вся карта Кордона.'));
+    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Кордон и Малая Зона.'));
     bar.appendChild(btn('chip', panel.zoom ? 'Отдалить' : 'Приблизить', () => { panel.zoom = !panel.zoom; refresh(); }));
     pbody.appendChild(bar);
     const w = el('div', 'mapwrap' + (panel.zoom ? ' zoom' : '')), c = el('canvas'); c.id = 'bigmap'; c.width = PW * 6; c.height = MH * 6;
@@ -8602,6 +8837,13 @@ function buildBigMini() {
     g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
     if (ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
+  if (BIG) {
+    g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); g.restore();
+    g.fillStyle='rgba(134,61,44,.65)';
+    for(let y=16;y<31;y+=.5) for(let x=31;x<54;x+=.5)
+      if (poppyBed(x,y)<.9 && tAt(Math.floor(x),CORDON_ROWS+Math.floor(y))===GR)
+        g.fillRect(x, CORDON_ROWS+y,.32,.32);
+  }
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
       g.fillStyle = o.k === 'bus' ? '#8a6a2a' : '#6b6a5e';
@@ -8617,8 +8859,8 @@ async function buildMini() {
     try {
       await photo.decode();
       if (photo.width === PW * 4 && photo.height === MH * 4) {
-        miniC.width = photo.width; miniC.height = photo.height;
-        miniC.getContext('2d').drawImage(photo, 0, 0);
+        miniC.width=photo.width; miniC.height=photo.height;
+        miniC.getContext('2d').drawImage(photo,0,0);
         return;
       }
     } catch (e) { /* Старый браузер использует карту из клеток мира. */ }
@@ -8753,8 +8995,9 @@ function drawMapTo(g, s, full, o) {
   if (full) LOCATIONS.forEach(l => {
     if (l.id === 'sid') return;
     const cx = (l.bounds[0] + l.bounds[2]) / 2, cy = (l.bounds[1] + l.bounds[3]) / 2;
-    if (!fog[Math.min(MH - 1, Math.max(0, Math.round(cy))) * MW + Math.min(MW - 1, Math.round(cx))]) return;
-    labs.push({ t: l.name, x: cx * s, y: cy * s, gap: 0, pri: 1, font: '600 ' + Math.round(11.5 * u) + 'px Arial', c: 'rgba(232,222,186,0.95)' });
+    const villageHub = l.id === 'zalissya';
+    if (!villageHub && !fog[Math.min(MH - 1, Math.max(0, Math.round(cy))) * MW + Math.min(MW - 1, Math.round(cx))]) return;
+    labs.push({ t: l.name, x: cx * s, y: cy * s, gap: villageHub ? 12*u : 0, pri: villageHub ? .5 : 1, font: '600 ' + Math.round(11.5 * u) + 'px Arial', c: 'rgba(232,222,186,0.95)' });
   });
   // раскладка подписей
   const hit = (a) => busy.some(b => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]);
@@ -9106,10 +9349,10 @@ function frame(now) {
 /* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
 function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  bootStep('мир'); gen(); bigWorld(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); await prepareShopGate(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
+  bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {

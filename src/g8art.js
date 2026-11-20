@@ -272,7 +272,7 @@ function* artGround(g, R) {
     const t = tiles[y * MW + x], px = x * T, py = y * T;
     let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
     if (C1 && t === SW) {
-      id = BIG && x >= 224 ? 'water' : 'swamp';
+      id = BIG && (x >= 224 || y >= CORDON_ROWS) ? 'water' : 'swamp';
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);

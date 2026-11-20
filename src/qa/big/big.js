@@ -19,13 +19,13 @@ Tt('K1_paths_to_all_places_and_exits', () => {
     const f = z.plus.freeTile(e[0], e[1]), L = pathLen(fx, fy, f.x * T, f.y * T);
     if (L < 0) bad.push(l.id); else tab[l.name] = Math.round(L / WALK / 6) / 10;
   });
-  const ex = { 'Свалка (север)': [128, 2.5], 'Залесье (запад)': [1.5, 118], 'Затон (восток)': [238.5, 92] };
+  const ex = { 'Свалка (север)': [128, 2.5], 'Малая Зона (западная дорога)': [11, 124], 'Затон (восток)': [238.5, 92] };
   Object.entries(ex).forEach(([n, p]) => { const L = pathLen(fx, fy, p[0] * T, p[1] * T); if (L < 0) bad.push(n); else tab[n] = Math.round(L / WALK / 6) / 10; });
   return { ok: bad.length === 0, unreachable: bad, walkMinutesFromVillage: tab };
 });
 Tt('K2_crossing_time', () => {
   reset();
-  const a = [128 * T, 2.5 * T], b = [128 * T, 216 * T], w = [1.5 * T, 118 * T], e = [238.5 * T, 92 * T];
+  const a = [128 * T, 2.5 * T], b = [128 * T, 216 * T], w = [11.5 * T, 124.5 * T], e = [238.5 * T, 92 * T];
   const ns = pathLen(a[0], a[1], b[0], b[1]), we = pathLen(w[0], w[1], e[0], e[1]);
   return { ok: ns > 0 && we > 0, note: 'справочно: время насквозь по дорогам без остановок', northSouth: { walkMin: +(ns / WALK / 60).toFixed(1), runMin: +(ns / RUN / 60).toFixed(1) }, westEast: { walkMin: +(we / WALK / 60).toFixed(1), runMin: +(we / RUN / 60).toFixed(1) } };
 });
@@ -48,7 +48,7 @@ Tt('K4_overview_and_fog', () => {
   z.save(true); const raw = localStorage.getItem('zona2d-kordon-qa') || '';
   const d = JSON.parse(raw), rev = d.fog.length;
   z.applyState(z.loadSave());
-  return { ok: mini[0] === B.PW() * 4 && mini[1] === B.MH() * 4 && fl === 252 * 220 && raw.length < 250000, mini, fogCells: fl, fogChars: rev, saveBytes: raw.length };
+  return { ok: mini[0] === B.PW() * 4 && mini[1] === B.MH() * 4 && fl === 252 * B.MH() && B.MH() > 220 && raw.length < 250000, mini, fogCells: fl, fogChars: rev, saveBytes: raw.length };
 });
 Tt('K5_migrate_rc1_save', () => {
   reset();
@@ -61,11 +61,11 @@ Tt('K5_migrate_rc1_save', () => {
 });
 Tt('K6_exit_messages', () => {
   reset(); const out = {};
-  [['west', 3 * T, 118 * T], ['east', 237 * T, 92 * T], ['north', 128 * T, 3 * T]].forEach(([n, x, y]) => {
+  [['east', 237 * T, 92 * T], ['north', 128 * T, 3 * T]].forEach(([n, x, y]) => {
     z.clearMsgs(); P().x = x; P().y = y; for (let i = 0; i < 400 && !B.msgs().length; i++) step(1);
     out[n] = B.msgs().join(' | ');
   });
-  return { ok: /Залесье/.test(out.west) && /Затон/.test(out.east) && /Свалка/.test(out.north), msgs: out };
+  return { ok: /Затон/.test(out.east) && /Свалка/.test(out.north), msgs: out };
 });
 Tt('K7_static_objects_clear', () => {
   const bad = [];
@@ -741,6 +741,72 @@ Tt('K_hostile_loner_shelters', () => {
   const held=S().blow.stage===2 && under() && !wolf.tgt && wolf.mag===mag;
   S().blow.t=.02; step(3);
   return {ok:!!(outside && disengaged && reached && held && !wolf.evacuating && wolf.angry), outside, disengaged, reached, held};
+});
+Tt('M1_continuous_world', () => {
+  reset();
+  const zales=M.LOC.zalissya.anchors.approach, west=M.LOC.exit_w.anchors.gate;
+  const route=z.findPath(west[0]*T,west[1]*T,zales[0]*T,zales[1]*T);
+  const boundary=220*T;
+  const cross=(x,dir)=>{
+    const p=P(), identity=p;
+    p.x=(x+.5)*T;p.y=boundary-dir*60;
+    z.IN.moveX=0;z.IN.moveY=dir;
+    let maxDelta=0;
+    for(let i=0;i<38;i++){
+      const old=[p.x,p.y];step(1);
+      maxDelta=Math.max(maxDelta,Math.hypot(p.x-old[0],p.y-old[1]));
+    }
+    z.resetInput();
+    return z.P===identity && (p.y-boundary)*dir>40 && maxDelta<6 && !z.panel;
+  };
+  const westLane=cross(23,1) && cross(23,-1);
+  const easternLane=cross(111,1) && cross(111,-1);
+  const oldFogLength=252*220/6;
+  z.save(true);const legacy=z.loadSave();
+  legacy.fog=legacy.fog.slice(0,oldFogLength);legacy.x=west[0]*T;legacy.y=west[1]*T;
+  z.applyState(legacy);const oldPos=P().x===legacy.x && P().y===legacy.y;
+  P().x=zales[0]*T;P().y=zales[1]*T;z.reveal();z.save(true);const saved=z.loadSave();z.applyState(saved);
+  const restored=P().x===saved.x && P().y===saved.y && saved.fog.length>oldFogLength;
+  return {ok:!!route?.length && westLane && easternLane && oldPos && restored,westLane,easternLane,oldPos,restored,routeCells:route?.length};
+});
+Tt('M2_lesser_zone_exploration', () => {
+  reset();const p=P(), s=S(), hh=z.gfxSnap().HOUSES;
+  const sites=M.LOCATIONS.filter(l=>l.bounds[1]>=220), center=M.LOC.zalissya.anchors.approach;
+  const reachable=sites.every(l=>{const [x,y]=l.anchors.approach;
+    return !!z.findPath(center[0]*T,center[1]*T,x*T,y*T);});
+  p.x=90.5*T;p.y=269.5*T+35;step(1);
+  const camp=z.near?.k==='rest';if(camp) z.interact();
+  const teller=document.getElementById('pbody').innerText;z.closePanel();
+  const stash=M.objs.find(o=>o.k==='locker' && o.baseName==='Залесье');
+  const houses=hh.filter(h=>h.y>=220);
+  const contacts=z.ents.filter(e=>e.alive&&e.fac==='loner'&&e.y>=220*T).length;
+  p.x=40.5*T;p.y=243.5*T;p.st=75;step(30);const tired=p.st<73;
+  p.x=91.5*T;p.y=268.5*T;step(30);const recovered=p.st>75;
+  return {ok:sites.length>=12 && reachable && camp && !!teller && !!stash && houses.every(h=>h.entrances.length) && contacts>=4 && tired && recovered,
+    sites:sites.length,houses:houses.length,reachable,camp,contacts,tired,recovered};
+});
+Tt('M3_walk_the_western_road', () => {
+  reset();
+  const p=P(), s=S();p.x=12.5*T;p.y=124.5*T;
+  const checkpoints=[[11,124],[7,129],[9,139],[8,153],[15,167],[11,185],[17,202],[22,214],[25,230],[36,233],[48,247],[59,252],[60,264],[76,266],[90,266]];
+  let walked=0, maxStep=0;
+  for(const [x,y] of checkpoints){
+    const path=z.findPath(p.x,p.y,(x+.5)*T,(y+.5)*T);
+    if(!path) return {ok:false,missing:[x,y]};
+    for(const goal of path){
+      let n=0;
+      while(Math.hypot(goal.x-p.x,goal.y-p.y)>6 && n++<52){
+        const dx=goal.x-p.x,dy=goal.y-p.y,d=Math.hypot(dx,dy);
+        z.IN.moveX=dx/d;z.IN.moveY=dy/d;
+        const bx=p.x,by=p.y;step(1);
+        const delta=Math.hypot(p.x-bx,p.y-by);maxStep=Math.max(maxStep,delta);walked+=delta;
+      }
+      if(n>=52){z.resetInput();return {ok:false,blocked:[goal.x/T,goal.y/T],at:[p.x/T,p.y/T],checkpoint:[x,y]};}
+    }
+  }
+  z.resetInput();
+  return {ok:p===P() && s===S() && maxStep<7 && p.y>260*T && walked>120*T,
+    walkedTiles:Math.round(walked/T),maxStepPx:+maxStep.toFixed(2)};
 });
 return JSON.stringify(R);
 })()
