@@ -103,6 +103,21 @@ function placeSearchContainers(){
       placed=true; break;
     }
   }
+  // Оба костра существуют до первого задания. Выбираем свободную обочину у каждого.
+  for (const base of ['village','camp']) {
+    const fire=locPt(base,'fire'), cx=Math.floor(fire.x/T)+2, cy=Math.floor(fire.y/T)-1;
+    let placed=false;
+    for(let r=0;r<=5 && !placed;r++) for(let dy=-r;dy<=r && !placed;dy++) for(let dx=-r;dx<=r;dx++) {
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const tx=cx+dx,ty=cy+dy,x=(tx+.5)*T,y=(ty+.5)*T;
+      if(![[0,0],[1,0],[-1,0],[0,-1],[0,1]].every(([i,j])=>nav[(ty+j)*MW+tx+i])) continue;
+      if(HOUSES.some(h=>x>(h.x-1)*T && x<(h.x+h.w+1)*T && y>(h.y-1)*T && y<(h.y+h.h+1)*T)) continue;
+      if(NPCDEF.some(n=>Math.hypot(x-n.x*T,y-n.y*T)<36)) continue;
+      addObj({k:'locker',baseName:LOC[base].name,x:x-13,y:y-9,w:26,h:18,solid:true});
+      placed=true; break;
+    }
+  }
+
 }
 function restoreContainer(o){
   if(!o.initialLoot) o.initialLoot={...o.loot};
@@ -219,6 +234,12 @@ function containerDraw(o){
       }
       else {g.fillStyle=id==='money'?'#83816a':'#ada389';g.fillRect(px-4,py-3,8,6);g.fillStyle='#534b39';g.fillRect(px-1,py-3,2,6);}
     });
+  }else if(o.k==='locker'){
+    if(ART) ART.draw(g,C1?'c1_crate_army':'crate',0,0,29,22);
+    else {g.fillStyle='#63624b';g.fillRect(-13,-9,26,18);}
+    g.fillStyle='#365856';g.fillRect(-5,-5,10,9);
+    g.strokeStyle='#c1d2bd';g.lineWidth=1;g.strokeRect(-3.5,-3,7,5);
+    g.fillStyle='#cad8c1';g.fillRect(-1,-1.5,2,2);
   }else if(o.k==='safe'){
     g.fillStyle='#242522';g.fillRect(-11,-8,23,19);
     const metal=g.createLinearGradient(0,-9,0,8);metal.addColorStop(0,'#76766a');metal.addColorStop(1,'#41433c');

@@ -4,14 +4,11 @@ let armyAngry = false, nextId = 1, spawnT = 0, fogT = 0, saveT = 0, warnT = 0;
 const cnt = id => S.inv[id] || 0;
 const has = id => cnt(id) > 0;
 const beltCount = id => S.belt.filter(x => x === id).length;
-function give(id, n) { S.inv[id] = cnt(id) + (n || 1); }
 function take(id, n) {
   S.inv[id] = Math.max(0, cnt(id) - (n || 1)); if (!S.inv[id]) delete S.inv[id];
   while (beltCount(id) > cnt(id)) S.belt.splice(S.belt.indexOf(id), 1);
   if (WP[id] && S.weapon === id && !has(id)) S.weapon = 'knife';
 }
-const weight = () => Math.round(Object.keys(S.inv).reduce((a, id) => a + (ITEMS[id] ? ITEMS[id].w : 0) * S.inv[id], 0) * 10) / 10;
-const MAXW = 50;
 const hour = () => (S.min / 60) % 24;
 const night = () => { const h = hour(); return h >= 21 || h < 5; };
 function darkness() {
@@ -504,12 +501,12 @@ function dropBody(e) {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
     const W = WP[e.wpn];
-    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + (W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = 1; }
+    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + (W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
     if (e.fac === 'army' && chance(0.3)) loot.grenade = 1;
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }
   if (e.kind === 'human' && (e.fac === 'loner' || e.fac === 'bandit') && chance(0.3)) loot.__tip = 1;
-  const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, t: S.min };
+  const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
   // Младший остаток визуального seed хранит расцветку и после загрузки тела.
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   objs.push(body); g7Fresh(body);   // визуальный переход падения (только в памяти, не в сейве)

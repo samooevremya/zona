@@ -254,7 +254,7 @@ function updatePlayer(dt) {
   let mx = IN.moveX, my = IN.moveY;
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
-  const over = weight() > MAXW;
+  const over = weight() > carryLimit();
   const sprint = (IN.sprint || ml > 0.95 && IN.touch && !P.crouch) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
@@ -365,6 +365,10 @@ function findInteract() {
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
   if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
+    if (o.k === 'locker') {
+      const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
+      if (d<49 && los(P.x,P.y,x,y)) cand(d,{k:'locker',o,label:'Открыть личный ящик'});
+    }
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
     if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
@@ -381,21 +385,16 @@ function findInteract() {
 }
 function lootAll(o) {
   let pickedUp = false;
-  const left = {};
-  Object.keys(o.loot).forEach(k => {
-    const q = o.loot[k];
-    if (k === '__tip') return;
-    if (k === 'money') { S.money += q; pickedUp = true; }
-    else if (WP[k] && !WP[k].melee && has(k)) left[k] = q;          // такой ствол уже есть — остаётся лежать
-    else { give(k, q); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); pickedUp = true; }
-  });
-  o.loot = left;
-  if (Object.keys(left).length) msg('Оставлено: такой ствол уже есть (' + Object.keys(left).map(k => ITEMS[k].n).join(', ') + ').', 'bad');
+  for (const id of Object.keys(o.loot)) {
+    if (id !== '__tip' && collectStock(o,id)) pickedUp = true;
+  }
+  if (Object.keys(o.loot).some(id=>ITEMS[id])) msg('Рюкзак заполнен. Остаток можно забрать позже.', 'bad');
   recordContents(o);
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
-  give(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
+  const err=receiveError(a.id,1); if(err) { msg(err,'bad'); return; }
+  addPacked(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
   play('pick');
   news('Найден ' + ITEMS[a.id].n + '.');
