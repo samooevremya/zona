@@ -13,6 +13,12 @@ js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() fo
 open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os
+detector_images = {}
+for file in sorted(_os.listdir('art/detectors')):
+    if file.endswith('.svg'):
+        with open('art/detectors/' + file, 'rb') as sprite:
+            detector_images['det_' + file[:-4]] = 'data:image/svg+xml;base64,' + _b64.b64encode(sprite.read()).decode()
+art += '\nwindow.DETECTOR_IMAGES=' + __import__('json').dumps(detector_images) + ';'
 # Предметы с листа house_village_floor, без стен и пола вокруг них.
 with open('art/c1/furniture.png', 'rb') as furniture:
     furniture_url = 'data:image/png;base64,' + _b64.b64encode(furniture.read()).decode()

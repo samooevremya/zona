@@ -50,6 +50,7 @@ function b1Flash(e, id, w, target = ctx) {   // попадание: подсве
   B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w); target.restore();
 }
 function b1Human(e, target) {
+  if (e === P && DETECTORS[S.weapon]) return false;
   if (!B1_READY() || e.captive) return false;
   const id = b1HumanId(e); if (!id || !b1Drawn(e, id)) return false;
   const w = e === P ? S.weapon : e.wpn;

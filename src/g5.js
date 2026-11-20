@@ -116,7 +116,7 @@ const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-ak
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
 /*AVATAR*/
 function person(c) {
@@ -232,7 +232,7 @@ function talk(e) {
     const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : LORE[(e.seed + e.talked * 5) % LORE.length]); } }];
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
-    if (!e.robbed && !e.follow) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
+    if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
     o.push({ t: 'Бывай', close: 1 });
     return o;
   }, 'dialog', e);
@@ -322,7 +322,7 @@ function traderOpts() {
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
-    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болт покажет границу. К артефакту иди, когда пыль осядет.');
+    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Детекторы есть у меня. Возьми прибор в руки и слушай. А границу аномалии проверяй болтом.');
     S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
@@ -596,6 +596,19 @@ function visibleContact(e) {
 }
 /* карта КПК: o.u — сколько пикселей холста в одном CSS-пикселе (маркеры и подписи одного экранного размера при любом масштабе);
    подписи раскладываются без наложения: сначала выбранная цель, потом места; не влезла ни в одну позицию — не рисуется */
+function drawDetectorContacts(g, s, u) {
+  const range = activeDetectorRange();
+  if (!range) return;
+  g.save();
+  for (const a of arts) {
+    if (dE(P, a) > range) continue;
+    const x = a.x / T * s, y = a.y / T * s, r = 3.8 * u;
+    g.beginPath(); g.moveTo(x, y-r); g.lineTo(x+r, y); g.lineTo(x, y+r); g.lineTo(x-r, y); g.closePath();
+    g.lineWidth = 3*u; g.strokeStyle = '#22251d'; g.stroke();
+    g.lineWidth = 1.3*u; g.strokeStyle = '#ffe298'; g.stroke();
+  }
+  g.restore();
+}
 function drawMapTo(g, s, full, o) {
   o = o || { ppl: 1, cache: 1 };
   const u = o.u || 1;
@@ -603,6 +616,7 @@ function drawMapTo(g, s, full, o) {
   g.imageSmoothingEnabled = !!ART;
   g.drawImage(miniC, 0, 0, PW * s, MH * s);
   g.drawImage(fogC, 0, 0, PW * s, MH * s);
+  drawDetectorContacts(g, s, u);
   const busy = [];   // занятые прямоугольники: маркеры и подписи
   const mark = (x, y, r) => busy.push([x - r, y - r, x + r, y + r]);
   const hx = HATCH.x / T * s, hy = HATCH.y / T * s;
@@ -676,6 +690,7 @@ function drawMini() {
     mctx.fillStyle = 'rgba(4,7,12,0.35)';
     mctx.fillRect(P.x / T * s - size / 2, P.y / T * s - size / 2, size, size);
   }
+  drawDetectorContacts(mctx, s, 1.65);
   mapSymbol(mctx, 'hatch', HATCH.x / T * s, HATCH.y / T * s, 1.65);
   objs.forEach(o => {
     if(o.k==='locker') mapSymbol(mctx,'locker',(o.x+o.w/2)/T*s,(o.y+o.h/2)/T*s,1.65);
@@ -726,7 +741,7 @@ function hud(dt) {
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
   const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
-  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint(), P.detD < 280 ? 'артефакт ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -737,14 +752,15 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const W = WP[S.weapon];
-  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = W.n; }
+  const detector = DETECTORS[S.weapon], W = detector || WP[S.weapon];
+  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
-  $('wpnbox').classList.toggle('mel', !!W.melee);   // нож и граната: без полосы состояния, одна подпись
-  H.wcn.textContent = W.melee ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
-  if (W.toss) H.am.textContent = '× ' + cnt('grenade');
+  $('wpnbox').classList.toggle('mel', !!W.melee || !!detector);   // нож и граната: без полосы состояния, одна подпись
+  H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
+  if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
+  else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
   else if (W.melee) H.am.textContent = '∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
   const q = trackedTarget();
@@ -824,6 +840,7 @@ addEventListener('keydown', e => {
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
+  if (/^Digit[678]$/.test(k)) setWeapon(WORDER[Number(k.slice(-1)) - 1]);
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }

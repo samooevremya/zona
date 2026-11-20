@@ -16,6 +16,7 @@ let fogDirty = true;
 
 function startReload() {
   const W = WP[S.weapon];
+  if (!W) return;
   if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); return; }
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
@@ -23,14 +24,14 @@ function startReload() {
   P.reload = W.reload; play('reload');
 }
 function finishReload() {
-  const W = WP[S.weapon]; if (W.melee) return;
+  const W = WP[S.weapon]; if (!W || W.melee) return;
   const m = S.mag[S.weapon] || 0, n = Math.min(W.mag - m, cnt(W.ammo));
   take(W.ammo, n); S.mag[S.weapon] = m + n;
 }
 let noAmmoT = 0;
 function playerFire() {
   const W = WP[S.weapon];
-  if (P.cool > 0 || P.reload > 0) return;
+  if (!W || P.cool > 0 || P.reload > 0) return;
   if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; } }, 300); return; }
   if (W.melee) { P.cool = W.rate; melee(P, W); return; }
   if (P.jam) { if (noAmmoT <= 0) { noAmmoT = 1; play('click'); } return; }
@@ -50,11 +51,15 @@ function playerFire() {
 }
 function cycleWeapon(dir) {
   const own = WORDER.filter(w => w === 'knife' || has(w));
-  let i = own.indexOf(S.weapon);
-  S.weapon = own[(i + (dir || 1) + own.length) % own.length];
+  const i = own.indexOf(S.weapon);
+  setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
+}
+function setWeapon(w) {
+  if (w !== 'knife' && !has(w)) return;
+  S.weapon = w;
+  P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
 }
-function setWeapon(w) { if (w === 'knife' || has(w)) { S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
 function useItem(id) {
   const it = ITEMS[id];
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
@@ -349,7 +354,7 @@ function findInteract() {
       }
     }
   }
-  for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
+  if (activeDetectorRange()) for (const a of arts) { const d = dE(P, a); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
   plusInteract(cand);
   return best;
@@ -364,6 +369,7 @@ function lootAll(o) {
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
+  if (!activeDetectorRange() || !arts.includes(a) || dE(P, a) >= 38) return;
   const err=receiveError(a.id,1); if(err) { msg(err,'bad'); return; }
   addPacked(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
@@ -416,6 +422,7 @@ function loadSave() {
 }
 function applyState(d) {
   S = d;
+  if (DETECTORS[S.weapon] && !has(S.weapon)) S.weapon = 'knife';
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
   fogDirty = true;

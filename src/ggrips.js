@@ -27,7 +27,7 @@ const HELD_SPRITES = {
 function frameWeapon(e, id, W, grip) {
   const gait = gaitOf(e);
   const pose = e.campRise != null ? 'idle' : e.crouch ? 'crouch' : gait.moving ? G8_WALK[gait.phase] : 'idle';
-  const skin = g3Skin(e), mount = HELD_POSES[id], coords = GLOVE_FRAMES[pose];
+  const skin = g3Skin(e), mount = HELD_POSES[id] || HELD_POSES.grenade, coords = GLOVE_FRAMES[pose];
   const dy = skin === 'bandit' ? -1.5 : skin === 'army' ? -0.8 : 0;
   const right = [coords[0],coords[1]+dy], left = [coords[2],coords[3]+dy];
   const turn = mount.turn || 0, cos = Math.cos(turn), sin = Math.sin(turn);
@@ -79,7 +79,9 @@ function equippedFrame(images, asset, w) {
   if (!source) return null;
   let models = heldFrames.get(source);
   if (!models) { models=new Map(); heldFrames.set(source,models); }
-  const sprite=packImage(HELD_SPRITES[w.id].file), cached=models.get(w.id);
+  const detector = detectorImages[w.id];
+  const sprite = detector ? (detector.naturalWidth ? detector : null) : packImage(HELD_SPRITES[w.id].file);
+  const cached = models.get(w.id);
   if (cached && cached.sprite === sprite) return cached;
   const body=frameCanvas(source), b=body.getContext('2d');
   b.drawImage(source,0,0);

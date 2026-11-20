@@ -177,11 +177,12 @@ function drawInv2() {
     dv.appendChild(el('div', 'nm', it.n + (isGun(id) && cnt(id)>1?' · '+(copy+1)+' из '+cnt(id):'')));
     const rows = el('div', 'cmp');
     const line = (k, v, d) => { const r = el('div', 'cr'); r.appendChild(el('span', 'ck', k)); r.appendChild(el('span', 'cv', v)); if (d) r.appendChild(el('span', 'cd ' + (d > 0 ? 'up' : 'dn'), (d > 0 ? '+' : '') + d)); rows.appendChild(r); };
-    if (WP[id]) {
+    if (DETECTORS[id]) line('Радиус поиска', it.metres + ' м');
+    else if (WP[id]) {
       const W = WP[id], C = WP[S.weapon], same = S.weapon === id && !copy;
-      line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
-      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
-      if (!same) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
+      line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same || !C ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
+      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || !C || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || !C || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
+      if (!same && C) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
     } else if (it.armor) {
       line('Предел веса',carryLimit(id)+' кг');
       const cur = ITEMS[S.armor] ? ITEMS[S.armor].armor : 0;
@@ -195,7 +196,7 @@ function drawInv2() {
     dv.appendChild(rows);
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
-    if (WP[id] && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
+    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
     if (it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
@@ -252,7 +253,7 @@ function sellWhy(id, e, o) {
   const it = ITEMS[id]; if (!it) return null;
   if (it.quest) return 'квест';
   if (o && o.sell[id]) return 'в корз.';
-  if (id === S.weapon && WP[id] && !WP[id].melee) return 'в руках';
+  if (id === S.weapon && (isGun(id) || DETECTORS[id])) return 'в руках';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
   if (e && it.armor) return 'не берёт';
@@ -263,7 +264,7 @@ function sellable(id, e) {
   if (e && it.armor) return 0;
   let n = cnt(id) - beltCount(id);
   if (id === S.armor) n -= 1;
-  if (id === S.weapon && WP[id] && !WP[id].melee) n -= 1;
+  if (id === S.weapon && (isGun(id) || DETECTORS[id])) n -= 1;
   return Math.max(0, n);
 }
 function offerSum(e) {

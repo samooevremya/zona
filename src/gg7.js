@@ -79,8 +79,8 @@ function g7PoseFrame(skin, pose) {
 
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
-  const id = e === P ? S.weapon : e.wpn, W = G3W[id]; if (!W) return null;
-  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' ? 'one' : 'two';
+  const id = e === P ? S.weapon : e.wpn, W = G3W[id] || (DETECTORS[id] && { len: 5 }); if (!W) return null;
+  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
   const r = rigActive(e);
   if (r) {
     const s = CordonRig.sockets(r.rig.pose, grip);
@@ -99,7 +99,7 @@ function localToWorld(e, ang, lat, fwd) {
   return { x: e.x + Math.sin(ang) * lat + Math.cos(ang) * fwd, y: e.y - Math.cos(ang) * lat + Math.sin(ang) * fwd };
 }
 function g7Muzzle(e, ang) {
-  const w = weaponLocal(e); if (!w || w.W.blade || w.W.toss) return null;
+  const w = weaponLocal(e); if (!w || DETECTORS[w.id] || w.W.blade || w.W.toss) return null;
   const tip = localToWorld(e, ang, w.muzzle[0], w.muzzle[1]);
   const motion = w.pose && e.campRise == null && actorFrameMotion(e,gaitOf(e).moving);
   if (motion) {
@@ -109,9 +109,17 @@ function g7Muzzle(e, ang) {
   return tip;
 }
 /* слой оружия: рукоять в main, ствол вдоль +y до muzzle. Тот же объект w, что и для дула */
+function drawHeldDetector(g, id, x, y) {
+  const image = detectorImages[id];
+  if (image.complete && image.naturalWidth) {
+    g.save(); g.translate(x,y); g.rotate(Math.PI);
+    g.drawImage(image,-5,-8,10,10); g.restore();
+  }
+}
 function drawWeaponLocal(c2, w) {
   if (!w) return;
   const W = w.W, x = w.main[0], y = w.main[1];
+  if (DETECTORS[w.id]) { drawHeldDetector(c2,w.id,x,y); return; }
   if (window.CORDON_G8_ON) {
     const shape = HELD_SPRITES[w.id], sprite = packImage(shape.file);
     if (sprite) {

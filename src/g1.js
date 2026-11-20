@@ -23,7 +23,20 @@ function vnoise(x, y, s) {
 }
 
 /* ===================== предметы и оружие ===================== */
+const DETECTORS = {
+  det_spark: { n: 'Детектор «Искра»', price: 500, w: 0.25, metres: 6 },
+  det_contour: { n: 'Детектор «Контур»', price: 1800, w: 0.45, metres: 15 },
+  det_spectrum: { n: 'Детектор «Спектр»', price: 4500, w: 0.75, metres: 30 }
+};
+const detectorImages = {};
+for (const [id, model] of Object.entries(DETECTORS)) {
+  model.d = 'Радиус поиска ' + model.metres + ' м. Возьми в руки через выбор оружия. Чем ближе артефакт, тем чаще сигнал.';
+  const image = new Image();
+  image.src = window.DETECTOR_IMAGES[id]; image.alt = ''; image.className = 'b1ic g3ic';
+  detectorImages[id] = image;
+}
 const ITEMS = {
+  ...DETECTORS,
   medkit: { n: 'Аптечка', price: 300, heal: 50, w: 0.3, d: '+50 здоровья' },
   bandage: { n: 'Бинт', price: 80, heal: 15, w: 0.1, d: '+15 здоровья' },
   antirad: { n: 'Антирад', price: 250, rad: 60, w: 0.1, d: '−60 радиации' },
@@ -59,8 +72,9 @@ const WP = {
   w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
   grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade'];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS)];
 const STOCK = [
+  ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
   { id: 'a9', q: 20, p: 160 }, { id: 'a12', q: 10, p: 200 }, { id: 'a545', q: 30, p: 450 },

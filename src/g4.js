@@ -546,7 +546,8 @@ function drawHuman(e, g) {
   if (lk.pack) { g.fillStyle = lk.pack; g.fillRect(-12, -6, 6, 12); }
   // оружие и руки
   if (!e.sit) {
-    if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
+    if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
+    else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
     g.beginPath(); g.arc(8 + bob * 0.3, 4, 3.2, 0, 6.28); g.fill();
@@ -676,9 +677,10 @@ function drawAnoms() {
     ctx.restore();
   }
 
-  for (const a of arts) {
-    const d = dst(a.x, a.y, P.x, P.y); if (d > 90) continue;
-    const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = clamp(1 - d / 90, 0, 1);
+  const range = activeDetectorRange();
+  if (range) for (const a of arts) {
+    const d = dE(a, P); if (d > range) continue;
+    const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = 1 - 0.65 * d / range;
     const gr = ctx.createRadialGradient(a.x, a.y, 1, a.x, a.y, 16);
     gr.addColorStop(0, 'rgba(' + c + ',' + (0.8 * al * p) + ')'); gr.addColorStop(1, 'rgba(' + c + ',0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(a.x, a.y, 16, 0, 6.28); ctx.fill();
@@ -927,7 +929,8 @@ function render() {
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e' && (anomalyPhase(a)==='active' || a.fx>.3)) hole(a.x, a.y, 70 + a.fx * 120, 0.5);
-    for (const a of arts) hole(a.x, a.y, 40, 0.6);
+    const range = activeDetectorRange();
+    if (range) for (const a of arts) if (dE(a, P) <= range) hole(a.x, a.y, 40, 0.6);
     ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);

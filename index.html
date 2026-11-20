@@ -839,6 +839,7 @@ window.VillageArt=class VillageArt{
  edge(ctx,id,x,y,w,h,side='left',size=256){const c=document.createElement('canvas');c.width=Math.ceil(w*2);c.height=Math.ceil(h*2);const g=c.getContext('2d');g.scale(2,2);g.translate(-x,-y);this.fill(g,id,x,y,w,h,size);g.setTransform(2,0,0,2,0,0);g.globalCompositeOperation='destination-in';const pts={left:[0,0,w,0],right:[w,0,0,0],top:[0,0,0,h],bottom:[0,h,0,0]}[side];if(!pts)throw Error('Invalid side');const grad=g.createLinearGradient(...pts);grad.addColorStop(0,'rgba(0,0,0,.95)');grad.addColorStop(.35,'rgba(0,0,0,.55)');grad.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=grad;g.fillRect(0,0,w,h);ctx.drawImage(c,x,y,w,h);}
 };
 
+window.DETECTOR_IMAGES={"det_contour": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJjYXNlIiB4Mj0iLjciIHkyPSIxIiBncmFkaWVudFVuaXRzPSJvYmplY3RCb3VuZGluZ0JveCI+PHN0b3Agc3RvcC1jb2xvcj0iIzkyOTg3YyIvPjxzdG9wIG9mZnNldD0iLjU1IiBzdG9wLWNvbG9yPSIjNTg2NDRmIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM2IzYzM0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxwYXRoIGQ9Ik0xNCAxNWgzMmwzIDZ2MzNsLTYgNUgxNmwtMy01VjIxeiIgZmlsbD0idXJsKCNjYXNlKSIgc3Ryb2tlPSIjMjIyNDIwIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMTkgMTZWOWg3djdtMTEtMVY1aDN2MTAiIGZpbGw9IiM5Mjg1NmEiIHN0cm9rZT0iIzM2MzUyYSIvPjxyZWN0IHg9IjE3IiB5PSIyMSIgd2lkdGg9IjI3IiBoZWlnaHQ9IjIwIiByeD0iMyIgZmlsbD0iIzI4MmMyNCIvPjxwYXRoIGQ9Ik0yMCAzNmExMSAxMSAwIDAgMSAyMSAwIiBmaWxsPSIjYzFiNDg3Ii8+PHBhdGggZD0ibTMwIDM2IDYtMTAiIHN0cm9rZT0iIzg1M2UyOSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMzciIGN5PSI0OSIgcj0iNSIgZmlsbD0iIzJhMjkyMiIgc3Ryb2tlPSIjYWQ5ZDc1Ii8+PHBhdGggZD0iTTE4IDQ3aDExbS0xMSA0aDExIiBzdHJva2U9IiM0NTQ3M2MiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4K", "det_spark": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJjYXNlIiB4Mj0iLjciIHkyPSIxIiBncmFkaWVudFVuaXRzPSJvYmplY3RCb3VuZGluZ0JveCI+PHN0b3Agc3RvcC1jb2xvcj0iI2FlOTg3MiIvPjxzdG9wIG9mZnNldD0iLjU1IiBzdG9wLWNvbG9yPSIjNzA2MzQ4Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM2IzYzM0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxyZWN0IHg9IjE3IiB5PSIxOCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjQyIiByeD0iNSIgZmlsbD0idXJsKCNjYXNlKSIgc3Ryb2tlPSIjMjMyMTE5IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMjEgMTdWOGg0djkiIGZpbGw9IiNhMDk3N2IiIHN0cm9rZT0iIzMxMmYyNCIvPjxyZWN0IHg9IjIwIiB5PSIyMiIgd2lkdGg9IjIyIiBoZWlnaHQ9IjEyIiByeD0iMiIgZmlsbD0iIzIxMWUxOCIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iMjgiIHI9IjMiIGZpbGw9IiNlYmE4NGQiLz48cGF0aCBkPSJNMzQgMjZoNW0tNSA0aDUiIHN0cm9rZT0iIzkyODc3NCIvPjxnIHN0cm9rZT0iIzMyMmYyNyIgc3Ryb2tlLXdpZHRoPSIyIj48cGF0aCBkPSJNMjEgMzloMTltLTE5IDRoMTltLTE5IDRoMTltLTE5IDRoMTUiLz48L2c+Cjwvc3ZnPgo=", "det_spectrum": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJjYXNlIiB4Mj0iLjciIHkyPSIxIiBncmFkaWVudFVuaXRzPSJvYmplY3RCb3VuZGluZ0JveCI+PHN0b3Agc3RvcC1jb2xvcj0iI2EzYWFhMSIvPjxzdG9wIG9mZnNldD0iLjU1IiBzdG9wLWNvbG9yPSIjNWE2MjVhIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM2IzYzM0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxwYXRoIGQ9Ik05IDIwbDYtNmgzM2w1IDZ2MzNsLTYgN0gxNWwtNi04eiIgZmlsbD0idXJsKCNjYXNlKSIgc3Ryb2tlPSIjMjEyNTIxIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTUgMTVWNWg0djEwbTIzIDFWN2g1djgiIGZpbGw9IiM5NTk4ODYiIHN0cm9rZT0iIzMwMzQyZSIvPjxyZWN0IHg9IjE0IiB5PSIyMCIgd2lkdGg9IjM0IiBoZWlnaHQ9IjI0IiByeD0iMyIgZmlsbD0iIzEwMWUxYiIgc3Ryb2tlPSIjNTY1YjRkIi8+PGcgc3Ryb2tlPSIjNmJhY2EwIiBmaWxsPSJub25lIj48Y2lyY2xlIGN4PSIzMSIgY3k9IjMyIiByPSI5Ii8+PGNpcmNsZSBjeD0iMzEiIGN5PSIzMiIgcj0iNSIvPjxwYXRoIGQ9Ik0zMSAyMnYxOW0tMTItOWgyNG0tMTIgMCA2LTciLz48L2c+PGNpcmNsZSBjeD0iMzYiIGN5PSIyOCIgcj0iMS42IiBmaWxsPSIjZTZkMDg3Ii8+PGcgZmlsbD0iIzMzMzcyZSIgc3Ryb2tlPSIjODM4NjczIj48cmVjdCB4PSIxNSIgeT0iNDgiIHdpZHRoPSI4IiBoZWlnaHQ9IjUiIHJ4PSIxIi8+PHJlY3QgeD0iMjYiIHk9IjQ4IiB3aWR0aD0iOCIgaGVpZ2h0PSI1IiByeD0iMSIvPjxyZWN0IHg9IjM3IiB5PSI0OCIgd2lkdGg9IjgiIGhlaWdodD0iNSIgcng9IjEiLz48L2c+Cjwvc3ZnPgo="};
 window.C1_MANIFEST.images.furniture = {file:'data:image/png;base64,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'};
 window.CordonSpritesB1 = {
   "version": 1,
@@ -1180,7 +1181,20 @@ function vnoise(x, y, s) {
 }
 
 /* ===================== предметы и оружие ===================== */
+const DETECTORS = {
+  det_spark: { n: 'Детектор «Искра»', price: 500, w: 0.25, metres: 6 },
+  det_contour: { n: 'Детектор «Контур»', price: 1800, w: 0.45, metres: 15 },
+  det_spectrum: { n: 'Детектор «Спектр»', price: 4500, w: 0.75, metres: 30 }
+};
+const detectorImages = {};
+for (const [id, model] of Object.entries(DETECTORS)) {
+  model.d = 'Радиус поиска ' + model.metres + ' м. Возьми в руки через выбор оружия. Чем ближе артефакт, тем чаще сигнал.';
+  const image = new Image();
+  image.src = window.DETECTOR_IMAGES[id]; image.alt = ''; image.className = 'b1ic g3ic';
+  detectorImages[id] = image;
+}
 const ITEMS = {
+  ...DETECTORS,
   medkit: { n: 'Аптечка', price: 300, heal: 50, w: 0.3, d: '+50 здоровья' },
   bandage: { n: 'Бинт', price: 80, heal: 15, w: 0.1, d: '+15 здоровья' },
   antirad: { n: 'Антирад', price: 250, rad: 60, w: 0.1, d: '−60 радиации' },
@@ -1216,8 +1230,9 @@ const WP = {
   w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
   grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade'];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS)];
 const STOCK = [
+  ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
   { id: 'a9', q: 20, p: 160 }, { id: 'a12', q: 10, p: 200 }, { id: 'a545', q: 30, p: 450 },
@@ -1608,7 +1623,7 @@ function footprint(id) {
   if (id === 'w_pm') return [2,1];
   return ITEMS[id]?.armor ? [2,2] : [1,1];
 }
-const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || ITEMS[id]?.armor ? 1 : 5;
+const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
 function packCells(inv) {
   return Object.entries(inv).reduce((total,[id,n]) => {
     const [w,h] = footprint(id);
@@ -1742,7 +1757,7 @@ const beltCount = id => S.belt.filter(x => x === id).length;
 function take(id, n) {
   S.inv[id] = Math.max(0, cnt(id) - (n || 1)); if (!S.inv[id]) delete S.inv[id];
   while (beltCount(id) > cnt(id)) S.belt.splice(S.belt.indexOf(id), 1);
-  if (WP[id] && S.weapon === id && !has(id)) S.weapon = 'knife';
+  if (S.weapon === id && !has(id)) setWeapon('knife');
 }
 const hour = () => (S.min / 60) % 24;
 const night = () => { const h = hour(); return h >= 21 || h < 5; };
@@ -2580,7 +2595,7 @@ function qTargets() {
     if(box) at('flash',{x:box.x+box.w/2,y:box.y+box.h/2},'Забрать флешку из личного ящика');
     else sidT('flash','Отнести флешку Сидоровичу');
   }
-  if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field', 'medusa'), 'Поле аномалий');
+  if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field'), 'Поле аномалий');
   if (q.pack === 1) at('pack', locPt('dogs_lair', 'lair'), 'Логово псов');
   if (q.pack === 2 && w) at('pack', w, 'Вернуться к Волку');
   const fx = byS('fox');
@@ -2797,6 +2812,7 @@ let fogDirty = true;
 
 function startReload() {
   const W = WP[S.weapon];
+  if (!W) return;
   if (P.jam && !W.melee) { P.jam = 0; P.reload = 0.8; play('jam'); return; }
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
@@ -2804,14 +2820,14 @@ function startReload() {
   P.reload = W.reload; play('reload');
 }
 function finishReload() {
-  const W = WP[S.weapon]; if (W.melee) return;
+  const W = WP[S.weapon]; if (!W || W.melee) return;
   const m = S.mag[S.weapon] || 0, n = Math.min(W.mag - m, cnt(W.ammo));
   take(W.ammo, n); S.mag[S.weapon] = m + n;
 }
 let noAmmoT = 0;
 function playerFire() {
   const W = WP[S.weapon];
-  if (P.cool > 0 || P.reload > 0) return;
+  if (!W || P.cool > 0 || P.reload > 0) return;
   if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; } }, 300); return; }
   if (W.melee) { P.cool = W.rate; melee(P, W); return; }
   if (P.jam) { if (noAmmoT <= 0) { noAmmoT = 1; play('click'); } return; }
@@ -2831,11 +2847,15 @@ function playerFire() {
 }
 function cycleWeapon(dir) {
   const own = WORDER.filter(w => w === 'knife' || has(w));
-  let i = own.indexOf(S.weapon);
-  S.weapon = own[(i + (dir || 1) + own.length) % own.length];
+  const i = own.indexOf(S.weapon);
+  setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
+}
+function setWeapon(w) {
+  if (w !== 'knife' && !has(w)) return;
+  S.weapon = w;
+  P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
 }
-function setWeapon(w) { if (w === 'knife' || has(w)) { S.weapon = w; P.reload = 0; P.cool = 0.25; P.jam = 0; } }
 function useItem(id) {
   const it = ITEMS[id];
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
@@ -3130,7 +3150,7 @@ function findInteract() {
       }
     }
   }
-  for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
+  if (activeDetectorRange()) for (const a of arts) { const d = dE(P, a); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
   plusInteract(cand);
   return best;
@@ -3145,6 +3165,7 @@ function lootAll(o) {
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
+  if (!activeDetectorRange() || !arts.includes(a) || dE(P, a) >= 38) return;
   const err=receiveError(a.id,1); if(err) { msg(err,'bad'); return; }
   addPacked(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
@@ -3197,6 +3218,7 @@ function loadSave() {
 }
 function applyState(d) {
   S = d;
+  if (DETECTORS[S.weapon] && !has(S.weapon)) S.weapon = 'knife';
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
   fogDirty = true;
@@ -3764,7 +3786,8 @@ function drawHuman(e, g) {
   if (lk.pack) { g.fillStyle = lk.pack; g.fillRect(-12, -6, 6, 12); }
   // оружие и руки
   if (!e.sit) {
-    if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
+    if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
+    else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
     g.beginPath(); g.arc(8 + bob * 0.3, 4, 3.2, 0, 6.28); g.fill();
@@ -3894,9 +3917,10 @@ function drawAnoms() {
     ctx.restore();
   }
 
-  for (const a of arts) {
-    const d = dst(a.x, a.y, P.x, P.y); if (d > 90) continue;
-    const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = clamp(1 - d / 90, 0, 1);
+  const range = activeDetectorRange();
+  if (range) for (const a of arts) {
+    const d = dE(a, P); if (d > range) continue;
+    const c = TINT[a.id], p = 0.6 + 0.4 * Math.sin(t * 3), al = 1 - 0.65 * d / range;
     const gr = ctx.createRadialGradient(a.x, a.y, 1, a.x, a.y, 16);
     gr.addColorStop(0, 'rgba(' + c + ',' + (0.8 * al * p) + ')'); gr.addColorStop(1, 'rgba(' + c + ',0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(a.x, a.y, 16, 0, 6.28); ctx.fill();
@@ -4145,7 +4169,8 @@ function render() {
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e' && (anomalyPhase(a)==='active' || a.fx>.3)) hole(a.x, a.y, 70 + a.fx * 120, 0.5);
-    for (const a of arts) hole(a.x, a.y, 40, 0.6);
+    const range = activeDetectorRange();
+    if (range) for (const a of arts) if (dE(a, P) <= range) hole(a.x, a.y, 40, 0.6);
     ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);
@@ -4502,6 +4527,10 @@ function wearAndJam(id) {
   if (c < 65 && chance((65 - c) / 500)) { P.jam = 1; play('jam'); msg('Заклинило! ' + (IN.touch ? 'Жми «Перезар.»,' : 'Жми R,') + ' чтобы передёрнуть.', 'bad'); return true; }
   return false;
 }
+function activeDetectorRange() {
+  const model = S && DETECTORS[S.weapon];
+  return model && has(S.weapon) && P.alive && !inBunker(P.x, P.y) ? model.metres * T / 1.5 : 0;
+}
 function survival(dt) {
   survDefaults();
   // голод
@@ -4515,12 +4544,20 @@ function survival(dt) {
     P.bleedT = (P.bleedT || 0) - dt;
     if (P.bleedT <= 0) { P.bleedT = 0.6; decals.push({ x: P.x + rnd(-6, 6), y: P.y + rnd(-6, 6), r: rnd(1.5, 3), a: 0.7 }); }
   }
-  // детектор артефактов
-  let bd = 1e9;
-  for (const a of arts) { const d = dst(P.x, P.y, a.x, a.y); if (d < bd) bd = d; }
-  P.detT = (P.detT || 0) - dt;
-  if (bd < 280 && P.detT <= 0 && !inBunker(P.x, P.y)) { P.detT = 0.12 + (bd / 280) * 1.2; play('beep', undefined, undefined, 0.5 + (1 - bd / 280) * 0.8); }
-  P.detD = bd;
+  const range = activeDetectorRange();
+  P.detD = Infinity;
+  if (range) for (const a of arts) {
+    const distance = dE(P, a);
+    if (distance <= range && distance < P.detD) P.detD = distance;
+  }
+  if (Number.isFinite(P.detD)) {
+    P.detT = (P.detT || 0) - dt;
+    if (P.detT <= 0) {
+      const fraction = P.detD / range;
+      play('beep', undefined, undefined, 1.3 - 0.8 * fraction);
+      P.detT = 0.12 + 1.2 * fraction;
+    }
+  } else P.detT = 0;
   // ранг
   const r = rankOf(score());
   if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }
@@ -6472,11 +6509,12 @@ function drawInv2() {
     dv.appendChild(el('div', 'nm', it.n + (isGun(id) && cnt(id)>1?' · '+(copy+1)+' из '+cnt(id):'')));
     const rows = el('div', 'cmp');
     const line = (k, v, d) => { const r = el('div', 'cr'); r.appendChild(el('span', 'ck', k)); r.appendChild(el('span', 'cv', v)); if (d) r.appendChild(el('span', 'cd ' + (d > 0 ? 'up' : 'dn'), (d > 0 ? '+' : '') + d)); rows.appendChild(r); };
-    if (WP[id]) {
+    if (DETECTORS[id]) line('Радиус поиска', it.metres + ' м');
+    else if (WP[id]) {
       const W = WP[id], C = WP[S.weapon], same = S.weapon === id && !copy;
-      line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
-      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
-      if (!same) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
+      line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same || !C ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
+      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || !C || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || !C || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
+      if (!same && C) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
     } else if (it.armor) {
       line('Предел веса',carryLimit(id)+' кг');
       const cur = ITEMS[S.armor] ? ITEMS[S.armor].armor : 0;
@@ -6490,7 +6528,7 @@ function drawInv2() {
     dv.appendChild(rows);
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
-    if (WP[id] && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
+    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
     if (it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
@@ -6547,7 +6585,7 @@ function sellWhy(id, e, o) {
   const it = ITEMS[id]; if (!it) return null;
   if (it.quest) return 'квест';
   if (o && o.sell[id]) return 'в корз.';
-  if (id === S.weapon && WP[id] && !WP[id].melee) return 'в руках';
+  if (id === S.weapon && (isGun(id) || DETECTORS[id])) return 'в руках';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
   if (e && it.armor) return 'не берёт';
@@ -6558,7 +6596,7 @@ function sellable(id, e) {
   if (e && it.armor) return 0;
   let n = cnt(id) - beltCount(id);
   if (id === S.armor) n -= 1;
-  if (id === S.weapon && WP[id] && !WP[id].melee) n -= 1;
+  if (id === S.weapon && (isGun(id) || DETECTORS[id])) n -= 1;
   return Math.max(0, n);
 }
 function offerSum(e) {
@@ -6799,6 +6837,7 @@ function b1Flash(e, id, w, target = ctx) {   // попадание: подсве
   B1.gfx.drawWorld(target, id, e.x, e.y, e.ang, w); target.restore();
 }
 function b1Human(e, target) {
+  if (e === P && DETECTORS[S.weapon]) return false;
   if (!B1_READY() || e.captive) return false;
   const id = b1HumanId(e); if (!id || !b1Drawn(e, id)) return false;
   const w = e === P ? S.weapon : e.wpn;
@@ -7741,7 +7780,7 @@ const HELD_SPRITES = {
 function frameWeapon(e, id, W, grip) {
   const gait = gaitOf(e);
   const pose = e.campRise != null ? 'idle' : e.crouch ? 'crouch' : gait.moving ? G8_WALK[gait.phase] : 'idle';
-  const skin = g3Skin(e), mount = HELD_POSES[id], coords = GLOVE_FRAMES[pose];
+  const skin = g3Skin(e), mount = HELD_POSES[id] || HELD_POSES.grenade, coords = GLOVE_FRAMES[pose];
   const dy = skin === 'bandit' ? -1.5 : skin === 'army' ? -0.8 : 0;
   const right = [coords[0],coords[1]+dy], left = [coords[2],coords[3]+dy];
   const turn = mount.turn || 0, cos = Math.cos(turn), sin = Math.sin(turn);
@@ -7793,7 +7832,9 @@ function equippedFrame(images, asset, w) {
   if (!source) return null;
   let models = heldFrames.get(source);
   if (!models) { models=new Map(); heldFrames.set(source,models); }
-  const sprite=packImage(HELD_SPRITES[w.id].file), cached=models.get(w.id);
+  const detector = detectorImages[w.id];
+  const sprite = detector ? (detector.naturalWidth ? detector : null) : packImage(HELD_SPRITES[w.id].file);
+  const cached = models.get(w.id);
   if (cached && cached.sprite === sprite) return cached;
   const body=frameCanvas(source), b=body.getContext('2d');
   b.drawImage(source,0,0);
@@ -8115,8 +8156,8 @@ function g7PoseFrame(skin, pose) {
 
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
-  const id = e === P ? S.weapon : e.wpn, W = G3W[id]; if (!W) return null;
-  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' ? 'one' : 'two';
+  const id = e === P ? S.weapon : e.wpn, W = G3W[id] || (DETECTORS[id] && { len: 5 }); if (!W) return null;
+  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
   const r = rigActive(e);
   if (r) {
     const s = CordonRig.sockets(r.rig.pose, grip);
@@ -8135,7 +8176,7 @@ function localToWorld(e, ang, lat, fwd) {
   return { x: e.x + Math.sin(ang) * lat + Math.cos(ang) * fwd, y: e.y - Math.cos(ang) * lat + Math.sin(ang) * fwd };
 }
 function g7Muzzle(e, ang) {
-  const w = weaponLocal(e); if (!w || w.W.blade || w.W.toss) return null;
+  const w = weaponLocal(e); if (!w || DETECTORS[w.id] || w.W.blade || w.W.toss) return null;
   const tip = localToWorld(e, ang, w.muzzle[0], w.muzzle[1]);
   const motion = w.pose && e.campRise == null && actorFrameMotion(e,gaitOf(e).moving);
   if (motion) {
@@ -8145,9 +8186,17 @@ function g7Muzzle(e, ang) {
   return tip;
 }
 /* слой оружия: рукоять в main, ствол вдоль +y до muzzle. Тот же объект w, что и для дула */
+function drawHeldDetector(g, id, x, y) {
+  const image = detectorImages[id];
+  if (image.complete && image.naturalWidth) {
+    g.save(); g.translate(x,y); g.rotate(Math.PI);
+    g.drawImage(image,-5,-8,10,10); g.restore();
+  }
+}
 function drawWeaponLocal(c2, w) {
   if (!w) return;
   const W = w.W, x = w.main[0], y = w.main[1];
+  if (DETECTORS[w.id]) { drawHeldDetector(c2,w.id,x,y); return; }
   if (window.CORDON_G8_ON) {
     const shape = HELD_SPRITES[w.id], sprite = packImage(shape.file);
     if (sprite) {
@@ -8930,7 +8979,7 @@ const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-ak
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
   function hash(s) { var h = 7; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
   function avatar(name, fac) {
@@ -9071,7 +9120,7 @@ function talk(e) {
     const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : LORE[(e.seed + e.talked * 5) % LORE.length]); } }];
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
-    if (!e.robbed && !e.follow) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
+    if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
     o.push({ t: 'Бывай', close: 1 });
     return o;
   }, 'dialog', e);
@@ -9161,7 +9210,7 @@ function traderOpts() {
   } });
   if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
     const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
-    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Болт покажет границу. К артефакту иди, когда пыль осядет.');
+    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Детекторы есть у меня. Возьми прибор в руки и слушай. А границу аномалии проверяй болтом.');
     S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
   } });
   jobOpts().forEach(x => o.push(x));
@@ -9435,6 +9484,19 @@ function visibleContact(e) {
 }
 /* карта КПК: o.u — сколько пикселей холста в одном CSS-пикселе (маркеры и подписи одного экранного размера при любом масштабе);
    подписи раскладываются без наложения: сначала выбранная цель, потом места; не влезла ни в одну позицию — не рисуется */
+function drawDetectorContacts(g, s, u) {
+  const range = activeDetectorRange();
+  if (!range) return;
+  g.save();
+  for (const a of arts) {
+    if (dE(P, a) > range) continue;
+    const x = a.x / T * s, y = a.y / T * s, r = 3.8 * u;
+    g.beginPath(); g.moveTo(x, y-r); g.lineTo(x+r, y); g.lineTo(x, y+r); g.lineTo(x-r, y); g.closePath();
+    g.lineWidth = 3*u; g.strokeStyle = '#22251d'; g.stroke();
+    g.lineWidth = 1.3*u; g.strokeStyle = '#ffe298'; g.stroke();
+  }
+  g.restore();
+}
 function drawMapTo(g, s, full, o) {
   o = o || { ppl: 1, cache: 1 };
   const u = o.u || 1;
@@ -9442,6 +9504,7 @@ function drawMapTo(g, s, full, o) {
   g.imageSmoothingEnabled = !!ART;
   g.drawImage(miniC, 0, 0, PW * s, MH * s);
   g.drawImage(fogC, 0, 0, PW * s, MH * s);
+  drawDetectorContacts(g, s, u);
   const busy = [];   // занятые прямоугольники: маркеры и подписи
   const mark = (x, y, r) => busy.push([x - r, y - r, x + r, y + r]);
   const hx = HATCH.x / T * s, hy = HATCH.y / T * s;
@@ -9515,6 +9578,7 @@ function drawMini() {
     mctx.fillStyle = 'rgba(4,7,12,0.35)';
     mctx.fillRect(P.x / T * s - size / 2, P.y / T * s - size / 2, size, size);
   }
+  drawDetectorContacts(mctx, s, 1.65);
   mapSymbol(mctx, 'hatch', HATCH.x / T * s, HATCH.y / T * s, 1.65);
   objs.forEach(o => {
     if(o.k==='locker') mapSymbol(mctx,'locker',(o.x+o.w/2)/T*s,(o.y+o.h/2)/T*s,1.65);
@@ -9565,7 +9629,7 @@ function hud(dt) {
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
   const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
-  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint(), P.detD < 280 ? 'артефакт ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [shelterStatus, fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -9576,14 +9640,15 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const W = WP[S.weapon];
-  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = W.n; }
+  const detector = DETECTORS[S.weapon], W = detector || WP[S.weapon];
+  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
-  $('wpnbox').classList.toggle('mel', !!W.melee);   // нож и граната: без полосы состояния, одна подпись
-  H.wcn.textContent = W.melee ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
-  if (W.toss) H.am.textContent = '× ' + cnt('grenade');
+  $('wpnbox').classList.toggle('mel', !!W.melee || !!detector);   // нож и граната: без полосы состояния, одна подпись
+  H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
+  if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
+  else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
   else if (W.melee) H.am.textContent = '∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
   const q = trackedTarget();
@@ -9663,6 +9728,7 @@ addEventListener('keydown', e => {
   if (k === 'KeyL') toggleTorch();
   if (k === 'Digit5') setWeapon('grenade');
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
+  if (/^Digit[678]$/.test(k)) setWeapon(WORDER[Number(k.slice(-1)) - 1]);
   if (k === 'Digit1') setWeapon('knife'); if (k === 'Digit2') setWeapon('w_pm'); if (k === 'Digit3') setWeapon('w_obrez'); if (k === 'Digit4') setWeapon('w_aksu');
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
   if (k === 'KeyM' || k === 'KeyP') { openPanel('pda', 'КПК', PDA_TABS2); refresh(); }

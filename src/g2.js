@@ -8,7 +8,7 @@ const beltCount = id => S.belt.filter(x => x === id).length;
 function take(id, n) {
   S.inv[id] = Math.max(0, cnt(id) - (n || 1)); if (!S.inv[id]) delete S.inv[id];
   while (beltCount(id) > cnt(id)) S.belt.splice(S.belt.indexOf(id), 1);
-  if (WP[id] && S.weapon === id && !has(id)) S.weapon = 'knife';
+  if (S.weapon === id && !has(id)) setWeapon('knife');
 }
 const hour = () => (S.min / 60) % 24;
 const night = () => { const h = hour(); return h >= 21 || h < 5; };
@@ -846,7 +846,7 @@ function qTargets() {
     if(box) at('flash',{x:box.x+box.w/2,y:box.y+box.h/2},'Забрать флешку из личного ящика');
     else sidT('flash','Отнести флешку Сидоровичу');
   }
-  if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field', 'medusa'), 'Поле аномалий');
+  if (q.medusa === 1) has('art_medusa') ? sidT('medusa', 'Отдать «Медузу» Сидоровичу') : at('medusa', locPt('field'), 'Поле аномалий');
   if (q.pack === 1) at('pack', locPt('dogs_lair', 'lair'), 'Логово псов');
   if (q.pack === 2 && w) at('pack', w, 'Вернуться к Волку');
   const fx = byS('fox');
