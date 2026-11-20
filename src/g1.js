@@ -40,6 +40,7 @@ const ITEMS = {
   medkit: { n: 'Аптечка', price: 300, heal: 50, w: 0.3, d: '+50 здоровья' },
   bandage: { n: 'Бинт', price: 80, heal: 15, w: 0.1, d: '+15 здоровья' },
   antirad: { n: 'Антирад', price: 250, rad: 60, w: 0.1, d: '−60 радиации' },
+  energy: { n: 'Энергетик', price: 150, w: 0.35, d: 'На 60 секунд игры расход сил снижается на 35%, восстановление ускоряется на 50%. Вторая банка обновляет время.' },
   vodka: { n: 'Водка', price: 100, rad: 20, heal: -3, w: 0.6, d: '−20 радиации, −3 здоровья' },
   bread: { n: 'Хлеб', price: 40, heal: 5, w: 0.3, d: '+5 здоровья' },
   sausage: { n: 'Колбаса', price: 60, heal: 8, w: 0.4, d: '+8 здоровья' },
@@ -75,7 +76,7 @@ const WP = {
 const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS)];
 const STOCK = [
   ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
-  { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 },
+  { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 }, { id: 'energy', q: 1, p: 150 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
   { id: 'a9', q: 20, p: 160 }, { id: 'a12', q: 10, p: 200 }, { id: 'a545', q: 30, p: 450 },
   { id: 'w_pm', q: 1, p: 600 }, { id: 'w_obrez', q: 1, p: 1200 }, { id: 'w_aksu', q: 1, p: 4500 }, { id: 'ar_zarya', q: 1, p: 6000 }

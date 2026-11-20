@@ -8,7 +8,11 @@ const beltCount = id => S.belt.filter(x => x === id).length;
 function take(id, n) {
   S.inv[id] = Math.max(0, cnt(id) - (n || 1)); if (!S.inv[id]) delete S.inv[id];
   while (beltCount(id) > cnt(id)) S.belt.splice(S.belt.indexOf(id), 1);
-  if (S.weapon === id && !has(id)) setWeapon('knife');
+  if (!has(id)) {
+    if (S.weapon === id) setWeapon('knife');
+    const slot=kitSlot(id);
+    if (slot && S.flags.kit?.[slot] === id) delete S.flags.kit[slot];
+  }
 }
 const hour = () => (S.min / 60) % 24;
 const night = () => { const h = hour(); return h >= 21 || h < 5; };

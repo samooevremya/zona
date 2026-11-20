@@ -50,18 +50,23 @@ function playerFire() {
   if (m - 1 <= 0 && cnt(W.ammo)) setTimeout(startReload, 150);
 }
 function cycleWeapon(dir) {
-  const own = WORDER.filter(w => w === 'knife' || has(w));
+  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean)];
   const i = own.indexOf(S.weapon);
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
 function setWeapon(w) {
   if (w !== 'knife' && !has(w)) return;
+  const slot = kitSlot(w);
+  if (slot) S.flags.kit[slot] = w;
   S.weapon = w;
   P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
 }
 function useItem(id) {
   const it = ITEMS[id];
+  if (id === 'energy' && has(id)) {
+    take(id,1); S.flags.energyUntil = S.min + 60; play('eat'); return true;
+  }
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
   take(id, 1);
   if (it.heal) P.hp = clamp(P.hp + it.heal, 1, 100);
@@ -101,12 +106,17 @@ function throwBolt() {
 function toggleTorch() { S.torch = S.torch === false; play('click'); }
 /* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
 const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier', 'fence']);
+function energyActive() { return S.flags.energyUntil > S.min; }
+function exertion(kg) {
+  return (1 + .8 * clamp(kg / carryLimit(), 0, 1)) * (energyActive() ? .65 : 1);
+}
 function startJump() {
   if (P.jumpT > 0 || (P.jumpCD || 0) > 0 || P.sit) return;
-  if (P.st < 15) { msg('Нет сил прыгать: отдышись.'); return; }
+  const cost = 15 * exertion(weight());
+  if (P.st < cost) { msg('Нет сил прыгать: отдышись.'); return; }
   if (swampAt(P.x, P.y)) { msg('В болоте не прыгнешь.'); return; }
   const ml = Math.hypot(IN.moveX, IN.moveY), a = ml > 0.2 ? Math.atan2(IN.moveY, IN.moveX) : P.ang;
-  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= 15; P.jumpA = a; play('step');
+  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play('step');
 }
 const JUMP_T = 0.42, JUMP_V = 250;
 /* тихое убийство: сзади, пока враг не заметил. Лёгкая броня — сразу; армейская держит удар */
@@ -126,6 +136,7 @@ function solidPx(x, y, skipFences = false) {
 }
 function throwNade() {
   if (!has('grenade')) { msg('Гранат нет.'); return; }
+  if (!kitItem('grenade')) { msg('Положи гранату в слот снаряжения.'); return; }
   if (P.nadeT > 0) return; P.nadeT = 1;
   take('grenade', 1);
   const a = P.ang;
@@ -255,11 +266,11 @@ function updatePlayer(dt) {
   let mx = IN.moveX, my = IN.moveY;
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
-  const over = weight() > carryLimit();
+  const kg = weight(), over = kg > carryLimit();
   const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
-  if (sprint) P.st = Math.max(0, P.st - 22 * dt); else P.st = Math.min(100, P.st + 14 * dt);
+  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
@@ -422,7 +433,7 @@ function loadSave() {
 }
 function applyState(d) {
   S = d;
-  if (DETECTORS[S.weapon] && !has(S.weapon)) S.weapon = 'knife';
+  restoreKit();
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
   fogDirty = true;

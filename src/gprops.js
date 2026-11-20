@@ -421,7 +421,7 @@ function chooseFieldSite(stock, previous) {
 
 function fieldCrateLoot() {
   const ammo = ['a9','a12','a545'][ri(0,2)];
-  const supplies = ['bandage','bread','cans','antirad','medkit'][ri(0,4)];
+  const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
   const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12), [supplies]: 1 };
   if (ri(1,4) === 1) loot.money = ri(15,65);
   return loot;

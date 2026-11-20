@@ -81,7 +81,8 @@ T_('R8_weapon_copies_and_shared_lockers', () => {
   const picked=s.inv.w_pm===2 && s.cond.w_pm===44 && s.mag.w_pm===3 && !body.loot.w_pm;
   z.openPanel('inv','Рюкзак'); z.refresh();
   const copies=document.querySelectorAll('.pack-grid button[aria-label="ПМ"]');
-  copies[1].click(); click('.inv-detail','Взять в руки'); z.closePanel();
+  if(copies.length!==1) throw Error('В рюкзаке должен быть только запасной ПМ');
+  copies[0].click(); click('.inv-detail','Взять в руки'); z.closePanel();
   const equipped=s.mag.w_pm===6 && s.cond.w_pm===91;
   const lockers=M.objs.filter(o=>o.k==='locker');
   const visit=o=>{P().x=o.x+o.w/2;P().y=o.y+o.h+12;step(1);z.interact();return z.panel?.kind==='locker';};
@@ -121,7 +122,7 @@ T_('R8_pack_capacity',()=>{
   const wear=id=>{z.openPanel('inv','Рюкзак');z.panel.sel=id;z.refresh();click('Надеть');z.closePanel();};
   wear('ar_zarya');z.openLoot(loot);click('Взять всё');z.closePanel();wear('ar_jacket');
   const suits=s.armor==='ar_zarya' && s.inv.medkit===5 && !loot.loot.medkit;
-  s.inv={ar_jacket:1,w_pm:21};s.armor='ar_jacket';
+  s.inv={ar_jacket:1,w_pm:25};s.armor='ar_jacket';s.flags.kit.sidearm='w_pm';
   const full={k:'body',name:'Тест',loot:{w_pm:1}};
   z.openLoot(full);
   const cells=document.querySelector('.row button').disabled && document.querySelector('.row').textContent.includes('ячеек');z.closePanel();
