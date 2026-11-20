@@ -1,0 +1,57 @@
+name: Mobile art checks
+on:
+  push:
+    branches: [art/cordon-bridge-furniture]
+    paths: ['.github/workflows/mobile-art-check.yml']
+permissions:
+  contents: read
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture landscape scenes and run six suites
+        working-directory: src
+        shell: bash
+        run: |
+          mkdir -p qa/cordon-props /tmp/reports
+          python -m pip install 'playwright==1.56.0'
+          cat > /tmp/frames.py <<'PY'
+          from playwright.sync_api import sync_playwright
+          from pathlib import Path
+          import sys
+          with sync_playwright() as pw:
+           b=pw.chromium.launch(executable_path='/usr/bin/google-chrome',args=['--no-sandbox'])
+           d=pw.devices['iPhone 13 landscape'].copy()
+           d.pop('default_browser_type')
+           p=b.new_page(**d); p.on('pageerror',lambda e: print('ERROR',e))
+           p.goto(Path('index_big.html').resolve().as_uri()+'#qa-seed=7');p.get_by_role('button',name='Новая игра').tap();p.wait_for_timeout(600)
+           print(p.evaluate("() => __z.map.objs.filter(o=>['barrier','bed','table'].includes(o.k)).map(o=>[o.k,o.x,o.y, __z.gfxSnap().HOUSES.findIndex(h=>o.x>=h.x*32 && o.x<(h.x+h.w)*32 && o.y>=h.y*32 && o.y<(h.y+h.h)*32)])"),flush=True)
+           for k in ['barrier','open','bed','table']:
+            p.evaluate("""k=>{let z=__z,o=z.map.objs.find(o=>o.k===(k==='open'?'barrier':k)); if(k==='open')z.map.openBarrier();
+             z.S.flags.intro=1; z.P.x=o.x+o.w/2;z.P.y=o.y+o.h+12;z.cam.x=z.P.x;z.cam.y=z.P.y;z.clearMsgs();z.closePanel();}""",k)
+            p.wait_for_timeout(800)
+            p.screenshot(path=f'qa/cordon-props/{k}-{sys.argv[1]}.jpg',quality=85)
+           b.close()
+          PY
+          git show abafccf5e3d188cb9a0a5bec4c2ed4b953f1b320:index.html > index_big.html
+          python /tmp/frames.py before
+          python3 build.py big
+          cp index_big.html ../index.html
+          python /tmp/frames.py after
+          for t in run rc1run runb g7run bigrun touch_perf; do
+            sed "s|/home/claude/zona2d/|$PWD/|g" "qa/big/$t.py" > "/tmp/$t.py"
+            python "/tmp/$t.py" index_big.html | tee "/tmp/reports/$t.log"
+          done
+          if grep -E ' FAIL|page[Ee]rrors:? \[[^]]|errors \[[^]]|: False' /tmp/reports/*.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-results
+          path: |
+            src/qa/cordon-props/*.jpg
+            /tmp/reports/*.log
