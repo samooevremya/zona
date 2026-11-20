@@ -360,9 +360,10 @@ function findInteract() {
   const sd = byS('sid');
   if (sd && inBunker(P.x, P.y) && dE(sd, P) < 120) cand(dE(sd, P) - 30, { k: 'trader', label: 'Поговорить: Сидорович' });
   const dh = dst(P.x, P.y, HATCH.x, HATCH.y);
-  if (dh < 54) cand(dh, { k: 'down', label: 'Спуститься в бункер' });
+  const atEntrance = SID_SHOP ? Math.abs(P.x-HATCH.x)<25 && P.y>=HATCH.y-62 && P.y<HATCH.y+45 : dh<54;
+  if (atEntrance) cand(dh, { k: 'down', label: 'Спуститься в бункер' });
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
-  if (ds < 56) cand(ds, { k: 'up', label: 'Подняться наверх' });
+  if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
     if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
@@ -408,7 +409,8 @@ function freeShust(e) {
 let fadeT = 0, fadeTo = null;
 function goThrough(down) {
   if (fadeT > 0) return;
-  fadeT = 0.5; fadeTo = down ? { x: RMp(SID_STAIR_X * T, 9.6 * T)[0], y: RMp(SID_STAIR_X * T, 9.6 * T)[1], a: -Math.PI / 2 } : { x: HATCH.x + 2, y: HATCH.y - 30, a: -Math.PI / 2 };
+  fadeT = 0.5; fadeTo = down ? { x:STAIRS.x, y:(SID_SHOP ? SID_STAIR_Y-.85 : 9.6)*T, a:-Math.PI/2 }
+    : { x:HATCH.x+2, y:HATCH.y+(SID_SHOP ? 27 : -30), a:SID_SHOP ? Math.PI/2 : -Math.PI/2 };
   play('reload');
 }
 function healWounded(e) {
@@ -450,6 +452,14 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  if (SID_SHOP && inBunker(P.x,P.y)) {
+    // Сохранения из более просторного подвала могли оставить героя за новой стеной.
+    const inside = Math.abs(P.x-STAIRS.x) <= 3*T-P.r && P.y >= SHOP_ROOM.counterFront*T+P.r && P.y <= 10*T-P.r;
+    const probe = {x:P.x,y:P.y,r:P.r}; collide(probe);
+    if (!inside || Math.hypot(P.x-probe.x,P.y-probe.y)>.1) {
+      P.x=S.x=STAIRS.x; P.y=S.y=SID_SPAWN_Y*T;
+    }
+  }
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);

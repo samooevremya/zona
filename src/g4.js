@@ -352,7 +352,28 @@ function drawRoadblock(g, o) {
   }
   g.restore();
 }
+// Ворота и насыпь запекаются в тот же слой, что и окружающая земля.
+const gateWidth = 174, gateHeight = 131;
+let gateTerrain = null;
+async function prepareShopGate() {
+  if (!SID_SHOP) return;
+  const im=new Image(); im.src=window.SID_GATE_IMAGE;
+  try { await im.decode(); } catch { return; }
+  const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
+  const g=c.getContext('2d'); g.drawImage(im,0,0);
+  g.scale(c.width/2,c.height/2);
+  const fade=g.createRadialGradient(1,1,.74,1,1,1.04);
+  fade.addColorStop(0,'#fff'); fade.addColorStop(.85,'rgba(255,255,255,.15)'); fade.addColorStop(1,'transparent');
+  g.globalCompositeOperation='destination-in'; g.fillStyle=fade; g.fillRect(0,0,2,2);
+  gateTerrain=c;
+  const gate=objs.find(o=>o.k==='hatch');
+  gate.x=HATCH.x-gateWidth/2; gate.y=HATCH.y-gateHeight*.79; gate.w=gateWidth; gate.h=gateHeight;
+  for (const [left,top,w,h] of [[.13,.28,.19,.43],[.68,.28,.19,.43],[.32,.20,.36,.09]]) {
+    addObj({k:'gateFrame',x:gate.x+gate.w*left,y:gate.y+gate.h*top,w:gate.w*w,h:gate.h*h,solid:1});
+  }
+}
 function drawStaticObj(g, o) {
+  if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
   if (o.roadblock) { drawRoadblock(g, o); return; }
   if (ART && artStatic(g, o)) return;
   if (o.k === 'genset') { if (!(G3.on && G3.pack && G3.pack.manifest.props && G3.pack.manifest.props.generator)) gensetProc(g, o); return; }   // растр G4 рисуется в динамическом слое
@@ -656,7 +677,7 @@ function drawDeskTrader(e) {
   ctx.translate(e.x-16, e.y-10+breath);
   ctx.scale(.25,.25);
   ctx.beginPath();
-  ctx.rect(0,0,128,(5.69*T-e.y+10-breath)*4);
+  ctx.rect(0,0,128,(SHOP_ROOM.counterY*T-e.y+10-breath)*4);
   for(const [x,y,rx,ry] of deskHands[pose]) {
     ctx.moveTo(x+rx,y); ctx.ellipse(x,y,rx,ry,0,0,2*Math.PI);
   }
@@ -674,8 +695,8 @@ function render() {
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
   if (SID_SHOP && P && inBunker(P.x, P.y)) {
-    cam.x = shopCamera(cam.x, BUNK.x0+.75*T, 9.5*T, VW/Z);
-    cam.y = shopCamera(cam.y, 1.25*T, 10.25*T, VH/Z);
+    cam.x = shopCamera(cam.x, STAIRS.x-SHOP_ROOM.width*T/2, SHOP_ROOM.width*T, VW/Z);
+    cam.y = shopCamera(cam.y, SHOP_ROOM.top*T, SHOP_ROOM.height*T, VH/Z);
   }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -686,8 +707,9 @@ function render() {
   const shopVisible = SID_SHOP && P && inBunker(P.x, P.y) && shopImage.complete && shopImage.naturalWidth;
   if (shopVisible) {
     ctx.save();
-    ctx.beginPath(); ctx.rect(BUNK.x0 + .75 * T, 1.25 * T, 9.5 * T, 10.25 * T); ctx.clip();
-    ctx.drawImage(shopImage, BUNK.x0 + .75*T, 1.25*T, 9.5*T, 10.25*T);
+    const width=SHOP_ROOM.width*T, height=SHOP_ROOM.height*T, x=STAIRS.x-width/2, y=SHOP_ROOM.top*T;
+    ctx.beginPath(); ctx.rect(x,y,width,height); ctx.clip();
+    ctx.drawImage(shopImage,x,y,width,height);
   }
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
@@ -830,7 +852,7 @@ function render() {
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
   const bunk = P && inBunker(P.x, P.y);
-  const dk = bunk ? (SID_SHOP ? 0.32 : 0.62) : darkness();
+  const dk = bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
@@ -850,7 +872,7 @@ function render() {
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
     hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
     if (shopVisible) {
-      hole(BUNK.x0+9.25*T, 5.95*T, 95, .8);
+      hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);

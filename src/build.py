@@ -29,6 +29,8 @@ art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(op
 if BIGF:
     shop = _b64.b64encode(open('art/sid-shop.webp', 'rb').read()).decode()
     art += '\nwindow.SID_SHOP_IMAGE="data:image/webp;base64,' + shop + '";'
+    gate = _b64.b64encode(open('art/sid-gate.webp', 'rb').read()).decode()
+    art += '\nwindow.SID_GATE_IMAGE="data:image/webp;base64,' + gate + '";'
     poses = _b64.b64encode(open('art/sid-desk-poses.webp', 'rb').read()).decode()
     art += '\nwindow.SID_DESK_POSES="data:image/webp;base64,' + poses + '";'
     aerial = _b64.b64encode(open('art/cordon-aerial.webp', 'rb').read()).decode()

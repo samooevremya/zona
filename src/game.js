@@ -151,9 +151,14 @@ const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
 const SID_SHOP = !!window.SID_SHOP_IMAGE && !/sid-shop-off/.test(location.hash);
-const SID_DESK_Y = SID_SHOP ? 5.32 : 4.6;
-const SID_STAIR_X = SID_SHOP ? 126.5 : 124.5;
-const STAIRS = { x: SID_STAIR_X * T, y: 11.4 * T };
+// План в клетках исходной карты. Большой Кордон переносит всю комнату вместе с лестницей.
+const SHOP_ROOM = {top:2.8, width:6.4, height:7.4, counterY:6.02, counterFront:6.93};
+const SID_DESK_Y = SID_SHOP ? SHOP_ROOM.counterY-.37 : 4.6;
+const SID_DESK_X = SID_SHOP ? 125.9 : 126.5;
+const SID_STAIR_X = SID_SHOP ? 126 : 124.5;
+const SID_STAIR_Y = SID_SHOP ? 9.55 : 11.4;
+const SID_SPAWN_Y = SID_SHOP ? 7.94 : 8.6;
+const STAIRS = { x: SID_STAIR_X * T, y: SID_STAIR_Y * T };
 const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
 const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
@@ -206,10 +211,13 @@ function gen() {
   house(39, 87, 7, 6, [[0, 2], [0, 3]]);
   house(25, 93, 8, 5, [[3, 0], [4, 0]]);
   // бункер: люк снаружи
-  for (let y = 96; y <= 100; y++) for (let x = 10; x <= 15; x++) setT(x, y, CF);
+  if (SID_SHOP) {
+    for (let y=95; y<=100; y++) for (let x=9; x<=15; x++) setT(x,y,GR);
+    setT(12,99,DI); setT(13,100,DI);
+  } else for (let y = 96; y <= 100; y++) for (let x = 10; x <= 15; x++) setT(x, y, CF);
   reserve(9, 95, 16, 101);
   // бункер внутри
-  for (let y = 1; y <= 12; y++) for (let x = 121; x <= 131; x++) setT(x, y, (x === 121 || x === 131 || y === 1 || y === 12) ? CO : CF);
+  for (let y = 1; y <= 12; y++) for (let x = 121; x <= 131; x++) setT(x, y, (SID_SHOP ? x<123 || x>128 || y<3 || y>9 : x===121 || x===131 || y===1 || y===12) ? CO : CF);
   // АТП
   for (let y = 60; y <= 82; y++) for (let x = 86; x <= 110; x++) {
     const edge = x === 86 || x === 110 || y === 60 || y === 82;
@@ -281,11 +289,16 @@ function gen() {
   [[60, 32], [66, 32]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   [[59, 102], [69, 102]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   // бункер: прилавок, полки, лестница
-  addObj({ k: 'counter', x: 122 * T, y: SID_SHOP ? 5.69*T : 6*T+4, w: 9*T, h: SID_SHOP ? .95*T : 22, solid: 1, opaque: 0 });
-  [[122, 2], [125, 2], [128, 2]].forEach(c => addObj({ k: 'shelf', x: c[0] * T + 2, y: c[1] * T + 2, w: 2 * T + 28, h: 20, solid: 1 }));
-  if (SID_SHOP) addObj({ k: 'crate', shopStack: true, x: 130.02*T, y: 7.16*T, w: .94*T, h: 1.82*T, solid: 1 });
-  else [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
-  addObj({ k: 'stairs', x: (SID_STAIR_X - 1) * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
+  if (SID_SHOP) {
+    addObj({k:'counter', x:123*T, y:SHOP_ROOM.counterY*T, w:6*T, h:(SHOP_ROOM.counterFront-SHOP_ROOM.counterY)*T, solid:1});
+    addObj({k:'shelf', x:123*T, y:3*T, w:6*T, h:.72*T, solid:1});
+    addObj({k:'crate', shopStack:true, x:128.23*T, y:7.17*T, w:.65*T, h:1.65*T, solid:1});
+  } else {
+    addObj({k:'counter', x:122*T, y:6*T+4, w:9*T, h:22, solid:1});
+    [[122,2],[125,2],[128,2]].forEach(c=>addObj({k:'shelf', x:c[0]*T+2, y:c[1]*T+2, w:2*T+28, h:20, solid:1}));
+    [[129.5,8.5],[129.5,10]].forEach(c=>addObj({k:'crate', x:c[0]*T, y:c[1]*T, w:26, h:26, solid:1}));
+  }
+  addObj({k:'stairs', x:(SID_STAIR_X-1)*T, y:(SID_STAIR_Y-1)*T, w:2*T, h:T+18});
   // аномалии и артефакты
   [[72, 52], [75, 50], [77, 54], [73, 56], [76, 57], [79, 52], [70, 55], [58, 16], [67, 21], [24, 26]].forEach(c => ANOM0.push({ x: c[0] * T + 16, y: c[1] * T + 16, r: 26, k: 'g' }));
   [[37.4, 28.5, 20], [39.6, 29.7, 20], [37.6, 31.9, 20], [30.5, 33.5, 24], [35.5, 32.5, 24]].forEach(c => ANOM0.push({ x: c[0] * T, y: c[1] * T, r: c[2], k: 'e' }));
@@ -369,7 +382,7 @@ const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
     anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
   { id: 'sid', name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-    anchors: { hatch: [12.5, 98.5], trader: [126.5, SID_DESK_Y], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6] } },
+    anchors: { hatch: [12.5, 98.5], trader: [SID_DESK_X, SID_DESK_Y], stairs: [SID_STAIR_X, SID_STAIR_Y], spawn: [SID_SHOP ? SID_STAIR_X : 126.5, SID_SPAWN_Y] } },
   { id: 'atp', name: 'АТП', gen: 'АТП', type: 'danger', bounds: [84, 58, 112, 84], entrances: [[86, 70], [104, 84]],
     anchors: { garage: [94.5, 64.6], petr: [93, 71.5], petr2: [97, 71.5], approach: [66, 37], sos: [[96, 96]] } },
   { id: 'field', name: 'Поле аномалий', gen: 'поля аномалий', type: 'anomaly', bounds: [66, 46, 84, 60], entrances: [[70, 60]],
@@ -497,7 +510,7 @@ const YARD_SEATS = [
   { sid: 'l4', x: 29.82, y: 86.33, wpn: 'w_pm', log: ['logs', -0.15, 0.35, 0.43] }
 ].map(s => ({ ...s, x: s.x + CAMP_TILE[0] - 30.5, y: s.y + CAMP_TILE[1] - 84.5 }));
 const NPCDEF = [
-  { sid: 'sid', fac: 'trader', name: 'Сидорович', x: 126.5, y: SID_DESK_Y, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
+  { sid: 'sid', fac: 'trader', name: 'Сидорович', x: SID_DESK_X, y: SID_DESK_Y, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
   { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
   { sid: 'petr', fac: 'loner', name: 'Петруха', x: 74, y: 63.5, wpn: 'w_pm', hp: 150, rank: 1, stay: 1, named: 1 },
   { sid: 'petr2', fac: 'loner', name: 'Хомяк', x: 74, y: 79, wpn: 'w_obrez', hp: 130, rank: 0, stay: 1, named: 1 },
@@ -1674,9 +1687,10 @@ function findInteract() {
   const sd = byS('sid');
   if (sd && inBunker(P.x, P.y) && dE(sd, P) < 120) cand(dE(sd, P) - 30, { k: 'trader', label: 'Поговорить: Сидорович' });
   const dh = dst(P.x, P.y, HATCH.x, HATCH.y);
-  if (dh < 54) cand(dh, { k: 'down', label: 'Спуститься в бункер' });
+  const atEntrance = SID_SHOP ? Math.abs(P.x-HATCH.x)<25 && P.y>=HATCH.y-62 && P.y<HATCH.y+45 : dh<54;
+  if (atEntrance) cand(dh, { k: 'down', label: 'Спуститься в бункер' });
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
-  if (ds < 56) cand(ds, { k: 'up', label: 'Подняться наверх' });
+  if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
     if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
@@ -1722,7 +1736,8 @@ function freeShust(e) {
 let fadeT = 0, fadeTo = null;
 function goThrough(down) {
   if (fadeT > 0) return;
-  fadeT = 0.5; fadeTo = down ? { x: RMp(SID_STAIR_X * T, 9.6 * T)[0], y: RMp(SID_STAIR_X * T, 9.6 * T)[1], a: -Math.PI / 2 } : { x: HATCH.x + 2, y: HATCH.y - 30, a: -Math.PI / 2 };
+  fadeT = 0.5; fadeTo = down ? { x:STAIRS.x, y:(SID_SHOP ? SID_STAIR_Y-.85 : 9.6)*T, a:-Math.PI/2 }
+    : { x:HATCH.x+2, y:HATCH.y+(SID_SHOP ? 27 : -30), a:SID_SHOP ? Math.PI/2 : -Math.PI/2 };
   play('reload');
 }
 function healWounded(e) {
@@ -1764,6 +1779,14 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  if (SID_SHOP && inBunker(P.x,P.y)) {
+    // Сохранения из более просторного подвала могли оставить героя за новой стеной.
+    const inside = Math.abs(P.x-STAIRS.x) <= 3*T-P.r && P.y >= SHOP_ROOM.counterFront*T+P.r && P.y <= 10*T-P.r;
+    const probe = {x:P.x,y:P.y,r:P.r}; collide(probe);
+    if (!inside || Math.hypot(P.x-probe.x,P.y-probe.y)>.1) {
+      P.x=S.x=STAIRS.x; P.y=S.y=SID_SPAWN_Y*T;
+    }
+  }
   cam.x = P.x; cam.y = P.y;
   deathT = 0; hurtFlash = 0; MSGS = []; radioQueue.length = 0;
   if (S.blow?.stage === 1) radioNotice(BLOW_WARNING, true);
@@ -2123,7 +2146,28 @@ function drawRoadblock(g, o) {
   }
   g.restore();
 }
+// Ворота и насыпь запекаются в тот же слой, что и окружающая земля.
+const gateWidth = 174, gateHeight = 131;
+let gateTerrain = null;
+async function prepareShopGate() {
+  if (!SID_SHOP) return;
+  const im=new Image(); im.src=window.SID_GATE_IMAGE;
+  try { await im.decode(); } catch { return; }
+  const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
+  const g=c.getContext('2d'); g.drawImage(im,0,0);
+  g.scale(c.width/2,c.height/2);
+  const fade=g.createRadialGradient(1,1,.74,1,1,1.04);
+  fade.addColorStop(0,'#fff'); fade.addColorStop(.85,'rgba(255,255,255,.15)'); fade.addColorStop(1,'transparent');
+  g.globalCompositeOperation='destination-in'; g.fillStyle=fade; g.fillRect(0,0,2,2);
+  gateTerrain=c;
+  const gate=objs.find(o=>o.k==='hatch');
+  gate.x=HATCH.x-gateWidth/2; gate.y=HATCH.y-gateHeight*.79; gate.w=gateWidth; gate.h=gateHeight;
+  for (const [left,top,w,h] of [[.13,.28,.19,.43],[.68,.28,.19,.43],[.32,.20,.36,.09]]) {
+    addObj({k:'gateFrame',x:gate.x+gate.w*left,y:gate.y+gate.h*top,w:gate.w*w,h:gate.h*h,solid:1});
+  }
+}
 function drawStaticObj(g, o) {
+  if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
   if (o.roadblock) { drawRoadblock(g, o); return; }
   if (ART && artStatic(g, o)) return;
   if (o.k === 'genset') { if (!(G3.on && G3.pack && G3.pack.manifest.props && G3.pack.manifest.props.generator)) gensetProc(g, o); return; }   // растр G4 рисуется в динамическом слое
@@ -2427,7 +2471,7 @@ function drawDeskTrader(e) {
   ctx.translate(e.x-16, e.y-10+breath);
   ctx.scale(.25,.25);
   ctx.beginPath();
-  ctx.rect(0,0,128,(5.69*T-e.y+10-breath)*4);
+  ctx.rect(0,0,128,(SHOP_ROOM.counterY*T-e.y+10-breath)*4);
   for(const [x,y,rx,ry] of deskHands[pose]) {
     ctx.moveTo(x+rx,y); ctx.ellipse(x,y,rx,ry,0,0,2*Math.PI);
   }
@@ -2445,8 +2489,8 @@ function render() {
     cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
   }
   if (SID_SHOP && P && inBunker(P.x, P.y)) {
-    cam.x = shopCamera(cam.x, BUNK.x0+.75*T, 9.5*T, VW/Z);
-    cam.y = shopCamera(cam.y, 1.25*T, 10.25*T, VH/Z);
+    cam.x = shopCamera(cam.x, STAIRS.x-SHOP_ROOM.width*T/2, SHOP_ROOM.width*T, VW/Z);
+    cam.y = shopCamera(cam.y, SHOP_ROOM.top*T, SHOP_ROOM.height*T, VH/Z);
   }
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2457,8 +2501,9 @@ function render() {
   const shopVisible = SID_SHOP && P && inBunker(P.x, P.y) && shopImage.complete && shopImage.naturalWidth;
   if (shopVisible) {
     ctx.save();
-    ctx.beginPath(); ctx.rect(BUNK.x0 + .75 * T, 1.25 * T, 9.5 * T, 10.25 * T); ctx.clip();
-    ctx.drawImage(shopImage, BUNK.x0 + .75*T, 1.25*T, 9.5*T, 10.25*T);
+    const width=SHOP_ROOM.width*T, height=SHOP_ROOM.height*T, x=STAIRS.x-width/2, y=SHOP_ROOM.top*T;
+    ctx.beginPath(); ctx.rect(x,y,width,height); ctx.clip();
+    ctx.drawImage(shopImage,x,y,width,height);
   }
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
@@ -2601,7 +2646,7 @@ function render() {
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
   const bunk = P && inBunker(P.x, P.y);
-  const dk = bunk ? (SID_SHOP ? 0.32 : 0.62) : darkness();
+  const dk = bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
@@ -2621,7 +2666,7 @@ function render() {
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
     hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
     if (shopVisible) {
-      hole(BUNK.x0+9.25*T, 5.95*T, 95, .8);
+      hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
     for (const f of flashes) hole(f.x, f.y, f.big ? 260 : 130, 0.9);
     for (const a of anoms) if (a.k === 'e') hole(a.x, a.y, 70 + a.fx * 120, 0.5);
@@ -5239,7 +5284,7 @@ const RC1 = {
       anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-      anchors: { hatch: [12.5, 98.5], trader: [126.5, SID_DESK_Y], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
+      anchors: { hatch: [12.5, 98.5], trader: [SID_DESK_X, SID_DESK_Y], stairs: [SID_STAIR_X, SID_STAIR_Y], spawn: [SID_SHOP ? SID_STAIR_X : 126.5, SID_SPAWN_Y], safe: [14.5, 95.5] } },
     bus: { name: 'Автобус у дороги', gen: 'автобуса', type: 'story', bounds: [44, 72, 53, 80], entrances: [[48, 80], [44, 75]],
       anchors: { bus: [47, 75], tolik: [49.5, 77.5], safe: [47, 79] } },
     pump: { name: 'Старая водокачка', gen: 'старой водокачки', type: 'story', bounds: [32, 57, 42, 67], entrances: [[36, 67], [42, 62]],
@@ -7624,7 +7669,7 @@ async function boot() {
   bootStep('мир'); gen(); bigWorld(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
+  bootStep('графика'); await loadArt(); await prepareShopGate(); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {

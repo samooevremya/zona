@@ -10,7 +10,7 @@ const RC1 = {
       anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
-      anchors: { hatch: [12.5, 98.5], trader: [126.5, SID_DESK_Y], stairs: [SID_STAIR_X, 11.4], spawn: [126.5, 8.6], safe: [14.5, 95.5] } },
+      anchors: { hatch: [12.5, 98.5], trader: [SID_DESK_X, SID_DESK_Y], stairs: [SID_STAIR_X, SID_STAIR_Y], spawn: [SID_SHOP ? SID_STAIR_X : 126.5, SID_SPAWN_Y], safe: [14.5, 95.5] } },
     bus: { name: 'Автобус у дороги', gen: 'автобуса', type: 'story', bounds: [44, 72, 53, 80], entrances: [[48, 80], [44, 75]],
       anchors: { bus: [47, 75], tolik: [49.5, 77.5], safe: [47, 79] } },
     pump: { name: 'Старая водокачка', gen: 'старой водокачки', type: 'story', bounds: [32, 57, 42, 67], entrances: [[36, 67], [42, 62]],

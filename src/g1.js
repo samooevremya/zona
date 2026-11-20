@@ -149,9 +149,14 @@ const addObj = o => { o.static = 1; objs.push(o); return o; };
 const ANOM0 = [], ARTS0 = [], rads = [];
 const HATCH = { x: 12.5 * T, y: 98.5 * T };
 const SID_SHOP = !!window.SID_SHOP_IMAGE && !/sid-shop-off/.test(location.hash);
-const SID_DESK_Y = SID_SHOP ? 5.32 : 4.6;
-const SID_STAIR_X = SID_SHOP ? 126.5 : 124.5;
-const STAIRS = { x: SID_STAIR_X * T, y: 11.4 * T };
+// План в клетках исходной карты. Большой Кордон переносит всю комнату вместе с лестницей.
+const SHOP_ROOM = {top:2.8, width:6.4, height:7.4, counterY:6.02, counterFront:6.93};
+const SID_DESK_Y = SID_SHOP ? SHOP_ROOM.counterY-.37 : 4.6;
+const SID_DESK_X = SID_SHOP ? 125.9 : 126.5;
+const SID_STAIR_X = SID_SHOP ? 126 : 124.5;
+const SID_STAIR_Y = SID_SHOP ? 9.55 : 11.4;
+const SID_SPAWN_Y = SID_SHOP ? 7.94 : 8.6;
+const STAIRS = { x: SID_STAIR_X * T, y: SID_STAIR_Y * T };
 const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
 const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
@@ -204,10 +209,13 @@ function gen() {
   house(39, 87, 7, 6, [[0, 2], [0, 3]]);
   house(25, 93, 8, 5, [[3, 0], [4, 0]]);
   // бункер: люк снаружи
-  for (let y = 96; y <= 100; y++) for (let x = 10; x <= 15; x++) setT(x, y, CF);
+  if (SID_SHOP) {
+    for (let y=95; y<=100; y++) for (let x=9; x<=15; x++) setT(x,y,GR);
+    setT(12,99,DI); setT(13,100,DI);
+  } else for (let y = 96; y <= 100; y++) for (let x = 10; x <= 15; x++) setT(x, y, CF);
   reserve(9, 95, 16, 101);
   // бункер внутри
-  for (let y = 1; y <= 12; y++) for (let x = 121; x <= 131; x++) setT(x, y, (x === 121 || x === 131 || y === 1 || y === 12) ? CO : CF);
+  for (let y = 1; y <= 12; y++) for (let x = 121; x <= 131; x++) setT(x, y, (SID_SHOP ? x<123 || x>128 || y<3 || y>9 : x===121 || x===131 || y===1 || y===12) ? CO : CF);
   // АТП
   for (let y = 60; y <= 82; y++) for (let x = 86; x <= 110; x++) {
     const edge = x === 86 || x === 110 || y === 60 || y === 82;
@@ -279,11 +287,16 @@ function gen() {
   [[60, 32], [66, 32]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   [[59, 102], [69, 102]].forEach(c => addObj({ k: 'sand', x: c[0] * T, y: c[1] * T + 8, w: T, h: 16, solid: 1 }));
   // бункер: прилавок, полки, лестница
-  addObj({ k: 'counter', x: 122 * T, y: SID_SHOP ? 5.69*T : 6*T+4, w: 9*T, h: SID_SHOP ? .95*T : 22, solid: 1, opaque: 0 });
-  [[122, 2], [125, 2], [128, 2]].forEach(c => addObj({ k: 'shelf', x: c[0] * T + 2, y: c[1] * T + 2, w: 2 * T + 28, h: 20, solid: 1 }));
-  if (SID_SHOP) addObj({ k: 'crate', shopStack: true, x: 130.02*T, y: 7.16*T, w: .94*T, h: 1.82*T, solid: 1 });
-  else [[129.5, 8.5], [129.5, 10]].forEach(c => addObj({ k: 'crate', x: c[0] * T, y: c[1] * T, w: 26, h: 26, solid: 1 }));
-  addObj({ k: 'stairs', x: (SID_STAIR_X - 1) * T, y: 10.4 * T, w: 2 * T, h: T + 18 });
+  if (SID_SHOP) {
+    addObj({k:'counter', x:123*T, y:SHOP_ROOM.counterY*T, w:6*T, h:(SHOP_ROOM.counterFront-SHOP_ROOM.counterY)*T, solid:1});
+    addObj({k:'shelf', x:123*T, y:3*T, w:6*T, h:.72*T, solid:1});
+    addObj({k:'crate', shopStack:true, x:128.23*T, y:7.17*T, w:.65*T, h:1.65*T, solid:1});
+  } else {
+    addObj({k:'counter', x:122*T, y:6*T+4, w:9*T, h:22, solid:1});
+    [[122,2],[125,2],[128,2]].forEach(c=>addObj({k:'shelf', x:c[0]*T+2, y:c[1]*T+2, w:2*T+28, h:20, solid:1}));
+    [[129.5,8.5],[129.5,10]].forEach(c=>addObj({k:'crate', x:c[0]*T, y:c[1]*T, w:26, h:26, solid:1}));
+  }
+  addObj({k:'stairs', x:(SID_STAIR_X-1)*T, y:(SID_STAIR_Y-1)*T, w:2*T, h:T+18});
   // аномалии и артефакты
   [[72, 52], [75, 50], [77, 54], [73, 56], [76, 57], [79, 52], [70, 55], [58, 16], [67, 21], [24, 26]].forEach(c => ANOM0.push({ x: c[0] * T + 16, y: c[1] * T + 16, r: 26, k: 'g' }));
   [[37.4, 28.5, 20], [39.6, 29.7, 20], [37.6, 31.9, 20], [30.5, 33.5, 24], [35.5, 32.5, 24]].forEach(c => ANOM0.push({ x: c[0] * T, y: c[1] * T, r: c[2], k: 'e' }));
