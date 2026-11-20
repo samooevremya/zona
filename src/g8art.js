@@ -349,9 +349,67 @@ function drawThresholds(g) {
   }
 }
 function artBush(g, x, y) { const h = hash2(x, y); ART.draw(g, C1 ? (tAt(x, y + 1) === SW || tAt(x, y - 1) === SW ? 'c1_bush3' : 'c1_bush' + Math.floor(hash2(y, x + 7) * 3)) : 'bush', x * T + 16 + (h - 0.5) * 6, y * T + 16 + (hash2(y, x) - 0.5) * 6, 36 * (0.85 + h * 0.3), 36 * (0.85 + h * 0.3), h * 6.28); }
+// Секции рисуются один раз на кусок земли, по оси того же препятствия, что и коллизия.
+function drawFenceRun(g, o) {
+  const upright = o.h > o.w, length = Math.max(o.w, o.h);
+  const wood = o.material === 'picket' || o.material === 'rail';
+  const bays = Math.ceil(length / 55), bay = length / bays;
+  g.save();
+  g.translate(o.x + o.w / 2, o.y + o.h / 2);
+  // Смещение тени в мировых координатах сохраняется и на поперечных секциях.
+  if (SHADOWS) {
+    g.save(); g.translate(SUN_DX * 4, SUN_DY * 4);
+    if (upright) g.rotate(Math.PI / 2);
+    g.fillStyle = 'rgba(26,21,15,.35)'; g.fillRect(-length / 2, -2, length, 5);
+    g.restore();
+  }
+  if (upright) g.rotate(Math.PI / 2);
+  g.translate(-length / 2, 0);
+  if (o.material === 'picket') {
+    for (let x = 2; x < length - 2; x += 5) {
+      const wear = hash2(o.x + x, o.y), h = 5 + 3 * wear;
+      g.fillStyle = wear < .3 ? '#6d6250' : '#897860';
+      g.fillRect(x, 3 - h, 3.8, h);
+      g.fillStyle = '#ae9c80'; g.fillRect(x, 3 - h, 3, 1);
+    }
+  } else if (o.material === 'wire') {
+    // Витки лежат вдоль нижней натяжной проволоки; узлы ловят свет через виток.
+    const turns = Math.ceil(length / 7), pitch = length / turns;
+    g.strokeStyle = '#443b35'; g.lineWidth = 1.8; g.beginPath();
+    for (let i = 0; i < turns; i++) {
+      const x = (i + .5) * pitch;
+      g.moveTo(x + 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, 0, 2 * Math.PI);
+    }
+    g.stroke(); g.beginPath(); g.lineWidth = 1; g.strokeStyle = '#b4aaa0';
+    for (let i = 0; i < turns; i++) {
+      const x = (i + .5) * pitch;
+      g.moveTo(x - 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, Math.PI, Math.PI * 1.8);
+      if (i % 2 === 0) { g.moveTo(x - 1, 2); g.lineTo(x + 2, 6); }
+    }
+    g.stroke();
+  } else if (!wood) {
+    g.beginPath();
+    for (let x = 0; x < length - 5; x += 5) {
+      g.moveTo(x, -3); g.lineTo(x + 5, 3); g.moveTo(x, 3); g.lineTo(x + 5, -3);
+    }
+    g.strokeStyle = '#847e6e'; g.lineWidth = 1; g.stroke();
+  }
+  for (let i = 0; i < bays; i++) {
+    const center = (i + .5) * bay;
+    ART.draw(g, wood ? 'c1_fence_picket' : 'c1_fence_mesh', center, 1, bay, wood ? 5 : 3);
+    if (o.material === 'rail') ART.draw(g, 'c1_fence_picket', center, -3, bay, 3);
+  }
+  for (let i = 0; i <= bays; i++) {
+    const x = i * bay;
+    g.fillStyle = wood ? '#504537' : '#494743'; g.fillRect(x - 2, -4, 4, 9);
+    g.fillStyle = wood ? '#aea08a' : '#aaa497'; g.fillRect(x - 2, -4, 3.5, 3);
+  }
+  g.restore();
+}
 /* объекты на земле: центр = левый верх + половина размера */
 function artStatic(g, o) { C1SH = o.k !== 'fire'; try { return artStatic0(g, o); } finally { C1SH = 0; } }
 function artStatic0(g, o) {
+  if (o.k === 'fence' && o.material) { drawFenceRun(g, o); return true; }
   const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
   if (C1 && o.k === 'bus') { const w = o.w * 1.25, s = ART.m.sprites.c1_bus, h = w * s.rect[3] / s.rect[2]; g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(cx - w / 2 + 6, cy - h / 2 + 7, w, h); c1Draw(g, 'c1_bus', cx, cy, w); return true; }
   if (C1 && o.k === 'car' && o.sprite) {
