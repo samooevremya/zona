@@ -13,6 +13,10 @@ js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() fo
 open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os
+# Предметы с листа house_village_floor, без стен и пола вокруг них.
+with open('art/c1/furniture.png', 'rb') as furniture:
+    furniture_url = 'data:image/png;base64,' + _b64.b64encode(furniture.read()).decode()
+art += '\nwindow.C1_MANIFEST.images.furniture = {file:' + repr(furniture_url) + '};'
 _b1png={f[:-4]:'data:image/png;base64,'+_b64.b64encode(open('art/b1/png/'+f,'rb').read()).decode() for f in sorted(_os.listdir('art/b1/png')) if f.endswith('.png')}
 art+='\n'+open('art/b1/manifest.js',encoding='utf8').read()+'\n'+open('art/b1/renderer.js',encoding='utf8').read()
 _b2m=__import__('json').load(open('art/b2/manifest.json',encoding='utf8'))
