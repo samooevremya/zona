@@ -671,5 +671,76 @@ Tt('L2_equipment_and_trade_scroll', () => {
   const retained=a>0 && Math.abs(mine().scrollTop-a)<=1 && Math.abs(their().scrollTop-b)<=1 && z.panel.offer.sell.art_blood===1;
   z.closePanel();return {ok:six && !!separate && swapped && kit.primary==='w_obrez' && retained,six,separate:!!separate,swapped,retained};
 });
+function witnessScene() {
+  reset();
+  // Leave only the participants so the outcome cannot depend on a passing patrol.
+  z.ents.splice(1);
+  const p = P();
+  const add = (name, offset, angle) => {
+    const npc = z.rc.mk.mkHuman({fac:'loner', name, x:(p.x+offset)/T, y:p.y/T, ang:angle});
+    npc.qaHold = true;
+    z.ents.push(npc);
+    return npc;
+  };
+  return { victim:add('Потерпевший', 28, Math.PI), add };
+}
+Tt('K_witness_private_attack', () => {
+  const {victim, add} = witnessScene();
+  const turned = add('Спиной к игроку', -38, Math.PI);
+  const hidden = add('За стеной', -50, 0);
+  const behindWall = z.gfxSnap().HOUSES.filter(h=>!h.ruin).flatMap(h=>
+    Array.from({length:h.w-2},(_,i)=>({x:(h.x+i+1.5)*T, y:(h.y+h.h/2)*T})))
+    .find(q=>Math.hypot(q.x-P().x,q.y-P().y)<360 && !M.los(q.x,q.y,P().x,P().y));
+  if (!behindWall) throw Error('No nearby occluded observer position');
+  Object.assign(hidden, behindWall);
+  hidden.ang = Math.atan2(P().y-hidden.y, P().x-hidden.x);
+  const hit = () => z.rc.hurt(victim, 8, P());
+  hit();
+  const onlyVictim = victim.angry && !turned.angry && !hidden.angry && S().rep===0;
+  z.rc.hurt(victim, 999, P()); step(100);
+  return {ok:!!onlyVictim && S().rep===0 && !S().flags.lonerReports, onlyVictim:!!onlyVictim};
+});
+Tt('K_witness_report_and_reload', () => {
+  const {victim, add} = witnessScene();
+  const first = add('Первый свидетель', -50, 0), second = add('Второй свидетель', -78, 0);
+  z.rc.hurt(victim, 999, P());
+  const local = first.angry && second.angry && S().rep===0;
+  z.rc.hurt(first, 999, 'anom');
+  z.save(true); z.applyState(z.loadSave());
+  step(100);
+  const reported = () => S().news.filter(n => n.x.includes('Второй свидетель в эфире')).length;
+  const once = reported()===1 && S().rep===-35;
+  z.save(true); z.applyState(z.loadSave()); step(110);
+  return {ok:!!local && once && reported()===1 && S().rep===-35, local:!!local, once};
+});
+Tt('K_no_surviving_witness', () => {
+  const {victim, add} = witnessScene(), witness = add('Свидетель', -50, 0);
+  z.rc.hurt(victim, 999, P()); z.rc.hurt(witness, 999, P()); step(110);
+  return {ok:S().rep===0 && !S().news.some(n=>n.x.includes('Видел, как Меченый'))};
+});
+Tt('K_hostile_loner_shelters', () => {
+  reset();
+  const wolf = z.ents.find(e=>e.sid==='wolf');
+  z.ents.splice(1); z.ents.push(wolf);
+  const h = z.gfxSnap().HOUSES.filter(h=>!h.ruin).sort((a,b)=>
+    Math.hypot(a.x*T-wolf.x,a.y*T-wolf.y)-Math.hypot(b.x*T-wolf.x,b.y*T-wolf.y))[0];
+  const d = h.entrances[0], x=h.x*T+d.x, y=h.y*T+d.y;
+  P().x=x-d.nx*T*1.5; P().y=y-d.ny*T*1.5;
+  wolf.x=x+d.nx*T*2; wolf.y=y+d.ny*T*2;
+  wolf.tgt=P(); wolf.angry=1; wolf.mem=8;
+  const outside=!z.rc.sheltered(wolf.x,wolf.y), mag=wolf.mag;
+  S().blow.next=S().min;
+  step(1);
+  const disengaged=S().blow.stage===1 && !wolf.tgt && wolf.mem===0;
+  step(280);
+  const under=()=>z.rc.sheltered(wolf.x,wolf.y);
+  const reached=under() && wolf.alive;
+  S().blow.t=.02; step(2);
+  P().x+=d.nx*3*T; P().y+=d.ny*3*T;
+  step(90);
+  const held=S().blow.stage===2 && under() && !wolf.tgt && wolf.mag===mag;
+  S().blow.t=.02; step(3);
+  return {ok:!!(outside && disengaged && reached && held && !wolf.evacuating && wolf.angry), outside, disengaged, reached, held};
+});
 return JSON.stringify(R);
 })()

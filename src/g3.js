@@ -172,8 +172,8 @@ function update(dt) {
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
+    if (e.qaHold || lonerBlowoutAI(e, dt)) continue;
     if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt) continue;
-    if (e.qaHold) continue;   // только для приёмочных кадров
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
     if (e.kind === 'dog') aiDog(e, dt); else if (e.kind === 'boar') aiBoar(e, dt); else if (e.kind === 'sucker') aiSucker(e, dt); else aiHuman(e, dt);
   }
@@ -203,6 +203,7 @@ function update(dt) {
   }
   updateBolts(dt);
   updateAnoms(dt);
+  deliverLonerReports();
   checkBridgeCrossing(oldX, oldY);
   g7Tick(dt);
   // гранаты
@@ -334,7 +335,7 @@ function findInteract() {
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
-    if (e.storyMan) { cand(d,{k:'talk',e,label:'Поговорить: '+e.name}); continue; }
+    if (e.storyMan && !hostile(e, P)) { cand(d,{k:'talk',e,label:'Поговорить: '+e.name}); continue; }
     if (e.wounded) cand(d, { k: 'heal', e: e, label: 'Помочь раненому: ' + e.name });
     else if (e.captive) cand(d, { k: 'free', e: e, label: 'Освободить: ' + e.name });
     else if (e.kind === 'human' && !hostile(e, P) && !e.tgt && e.fac !== 'trader') cand(d, { k: 'talk', e: e, label: 'Поговорить: ' + e.name });

@@ -144,7 +144,7 @@ function cordonTick() {
   cordonStart();
   const stage=cordonStage();
   if (stage==='voice' && (S.dead.shust || (byS('shust') && hostile(byS('shust'),P)))) cordonSet('confirm','У костра осталась копия вызова Шустрого.');
-  if (!['escort','rescue','pickup'].includes(stage)) return;
+  if (S.blow?.stage || !['escort','rescue','pickup'].includes(stage)) return;
   const men=cordonMen();
   if (!men.length) { S.flags.cordonLoss=1; cordonSet('lastLog','Оба сталкера погибли. Отыщи резервный журнал у машины.'); return; }
   if (stage==='pickup' && !S.flags.cordonExtracted && men.every(e=>dE(e,P)>650)) {

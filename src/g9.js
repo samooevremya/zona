@@ -85,7 +85,7 @@ function spawnClear(j) {
   }
 }
 /* отменённая/закрытая группа становится обычными бандитами: больше не связана с заказом */
-function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag = 0; e.stay = 0; e.uid = null; } }); }
+function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag = 0; e.stay = 0; if (!e.angry) e.uid = null; } }); }
 function jobCancel() {
   const j = S.jobs.act; if (!j) return;
   j.status = 'cancelled'; releaseGroup(j.id); S.jobs.act = null; S.rep -= 2;
@@ -168,7 +168,7 @@ function hireOpts(e) {
 function endHire(e, line) {
   e.follow = 0; e.wait = 0; e.waitAt = null;
   e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (!e.sid) e.uid = null;
+  if (!e.sid && !e.angry) e.uid = null;
   if (line) say(line);
 }
 const offCam = o => Math.abs(o.x - cam.x) > VW / 2 / Z + 48 || Math.abs(o.y - cam.y) > VH / 2 / Z + 48;
@@ -319,7 +319,7 @@ function finishEncounter(reason) {
   else if (reason === 'dead') bulletin('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
   else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
-  allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
+  allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else if (!e.angry) e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
   delete S.flags.sosAssist;
   S.sos.last = { reason: reason, where: a.where, t: S.min };
@@ -453,9 +453,10 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.resident)).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.resident || e.evacuating || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
+    ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip } } : {}),
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
     sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, inv: e.traded ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
@@ -490,6 +491,7 @@ function dynRestore() {
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;
     if (e.follow) { e.sit = 0; e.trip = null; }
+    if (r.evacuation) Object.assign(e, r.evacuation, { evacuating: true });
   });
   // заказ без живой группы (старое сохранение) — досоздать остаток, без повтора уже убитых
   const j = S.jobs.act;

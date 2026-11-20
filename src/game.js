@@ -875,6 +875,41 @@ function attWord(e) {
   if (rel === 'friend') return 'друг';
   return e.fac === 'loner' && S.rep < 0 ? 'не доверяет' : 'нейтрал';
 }
+function lonerWitnesses(victim) {
+  return ents.filter(o => {
+    if (o === victim || o.fac !== 'loner' || !o.alive || o.captive) return false;
+    const range = sight(o);
+    return [P, victim].every(target =>
+      dE(o, target) < range && seesActor(o, target) &&
+      Math.abs(angD(o.ang, Math.atan2(target.y - o.y, target.x - o.x))) < 1.0);
+  });
+}
+function rememberAttacker(e) {
+  if (!e.sid && !e.uid) e.uid = dynId();
+  e.angry = 1;
+  markAngry(e);
+}
+function witnessLonerAttack(victim, fatal, witnesses = lonerWitnesses(victim)) {
+  witnesses.forEach(rememberAttacker);
+  if (!fatal) { rememberAttacker(victim); return; }
+  if (!witnesses.length) return;
+  const reports = S.flags.lonerReports || (S.flags.lonerReports = []);
+  reports.push({ victim: victim.name, due: S.min + 3, witnesses: witnesses.map(e => e.sid || e.uid) });
+}
+function deliverLonerReports() {
+  const reports = S.flags.lonerReports;
+  if (!reports) return;
+  S.flags.lonerReports = reports.filter(report => {
+    if (report.due > S.min) return true;
+    const sender = ents.find(e => e.alive && !e.captive && report.witnesses.includes(e.sid || e.uid));
+    if (sender) {
+      S.rep -= 35;
+      bulletin(sender.name + ' в эфире: «Видел, как Меченый убил одиночку. Погиб ' + report.victim + '».');
+    }
+    return false;
+  });
+  if (!S.flags.lonerReports.length) delete S.flags.lonerReports;
+}
 function anger(e) {
   if (e.fac === 'loner' && !e.angry) {
     ents.forEach(o => { if (o.fac === 'loner' && o.alive && !o.captive && dE(o, e) < 450 && los(o.x, o.y, e.x, e.y)) { o.angry = 1; markAngry(o); } });
@@ -1136,7 +1171,8 @@ function hurt(e, dmg, src, ang) {
   const n = Math.min(6, 2 + Math.floor(dmg / 8));
   for (let i = 0; i < n; i++) parts.push({ x: e.x, y: e.y, vx: Math.cos((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), vy: Math.sin((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), life: rnd(0.2, 0.4), c: '#7a1d14', s: 2, blood: 1 });
   if (e !== P && src && src.alive !== undefined) {
-    if (src === P && !hostile(e, P) && (e.fac === 'loner' || e.fac === 'army')) anger(e);
+    if (src === P && e.fac === 'loner' && e.hp > 0) witnessLonerAttack(e, false);
+    if (src === P && e.fac === 'army' && !hostile(e, P)) anger(e);
     if (hostile(e, src)) { e.tgt = src; e.lastSeen = { x: src.x, y: src.y }; e.mem = 6; e.react = Math.min(e.react, 0.15); }
   }
   if (e.hp <= 0) kill(e, src);
@@ -1145,14 +1181,15 @@ function kill(e, src) {
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
   if (e.sid) S.dead[e.sid] = 1;
-  ents.forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
+  const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e) : null;
+  (witnesses || ents).forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
   decals.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), r: rnd(10, 16), a: 0.75 });
   if (decals.length > 140) decals.shift();
   dropBody(e);
   const byPlayer = src === P;
   if (byPlayer) {
     if (e.kind !== 'human') S.stats.kM++; else S.stats.kS++;
-    if (e.fac === 'loner') { S.rep -= 35; msg('Убит одиночка. Слух разойдётся по всему Кордону.', 'bad'); }
+    if (witnesses) witnessLonerAttack(e, true, witnesses);
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
     const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
@@ -1230,7 +1267,7 @@ function findTarget(e) {
   return best;
 }
 function aiHuman(e, dt) {
-  if (e.storyMan) { cordonAI(e,dt); return; }
+  if (e.storyMan && !hostile(e, P)) { cordonAI(e,dt); return; }
   if (SID_SHOP && e.sid === 'sid') {
     e.ang = Math.PI / 2;
     e.deskTime = (e.deskTime || 0) + dt;
@@ -1870,8 +1907,8 @@ function update(dt) {
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
+    if (e.qaHold || lonerBlowoutAI(e, dt)) continue;
     if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt) continue;
-    if (e.qaHold) continue;   // только для приёмочных кадров
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
     if (e.kind === 'dog') aiDog(e, dt); else if (e.kind === 'boar') aiBoar(e, dt); else if (e.kind === 'sucker') aiSucker(e, dt); else aiHuman(e, dt);
   }
@@ -1901,6 +1938,7 @@ function update(dt) {
   }
   updateBolts(dt);
   updateAnoms(dt);
+  deliverLonerReports();
   checkBridgeCrossing(oldX, oldY);
   g7Tick(dt);
   // гранаты
@@ -2032,7 +2070,7 @@ function findInteract() {
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
-    if (e.storyMan) { cand(d,{k:'talk',e,label:'Поговорить: '+e.name}); continue; }
+    if (e.storyMan && !hostile(e, P)) { cand(d,{k:'talk',e,label:'Поговорить: '+e.name}); continue; }
     if (e.wounded) cand(d, { k: 'heal', e: e, label: 'Помочь раненому: ' + e.name });
     else if (e.captive) cand(d, { k: 'free', e: e, label: 'Освободить: ' + e.name });
     else if (e.kind === 'human' && !hostile(e, P) && !e.tgt && e.fac !== 'trader') cand(d, { k: 'talk', e: e, label: 'Поговорить: ' + e.name });
@@ -3263,9 +3301,12 @@ function worldFx(dt) {
 }
 const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей. Ближайшее укрытие отмечено на карте.';
 // One flood from all usable doorways gives each reachable tile its closest shelter.
-let shelterRevision = -1;
-const shelterOwner = new Int16Array(MW * MH), shelterDoors = [];
-function rebuildShelterRoutes() {
+function shelterRoutes(includeHatch) {
+  return { includeHatch, revision: -1, owner: new Int16Array(MW * MH), doors: [] };
+}
+const playerShelters = shelterRoutes(true), lonerShelters = shelterRoutes(false);
+function rebuildShelterRoutes(routes) {
+  const { owner: shelterOwner, doors: shelterDoors } = routes;
   shelterOwner.fill(-1);
   shelterDoors.length = 0;
   let head = 0, tail = 0;
@@ -3287,7 +3328,7 @@ function rebuildShelterRoutes() {
       }
     }
   }
-  seed(HATCH.x, HATCH.y + (SID_SHOP ? 27 : -30));
+  if (routes.includeHatch) seed(HATCH.x, HATCH.y + (SID_SHOP ? 27 : -30));
   while (head < tail) {
     const i = bfsQ[head++], x = i % MW, y = Math.floor(i / MW);
     for (let k = 0; k < DIRS.length; k++) {
@@ -3297,13 +3338,43 @@ function rebuildShelterRoutes() {
       bfsQ[tail++] = j;
     }
   }
-  shelterRevision = navRevision;
+  routes.revision = navRevision;
+}
+function routeToShelter(actor, routes) {
+  if (routes.revision !== navRevision) rebuildShelterRoutes(routes);
+  const cell = nearestNav(Math.floor(actor.x / T), Math.floor(actor.y / T));
+  return routes.doors[routes.owner[cell]] || null;
 }
 function blowShelterTarget() {
   if (!P || !P.alive || !S.blow?.stage || sheltered(P.x, P.y)) return null;
-  if (shelterRevision !== navRevision) rebuildShelterRoutes();
-  const cell = nearestNav(Math.floor(P.x / T), Math.floor(P.y / T));
-  return shelterDoors[shelterOwner[cell]] || null;
+  return routeToShelter(P, playerShelters);
+}
+function lonerBlowoutAI(e, dt) {
+  if (e.fac !== 'loner' || e.captive || e.wounded) return false;
+  if (!S.blow?.stage) {
+    if (e.evacuating) {
+      e.evacuating = false;
+      e.path = null;
+      if (e.seat && !e.sit && !e.trip && !e.follow) e.trip = { stage: 2 };
+    }
+    return false;
+  }
+  if (!e.evacuating) {
+    e.evacuating = true;
+    e.path = null;
+    e.cover = e.role = null;
+    e.inCover = 0;
+    if (e.trip?.shelter) e.trip = null;
+  }
+  e.tgt = e.lastSeen = null;
+  e.mem = e.aw = 0;
+  if (sheltered(e.x, e.y)) return true;
+  if (e.sit) e.seat = 1;
+  e.sit = e.crouch = 0;
+  e.campRise = null;
+  const door = routeToShelter(e, lonerShelters);
+  if (door) goTo(e, door.x, door.y, 122, dt);
+  return true;
 }
 function blowout(dt) {
   const B = S.blow;
@@ -3311,7 +3382,7 @@ function blowout(dt) {
     B.stage = 1; B.t = 80;
     radioNews(BLOW_WARNING, true);
     ents.forEach(e => {
-      if (!e.alive || e === P || e.kind !== 'human' || sheltered(e.x, e.y) || e.captive || e.guard) return;
+      if (!e.alive || e === P || e.kind !== 'human' || e.fac === 'loner' || sheltered(e.x, e.y) || e.captive || e.guard) return;
       let best = null, bd = 1100;
       HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
       if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
@@ -4673,7 +4744,7 @@ function spawnClear(j) {
   }
 }
 /* отменённая/закрытая группа становится обычными бандитами: больше не связана с заказом */
-function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag = 0; e.stay = 0; e.uid = null; } }); }
+function releaseGroup(id) { ents.forEach(e => { if (e.jobTag === id) { e.jobTag = 0; e.stay = 0; if (!e.angry) e.uid = null; } }); }
 function jobCancel() {
   const j = S.jobs.act; if (!j) return;
   j.status = 'cancelled'; releaseGroup(j.id); S.jobs.act = null; S.rep -= 2;
@@ -4756,7 +4827,7 @@ function hireOpts(e) {
 function endHire(e, line) {
   e.follow = 0; e.wait = 0; e.waitAt = null;
   e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (!e.sid) e.uid = null;
+  if (!e.sid && !e.angry) e.uid = null;
   if (line) say(line);
 }
 const offCam = o => Math.abs(o.x - cam.x) > VW / 2 / Z + 48 || Math.abs(o.y - cam.y) > VH / 2 / Z + 48;
@@ -4907,7 +4978,7 @@ function finishEncounter(reason) {
   else if (reason === 'dead') bulletin('Сигнал SOS пропал. Группа ' + lead + ' у ' + a.where + ' погибла.');
   else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
-  allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
+  allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else if (!e.angry) e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
   foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
   delete S.flags.sosAssist;
   S.sos.last = { reason: reason, where: a.where, t: S.min };
@@ -5041,9 +5112,10 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.resident)).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.resident || e.evacuating || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
+    ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip } } : {}),
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
     sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, inv: e.traded ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
@@ -5078,6 +5150,7 @@ function dynRestore() {
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;
     if (e.follow) { e.sit = 0; e.trip = null; }
+    if (r.evacuation) Object.assign(e, r.evacuation, { evacuating: true });
   });
   // заказ без живой группы (старое сохранение) — досоздать остаток, без повтора уже убитых
   const j = S.jobs.act;
@@ -6059,7 +6132,7 @@ function cordonTick() {
   cordonStart();
   const stage=cordonStage();
   if (stage==='voice' && (S.dead.shust || (byS('shust') && hostile(byS('shust'),P)))) cordonSet('confirm','У костра осталась копия вызова Шустрого.');
-  if (!['escort','rescue','pickup'].includes(stage)) return;
+  if (S.blow?.stage || !['escort','rescue','pickup'].includes(stage)) return;
   const men=cordonMen();
   if (!men.length) { S.flags.cordonLoss=1; cordonSet('lastLog','Оба сталкера погибли. Отыщи резервный журнал у машины.'); return; }
   if (stage==='pickup' && !S.flags.cordonExtracted && men.every(e=>dE(e,P)>650)) {
@@ -9054,7 +9127,7 @@ window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
 window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 /* мост: тип открытой панели для стилей */
 (function(){ const oldHUD = hud; hud = function(dt){ oldHUD(dt); ov.dataset.kind = panel ? panel.kind : ''; }; })();
 
