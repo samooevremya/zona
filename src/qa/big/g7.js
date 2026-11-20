@@ -181,5 +181,34 @@ T_('Q1_generator_items_flow', () => {
   return { ok: p0 === 'fuel,fuse' && p1 === p0 && inv.fuel === 1 && inv.fuse === 1 && afterLoad.picks === '' && afterLoad.fuel === 1 && used.st === 'completed' && !used.fuel && !used.fuse && Q.q5().st === 'completed' && (icons.every(x => x === 'IMG:png') || /g3-off/.test(location.hash)),
     picksNew: p0, picksAfterReload: p1, inv, icons, afterLoad, used, stAfterLoad: Q.q5().st };
 });
+T_('G_fence_cover', () => {
+  reset(); isolate();
+  // Северный створ КПП. Влево от дороги — настоящий пролёт, на дороге — разрыв.
+  const p = P(), y = 201.5 * T, x = 124 * T;
+  place(p, x, y + 20); const guard = tgt(x, y - 80, 'army');
+  const trace = (from, to) => G.shotTrace(from, Math.atan2(to.y - from.y, to.x - from.x), G.WP.w_pm);
+  const cases = {};
+  p.crouch = 0; cases.standing = trace(guard, p).best === p;
+  p.crouch = 1; const impact = trace(guard, p);
+  cases.stoppedAtWire = !impact.best && impact.wall && Math.abs(guard.y + impact.t - (y - 4)) < .01;
+  cases.returnFireBlocked = trace(p, guard).wall;
+  guard.x += 45; cases.diagonal = trace(guard, p).wall;
+  place(guard, x + 75, p.y); cases.flank = trace(guard, p).best === p;
+  place(p, 129 * T, y + 20); place(guard, p.x, y - 80); cases.gate = trace(guard, p).best === p;
+  place(p, x, y + 80); place(guard, x, y - 80); cases.awayFromFence = trace(guard, p).best === p;
+
+  // Сначала часовой не знает о герое. После обнаружения присед прерывает уже начатый огонь.
+  place(p, x, y - 20); place(guard, x, y + 80, -Math.PI / 2);
+  guard.qaHold = 0; guard.guard = 'south'; guard.stay = 1; guard.nade = 0;
+  guard.home = { x: guard.x, y: guard.y }; guard.aw = 0; S().min = 720;
+  const tick = n => { for (let i = 0; i < n; i++) z.update(1 / 60); };
+  tick(100); cases.undetected = !guard.tgt && !guard.aw;
+  p.crouch = 0; const full = guard.mag;
+  tick(112); cases.openedFire = guard.tgt === p && guard.mag < full;
+  p.crouch = 1; guard.cool = 0; const mag = guard.mag, hp = p.hp;
+  tick(15); cases.lostSight = guard.unseen > 0 && guard.mag === mag && p.hp === hp;
+  p.crouch = 0; tick(10); cases.resumedFire = guard.mag < mag;
+  reset(); return { ok: Object.values(cases).every(Boolean), cases };
+});
 return JSON.stringify(R);
 })()

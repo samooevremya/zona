@@ -279,10 +279,13 @@ function openBarrier() { const b = objs.find(o => o.key === 'bar'); if (b && b.s
 
 /* сетки проходимости и видимости */
 const nav = new Uint8Array(MW * MH), opq = new Uint8Array(MW * MH);
+const fences = [];
 function buildGrids() {
+  fences.length = 0;
   for (let i = 0; i < MW * MH; i++) { nav[i] = SOLID[map[i]] ? 0 : 1; opq[i] = OPAQ[map[i]]; }
   objs.forEach(o => {
     if (!o.solid) return;
+    if (o.k === 'fence') fences.push(o);
     for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++)
       for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) if (inb(x, y)) {
         nav[y * MW + x] = 0; if (o.opaque) opq[y * MW + x] = 1;

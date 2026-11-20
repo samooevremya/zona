@@ -277,10 +277,43 @@ function rayCircle(sx, sy, ca, sa, cx, cy, rr) {
   if (tc + th < 0) return null;
   return Math.max(0, tc - th);
 }
+// Высота забора имеет значение в пределах полутора клеток от присевшей фигуры.
+const FENCE_REACH = 1.5 * T;
+function rayFence(x, y, dx, dy, near, far) {
+  let hit = Infinity;
+  for (const f of fences) {
+    // Интервал луча внутри каждой из двух осевых полос прямоугольника.
+    let enter = near, exit = far;
+    if (Math.abs(dx) < 1e-9) {
+      if (x < f.x || x > f.x + f.w) continue;
+    } else {
+      const a = (f.x - x) / dx, b = (f.x + f.w - x) / dx;
+      enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
+    }
+    if (Math.abs(dy) < 1e-9) {
+      if (y < f.y || y > f.y + f.h) continue;
+    } else {
+      const a = (f.y - y) / dy, b = (f.y + f.h - y) / dy;
+      enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
+    }
+    if (enter <= exit) hit = Math.min(hit, enter);
+  }
+  return hit;
+}
+function seesActor(observer, target) {
+  if (!los(observer.x, observer.y, target.x, target.y)) return false;
+  if (!target.crouch) return true;
+  const dx = observer.x - target.x, dy = observer.y - target.y, d = Math.hypot(dx, dy);
+  return !d || rayFence(target.x, target.y, dx / d, dy / d, 0, Math.min(d, FENCE_REACH)) === Infinity;
+}
+function shotBarrier(sh, ca, sa, reach) {
+  const wall = rayWall(sh.x, sh.y, ca, sa, reach);
+  return sh.crouch ? Math.min(wall, rayFence(sh.x, sh.y, ca, sa, 0, Math.min(wall, FENCE_REACH))) : wall;
+}
 const ballOff = sh => (sh.r || 11) + 8;
 function shotTrace(sh, a, W) {   // чистая функция исхода одного луча: {t, best, wall}
   const ca = Math.cos(a), sa = Math.sin(a), reach = W.range + ballOff(sh);
-  const wallT = rayWall(sh.x, sh.y, ca, sa, reach);
+  const wallT = shotBarrier(sh, ca, sa, reach);
   let best = null, bt = wallT;
   const passFriends = sh === P && combatNear();
   for (const e of ents) {
@@ -289,12 +322,17 @@ function shotTrace(sh, a, W) {   // чистая функция исхода о�
     const t = rayCircle(sh.x, sh.y, ca, sa, e.x, e.y, e.r + (e.captive ? -4 : 0));
     if (t !== null && t <= bt) { best = e; bt = t; }
   }
+  if (best && best.crouch) {
+    const centerT = (best.x - sh.x) * ca + (best.y - sh.y) * sa;
+    const fence = rayFence(sh.x, sh.y, ca, sa, Math.max(0, centerT - FENCE_REACH), bt);
+    if (fence <= bt) { bt = fence; best = null; }
+  }
   return { t: bt, best: best, wall: !best && bt < reach, ca: ca, sa: sa };
 }
 function fire(sh, ang, W, spread) {
   const mz = muzzlePoint(sh, ang), n = W.pellets || 1;
   const ca0 = Math.cos(ang), sa0 = Math.sin(ang), mzT = Math.max(0, (mz.x - sh.x) * ca0 + (mz.y - sh.y) * sa0);
-  const w0 = rayWall(sh.x, sh.y, ca0, sa0, mzT + 1), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
+  const w0 = shotBarrier(sh, ca0, sa0, mzT + 1), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
   const fx = blocked ? sh.x + ca0 * Math.max(0, w0 - 1) : mz.x, fy = blocked ? sh.y + sa0 * Math.max(0, w0 - 1) : mz.y;
   for (let k = 0; k < n; k++) {
     const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
@@ -326,7 +364,7 @@ function combatNear() { for (const e of ents) if (e.alive && e !== P && hostile(
 function coverBlocks(t, sx, sy) {
   if (!(t.crouch || t.inCover)) return false;
   const a = Math.atan2(sy - t.y, sx - t.x);
-  for (const d of [16, 26, 36]) if (solidPx(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d)) return true;
+  for (const d of [16, 26, 36]) if (solidPx(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, true)) return true;
   return false;
 }
 /* линия огня свободна от своих (для НПС) */
@@ -435,7 +473,7 @@ function stealthTick(e, dt) {
   if (!P.alive || !hostile(e, P) || e.tgt === P || P.cloak > 0.7) { if (e.tgt === P) e.aw = 1; return; }
   const d = dE(e, P), aP = Math.atan2(P.y - e.y, P.x - e.x), range = sight(e) * pVis();
   let gain = 0;
-  if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && los(e.x, e.y, P.x, P.y)) gain = 0.45 + 2.4 * (1 - d / range);
+  if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && seesActor(e, P)) gain = 0.45 + 2.4 * (1 - d / range);
   const nz = pNoise(); if (nz && d < nz) gain = Math.max(gain, 0.5 + 1.5 * (1 - d / nz));
   const was = e.aw || 0;
   e.aw = gain ? Math.min(1, was + gain * dt) : Math.max(0, was - 0.25 * dt);
@@ -452,7 +490,7 @@ function findTarget(e) {
     const d = dE(e, o);
     if (o === P && e.kind === 'human' && e.tgt !== P) { if ((e.aw || 0) < 1 || d > sr * 1.2 || d >= bd) continue; }   // игрока сначала надо заметить
     else if (d > sr || d >= bd) continue;
-    if (!los(e.x, e.y, o.x, o.y)) continue;
+    if (!seesActor(e, o)) continue;
     best = o; bd = d;
   }
   return best;
@@ -468,7 +506,7 @@ function aiHuman(e, dt) {
     if (t && t !== e.tgt) { e.tgt = t; e.react = rnd(0.35, 0.8) - (e.rank || 0) * 0.08; if (chance(0.6)) callout(e, 'combat'); }
     if (!t && e.tgt && (!e.tgt.alive || !hostile(e, e.tgt))) e.tgt = null;
     // охрана южного блокпоста
-    if (e.guard === 'south' && P.alive) {
+    if (e.guard === 'south' && P.alive && dE(e, P) < 300 && seesActor(e, P)) {
       const d = dE(e, P);
       if (d < 150 && !e.angry && !armyAngry) { e.angry = 1; msg('Часовой: — Огонь по нарушителю!', 'bad'); }
       else if (d < 300 && warnT <= 0 && !e.angry) { warnT = 8; msg('Часовой: — Стой! Назад, стреляю без предупреждения!', 'bad'); }
@@ -542,7 +580,7 @@ function npcGrenade(e, x, y) {
 }
 function combatHuman(e, t, W, dt) {
   e.sit = 0; e.campRise = null; e.trip = null;
-  const d = dE(e, t), see = los(e.x, e.y, t.x, t.y);
+  const d = dE(e, t), see = seesActor(e, t);
   if (see) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
   const want = Math.atan2(t.y - e.y, t.x - e.x);
