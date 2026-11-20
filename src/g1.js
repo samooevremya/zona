@@ -119,6 +119,8 @@ function house(x, y, w, h, doors, wall, broken, roof) {
 // сетки покрывает оба случая и объединяет смежные клетки в один проход.
 function buildEntrances(h) {
   h.entrances = [];
+  const home = h.ok || (h.x + ',' + h.y);
+  const hasPorch = BIG && C1 && (home === '26,71' || home === '37,73');
   for (const [nx, ny] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
     const length = nx ? h.h : h.w;
     let start = 0, declared = false;
@@ -134,10 +136,14 @@ function buildEntrances(h) {
       if (!start) continue;
       const end = i - 1;
       const mid = (start + end + 1) * T / 2;
+      let approach = 'earth';
+      if (!declared || h.ruin) approach = 'rubble';
+      else if (h.mat === 'conc') approach = 'slab';
+      else if (hasPorch && ny === 1) approach = 'porch';
       h.entrances.push({
         x: nx ? (nx > 0 ? h.w * T : 0) : mid,
         y: ny ? (ny > 0 ? h.h * T : 0) : mid,
-        nx, ny, breach: !declared, width: (end - start + 1) * T - 4
+        nx, ny, approach, breach: !declared, width: (end - start + 1) * T - 4
       });
       start = 0; declared = false;
     }
