@@ -7453,7 +7453,6 @@ const TCOL = ['#3f4628', '#5a4b34', '#3c3c37', '#26332c', '#7a7a6d', '#1f2a17', 
 const miniC = document.createElement('canvas'), fogC = document.createElement('canvas');
 // Четыре пикселя на клетку. Каналы маски хранят покрытие всех дорог и асфальта
 // отдельно: после интерполяции узкая тропа, широкий двор и развилка сохраняют форму.
-const MAP_ATLAS = /(?:#|&)map-atlas(?:&|$)/.test(location.hash);
 function buildBigMini() {
   const K = 4;
   miniC.width = PW * K; miniC.height = MH * K;
@@ -7461,16 +7460,12 @@ function buildBigMini() {
   const base = document.createElement('canvas');
   base.width = PW; base.height = MH;
   const bg = base.getContext('2d'), terrain = bg.createImageData(PW, MH), roads = bg.createImageData(PW, MH);
-  const palette = MAP_ATLAS
-    ? [0xada284, 0xada284, 0xada284, 0x71918a, 0x999784, 0x7a8465,
-       0x98896f, 0x8d806b, 0x8d9374, 0x716e60, 0xa09b87, 0x373930]
-    : [0x655a46, 0x655a46, 0x655a46, 0x405653, 0x817e71, 0x484735,
+  const palette = [0x655a46, 0x655a46, 0x655a46, 0x405653, 0x817e71, 0x484735,
        0x6b5d4b, 0x726152, 0x58573e, 0x655e51, 0x797465, 0x24251e];
   const tiles = surfaceTiles();
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     const t = tiles[y * MW + x], c = palette[t], i = (y * PW + x) * 4;
-    const k = MAP_ATLAS ? 0.91 + vnoise(x, y, 7) * 0.10 + hash2(x, y) * 0.035
-      : 0.69 + vnoise(x, y, 6) * 0.37 + hash2(x, y) * 0.24;
+    const k = 0.69 + vnoise(x, y, 6) * 0.37 + hash2(x, y) * 0.24;
     terrain.data[i] = (c >> 16) * k;
     terrain.data[i + 1] = ((c >> 8) & 255) * k;
     terrain.data[i + 2] = (c & 255) * k;
@@ -7487,11 +7482,6 @@ function buildBigMini() {
   for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) {
     if (map[y * MW + x] !== TR) continue;
     const n = hash2(x, y), crown = yardTreeCrown && yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[Math.floor(n * CANOPY.length)];
-    if (MAP_ATLAS) {
-      g.fillStyle = 'rgba(72,87,57,.34)'; g.beginPath();
-      g.arc(x + 0.5, y + 0.5, 1.2 + n * 0.65, 0, 2 * Math.PI); g.fill();
-      continue;
-    }
     const width = (2.8 + n * 0.9) * CAN_PAD;
     g.drawImage(crown, x + 0.5 - width / 2, y + 0.4 - width / 2, width, width);
   }
@@ -7503,16 +7493,15 @@ function buildBigMini() {
     const asphalt = clamp((mask.data[i + 1] - 80) / 80, 0, 1);
     const pixel = i / 4, x = pixel % miniC.width, y = Math.floor(pixel / miniC.width);
     const grain = (hash2(x, y) - 0.5) * 13 + (vnoise(x, y, 7) - 0.5) * 22;
-    const tone = MAP_ATLAS ? grain * 0.17 : grain;
-    mask.data[i] = (MAP_ATLAS ? 215 - asphalt * 130 : 148 - asphalt * 32) + tone;
-    mask.data[i + 1] = (MAP_ATLAS ? 195 - asphalt * 110 : 128 - asphalt * 15) + tone;
-    mask.data[i + 2] = (MAP_ATLAS ? 155 - asphalt * 73 : 103 + asphalt * 5) + tone;
+    mask.data[i] = 148 - asphalt * 32 + grain;
+    mask.data[i + 1] = 128 - asphalt * 15 + grain;
+    mask.data[i + 2] = 103 + asphalt * 5 + grain;
     mask.data[i + 3] = clamp((coverage - 35 + grain) * 1.45, 0, 238);
   }
   // putImageData не смешивает прозрачность. Переиспользуем временный холст для наложения.
   base.width = miniC.width; base.height = miniC.height;
   bg.putImageData(mask, 0, 0); g.drawImage(base, 0, 0);
-  if (ART && !MAP_ATLAS) {
+  if (ART) {
     // Фактура сухой травы смягчает переход между грунтом и обочиной в масштабе HUD.
     g.save(); g.scale(0.4, 0.4); g.globalCompositeOperation = 'soft-light';
     artFill(g, 'grass_dry', 0, 0, miniC.width / 0.4, miniC.height / 0.4);
@@ -7520,7 +7509,7 @@ function buildBigMini() {
   }
   g.scale(K, K); g.imageSmoothingQuality = 'high';
   if (BIG && C1 && ART) {
-    g.strokeStyle = MAP_ATLAS ? '#776e59' : '#473e31'; g.lineWidth = 0.32;
+    g.strokeStyle = '#473e31'; g.lineWidth = 0.32;
     g.beginPath();
     for (const [, x1, y1, x2, y2] of CORDON_FENCES) {
       g.moveTo(x1, y1); g.lineTo(x2, y2);
@@ -7531,10 +7520,7 @@ function buildBigMini() {
     if (h.x >= PW) return;
     g.fillStyle = '#36372e'; g.fillRect(h.x - 0.2, h.y - 0.2, h.w + 0.5, h.h + 0.6);
     g.fillStyle = '#887d6a'; g.fillRect(h.x, h.y, h.w, h.h);
-    if (MAP_ATLAS) {
-      g.fillStyle = '#645c4f'; g.fillRect(h.x, h.y, h.w, h.h);
-      g.fillStyle = '#8a7c66'; g.fillRect(h.x + 0.25, h.y + 0.25, h.w - 0.5, h.h / 2);
-    } else if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
+    if (ROOFS[i]) g.drawImage(ROOFS[i], h.x - 3 / T, h.y - 3 / T, h.w + 10 / T, h.h + 10 / T);
   });
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
@@ -7542,17 +7528,10 @@ function buildBigMini() {
       g.fillRect(o.x / T, o.y / T, Math.max(1, o.w / T), Math.max(1, o.h / T));
     }
   });
-  if (MAP_ATLAS) {
-    g.strokeStyle = 'rgba(57,62,48,.29)'; g.lineWidth = 0.22;
-    g.beginPath();
-    for (let x = 0; x < PW; x += 12) { g.moveTo(x, 0); g.lineTo(x, MH); }
-    for (let y = 0; y < MH; y += 12) { g.moveTo(0, y); g.lineTo(PW, y); }
-    g.stroke();
-  }
 }
 async function buildMini() {
   fogC.width = PW; fogC.height = MH;
-  if (BIG && ART && C1 && !MAP_ATLAS && window.CORDON_AERIAL) {
+  if (BIG && ART && C1 && window.CORDON_AERIAL) {
     const photo = new Image();
     photo.src = window.CORDON_AERIAL;
     try {
