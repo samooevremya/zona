@@ -72,16 +72,62 @@ T_('R7_night_guest_clues', () => {
   const c = Q.q3c();
   return { ok: c.story === 1 && c.tracks === 1 && c.warned === 1 && c.barn === 1, clues: c };
 });
-T_('R8_one_weapon_rule', () => {
-  reset(); S().inv.w_pm = 1; S().cond.w_pm = 44;
-  const body = { k: 'body', name: 'Тест', x: P().x, y: P().y, loot: { w_pm: 1, a9: 10 } }; z.openLoot(body);
-  const btn = [...document.querySelectorAll('#pbody .row')].find(r => /ПМ/.test(r.textContent)).querySelector('button');
-  const dis = btn.disabled; z.closePanel();
-  // выбросить и подобрать — состояние сохраняется
-  S().weapon = 'w_aksu'; z.openPanel('inv', 'Рюкзак'); z.panel.sel = 'w_pm'; z.refresh(); [...document.querySelectorAll('#pbody button')].find(b => b.textContent === 'Выбросить').click(); z.closePanel();
-  const sack = z.map.objs.find(o => o.kind === 'sack'); z.openLoot(sack); [...document.querySelectorAll('#pbody .row')].find(r => /ПМ/.test(r.textContent)).querySelector('button').click(); z.closePanel();
-  return { ok: dis && S().inv.w_pm === 1 && S().cond.w_pm === 44, duplicateBlocked: dis, countAfter: S().inv.w_pm, condAfterDropPick: S().cond.w_pm };
+T_('R8_weapon_copies_and_shared_lockers', () => {
+  reset();
+  const s=S(); s.inv.w_pm=1; s.weapon='w_pm'; s.cond.w_pm=44; s.mag.w_pm=3;
+  const body={k:'body',name:'Тест',loot:{w_pm:1},guns:{w_pm:[{cond:91,mag:6}]}};
+  const click=(scope,text)=>[...document.querySelectorAll(scope+' button')].find(b=>b.textContent===text && !b.disabled)?.click();
+  z.openLoot(body); click('#pbody','Взять'); z.closePanel();
+  const picked=s.inv.w_pm===2 && s.cond.w_pm===44 && s.mag.w_pm===3 && !body.loot.w_pm;
+  z.openPanel('inv','Рюкзак'); z.refresh();
+  const copies=document.querySelectorAll('.pack-grid button[aria-label="ПМ"]');
+  copies[1].click(); click('.inv-detail','Взять в руки'); z.closePanel();
+  const equipped=s.mag.w_pm===6 && s.cond.w_pm===91;
+  const lockers=M.objs.filter(o=>o.k==='locker');
+  const visit=o=>{P().x=o.x+o.w/2;P().y=o.y+o.h+12;step(1);z.interact();return z.panel?.kind==='locker';};
+  if(lockers.length!==2 || !visit(lockers[0])) return {ok:false,lockers:lockers.length};
+  const gunRow=(side,percent)=>[...document.querySelectorAll('.locker-side.'+side+' .locker-row')].find(r=>r.textContent.includes(percent+'%'));
+  gunRow('mine',44).querySelector('button').click(); z.closePanel(); saveLoad();
+  if(!visit(lockers[1])) return {ok:false,reason:'second locker'};
+  const stored=gunRow('their',44);
+  const synced=stored.textContent.includes('3 патр.');
+  stored.querySelector('button').click(); z.closePanel();
+  z.openTrade(null); document.querySelector('.mine button[aria-label^="ПМ"]').click();
+  const oldMoney=S().money; click('.tr-acts','Подтвердить'); z.closePanel();
+  const sold=S().money>oldMoney && S().inv.w_pm===1 && S().mag.w_pm===6 && S().cond.w_pm===91;
+  return {ok:picked&&equipped&&synced&&sold,picked,equipped,synced,sold,places:lockers.map(o=>o.baseName)};
 });
+T_('R8_buy_duplicate_and_trade_back',()=>{
+  reset(); const s=S();s.money=10000;s.inv.w_pm=1;s.weapon='w_pm';s.cond.w_pm=37;s.mag.w_pm=5;
+  const confirm=()=>document.querySelector('.tr-acts .deal').click();
+  z.openTrade(null);document.querySelector('.their button[aria-label^="ПМ"]').click();confirm();z.closePanel();
+  const bought=s.inv.w_pm===2&&s.cond.w_pm===37&&s.mag.w_pm===5;
+  z.openPanel('inv','Рюкзак');z.panel.sel='w_pm';z.panel.copy=1;z.refresh();
+  [...document.querySelectorAll('.inv-detail button')].find(b=>b.textContent==='Взять в руки').click();z.closePanel();
+  const trader=z.ents.find(e=>e.sid==='l1');trader.money=10000;trader.inv={};z.openTrade(trader);
+  document.querySelector('.mine button[aria-label^="ПМ"]').click();confirm();
+  document.querySelector('.their button[aria-label^="ПМ"]').click();confirm();z.closePanel();
+  const reserve=s.flags.spareGuns.w_pm[0];
+  return {ok:bought&&s.cond.w_pm===100&&s.mag.w_pm===0&&reserve.cond===37&&reserve.mag===5,bought,reserve};
+});
+T_('R8_pack_capacity',()=>{
+  reset(); const s=S(), loot={k:'body',name:'Тест',loot:{medkit:5}};
+  s.inv={ar_jacket:1,ar_zarya:1,cans:50};s.weapon='knife';s.money=20000;
+  const click=t=>[...document.querySelectorAll('#pbody button')].find(b=>b.textContent===t&&!b.disabled)?.click();
+  z.openLoot(loot);click('Взять всё');z.closePanel();
+  const partial=s.inv.medkit===1 && loot.loot.medkit===4;
+  z.openTrade(null);document.querySelector('.their button[aria-label^="ПМ"]').click();
+  const blocked=document.querySelector('.deal').disabled;z.closePanel();
+  const wear=id=>{z.openPanel('inv','Рюкзак');z.panel.sel=id;z.refresh();click('Надеть');z.closePanel();};
+  wear('ar_zarya');z.openLoot(loot);click('Взять всё');z.closePanel();wear('ar_jacket');
+  const suits=s.armor==='ar_zarya' && s.inv.medkit===5 && !loot.loot.medkit;
+  s.inv={ar_jacket:1,w_pm:21};s.armor='ar_jacket';
+  const full={k:'body',name:'Тест',loot:{w_pm:1}};
+  z.openLoot(full);
+  const cells=document.querySelector('.row button').disabled && document.querySelector('.row').textContent.includes('ячеек');z.closePanel();
+  return {ok:partial&&blocked&&suits&&cells,partial,blocked,suits,cells};
+});
+
 T_('R9_death_and_reload', () => {
   reset(); Q.q5().st = 'collecting'; S().money = 777; z.save(true); S().money = 1; P().hp = -5; z.update(1 / 30); z.update(1 / 30);
   const d = z.loadSave(); z.applyState(d); step(3);

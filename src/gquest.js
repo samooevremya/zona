@@ -23,7 +23,8 @@ function drawPick(o) {   // растр G4 (gg7.js: g7Pick); ниже — пре�
   ctx.restore();
 }
 function pickUp(o) {
-  give(o.pick, 1); S.flags['pk_' + o.pick] = 1;
+  const err=receiveError(o.pick,1); if(err) { msg(err,'bad'); return; }
+  addPacked(o.pick, 1); S.flags['pk_' + o.pick] = 1;
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
   play('pick');
   const q = q5();
@@ -49,9 +50,9 @@ function wolfRC1Opts() {
 }
 /* верстак после генератора: ремонт до 70%, оплата за каждый процент */
 function benchOpts() {
-  const worn = WORDER.filter(w => w !== 'knife' && !WP[w].toss && has(w) && (S.cond[w] == null ? 80 : S.cond[w]) < 70);
-  const cost = worn.reduce((s, w) => s + Math.ceil((70 - (S.cond[w] == null ? 80 : S.cond[w])) * 6), 0);
-  return worn.length ? [{ t: 'Подлатать оружие до 70% · ' + cost + ' RU', k: 'key', d: S.money < cost, fn: () => { S.money -= cost; worn.forEach(w => S.cond[w] = 70); sys('Оружие подлатано до 70%. Полный ремонт — у Сидоровича.'); } }]
+  const worn=gunsBelow(70);
+  const cost=worn.reduce((sum,gun)=>sum+Math.ceil((70-gun.cond)*6),0);
+  return worn.length ? [{ t: 'Подлатать оружие до 70% · ' + cost + ' RU', k: 'key', d: S.money < cost, fn: () => { S.money -= cost; repairCopies(worn,70); sys('Оружие подлатано до 70%. Полный ремонт — у Сидоровича.'); } }]
     : [{ t: 'Оружие в порядке (выше 70%) — верстаку делать нечего', d: true, fn: () => {} }];
 }
 function gensetUse() {

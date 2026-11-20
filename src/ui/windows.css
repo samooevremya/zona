@@ -199,3 +199,51 @@ img.b1ic.tall{width:62%;height:86%}
 .kpk-detail{background:#292a22;border-color:#504c3d}
 #ov[data-kind=pda] .kpk-bar .chip{border:1px solid #625e4e;border-radius:2px;background:linear-gradient(#37392f,#292a24);color:#ddd8c5;box-shadow:inset 0 1px #ffffff0c}
 #ov[data-kind=pda] .kpk-bar .chip.on{background:#42493a;border-color:#899278;color:#f3eed9}
+
+/* Два владельца по краям, расчёт отдельно от товара. */
+#pbody .trade2{gap:8px 12px}
+#pbody .tr-col,.locker-side,#pbody .inv-grid{padding:8px;border:1px solid #575449;background:#272822;min-width:0}
+#pbody .tr-col.mine,.locker-side.mine{border-top:3px solid #90a89b;background:#222c29}
+#pbody .tr-col.their,.locker-side.their{border-top:3px solid #bc9a61;background:#302b22}
+#pbody .tr-col .tr-who{align-items:center;gap:7px;flex:none}
+#pbody .tr-col .tr-who.r{text-align:left;flex-direction:row-reverse;justify-content:flex-end;margin:0}
+#pbody .mine .pn,#pbody .mine .pack-heading{color:#bbd6c8}
+#pbody .their .pn,#pbody .their .pack-heading{color:#e4c48f}
+#pbody .tr-col .h3,.pack-heading{font:700 13px/1.3 Arial;color:#e2d7bb;margin:0 0 5px;letter-spacing:.035em}
+#pbody .tr-who .price{color:#e1daca}
+#pbody .tr-col .igrid{grid-template-columns:repeat(auto-fill,minmax(87px,1fr));gap:4px}
+#pbody .tr-col .icell{height:76px;position:relative;padding:0 2px 34px}
+#pbody .tr-col .icell img,#pbody .tr-col .icell svg{width:80%;height:100%;object-fit:contain}
+.trade-label{position:absolute;left:2px;right:2px;bottom:13px;font:11px/12px Arial;color:#e6dfce;max-height:24px;overflow:hidden}
+#pbody .tr-col .icell .pr::after{content:" RU"}
+#pbody .tr-col .icell .pr{bottom:1px;left:4px;color:#ead29d}
+#pbody .tr-col .icell .cnd{bottom:0;height:2px}
+#pbody .tr-cart{border-color:#625b4b;background:#23231e}
+#pbody .tr-cart .cside:first-child{border-left:2px solid #90a89b;padding-left:5px}
+#pbody .tr-cart .cside:last-child{border-left:2px solid #bc9a61;padding-left:5px}
+#pbody .inv3{gap:8px}
+#pbody .pack-grid{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:46px;grid-auto-flow:row dense;gap:2px}
+#pbody .pack-grid .icell{height:100%;min-width:0;min-height:0;width:100%;box-sizing:border-box;aspect-ratio:auto}
+#pbody .pack-grid .icell img,#pbody .pack-grid .icell svg{position:absolute;inset:6% 5%;width:90%;height:88%;object-fit:contain}
+#pbody .pack-grid .empty{background:#20231e;border:1px solid #373a30}
+#pbody .inv-detail,#pbody .inv-eq{border:1px solid #525246;background:#262720;padding:8px}
+#pbody .inv-stats{color:#d0cbb8}
+.locker-status{font:13px/1.4 Arial;color:#d6d5c4;margin:0 0 8px}
+.locker-sides{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.locker-row{display:flex;align-items:center;gap:5px;padding:4px 0;border-top:1px solid #47483e}
+#pbody .locker-row>img,#pbody .locker-row>svg{width:36px;height:35px;max-width:36px;max-height:35px;object-fit:contain;flex:none}
+.locker-item{flex:1;font:600 13px Arial;color:#e5dfcc}
+.locker-item small{display:block;color:#b7b5a6;font:11px Arial}
+.locker-row .chip{min-height:44px;min-width:44px;padding:0 4px}
+@media(min-width:701px){#pbody .trade2{grid-template-areas:"mine their" "cart cart";grid-template-rows:minmax(0,1fr) auto}#pbody .tr-head{display:none}}
+@media(max-width:700px){.locker-sides{grid-template-columns:1fr}#pbody .trade2{gap:4px}#pbody .inv-grid{min-height:160px}#pbody .inv3{height:auto}}
+@media(max-height:430px) and (orientation:landscape){#pbody .tr-col{padding:4px 7px}#pbody .tr-col .tr-who{min-height:26px}#pbody .tr-col .h3{margin:0 0 2px}#pbody .tr-col .igrid{grid-template-columns:repeat(auto-fill,minmax(79px,1fr))}}
+
+
+#pbody .pack-grid .icell.sel{outline:2px solid #d8bc76;outline-offset:-2px}
+@media(min-width:1000px){#pbody .pack-grid{grid-template-columns:repeat(8,minmax(0,1fr))}}
+@media(min-width:701px) and (max-width:940px){#pbody .pack-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+#pbody .pack-grid [data-item^="w_"]{overflow:hidden}
+#pbody .pack-grid [data-item^="w_"] img{inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(89%,118px);height:auto;max-height:none;pointer-events:none}
+#pbody .pack-grid [data-item="w_pm"] img{width:min(85%,48px)}

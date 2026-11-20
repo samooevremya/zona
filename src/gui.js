@@ -9,6 +9,7 @@ function itemCell(id, opt) {
   const c = el('button', 'icell' + (opt.sel ? ' sel' : '') + (opt.on ? ' on' : '') + (opt.dim ? ' dim' : ''));
   c.type = 'button';
   c.appendChild(itemIcon(id));
+  if (opt.price != null || opt.dim != null) c.appendChild(el('span','trade-label',itemName(id)));
   if (opt.q > 1) c.appendChild(el('span', 'bd', String(opt.q)));
   if (opt.price != null) c.appendChild(el('span', 'pr', opt.price + ''));
   const cd = opt.cond != null ? opt.cond : null;
@@ -129,16 +130,17 @@ function drawInv2() {
   // снаряжение
   const eq = el('div', 'inv-eq');
   { const who = el('div', 'tr-who'); who.appendChild(portraitFor(meCard())); const t = el('div'); t.appendChild(el('div', 'pn', 'Меченый')); t.appendChild(el('div', 'price', RANKS[rankOf(score())])); who.appendChild(t); eq.appendChild(who); }
-  const slot = (label, id, onTap) => { const s = el('div', 'slot'); s.appendChild(el('span', 'sl', label)); s.appendChild(id ? itemCell(id, { on: 1, cond: condOf(id), sel: panel.sel === id, fn: () => { panel.sel = id; refresh(); } }) : el('div', 'icell empty')); return s; };
+  const slot = (label, id, onTap) => { const s = el('div', 'slot'); s.appendChild(el('span', 'sl', label)); s.appendChild(id ? itemCell(id, { on: 1, cond: condOf(id), sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); return s; };
   eq.appendChild(slot('В руках', S.weapon));
   eq.appendChild(slot('Костюм', S.armor));
   const belt = el('div', 'slot beltslot'); belt.appendChild(el('span', 'sl', 'Пояс'));
   const br = el('div', 'beltrow');
-  for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; refresh(); } }) : el('div', 'icell empty')); }
+  for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); }
   belt.appendChild(br); eq.appendChild(belt);
   const wt = weight(), st = el('div', 'inv-stats');
-  const wb = el('div', 'wbar'); const wi = el('i'); wi.style.width = Math.min(100, wt / MAXW * 100) + '%'; if (wt > MAXW) wb.classList.add('over'); wb.appendChild(wi);
-  st.appendChild(el('div', 'ds', 'Вес ' + wt + ' / ' + MAXW + ' кг')); st.appendChild(wb);
+  const wb = el('div', 'wbar'); const wi = el('i'); wi.style.width = Math.min(100, wt / carryLimit() * 100) + '%'; if (wt > carryLimit()) wb.classList.add('over'); wb.appendChild(wi);
+  st.appendChild(el('div', 'ds', 'Вес ' + showKg(wt) + ' / ' + carryLimit() + ' кг')); st.appendChild(wb);
+  st.appendChild(el('div','ds','Пустой рюкзак · '+showKg(PACK_KG)+' кг'));
   st.appendChild(el('div', 'ds', 'Защита ' + Math.round(def() * 100) + '% · Радиация ' + Math.round(S.rad)));
   st.appendChild(el('div', 'ds', 'Сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '') + ' · ' + S.money + ' RU'));
   eq.appendChild(st);
@@ -146,37 +148,55 @@ function drawInv2() {
   // сетка
   const gw = el('div', 'inv-grid');
   const ids = ['knife'].concat(Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0));
-  const g = el('div', 'igrid');
-  ids.forEach(id => g.appendChild(itemCell(id, { q: id === 'knife' ? 1 : cnt(id), cond: condOf(id), sel: panel.sel === id, on: S.weapon === id || S.armor === id || beltCount(id) > 0, fn: () => { panel.sel = id; panel.hint = ''; refresh(); } })));
-  const pad = Math.max(0, 24 - ids.length); for (let i = 0; i < pad; i++) g.appendChild(el('div', 'icell empty'));
+  const used=packCells(S.inv);
+  gw.appendChild(el('h3','pack-heading','Рюкзак · '+used+' / '+PACK_CELLS+' ячеек'));
+  const g = el('div', 'igrid pack-grid');
+  for (const id of ids) {
+    const count=id==='knife'?1:cnt(id), stack=stackLimit(id);
+    for(let start=0;start<count;start+=stack) {
+      const selected=panel.sel===id && (panel.copy || 0)===start;
+      const cd=isGun(id)?Math.round(gunCopy(id,start).cond):null;
+      const cell=itemCell(id,{q:Math.min(count-start,stack),cond:cd,sel:selected,
+        on:(S.weapon===id || S.armor===id || beltCount(id)>0) && start===0,
+        fn:()=>{panel.sel=id; panel.copy=start; panel.hint=''; refresh();}});
+      cell.dataset.item=id;
+      const [w,h]=footprint(id);
+      cell.style.gridColumn='span '+w; cell.style.gridRow='span '+h;
+      cell.title=itemName(id)+(cd==null?'':' · '+cd+'%');
+      g.appendChild(cell);
+    }
+  }
+  for (let i=used;i<PACK_CELLS;i++) g.appendChild(el('div','icell empty'));
   gw.appendChild(g); box.appendChild(gw);
   // описание
   const dv = el('div', 'inv-detail');
-  const id = panel.sel;
+  const id = panel.sel, copy=Math.min(panel.copy || 0,Math.max(0,cnt(id)-1));
   if (!id || (id !== 'knife' && !has(id))) dv.appendChild(el('p', 'note', 'Выбери вещь. Артефакты вешаются на пояс, до трёх штук. Оружие в руках меняется по кругу кнопкой на HUD.'));
   else {
     const it = id === 'knife' ? { n: 'Нож', w: 0.3 } : ITEMS[id];
-    dv.appendChild(el('div', 'nm', it.n + (cnt(id) > 1 ? ' ×' + cnt(id) : '')));
+    dv.appendChild(el('div', 'nm', it.n + (isGun(id) && cnt(id)>1?' · '+(copy+1)+' из '+cnt(id):'')));
     const rows = el('div', 'cmp');
     const line = (k, v, d) => { const r = el('div', 'cr'); r.appendChild(el('span', 'ck', k)); r.appendChild(el('span', 'cv', v)); if (d) r.appendChild(el('span', 'cd ' + (d > 0 ? 'up' : 'dn'), (d > 0 ? '+' : '') + d)); rows.appendChild(r); };
     if (WP[id]) {
-      const W = WP[id], C = WP[S.weapon], same = S.weapon === id;
+      const W = WP[id], C = WP[S.weapon], same = S.weapon === id && !copy;
       line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
-      if (!W.melee) { line('Магазин', W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', condOf(id) + '%'); }
+      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
       if (!same) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
     } else if (it.armor) {
+      line('Предел веса',carryLimit(id)+' кг');
       const cur = ITEMS[S.armor] ? ITEMS[S.armor].armor : 0;
       line('Защита', Math.round(it.armor * 100) + '%', S.armor === id ? 0 : Math.round((it.armor - cur) * 100));
     }
     if (FOOD[id]) line('Сытость', '+' + FOOD[id]);
     if (it.heal) line('Лечение', '+' + it.heal);
     if (ARTFX[id]) rows.appendChild(el('div', 'ds', ARTFX[id]));
-    line('Вес', (Math.round(itemW(id) * Math.max(1, cnt(id)) * 100) / 100) + ' кг');
+    line('Вес предмета', showKg(itemW(id)+(isGun(id)?loadedMass(id,gunCopy(id,copy)):0))+' кг');
+    line('Размер',footprint(id).join(' × '));
     dv.appendChild(rows);
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
-    if (WP[id] && S.weapon !== id) row.appendChild(btn('go', 'Взять в руки', () => { setWeapon(id); refresh(); }));
-    if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { S.armor = id; refresh(); }));
+    if (WP[id] && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
+    if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
     if (it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
       if (beltCount(id)) S.belt.splice(S.belt.indexOf(id), 1);
@@ -184,11 +204,12 @@ function drawInv2() {
       else S.belt.push(id);
       refresh();
     }));
-    if (id !== 'knife' && !it.quest && S.armor !== id && S.weapon !== id) row.appendChild(btn('wide', 'Выбросить', () => {
-      const q = cnt(id); take(id, q); S.belt = S.belt.filter(b => b !== id);
-      const wc = condOf(id); objs.push({ k: 'body', kind: 'sack', x: P.x + rnd(-6, 6), y: P.y + 12, ang: 0, fac: 'loner', name: 'Рюкзак', seed: 1, loot: { [id]: q }, wcond: wc != null ? { [id]: wc } : null, t: S.min });
-      if (WP[id]) { delete S.cond[id]; delete S.mag[id]; }
-      panel.sel = null; refresh();
+    if (id !== 'knife' && !it.quest && (id!==S.armor || copy) && (id!==S.weapon || copy) && cnt(id)>beltCount(id)) row.appendChild(btn('wide','Выбросить',()=>{
+      const q=isGun(id)||it.armor?1:Math.min(stackLimit(id),cnt(id)-beltCount(id));
+      const gun=removePacked(id,q,copy);
+      const sack={k:'body',kind:'sack',x:P.x,y:P.y,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min,scatterStart:performance.now()};
+      putStock(sack,id,q,gun); objs.push(sack); groundItems(sack);
+      panel.sel=null; panel.copy=0; refresh();
     }));
     dv.appendChild(row);
   }
@@ -207,12 +228,25 @@ function stockCond(e, id) {
   e.wcond = e.wcond || {}; if (e.wcond[id] == null) e.wcond[id] = ri(55, 85); return e.wcond[id];
 }
 function tradeStock(e) {
-  const one = id => (ITEMS[id].weapon || ITEMS[id].armor) && has(id);   // один ствол/костюм каждого типа: экземпляры не объединяются
-  if (e) return Object.keys(e.inv).filter(id => e.inv[id] > 0).map(id => ({ id: id, q: 1, p: Math.ceil(ITEMS[id].price * (S.rep >= 20 ? 1.1 : 1.3)), c: one(id) ? 0 : e.inv[id], cond: stockCond(e, id) }));
-  return STOCK.map(s => Object.assign({ c: (ITEMS[s.id].weapon || ITEMS[s.id].armor) ? (has(s.id) ? 0 : 1) : 99, cond: stockCond(null, s.id) }, s));
+  if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
+    id,q:1,p:Math.ceil((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
+  }));
+  return STOCK.map(s=>({...s,c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }
-function tradePrice(id, e) { const c = condOf(id); return Math.max(1, Math.floor(sellPrice(id, !!e) * (c != null ? Math.max(0.3, c / 100) : 1))); }
+function vendorGun(e,id,offset) {
+  return e?.guns?.[id]?.at(-1-offset) || {cond:stockCond(e,id),mag:0};
+}
+function tradePrice(id,e,offset=0) {
+  const c=isGun(id)?gunCopy(id,Math.max(0,cnt(id)-1-offset)).cond:null;
+  return Math.max(1,Math.floor(sellPrice(id,!!e)*(c==null?1:Math.max(.3,c/100))));
+}
+function saleTotal(id,q,e) {
+  if (!isGun(id)) return tradePrice(id,e)*q;
+  let sum=0; for(let i=0;i<q;i++) sum+=tradePrice(id,e,i);
+  return sum;
+}
 /* почему вещь нельзя продать сейчас — короткий знак на ячейке вместо затемнения до черноты */
 function sellWhy(id, e, o) {
   const it = ITEMS[id]; if (!it) return null;
@@ -221,30 +255,40 @@ function sellWhy(id, e, o) {
   if (id === S.weapon && WP[id] && !WP[id].melee) return 'в руках';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
-  if (e && (it.weapon || it.armor)) return 'не берёт';
+  if (e && it.armor) return 'не берёт';
   return null;
 }
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
-  if (e && (it.weapon || it.armor)) return 0;
+  if (e && it.armor) return 0;
   let n = cnt(id) - beltCount(id);
   if (id === S.armor) n -= 1;
-  if (id === S.weapon && WP[id] && !WP[id].melee && cnt(id) <= 1) n -= 1;
+  if (id === S.weapon && WP[id] && !WP[id].melee) n -= 1;
   return Math.max(0, n);
 }
 function offerSum(e) {
   const o = panel.offer, st = tradeStock(e);
-  let buy = 0, sell = 0, w = 0;
-  Object.entries(o.buy).forEach(([id, n]) => { const s = st.find(x => x.id === id); if (s) { buy += s.p * n; w += itemW(id) * s.q * n; } });
-  Object.entries(o.sell).forEach(([id, n]) => { const u = ITEMS[id].ammo ? 10 : 1; sell += tradePrice(id, e) * Math.min(n * u, cnt(id)); w -= itemW(id) * Math.min(n * u, cnt(id)); });
-  return { buy: buy, sell: sell, net: sell - buy, wAfter: Math.round((weight() + w) * 10) / 10 };
+  let buy=0,sell=0,kg=weight();
+  const inv={...S.inv};
+  for(const [id,n] of Object.entries(o.sell)) {
+    const q=Math.min(n*(ITEMS[id].ammo?10:1),cnt(id));
+    sell+=saleTotal(id,q,e); inv[id]=cnt(id)-q; kg-=itemW(id)*q;
+    if(isGun(id)) for(let i=0;i<q;i++) kg-=loadedMass(id,gunCopy(id,cnt(id)-1-i));
+  }
+  for(const [id,n] of Object.entries(o.buy)) {
+    const s=st.find(x=>x.id===id); if(!s) continue;
+    const q=s.q*n; buy+=s.p*n; inv[id]=(inv[id] || 0)+q; kg+=itemW(id)*q;
+    if(isGun(id)) for(let i=0;i<n;i++) kg+=loadedMass(id,vendorGun(e,id,i));
+  }
+  return {buy,sell,net:sell-buy,wAfter:Math.round(kg*1000)/1000,cells:packCells(inv)};
+
 }
 function tradeCheck(e) {
   const o = panel.offer, st = tradeStock(e), sm = offerSum(e);
   if (!Object.keys(o.buy).length && !Object.keys(o.sell).length) return 'Предложение пустое.';
   for (const [id, n] of Object.entries(o.buy)) { const s = st.find(x => x.id === id); if (!s || s.c < n) return 'У торговца нет столько: ' + itemName(id) + '.'; }
   for (const [id, n] of Object.entries(o.sell)) {
-    const u = ITEMS[id].ammo ? 10 : 1; if (sellable(id, e) >= Math.min(n * u, cnt(id)) && cnt(id) > 0) continue;
+    const u = ITEMS[id].ammo ? 10 : 1; if (n <= Math.ceil(sellable(id,e)/u)) continue;
     if (cnt(id) <= 0) return 'У тебя больше нет: ' + itemName(id) + '.';
     if (id === S.weapon) return itemName(id) + ' в руках: сначала возьми другое оружие.';
     if (id === S.armor) return itemName(id) + ' надет: сначала сними.';
@@ -253,25 +297,36 @@ function tradeCheck(e) {
   }
   if (sm.net < 0 && S.money < -sm.net) return 'Не хватает ' + (-sm.net - S.money) + ' RU.';
   if (sm.net > 0 && e && e.money < sm.net) return 'У него не хватает денег: есть ' + e.money + ' RU.';
-  if (sm.wAfter > MAXW * 1.6) return 'Столько не унести: будет ' + sm.wAfter + ' кг.';
+  if (Object.keys(o.buy).length) return capacityError(sm.wAfter,sm.cells);
   return '';
 }
 function tradeDo(e) {
   const err = tradeCheck(e); if (err) { panel.hint = err; refresh(); return; }
   const o = panel.offer, st = tradeStock(e), sm = offerSum(e);
-  Object.entries(o.sell).forEach(([id, n]) => {
-    const u = ITEMS[id].ammo ? 10 : 1, q = Math.min(n * u, cnt(id)), c = condOf(id);
-    take(id, q); if (e) { e.inv[id] = (e.inv[id] || 0) + q; if (c != null) { e.wcond = e.wcond || {}; e.wcond[id] = c; } }
-    if (WP[id] && !cnt(id)) { delete S.cond[id]; delete S.mag[id]; }      // проданный ствол уносит своё состояние и патроны в магазине
-  });
-  Object.entries(o.buy).forEach(([id, n]) => {
-    const s = st.find(x => x.id === id); give(id, s.q * n);
-    if (WP[id] && !WP[id].melee) { S.cond[id] = s.cond; S.mag[id] = 0; }  // купленный ствол: состояние продавца, магазин пустой
-    if (e) { e.inv[id] -= n; if (e.inv[id] <= 0) { delete e.inv[id]; if (e.wcond) delete e.wcond[id]; } }
-  });
+  // Забираем оплаченный товар из прежнего запаса до пополнения товарами игрока.
+  const incoming={loot:{},guns:{}};
+  for(const [id,n] of Object.entries(o.buy)) {
+    const q=st.find(s=>s.id===id).q*n;
+    if(isGun(id)) for(let i=0;i<q;i++) {
+      putStock(incoming,id,1,vendorGun(e,id,0)); e?.guns?.[id]?.pop();
+    } else putStock(incoming,id,q);
+    if(e) { e.inv[id]-=q; if(!e.inv[id]) delete e.inv[id]; }
+  }
+  for(const [id,n] of Object.entries(o.sell)) {
+    const q=Math.min(n*(ITEMS[id].ammo?10:1),cnt(id));
+    if (isGun(id)) for(let i=0;i<q;i++) {
+      const gun=removePacked(id);
+      if(e) ((e.guns ||= {})[id] ||= []).push(gun);
+    } else take(id,q);
+    if(e) e.inv[id]=(e.inv[id] || 0)+q;
+  }
+  for(const [id,q] of Object.entries(incoming.loot)) {
+    if (isGun(id)) for(const gun of incoming.guns[id]) addPacked(id,1,gun);
+    else addPacked(id,q);
+  }
   S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1;   // инвентарь и деньги этого NPC теперь сохраняются
   panel.offer = { buy: {}, sell: {} }; play('pick');
-  panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.' + (sm.wAfter > MAXW ? ' Перегруз: ' + sm.wAfter + ' кг.' : '');
+  panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.';
   refresh();
 }
 function drawTrade2() {
@@ -282,24 +337,24 @@ function drawTrade2() {
   const box = el('div', 'trade2' + (panel.side === 'mine' ? ' show-mine' : ' show-their'));
   // шапка: портреты и переключатель для узкого экрана
   const head = el('div', 'tr-head');
-  const me = el('div', 'tr-who'); me.appendChild(portraitFor(meCard())); const mt = el('div'); mt.appendChild(el('div', 'pn', 'Меченый')); mt.appendChild(el('div', 'price', S.money + ' RU')); me.appendChild(mt); head.appendChild(me);
+  const me = el('div', 'tr-who'); me.appendChild(portraitFor(meCard())); const mt = el('div'); mt.appendChild(el('div', 'pn', 'Меченый')); mt.appendChild(el('div', 'price', S.money + ' RU')); me.appendChild(mt);
   const sw = el('div', 'tr-switch');
   sw.appendChild(btn('chip' + (panel.side === 'mine' ? ' on' : ''), 'Мои вещи', () => { panel.side = 'mine'; refresh(); }));
   sw.appendChild(btn('chip' + (panel.side === 'their' ? ' on' : ''), 'Торговец', () => { panel.side = 'their'; refresh(); }));
   head.appendChild(sw);
-  const th = el('div', 'tr-who r'); const c = e ? cardOf(e) : SIDCARD(); const tt = el('div'); tt.appendChild(el('div', 'pn', c.n)); tt.appendChild(el('div', 'price', e ? e.money + ' RU' : 'касса без дна')); th.appendChild(tt); th.appendChild(portraitFor(c)); head.appendChild(th);
+  const th = el('div', 'tr-who r'); const c = e ? cardOf(e) : SIDCARD(); const tt = el('div'); tt.appendChild(el('div', 'pn', c.n)); tt.appendChild(el('div', 'price', e ? e.money + ' RU' : 'Торговец')); th.appendChild(tt); th.appendChild(portraitFor(c));
   box.appendChild(head);
   // мои вещи
-  const mine = el('div', 'tr-col mine'); mine.appendChild(el('h3', 'h3', 'Мои вещи · продать'));
+  const mine = el('div', 'tr-col mine'); mine.appendChild(me); mine.appendChild(el('h3', 'h3', 'Мой рюкзак · продажа'));
   const gm = el('div', 'igrid');
   Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0).forEach(id => {
     const left = sellable(id, e) - (o.sell[id] || 0) * (ITEMS[id].ammo ? 10 : 1);
-    gm.appendChild(itemCell(id, { q: cnt(id), cond: condOf(id), price: sellable(id, e) ? tradePrice(id, e) * sellUnit(id) : null, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : sellWhy(id, e, o),
+    gm.appendChild(itemCell(id, { q: cnt(id), cond: isGun(id)?Math.round(gunCopy(id,Math.max(0,cnt(id)-1-(o.sell[id] || 0))).cond):null, price: sellable(id, e) ? tradePrice(id, e,o.sell[id] || 0) * sellUnit(id) : null, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : sellWhy(id, e, o),
       fn: () => { o.sell[id] = (o.sell[id] || 0) + 1; panel.hint = ''; refresh(); } }));
   });
   mine.appendChild(gm);
   // товар торговца
-  const their = el('div', 'tr-col their'); their.appendChild(el('h3', 'h3', 'Товар · купить'));
+  const their = el('div', 'tr-col their'); their.appendChild(th); their.appendChild(el('h3', 'h3', 'Товары · покупка'));
   const gt = el('div', 'igrid');
   if (!st.length) their.appendChild(el('p', 'note', 'Ему нечего продать.'));
   st.forEach(s => { const left = s.c - (o.buy[s.id] || 0); gt.appendChild(itemCell(s.id, { q: s.q > 1 ? s.q : (e ? s.c : 0), price: s.p, cond: s.cond, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : (o.buy[s.id] ? 'в корз.' : has(s.id) ? 'есть' : 'нет'), fn: () => { o.buy[s.id] = (o.buy[s.id] || 0) + 1; panel.hint = ''; refresh(); } })); });
@@ -308,10 +363,10 @@ function drawTrade2() {
   const cart = el('div', 'tr-cart');
   const lineFor = (side, id, n) => {
     const s = side === 'buy' ? st.find(x => x.id === id) : null;
-    const q = side === 'buy' ? s.q * n : Math.min(n * (ITEMS[id].ammo ? 10 : 1), cnt(id));
-    const p = side === 'buy' ? s.p * n : tradePrice(id, e) * q;
+    const q = side === 'buy' ? (s?.q || 1) * n : Math.min(n * (ITEMS[id].ammo ? 10 : 1), cnt(id));
+    const p = side === 'buy' ? (s?.p || 0) * n : saleTotal(id,q,e);
     const b = btn('cline ' + side, '', () => { o[side][id]--; if (o[side][id] <= 0) delete o[side][id]; refresh(); });
-    const cd = side === 'buy' ? s.cond : condOf(id);
+    const cd = side === 'buy' ? s?.cond : (isGun(id)&&n===1?Math.round(gunCopy(id,cnt(id)-1).cond):null);
     b.appendChild(itemIcon(id)); b.appendChild(el('span', 'cn', itemName(id) + (q > 1 ? ' ×' + q : '') + (cd != null ? ' · ' + cd + '%' : ''))); b.appendChild(el('span', 'cp', (side === 'buy' ? '−' : '+') + p)); b.setAttribute('aria-label', 'Убрать из сделки: ' + itemName(id));
     return b;
   };
@@ -321,8 +376,8 @@ function drawTrade2() {
   const tot = el('div', 'tr-total');
   const err = tradeCheck(e);
   tot.appendChild(el('div', 'tsum', 'Отдаю ' + sm.sell + ' · беру ' + sm.buy));
-  tot.appendChild(el('div', 'tnet ' + (sm.net >= 0 ? 'plus' : 'minus'), sm.net >= 0 ? 'Тебе доплатят: ' + sm.net + ' RU' : 'Доплата: ' + (-sm.net) + ' RU'));
-  tot.appendChild(el('div', 'twt' + (sm.wAfter > MAXW ? ' over' : ''), 'Вес после: ' + sm.wAfter + ' / ' + MAXW + ' кг'));
+  tot.appendChild(el('div', 'tnet ' + (sm.net >= 0 ? 'plus' : 'minus'), sm.net===0?(sm.buy||sm.sell?'Равный обмен':'Сделка не выбрана'):sm.net>0?'К получению: '+sm.net+' RU':'Доплата: '+(-sm.net)+' RU'));
+  tot.appendChild(el('div', 'twt' + (sm.wAfter > carryLimit() ? ' over' : ''), 'Вес после: ' + showKg(sm.wAfter) + ' / ' + carryLimit() + ' кг'));
   const acts = el('div', 'tr-acts');
   acts.appendChild(btn('chip', 'Сбросить', () => { panel.offer = { buy: {}, sell: {} }; panel.hint = ''; refresh(); }, !Object.keys(o.buy).length && !Object.keys(o.sell).length));
   acts.appendChild(btn('go deal', 'Подтвердить', () => tradeDo(e), !!err));
@@ -347,4 +402,52 @@ function markScroll(list) {
     const upd = () => n.classList.toggle('more', n.scrollHeight - n.clientHeight - n.scrollTop > 6);
     upd(); n.addEventListener('scroll', upd, { passive: true });
   }));
+}
+function drawLocker() {
+  const stock=personalStock(), shell=el('div','locker-panel');
+  shell.appendChild(el('p','locker-status','Вес рюкзака · '+showKg(weight())+' / '+carryLimit()+' кг · '+packCells(S.inv)+' / '+PACK_CELLS+' ячеек. Один ящик для обеих баз.'));
+  const sides=el('div','locker-sides');
+  function side(deposit) {
+    const col=el('section','locker-side '+(deposit?'mine':'their'));
+    col.appendChild(el('h3','pack-heading',deposit?'Мой рюкзак':'Личный ящик'));
+    const contents=deposit?S.inv:stock.loot;
+    let rows=0;
+    for(const [id,count] of Object.entries(contents)) {
+      if (!ITEMS[id] || count<=0) continue;
+      const total=isGun(id)?count:1;
+      for(let i=0;i<total;i++) {
+        const gun=isGun(id)?(deposit?gunCopy(id,i):stock.guns[id]?.[i] || {cond:80,mag:0}):null;
+        const available=deposit?sellable(id,null):count;
+        const fixed=deposit && (available<=0 || (isGun(id) && id===S.weapon && i===0));
+        const row=el('div','locker-row');
+        row.appendChild(itemIcon(id));
+        const label=el('div','locker-item',itemName(id));
+        label.appendChild(el('small','',gun?Math.round(gun.cond)+'% · '+gun.mag+' патр.':count+' шт. · '+showKg(itemW(id))+' кг/шт.'));
+        row.appendChild(label);
+        const action=deposit?'Положить':'Забрать';
+        const move=n=>{
+          let moved=0;
+          if(deposit) {
+            if(fixed || n>sellable(id,null)) return;
+            const copy=removePacked(id,n,i); putStock(stock,id,n,copy); moved=n;
+          } else if(gun) {
+            if(receiveError(id,1,gun)) return;
+            stock.guns[id]?.splice(i,1); if(--stock.loot[id]===0) {delete stock.loot[id];delete stock.guns[id];}
+            addPacked(id,1,gun); moved=1;
+          } else moved=collectStock(stock,id,n);
+          panel.hint=(deposit?'В ящик: ':'В рюкзак: ')+itemName(id)+' ×'+moved+'.';
+          if(!save(true)) panel.hint+=' Не удалось записать сохранение.';
+          refresh();
+        };
+        const err=deposit?'':receiveError(id,1,gun);
+        const one=btn('chip',fixed?'При себе':err?'Не влезает':action,()=>move(1),fixed||!!err);
+        if(err) one.title=err; row.appendChild(one);
+        if(!gun && available>1) row.appendChild(btn('chip','×'+available,()=>move(available),fixed||!!err));
+        col.appendChild(row); rows++;
+      }
+    }
+    if(!rows) col.appendChild(el('p','note',deposit?'Рюкзак пуст.':'Ящик пуст.'));
+    return col;
+  }
+  sides.append(side(true),side(false)); shell.appendChild(sides); pbody.appendChild(shell);
 }

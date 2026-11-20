@@ -438,20 +438,151 @@ function locNear(x, y) {
 }
 function locAt(x, y) { return LOCATIONS.find(l => x >= l.bounds[0] && x <= l.bounds[2] && y >= l.bounds[1] && y <= l.bounds[3]) || null; }
 
+/* Первая копия каждого ствола использует поля старых сохранений и боевой системы.
+   В запасе хранятся только дополнительные экземпляры, каждый со своим магазином. */
+const PACK_CELLS = 48, PACK_KG = 1.2, KNIFE_KG = .3;
+const carryLimit = (armor = S.armor) => armor === 'ar_zarya' ? 50 : 35;
+const isGun = id => !!ITEMS[id]?.weapon;
+function footprint(id) {
+  if (id === 'w_aksu' || id === 'w_obrez') return [3,1];
+  if (id === 'w_pm') return [2,1];
+  return ITEMS[id]?.armor ? [2,2] : [1,1];
+}
+const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || ITEMS[id]?.armor ? 1 : 5;
+function packCells(inv) {
+  return Object.entries(inv).reduce((total,[id,n]) => {
+    const [w,h] = footprint(id);
+    return total + w*h*Math.ceil(n/stackLimit(id));
+  },1); // нож
+}
+function primaryGun(id) { return {cond:S.cond?.[id] ?? 80, mag:S.mag[id] || 0}; }
+function gunCopy(id,index) {
+  return index ? S.flags.spareGuns?.[id]?.[index-1] || {cond:80,mag:0} : primaryGun(id);
+}
+function setPrimary(id,gun) { S.cond[id]=gun.cond; S.mag[id]=gun.mag; }
+function spareList(id) {
+  const lists=S.flags.spareGuns ||= {};
+  const guns=lists[id] ||= [];
+  while (guns.length < cnt(id)-1) guns.push({cond:80,mag:0});
+  return guns;
+}
+function gunsBelow(condition) {
+  const worn=[];
+  for (const id of WORDER.filter(isGun)) {
+    for(let i=0;i<cnt(id);i++) {
+      const gun=gunCopy(id,i);
+      if(gun.cond<condition) worn.push({id,index:i,cond:gun.cond});
+    }
+  }
+  return worn;
+}
+function repairCopies(copies,condition) {
+  for (const {id,index} of copies) {
+    if(index) spareList(id)[index-1].cond=condition;
+    else S.cond[id]=condition;
+  }
+}
+function selectGun(id,index) {
+  if (!has(id) || index < 0 || index >= cnt(id)) return;
+  if (index) {
+    const guns=spareList(id), gun=guns[index-1];
+    guns[index-1]=primaryGun(id); setPrimary(id,gun);
+  }
+  setWeapon(id);
+}
+function loadedMass(id,gun) { return gun ? (ITEMS[WP[id].ammo]?.w || 0)*gun.mag : 0; }
+function weight() {
+  let kg=PACK_KG+KNIFE_KG;
+  for (const [id,n] of Object.entries(S.inv)) {
+    kg+=(ITEMS[id]?.w || 0)*n;
+    if (isGun(id)) for(let i=0;i<n;i++) kg+=loadedMass(id,gunCopy(id,i));
+  }
+  return Math.round(kg*1000)/1000;
+}
+const showKg = kg => Number(kg.toFixed(3)).toLocaleString('ru-RU');
+function capacityError(kg,cells,armor=S.armor) {
+  if (kg > carryLimit(armor)+.00001) return 'Превышен вес: '+showKg(kg)+' / '+carryLimit(armor)+' кг.';
+  if (cells > PACK_CELLS) return 'Не хватает ячеек: '+cells+' / '+PACK_CELLS+'.';
+  return '';
+}
+function receiveError(id,n,gun) {
+  const inv={...S.inv,[id]:cnt(id)+n};
+  return capacityError(weight()+ITEMS[id].w*n+loadedMass(id,gun),packCells(inv));
+}
+function addPacked(id,n=1,gun) {
+  if (isGun(id)) {
+    for (let i=0;i<n;i++) {
+      const copy={...(gun || {cond:80,mag:0})};
+      if (cnt(id)) spareList(id).push(copy); else setPrimary(id,copy);
+      S.inv[id]=cnt(id)+1;
+    }
+  } else S.inv[id]=cnt(id)+n;
+}
+// Продажа и склад по умолчанию берут запасной ствол. Снаряжение в руках защищено.
+function removePacked(id,n=1,index=cnt(id)-1) {
+  let gun;
+  if (isGun(id)) {
+    gun=gunCopy(id,index);
+    const spares=spareList(id);
+    if (index) spares.splice(index-1,1);
+    else if (spares.length) setPrimary(id,spares.pop());
+    if (cnt(id)===1) { delete S.cond[id]; delete S.mag[id]; }
+  }
+  take(id,n); return gun;
+}
+function personalStock() { return S.flags.personalStock ||= {loot:{},guns:{}}; }
+function putStock(stock,id,n,gun) {
+  stock.loot[id]=(stock.loot[id] || 0)+n;
+  if (gun) ((stock.guns ||= {})[id] ||= []).push({...gun});
+}
+function lootGun(stock,id) {
+  return isGun(id) ? stock.guns?.[id]?.at(-1) || {cond:stock.wcond?.[id] ?? 80,mag:0} : null;
+}
+// Переносит только то, что поместилось. Остаток остаётся в исходном контейнере.
+function collectStock(stock,id,limit=Infinity) {
+  const available=Math.min(stock.loot[id] || 0,limit);
+  let moved=0;
+  if (id==='money') { S.money+=available; moved=available; }
+  else if (ITEMS[id]) {
+    while (moved < available) {
+      const gun=lootGun(stock,id);
+      if (receiveError(id,1,gun)) break;
+      addPacked(id,1,gun);
+      if (gun) stock.guns?.[id]?.pop();
+      moved++;
+    }
+  }
+  if (moved) {
+    stock.loot[id]-=moved;
+    if (!stock.loot[id]) { delete stock.loot[id]; if(stock.guns) delete stock.guns[id]; }
+  }
+  return moved;
+}
+function give(id,n=1,gun) {
+  // Обязательные награды доступны и при полном рюкзаке.
+  const stock={loot:{[id]:n},wcond:{},guns:gun?{[id]:Array(n).fill(gun)}:{}};
+  const moved=collectStock(stock,id);
+  if (moved<n) {
+    const left=n-moved;
+    if (gun) for(let i=0;i<left;i++) putStock(personalStock(),id,1,gun);
+    else putStock(personalStock(),id,left);
+    const note=ITEMS[id].n+' ×'+left+' — в личном ящике.';
+    msg(note); news(note);
+  }
+  return moved;
+}
+
 /* ===================== состояние ===================== */
 let S = null, P = null, ents = [], decals = [], parts = [], tracers = [], flashes = [], bolts = [], nades = [], crows = [], anoms = [], arts = [];
 let armyAngry = false, nextId = 1, spawnT = 0, fogT = 0, saveT = 0, warnT = 0;
 const cnt = id => S.inv[id] || 0;
 const has = id => cnt(id) > 0;
 const beltCount = id => S.belt.filter(x => x === id).length;
-function give(id, n) { S.inv[id] = cnt(id) + (n || 1); }
 function take(id, n) {
   S.inv[id] = Math.max(0, cnt(id) - (n || 1)); if (!S.inv[id]) delete S.inv[id];
   while (beltCount(id) > cnt(id)) S.belt.splice(S.belt.indexOf(id), 1);
   if (WP[id] && S.weapon === id && !has(id)) S.weapon = 'knife';
 }
-const weight = () => Math.round(Object.keys(S.inv).reduce((a, id) => a + (ITEMS[id] ? ITEMS[id].w : 0) * S.inv[id], 0) * 10) / 10;
-const MAXW = 50;
 const hour = () => (S.min / 60) % 24;
 const night = () => { const h = hour(); return h >= 21 || h < 5; };
 function darkness() {
@@ -944,12 +1075,12 @@ function dropBody(e) {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
     const W = WP[e.wpn];
-    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + (W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = 1; }
+    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + (W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
     if (e.fac === 'army' && chance(0.3)) loot.grenade = 1;
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }
   if (e.kind === 'human' && (e.fac === 'loner' || e.fac === 'bandit') && chance(0.3)) loot.__tip = 1;
-  const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, t: S.min };
+  const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
   // Младший остаток визуального seed хранит расцветку и после загрузки тела.
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   objs.push(body); g7Fresh(body);   // визуальный переход падения (только в памяти, не в сейве)
@@ -1587,7 +1718,7 @@ function updatePlayer(dt) {
   let mx = IN.moveX, my = IN.moveY;
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
-  const over = weight() > MAXW;
+  const over = weight() > carryLimit();
   const sprint = (IN.sprint || ml > 0.95 && IN.touch && !P.crouch) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
@@ -1698,12 +1829,18 @@ function findInteract() {
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
   if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
+    if (o.k === 'locker') {
+      const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
+      if (d<49 && los(P.x,P.y,x,y)) cand(d,{k:'locker',o,label:'Открыть личный ящик'});
+    }
+    if ((o.k==='crate' && o.broken && !o.looted) || o.kind==='sack') {
+      nearbyGroundItems(o,cand); continue;
+    }
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
-    if(o.stash && !o.looted && (o.k!=='crate'||o.broken)){
+    if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
-        if(o.k==='crate') cand(d,{k:'pickupLoot',o,label:'Подобрать добычу'});
-        else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
+        cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
       }
     }
   }
@@ -1714,21 +1851,16 @@ function findInteract() {
 }
 function lootAll(o) {
   let pickedUp = false;
-  const left = {};
-  Object.keys(o.loot).forEach(k => {
-    const q = o.loot[k];
-    if (k === '__tip') return;
-    if (k === 'money') { S.money += q; pickedUp = true; }
-    else if (WP[k] && !WP[k].melee && has(k)) left[k] = q;          // такой ствол уже есть — остаётся лежать
-    else { give(k, q); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); pickedUp = true; }
-  });
-  o.loot = left;
-  if (Object.keys(left).length) msg('Оставлено: такой ствол уже есть (' + Object.keys(left).map(k => ITEMS[k].n).join(', ') + ').', 'bad');
+  for (const id of Object.keys(o.loot)) {
+    if (id !== '__tip' && collectStock(o,id)) pickedUp = true;
+  }
+  if (Object.keys(o.loot).some(id=>ITEMS[id])) msg('Рюкзак заполнен. Остаток можно забрать позже.', 'bad');
   recordContents(o);
   if (pickedUp) play('pick');
 }
 function takeArt(a) {
-  give(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
+  const err=receiveError(a.id,1); if(err) { msg(err,'bad'); return; }
+  addPacked(a.id, 1); S.stats.art++; S.flags['art_' + a.key] = 1;
   arts.splice(arts.indexOf(a), 1);
   play('pick');
   news('Найден ' + ITEMS[a.id].n + '.');
@@ -2524,11 +2656,13 @@ function render() {
   // костёр
   for (const F of [FIRE, FIRE2]) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if ((o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
+    if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
-    if (o.k === 'body' && inView(o.x, o.y, 40)) drawBody(o);
+    if (o.k === 'body' && inView(o.x,o.y,48)) {
+      if(o.kind==='sack') drawGroundItems(o); else drawBody(o);
+    }
     if (o.k === 'barrier' && inView(o.x, o.y, o.w) && !drawBridgeGate(ctx, o)) {
       ctx.fillStyle = '#4b4a42'; ctx.fillRect(o.x - 6, o.y, 8, o.h); ctx.fillRect(o.x + o.w - 2, o.y, 8, o.h);
       ctx.save(); ctx.translate(o.x, o.y + o.h / 2); if (!o.solid) ctx.rotate(-1.35);
@@ -4590,7 +4724,7 @@ function dynSnapshot() {
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
-    sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, inv: e.traded ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, rescuedAt: e.rescuedAt
+    sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, inv: e.traded ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
   }));
 }
 function dynRestore() {
@@ -4618,7 +4752,7 @@ function dynRestore() {
     Object.assign(e, { uid: r.uid, x: r.x, y: r.y, hp: r.hp, maxhp: r.maxhp || e.maxhp, follow: r.follow, wait: r.wait, waitAt: r.waitAt, hireEnd: r.hireEnd, hirePaid: r.hirePaid,
       sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, ringPt: r.ringPt });
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
-    if (r.traded) { if (r.inv) e.inv = r.inv; if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; }
+    if (r.traded) { if (r.inv) e.inv = r.inv; if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; if(r.guns) e.guns=r.guns; }
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;
     if (e.follow) { e.sit = 0; e.trip = null; }
@@ -4798,6 +4932,7 @@ function itemCell(id, opt) {
   const c = el('button', 'icell' + (opt.sel ? ' sel' : '') + (opt.on ? ' on' : '') + (opt.dim ? ' dim' : ''));
   c.type = 'button';
   c.appendChild(itemIcon(id));
+  if (opt.price != null || opt.dim != null) c.appendChild(el('span','trade-label',itemName(id)));
   if (opt.q > 1) c.appendChild(el('span', 'bd', String(opt.q)));
   if (opt.price != null) c.appendChild(el('span', 'pr', opt.price + ''));
   const cd = opt.cond != null ? opt.cond : null;
@@ -4918,16 +5053,17 @@ function drawInv2() {
   // снаряжение
   const eq = el('div', 'inv-eq');
   { const who = el('div', 'tr-who'); who.appendChild(portraitFor(meCard())); const t = el('div'); t.appendChild(el('div', 'pn', 'Меченый')); t.appendChild(el('div', 'price', RANKS[rankOf(score())])); who.appendChild(t); eq.appendChild(who); }
-  const slot = (label, id, onTap) => { const s = el('div', 'slot'); s.appendChild(el('span', 'sl', label)); s.appendChild(id ? itemCell(id, { on: 1, cond: condOf(id), sel: panel.sel === id, fn: () => { panel.sel = id; refresh(); } }) : el('div', 'icell empty')); return s; };
+  const slot = (label, id, onTap) => { const s = el('div', 'slot'); s.appendChild(el('span', 'sl', label)); s.appendChild(id ? itemCell(id, { on: 1, cond: condOf(id), sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); return s; };
   eq.appendChild(slot('В руках', S.weapon));
   eq.appendChild(slot('Костюм', S.armor));
   const belt = el('div', 'slot beltslot'); belt.appendChild(el('span', 'sl', 'Пояс'));
   const br = el('div', 'beltrow');
-  for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; refresh(); } }) : el('div', 'icell empty')); }
+  for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); }
   belt.appendChild(br); eq.appendChild(belt);
   const wt = weight(), st = el('div', 'inv-stats');
-  const wb = el('div', 'wbar'); const wi = el('i'); wi.style.width = Math.min(100, wt / MAXW * 100) + '%'; if (wt > MAXW) wb.classList.add('over'); wb.appendChild(wi);
-  st.appendChild(el('div', 'ds', 'Вес ' + wt + ' / ' + MAXW + ' кг')); st.appendChild(wb);
+  const wb = el('div', 'wbar'); const wi = el('i'); wi.style.width = Math.min(100, wt / carryLimit() * 100) + '%'; if (wt > carryLimit()) wb.classList.add('over'); wb.appendChild(wi);
+  st.appendChild(el('div', 'ds', 'Вес ' + showKg(wt) + ' / ' + carryLimit() + ' кг')); st.appendChild(wb);
+  st.appendChild(el('div','ds','Пустой рюкзак · '+showKg(PACK_KG)+' кг'));
   st.appendChild(el('div', 'ds', 'Защита ' + Math.round(def() * 100) + '% · Радиация ' + Math.round(S.rad)));
   st.appendChild(el('div', 'ds', 'Сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '') + ' · ' + S.money + ' RU'));
   eq.appendChild(st);
@@ -4935,37 +5071,55 @@ function drawInv2() {
   // сетка
   const gw = el('div', 'inv-grid');
   const ids = ['knife'].concat(Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0));
-  const g = el('div', 'igrid');
-  ids.forEach(id => g.appendChild(itemCell(id, { q: id === 'knife' ? 1 : cnt(id), cond: condOf(id), sel: panel.sel === id, on: S.weapon === id || S.armor === id || beltCount(id) > 0, fn: () => { panel.sel = id; panel.hint = ''; refresh(); } })));
-  const pad = Math.max(0, 24 - ids.length); for (let i = 0; i < pad; i++) g.appendChild(el('div', 'icell empty'));
+  const used=packCells(S.inv);
+  gw.appendChild(el('h3','pack-heading','Рюкзак · '+used+' / '+PACK_CELLS+' ячеек'));
+  const g = el('div', 'igrid pack-grid');
+  for (const id of ids) {
+    const count=id==='knife'?1:cnt(id), stack=stackLimit(id);
+    for(let start=0;start<count;start+=stack) {
+      const selected=panel.sel===id && (panel.copy || 0)===start;
+      const cd=isGun(id)?Math.round(gunCopy(id,start).cond):null;
+      const cell=itemCell(id,{q:Math.min(count-start,stack),cond:cd,sel:selected,
+        on:(S.weapon===id || S.armor===id || beltCount(id)>0) && start===0,
+        fn:()=>{panel.sel=id; panel.copy=start; panel.hint=''; refresh();}});
+      cell.dataset.item=id;
+      const [w,h]=footprint(id);
+      cell.style.gridColumn='span '+w; cell.style.gridRow='span '+h;
+      cell.title=itemName(id)+(cd==null?'':' · '+cd+'%');
+      g.appendChild(cell);
+    }
+  }
+  for (let i=used;i<PACK_CELLS;i++) g.appendChild(el('div','icell empty'));
   gw.appendChild(g); box.appendChild(gw);
   // описание
   const dv = el('div', 'inv-detail');
-  const id = panel.sel;
+  const id = panel.sel, copy=Math.min(panel.copy || 0,Math.max(0,cnt(id)-1));
   if (!id || (id !== 'knife' && !has(id))) dv.appendChild(el('p', 'note', 'Выбери вещь. Артефакты вешаются на пояс, до трёх штук. Оружие в руках меняется по кругу кнопкой на HUD.'));
   else {
     const it = id === 'knife' ? { n: 'Нож', w: 0.3 } : ITEMS[id];
-    dv.appendChild(el('div', 'nm', it.n + (cnt(id) > 1 ? ' ×' + cnt(id) : '')));
+    dv.appendChild(el('div', 'nm', it.n + (isGun(id) && cnt(id)>1?' · '+(copy+1)+' из '+cnt(id):'')));
     const rows = el('div', 'cmp');
     const line = (k, v, d) => { const r = el('div', 'cr'); r.appendChild(el('span', 'ck', k)); r.appendChild(el('span', 'cv', v)); if (d) r.appendChild(el('span', 'cd ' + (d > 0 ? 'up' : 'dn'), (d > 0 ? '+' : '') + d)); rows.appendChild(r); };
     if (WP[id]) {
-      const W = WP[id], C = WP[S.weapon], same = S.weapon === id;
+      const W = WP[id], C = WP[S.weapon], same = S.weapon === id && !copy;
       line('Урон', W.dmg + (W.pellets ? '×' + W.pellets : ''), same ? 0 : Math.round(W.dmg * (W.pellets || 1) - C.dmg * (C.pellets || 1)));
-      if (!W.melee) { line('Магазин', W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', condOf(id) + '%'); }
+      if (isGun(id)) { line('Магазин', gunCopy(id,copy).mag+' / '+W.mag, same || C.melee ? 0 : W.mag - C.mag); line('Дальность', W.range, same || C.melee ? 0 : W.range - C.range); line('Состояние', Math.round(gunCopy(id,copy).cond)+'%'); }
       if (!same) rows.appendChild(el('div', 'ds lite', 'Сравнение с тем, что в руках: ' + itemName(S.weapon)));
     } else if (it.armor) {
+      line('Предел веса',carryLimit(id)+' кг');
       const cur = ITEMS[S.armor] ? ITEMS[S.armor].armor : 0;
       line('Защита', Math.round(it.armor * 100) + '%', S.armor === id ? 0 : Math.round((it.armor - cur) * 100));
     }
     if (FOOD[id]) line('Сытость', '+' + FOOD[id]);
     if (it.heal) line('Лечение', '+' + it.heal);
     if (ARTFX[id]) rows.appendChild(el('div', 'ds', ARTFX[id]));
-    line('Вес', (Math.round(itemW(id) * Math.max(1, cnt(id)) * 100) / 100) + ' кг');
+    line('Вес предмета', showKg(itemW(id)+(isGun(id)?loadedMass(id,gunCopy(id,copy)):0))+' кг');
+    line('Размер',footprint(id).join(' × '));
     dv.appendChild(rows);
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
-    if (WP[id] && S.weapon !== id) row.appendChild(btn('go', 'Взять в руки', () => { setWeapon(id); refresh(); }));
-    if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { S.armor = id; refresh(); }));
+    if (WP[id] && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{ if(isGun(id)) selectGun(id,copy); else setWeapon(id); panel.copy=0; refresh(); }));
+    if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
     if (it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
       if (beltCount(id)) S.belt.splice(S.belt.indexOf(id), 1);
@@ -4973,11 +5127,12 @@ function drawInv2() {
       else S.belt.push(id);
       refresh();
     }));
-    if (id !== 'knife' && !it.quest && S.armor !== id && S.weapon !== id) row.appendChild(btn('wide', 'Выбросить', () => {
-      const q = cnt(id); take(id, q); S.belt = S.belt.filter(b => b !== id);
-      const wc = condOf(id); objs.push({ k: 'body', kind: 'sack', x: P.x + rnd(-6, 6), y: P.y + 12, ang: 0, fac: 'loner', name: 'Рюкзак', seed: 1, loot: { [id]: q }, wcond: wc != null ? { [id]: wc } : null, t: S.min });
-      if (WP[id]) { delete S.cond[id]; delete S.mag[id]; }
-      panel.sel = null; refresh();
+    if (id !== 'knife' && !it.quest && (id!==S.armor || copy) && (id!==S.weapon || copy) && cnt(id)>beltCount(id)) row.appendChild(btn('wide','Выбросить',()=>{
+      const q=isGun(id)||it.armor?1:Math.min(stackLimit(id),cnt(id)-beltCount(id));
+      const gun=removePacked(id,q,copy);
+      const sack={k:'body',kind:'sack',x:P.x,y:P.y,ang:0,fac:'loner',name:'Рюкзак',seed:1,loot:{},t:S.min,scatterStart:performance.now()};
+      putStock(sack,id,q,gun); objs.push(sack); groundItems(sack);
+      panel.sel=null; panel.copy=0; refresh();
     }));
     dv.appendChild(row);
   }
@@ -4996,12 +5151,25 @@ function stockCond(e, id) {
   e.wcond = e.wcond || {}; if (e.wcond[id] == null) e.wcond[id] = ri(55, 85); return e.wcond[id];
 }
 function tradeStock(e) {
-  const one = id => (ITEMS[id].weapon || ITEMS[id].armor) && has(id);   // один ствол/костюм каждого типа: экземпляры не объединяются
-  if (e) return Object.keys(e.inv).filter(id => e.inv[id] > 0).map(id => ({ id: id, q: 1, p: Math.ceil(ITEMS[id].price * (S.rep >= 20 ? 1.1 : 1.3)), c: one(id) ? 0 : e.inv[id], cond: stockCond(e, id) }));
-  return STOCK.map(s => Object.assign({ c: (ITEMS[s.id].weapon || ITEMS[s.id].armor) ? (has(s.id) ? 0 : 1) : 99, cond: stockCond(null, s.id) }, s));
+  if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
+    id,q:1,p:Math.ceil((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
+  }));
+  return STOCK.map(s=>({...s,c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }
-function tradePrice(id, e) { const c = condOf(id); return Math.max(1, Math.floor(sellPrice(id, !!e) * (c != null ? Math.max(0.3, c / 100) : 1))); }
+function vendorGun(e,id,offset) {
+  return e?.guns?.[id]?.at(-1-offset) || {cond:stockCond(e,id),mag:0};
+}
+function tradePrice(id,e,offset=0) {
+  const c=isGun(id)?gunCopy(id,Math.max(0,cnt(id)-1-offset)).cond:null;
+  return Math.max(1,Math.floor(sellPrice(id,!!e)*(c==null?1:Math.max(.3,c/100))));
+}
+function saleTotal(id,q,e) {
+  if (!isGun(id)) return tradePrice(id,e)*q;
+  let sum=0; for(let i=0;i<q;i++) sum+=tradePrice(id,e,i);
+  return sum;
+}
 /* почему вещь нельзя продать сейчас — короткий знак на ячейке вместо затемнения до черноты */
 function sellWhy(id, e, o) {
   const it = ITEMS[id]; if (!it) return null;
@@ -5010,30 +5178,40 @@ function sellWhy(id, e, o) {
   if (id === S.weapon && WP[id] && !WP[id].melee) return 'в руках';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
-  if (e && (it.weapon || it.armor)) return 'не берёт';
+  if (e && it.armor) return 'не берёт';
   return null;
 }
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
-  if (e && (it.weapon || it.armor)) return 0;
+  if (e && it.armor) return 0;
   let n = cnt(id) - beltCount(id);
   if (id === S.armor) n -= 1;
-  if (id === S.weapon && WP[id] && !WP[id].melee && cnt(id) <= 1) n -= 1;
+  if (id === S.weapon && WP[id] && !WP[id].melee) n -= 1;
   return Math.max(0, n);
 }
 function offerSum(e) {
   const o = panel.offer, st = tradeStock(e);
-  let buy = 0, sell = 0, w = 0;
-  Object.entries(o.buy).forEach(([id, n]) => { const s = st.find(x => x.id === id); if (s) { buy += s.p * n; w += itemW(id) * s.q * n; } });
-  Object.entries(o.sell).forEach(([id, n]) => { const u = ITEMS[id].ammo ? 10 : 1; sell += tradePrice(id, e) * Math.min(n * u, cnt(id)); w -= itemW(id) * Math.min(n * u, cnt(id)); });
-  return { buy: buy, sell: sell, net: sell - buy, wAfter: Math.round((weight() + w) * 10) / 10 };
+  let buy=0,sell=0,kg=weight();
+  const inv={...S.inv};
+  for(const [id,n] of Object.entries(o.sell)) {
+    const q=Math.min(n*(ITEMS[id].ammo?10:1),cnt(id));
+    sell+=saleTotal(id,q,e); inv[id]=cnt(id)-q; kg-=itemW(id)*q;
+    if(isGun(id)) for(let i=0;i<q;i++) kg-=loadedMass(id,gunCopy(id,cnt(id)-1-i));
+  }
+  for(const [id,n] of Object.entries(o.buy)) {
+    const s=st.find(x=>x.id===id); if(!s) continue;
+    const q=s.q*n; buy+=s.p*n; inv[id]=(inv[id] || 0)+q; kg+=itemW(id)*q;
+    if(isGun(id)) for(let i=0;i<n;i++) kg+=loadedMass(id,vendorGun(e,id,i));
+  }
+  return {buy,sell,net:sell-buy,wAfter:Math.round(kg*1000)/1000,cells:packCells(inv)};
+
 }
 function tradeCheck(e) {
   const o = panel.offer, st = tradeStock(e), sm = offerSum(e);
   if (!Object.keys(o.buy).length && !Object.keys(o.sell).length) return 'Предложение пустое.';
   for (const [id, n] of Object.entries(o.buy)) { const s = st.find(x => x.id === id); if (!s || s.c < n) return 'У торговца нет столько: ' + itemName(id) + '.'; }
   for (const [id, n] of Object.entries(o.sell)) {
-    const u = ITEMS[id].ammo ? 10 : 1; if (sellable(id, e) >= Math.min(n * u, cnt(id)) && cnt(id) > 0) continue;
+    const u = ITEMS[id].ammo ? 10 : 1; if (n <= Math.ceil(sellable(id,e)/u)) continue;
     if (cnt(id) <= 0) return 'У тебя больше нет: ' + itemName(id) + '.';
     if (id === S.weapon) return itemName(id) + ' в руках: сначала возьми другое оружие.';
     if (id === S.armor) return itemName(id) + ' надет: сначала сними.';
@@ -5042,25 +5220,36 @@ function tradeCheck(e) {
   }
   if (sm.net < 0 && S.money < -sm.net) return 'Не хватает ' + (-sm.net - S.money) + ' RU.';
   if (sm.net > 0 && e && e.money < sm.net) return 'У него не хватает денег: есть ' + e.money + ' RU.';
-  if (sm.wAfter > MAXW * 1.6) return 'Столько не унести: будет ' + sm.wAfter + ' кг.';
+  if (Object.keys(o.buy).length) return capacityError(sm.wAfter,sm.cells);
   return '';
 }
 function tradeDo(e) {
   const err = tradeCheck(e); if (err) { panel.hint = err; refresh(); return; }
   const o = panel.offer, st = tradeStock(e), sm = offerSum(e);
-  Object.entries(o.sell).forEach(([id, n]) => {
-    const u = ITEMS[id].ammo ? 10 : 1, q = Math.min(n * u, cnt(id)), c = condOf(id);
-    take(id, q); if (e) { e.inv[id] = (e.inv[id] || 0) + q; if (c != null) { e.wcond = e.wcond || {}; e.wcond[id] = c; } }
-    if (WP[id] && !cnt(id)) { delete S.cond[id]; delete S.mag[id]; }      // проданный ствол уносит своё состояние и патроны в магазине
-  });
-  Object.entries(o.buy).forEach(([id, n]) => {
-    const s = st.find(x => x.id === id); give(id, s.q * n);
-    if (WP[id] && !WP[id].melee) { S.cond[id] = s.cond; S.mag[id] = 0; }  // купленный ствол: состояние продавца, магазин пустой
-    if (e) { e.inv[id] -= n; if (e.inv[id] <= 0) { delete e.inv[id]; if (e.wcond) delete e.wcond[id]; } }
-  });
+  // Забираем оплаченный товар из прежнего запаса до пополнения товарами игрока.
+  const incoming={loot:{},guns:{}};
+  for(const [id,n] of Object.entries(o.buy)) {
+    const q=st.find(s=>s.id===id).q*n;
+    if(isGun(id)) for(let i=0;i<q;i++) {
+      putStock(incoming,id,1,vendorGun(e,id,0)); e?.guns?.[id]?.pop();
+    } else putStock(incoming,id,q);
+    if(e) { e.inv[id]-=q; if(!e.inv[id]) delete e.inv[id]; }
+  }
+  for(const [id,n] of Object.entries(o.sell)) {
+    const q=Math.min(n*(ITEMS[id].ammo?10:1),cnt(id));
+    if (isGun(id)) for(let i=0;i<q;i++) {
+      const gun=removePacked(id);
+      if(e) ((e.guns ||= {})[id] ||= []).push(gun);
+    } else take(id,q);
+    if(e) e.inv[id]=(e.inv[id] || 0)+q;
+  }
+  for(const [id,q] of Object.entries(incoming.loot)) {
+    if (isGun(id)) for(const gun of incoming.guns[id]) addPacked(id,1,gun);
+    else addPacked(id,q);
+  }
   S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1;   // инвентарь и деньги этого NPC теперь сохраняются
   panel.offer = { buy: {}, sell: {} }; play('pick');
-  panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.' + (sm.wAfter > MAXW ? ' Перегруз: ' + sm.wAfter + ' кг.' : '');
+  panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.';
   refresh();
 }
 function drawTrade2() {
@@ -5071,24 +5260,24 @@ function drawTrade2() {
   const box = el('div', 'trade2' + (panel.side === 'mine' ? ' show-mine' : ' show-their'));
   // шапка: портреты и переключатель для узкого экрана
   const head = el('div', 'tr-head');
-  const me = el('div', 'tr-who'); me.appendChild(portraitFor(meCard())); const mt = el('div'); mt.appendChild(el('div', 'pn', 'Меченый')); mt.appendChild(el('div', 'price', S.money + ' RU')); me.appendChild(mt); head.appendChild(me);
+  const me = el('div', 'tr-who'); me.appendChild(portraitFor(meCard())); const mt = el('div'); mt.appendChild(el('div', 'pn', 'Меченый')); mt.appendChild(el('div', 'price', S.money + ' RU')); me.appendChild(mt);
   const sw = el('div', 'tr-switch');
   sw.appendChild(btn('chip' + (panel.side === 'mine' ? ' on' : ''), 'Мои вещи', () => { panel.side = 'mine'; refresh(); }));
   sw.appendChild(btn('chip' + (panel.side === 'their' ? ' on' : ''), 'Торговец', () => { panel.side = 'their'; refresh(); }));
   head.appendChild(sw);
-  const th = el('div', 'tr-who r'); const c = e ? cardOf(e) : SIDCARD(); const tt = el('div'); tt.appendChild(el('div', 'pn', c.n)); tt.appendChild(el('div', 'price', e ? e.money + ' RU' : 'касса без дна')); th.appendChild(tt); th.appendChild(portraitFor(c)); head.appendChild(th);
+  const th = el('div', 'tr-who r'); const c = e ? cardOf(e) : SIDCARD(); const tt = el('div'); tt.appendChild(el('div', 'pn', c.n)); tt.appendChild(el('div', 'price', e ? e.money + ' RU' : 'Торговец')); th.appendChild(tt); th.appendChild(portraitFor(c));
   box.appendChild(head);
   // мои вещи
-  const mine = el('div', 'tr-col mine'); mine.appendChild(el('h3', 'h3', 'Мои вещи · продать'));
+  const mine = el('div', 'tr-col mine'); mine.appendChild(me); mine.appendChild(el('h3', 'h3', 'Мой рюкзак · продажа'));
   const gm = el('div', 'igrid');
   Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0).forEach(id => {
     const left = sellable(id, e) - (o.sell[id] || 0) * (ITEMS[id].ammo ? 10 : 1);
-    gm.appendChild(itemCell(id, { q: cnt(id), cond: condOf(id), price: sellable(id, e) ? tradePrice(id, e) * sellUnit(id) : null, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : sellWhy(id, e, o),
+    gm.appendChild(itemCell(id, { q: cnt(id), cond: isGun(id)?Math.round(gunCopy(id,Math.max(0,cnt(id)-1-(o.sell[id] || 0))).cond):null, price: sellable(id, e) ? tradePrice(id, e,o.sell[id] || 0) * sellUnit(id) : null, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : sellWhy(id, e, o),
       fn: () => { o.sell[id] = (o.sell[id] || 0) + 1; panel.hint = ''; refresh(); } }));
   });
   mine.appendChild(gm);
   // товар торговца
-  const their = el('div', 'tr-col their'); their.appendChild(el('h3', 'h3', 'Товар · купить'));
+  const their = el('div', 'tr-col their'); their.appendChild(th); their.appendChild(el('h3', 'h3', 'Товары · покупка'));
   const gt = el('div', 'igrid');
   if (!st.length) their.appendChild(el('p', 'note', 'Ему нечего продать.'));
   st.forEach(s => { const left = s.c - (o.buy[s.id] || 0); gt.appendChild(itemCell(s.id, { q: s.q > 1 ? s.q : (e ? s.c : 0), price: s.p, cond: s.cond, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : (o.buy[s.id] ? 'в корз.' : has(s.id) ? 'есть' : 'нет'), fn: () => { o.buy[s.id] = (o.buy[s.id] || 0) + 1; panel.hint = ''; refresh(); } })); });
@@ -5097,10 +5286,10 @@ function drawTrade2() {
   const cart = el('div', 'tr-cart');
   const lineFor = (side, id, n) => {
     const s = side === 'buy' ? st.find(x => x.id === id) : null;
-    const q = side === 'buy' ? s.q * n : Math.min(n * (ITEMS[id].ammo ? 10 : 1), cnt(id));
-    const p = side === 'buy' ? s.p * n : tradePrice(id, e) * q;
+    const q = side === 'buy' ? (s?.q || 1) * n : Math.min(n * (ITEMS[id].ammo ? 10 : 1), cnt(id));
+    const p = side === 'buy' ? (s?.p || 0) * n : saleTotal(id,q,e);
     const b = btn('cline ' + side, '', () => { o[side][id]--; if (o[side][id] <= 0) delete o[side][id]; refresh(); });
-    const cd = side === 'buy' ? s.cond : condOf(id);
+    const cd = side === 'buy' ? s?.cond : (isGun(id)&&n===1?Math.round(gunCopy(id,cnt(id)-1).cond):null);
     b.appendChild(itemIcon(id)); b.appendChild(el('span', 'cn', itemName(id) + (q > 1 ? ' ×' + q : '') + (cd != null ? ' · ' + cd + '%' : ''))); b.appendChild(el('span', 'cp', (side === 'buy' ? '−' : '+') + p)); b.setAttribute('aria-label', 'Убрать из сделки: ' + itemName(id));
     return b;
   };
@@ -5110,8 +5299,8 @@ function drawTrade2() {
   const tot = el('div', 'tr-total');
   const err = tradeCheck(e);
   tot.appendChild(el('div', 'tsum', 'Отдаю ' + sm.sell + ' · беру ' + sm.buy));
-  tot.appendChild(el('div', 'tnet ' + (sm.net >= 0 ? 'plus' : 'minus'), sm.net >= 0 ? 'Тебе доплатят: ' + sm.net + ' RU' : 'Доплата: ' + (-sm.net) + ' RU'));
-  tot.appendChild(el('div', 'twt' + (sm.wAfter > MAXW ? ' over' : ''), 'Вес после: ' + sm.wAfter + ' / ' + MAXW + ' кг'));
+  tot.appendChild(el('div', 'tnet ' + (sm.net >= 0 ? 'plus' : 'minus'), sm.net===0?(sm.buy||sm.sell?'Равный обмен':'Сделка не выбрана'):sm.net>0?'К получению: '+sm.net+' RU':'Доплата: '+(-sm.net)+' RU'));
+  tot.appendChild(el('div', 'twt' + (sm.wAfter > carryLimit() ? ' over' : ''), 'Вес после: ' + showKg(sm.wAfter) + ' / ' + carryLimit() + ' кг'));
   const acts = el('div', 'tr-acts');
   acts.appendChild(btn('chip', 'Сбросить', () => { panel.offer = { buy: {}, sell: {} }; panel.hint = ''; refresh(); }, !Object.keys(o.buy).length && !Object.keys(o.sell).length));
   acts.appendChild(btn('go deal', 'Подтвердить', () => tradeDo(e), !!err));
@@ -5136,6 +5325,54 @@ function markScroll(list) {
     const upd = () => n.classList.toggle('more', n.scrollHeight - n.clientHeight - n.scrollTop > 6);
     upd(); n.addEventListener('scroll', upd, { passive: true });
   }));
+}
+function drawLocker() {
+  const stock=personalStock(), shell=el('div','locker-panel');
+  shell.appendChild(el('p','locker-status','Вес рюкзака · '+showKg(weight())+' / '+carryLimit()+' кг · '+packCells(S.inv)+' / '+PACK_CELLS+' ячеек. Один ящик для обеих баз.'));
+  const sides=el('div','locker-sides');
+  function side(deposit) {
+    const col=el('section','locker-side '+(deposit?'mine':'their'));
+    col.appendChild(el('h3','pack-heading',deposit?'Мой рюкзак':'Личный ящик'));
+    const contents=deposit?S.inv:stock.loot;
+    let rows=0;
+    for(const [id,count] of Object.entries(contents)) {
+      if (!ITEMS[id] || count<=0) continue;
+      const total=isGun(id)?count:1;
+      for(let i=0;i<total;i++) {
+        const gun=isGun(id)?(deposit?gunCopy(id,i):stock.guns[id]?.[i] || {cond:80,mag:0}):null;
+        const available=deposit?sellable(id,null):count;
+        const fixed=deposit && (available<=0 || (isGun(id) && id===S.weapon && i===0));
+        const row=el('div','locker-row');
+        row.appendChild(itemIcon(id));
+        const label=el('div','locker-item',itemName(id));
+        label.appendChild(el('small','',gun?Math.round(gun.cond)+'% · '+gun.mag+' патр.':count+' шт. · '+showKg(itemW(id))+' кг/шт.'));
+        row.appendChild(label);
+        const action=deposit?'Положить':'Забрать';
+        const move=n=>{
+          let moved=0;
+          if(deposit) {
+            if(fixed || n>sellable(id,null)) return;
+            const copy=removePacked(id,n,i); putStock(stock,id,n,copy); moved=n;
+          } else if(gun) {
+            if(receiveError(id,1,gun)) return;
+            stock.guns[id]?.splice(i,1); if(--stock.loot[id]===0) {delete stock.loot[id];delete stock.guns[id];}
+            addPacked(id,1,gun); moved=1;
+          } else moved=collectStock(stock,id,n);
+          panel.hint=(deposit?'В ящик: ':'В рюкзак: ')+itemName(id)+' ×'+moved+'.';
+          if(!save(true)) panel.hint+=' Не удалось записать сохранение.';
+          refresh();
+        };
+        const err=deposit?'':receiveError(id,1,gun);
+        const one=btn('chip',fixed?'При себе':err?'Не влезает':action,()=>move(1),fixed||!!err);
+        if(err) one.title=err; row.appendChild(one);
+        if(!gun && available>1) row.appendChild(btn('chip','×'+available,()=>move(available),fixed||!!err));
+        col.appendChild(row); rows++;
+      }
+    }
+    if(!rows) col.appendChild(el('p','note',deposit?'Рюкзак пуст.':'Ящик пуст.'));
+    return col;
+  }
+  sides.append(side(true),side(false)); shell.appendChild(sides); pbody.appendChild(shell);
 }
 
 /* ===================== набор спрайтов B1 (пробный, статичный) =====================
@@ -5242,7 +5479,8 @@ function drawPick(o) {   // растр G4 (gg7.js: g7Pick); ниже — пре�
   ctx.restore();
 }
 function pickUp(o) {
-  give(o.pick, 1); S.flags['pk_' + o.pick] = 1;
+  const err=receiveError(o.pick,1); if(err) { msg(err,'bad'); return; }
+  addPacked(o.pick, 1); S.flags['pk_' + o.pick] = 1;
   const i = objs.indexOf(o); if (i >= 0) objs.splice(i, 1);
   play('pick');
   const q = q5();
@@ -5268,9 +5506,9 @@ function wolfRC1Opts() {
 }
 /* верстак после генератора: ремонт до 70%, оплата за каждый процент */
 function benchOpts() {
-  const worn = WORDER.filter(w => w !== 'knife' && !WP[w].toss && has(w) && (S.cond[w] == null ? 80 : S.cond[w]) < 70);
-  const cost = worn.reduce((s, w) => s + Math.ceil((70 - (S.cond[w] == null ? 80 : S.cond[w])) * 6), 0);
-  return worn.length ? [{ t: 'Подлатать оружие до 70% · ' + cost + ' RU', k: 'key', d: S.money < cost, fn: () => { S.money -= cost; worn.forEach(w => S.cond[w] = 70); sys('Оружие подлатано до 70%. Полный ремонт — у Сидоровича.'); } }]
+  const worn=gunsBelow(70);
+  const cost=worn.reduce((sum,gun)=>sum+Math.ceil((70-gun.cond)*6),0);
+  return worn.length ? [{ t: 'Подлатать оружие до 70% · ' + cost + ' RU', k: 'key', d: S.money < cost, fn: () => { S.money -= cost; repairCopies(worn,70); sys('Оружие подлатано до 70%. Полный ремонт — у Сидоровича.'); } }]
     : [{ t: 'Оружие в порядке (выше 70%) — верстаку делать нечего', d: true, fn: () => {} }];
 }
 function gensetUse() {
@@ -6450,8 +6688,24 @@ function placeSearchContainers(){
       placed=true; break;
     }
   }
+  // Оба костра существуют до первого задания. Выбираем свободную обочину у каждого.
+  for (const base of ['village','camp']) {
+    const fire=locPt(base,'fire'), cx=Math.floor(fire.x/T)+2, cy=Math.floor(fire.y/T)-1;
+    let placed=false;
+    for(let r=0;r<=5 && !placed;r++) for(let dy=-r;dy<=r && !placed;dy++) for(let dx=-r;dx<=r;dx++) {
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const tx=cx+dx,ty=cy+dy,x=(tx+.5)*T,y=(ty+.5)*T;
+      if(![[0,0],[1,0],[-1,0],[0,-1],[0,1]].every(([i,j])=>nav[(ty+j)*MW+tx+i])) continue;
+      if(HOUSES.some(h=>x>(h.x-1)*T && x<(h.x+h.w+1)*T && y>(h.y-1)*T && y<(h.y+h.h+1)*T)) continue;
+      if(NPCDEF.some(n=>Math.hypot(x-n.x*T,y-n.y*T)<36)) continue;
+      addObj({k:'locker',baseName:LOC[base].name,x:x-13,y:y-9,w:26,h:18,solid:true});
+      placed=true; break;
+    }
+  }
+
 }
 function restoreContainer(o){
+  o.scatterStart = null;
   if(!o.initialLoot) o.initialLoot={...o.loot};
   o.looted=!!S.flags['st_'+o.stash];
   o.loot=o.looted?{}:{...(S.flags['contents_'+o.stash]||o.initialLoot)};
@@ -6478,7 +6732,7 @@ function breakCrate(o){
   if(o.broken || o.k!=='crate' || !o.stash) return;
   if(o.fieldTile != null) breakFieldBox(o);
   else S.flags['broken_'+o.stash]=1;
-  o.broken=true; o.solid=false; scheduleCrateCleanup(o); buildGrids();
+  o.broken=true; o.solid=false; scheduleCrateCleanup(o); buildGrids(); groundItems(o); o.scatterStart=performance.now();
   play('hit',o.x,o.y);
   for(let i=0;i<8;i++) parts.push({x:o.x+o.w/2,y:o.y+o.h/2,vx:rnd(-50,50),vy:rnd(-45,45),life:rnd(.15,.4),c:i%2?'#947349':'#59402a',s:2});
 }
@@ -6497,6 +6751,7 @@ function scheduleCrateCleanup(o) {
 function clearCrateRemains(index) {
   const o = objs[index];
   if (G.near?.o === o) G.near = null;
+  forgetGroundItems(o);
   o.loot = {}; o.looted = true;
   objs.splice(index, 1);
   if (o.fieldTile != null) {
@@ -6547,6 +6802,105 @@ function containerOnRay(sh,ca,sa,limit){
   }
   return {o,d};
 }
+// Количество хранится в обычном loot. План запоминает место каждой отдельной вещи.
+const GROUND_REACH = 34;
+const groundBundle = id => id === 'money' || ITEMS[id]?.ammo;
+function scatterGroundItems(o) {
+  const ids=[];
+  for (const [id,count] of Object.entries(o.loot)) {
+    for (let i=0;i<(groundBundle(id)?1:count);i++) ids.push(id);
+  }
+  const cx=o.x+(o.w||0)/2, cy=o.y+(o.h||0)/2;
+  const turn=hash2(cx,cy)*Math.PI*2, drops=[], occupied=[];
+  for(const other of objs) {
+    if (other===o || Math.hypot(other.x-cx,other.y-cy)>110) continue;
+    const existing=other.groundItems || (other.broken && S.flags.groundItems?.[other.stash]);
+    if(existing) for(const item of existing) occupied.push(groundPosition(other,item));
+  }
+  for (const [i,id] of ids.entries()) {
+    let best=null, score=-Infinity;
+    const reach=22+Math.round(hash2(cx+i+7,cy)*6);
+    candidates: for (const radius of [reach,34,16,8,0]) for (let j=0;j<12;j++) {
+      const a=turn+2*Math.PI*(i/ids.length+j/12);
+      const x=Math.round(cx+Math.cos(a)*radius), y=Math.round(cy+Math.sin(a)*radius);
+      const probe={x,y,r:11}; collide(probe);
+      if (Math.hypot(probe.x-x,probe.y-y)>.1 || !los(cx,cy,x,y)) continue;
+      const spacing=occupied.reduce((gap,p)=>Math.min(gap,Math.hypot(x-p.x,y-p.y)),40);
+      const value=Math.min(spacing,25)-.14*Math.abs(radius-reach)-j*.03;
+      if (value>score) { best={id,dx:x-cx,dy:y-cy}; score=value; }
+      if (value===25) break candidates;
+    }
+    const drop=best || {id,dx:0,dy:0};
+    drops.push(drop); occupied.push(groundPosition(o,drop));
+  }
+  return drops;
+}
+function groundItems(o) {
+  if (o.kind==='sack') return o.groundItems ||= scatterGroundItems(o);
+  const layouts=S.flags.groundItems ||= {};
+  return layouts[o.stash] ||= scatterGroundItems(o);
+}
+function forgetGroundItems(o) {
+  const layouts=S.flags.groundItems;
+  if (layouts && o.stash) {
+    delete layouts[o.stash];
+    if (!Object.keys(layouts).length) delete S.flags.groundItems;
+  }
+}
+function groundPosition(o,drop) {
+  return {x:o.x+(o.w||0)/2+drop.dx, y:o.y+(o.h||0)/2+drop.dy};
+}
+function nearbyGroundItems(o,cand) {
+  if (Math.hypot(P.x-o.x-(o.w||0)/2,P.y-o.y-(o.h||0)/2)>GROUND_REACH+35) return;
+  for(const drop of groundItems(o)) {
+    const {x,y}=groundPosition(o,drop), d=dst(P.x,P.y,x,y);
+    if(d>GROUND_REACH || !los(P.x,P.y,x,y)) continue;
+    const id=drop.id, count=o.loot[id];
+    const name=id==='money'?count+' RU':ITEMS[id].n+(groundBundle(id)?' ×'+count:'');
+    cand(d,{k:'groundItem',o,drop,label:'Подобрать: '+name});
+  }
+}
+function pickGroundItem({o,drop}) {
+  const id=drop.id, {x,y}=groundPosition(o,drop);
+  if (!objs.includes(o) || !o.loot[id] || dst(P.x,P.y,x,y)>GROUND_REACH || !los(P.x,P.y,x,y)) return;
+  const drops=groundItems(o), index=drops.indexOf(drop);
+  if (index<0) return;
+  const moved=collectStock(o,id,groundBundle(id)?o.loot[id]:1);
+  if (!moved) { msg(receiveError(id,1,lootGun(o,id)),'bad'); return; }
+  if (!groundBundle(id) || !o.loot[id]) drops.splice(index,1);
+  if (o.stash) recordContents(o);
+  if (!drops.length) {
+    if (o.kind==='sack') objs.splice(objs.indexOf(o),1);
+    else forgetGroundItems(o);
+  }
+  play('pick'); G.near=findInteract();
+}
+function drawGroundItems(o) {
+  if (o.looted || !Object.keys(o.loot).length) return;
+  const flight=o.scatterStart==null?1:clamp((performance.now()-o.scatterStart)/240,0,1);
+  const remaining=(1-flight)**2;
+  for(const drop of groundItems(o)) {
+    const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop), frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
+    ctx.save(); ctx.translate(x-dx*remaining,y-dy*remaining-5*Math.sin(Math.PI*flight));
+    if (G.near?.drop===drop) {
+      ctx.strokeStyle='rgba(234,207,143,.85)'; ctx.lineWidth=1.2; ctx.beginPath();
+      for (const sx of [-1,1]) for(const sy of [-1,1]) {
+        ctx.moveTo(sx*8,sy*11); ctx.lineTo(sx*12,sy*11); ctx.lineTo(sx*12,sy*7);
+      }
+      ctx.stroke();
+    }
+    if(im) {
+      const scale=(isGun(id)?30:22)/Math.max(im.naturalWidth,im.naturalHeight);
+      const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+      ctx.drawImage(im,-w/2,-h/2,w,h);
+    } else {
+      ctx.fillStyle=id==='money'?'#83816a':'#ada389'; ctx.fillRect(-5,-3,10,6);
+      ctx.fillStyle='#534b39'; ctx.fillRect(-1,-3,2,6);
+    }
+    ctx.restore();
+  }
+}
+
 function containerDraw(o){
   const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
   g.save(); g.translate(x,y);
@@ -6555,17 +6909,12 @@ function containerDraw(o){
       g.save();g.translate(dx,dy);g.rotate(angle);g.fillStyle='#32291f';g.fillRect(-len/2,-2,len,5);
       g.fillStyle='#806343';g.fillRect(-len/2,-2,len-1,2);g.restore();
     }
-    Object.keys(o.loot).forEach((id,i)=>{
-      const drops=[[15,-4],[5,13],[-13,6],[-4,-13]];
-      const [px,py]=drops[i%drops.length];
-      const frame=G3.pack?.manifest.items?.[id], im=frame && packImage(frame.file);
-      if(im){
-        const scale=15/Math.max(im.naturalWidth,im.naturalHeight);
-        const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
-        g.drawImage(im,px-w/2,py-h/2,w,h);
-      }
-      else {g.fillStyle=id==='money'?'#83816a':'#ada389';g.fillRect(px-4,py-3,8,6);g.fillStyle='#534b39';g.fillRect(px-1,py-3,2,6);}
-    });
+  }else if(o.k==='locker'){
+    if(ART) ART.draw(g,C1?'c1_crate_army':'crate',0,0,29,22);
+    else {g.fillStyle='#63624b';g.fillRect(-13,-9,26,18);}
+    g.fillStyle='#365856';g.fillRect(-5,-5,10,9);
+    g.strokeStyle='#c1d2bd';g.lineWidth=1;g.strokeRect(-3.5,-3,7,5);
+    g.fillStyle='#cad8c1';g.fillRect(-1,-1.5,2,2);
   }else if(o.k==='safe'){
     g.fillStyle='#242522';g.fillRect(-11,-8,23,19);
     const metal=g.createLinearGradient(0,-9,0,8);metal.addColorStop(0,'#76766a');metal.addColorStop(1,'#41433c');
@@ -6575,6 +6924,7 @@ function containerDraw(o){
   }else if(ART){ART.draw(g,'stash',0,0,22,18);}
   else{g.fillStyle='#55513a';g.fillRect(-10,-6,20,12);g.fillStyle='#322d21';g.fillRect(-8,-1,16,2);}
   g.restore();
+  if(o.k==='crate') drawGroundItems(o);
 }
 
 // Оставляем персонажа как можно ближе к его исходному месту у костра или поста.
@@ -6903,7 +7253,7 @@ function refresh() {
   const top = pbody.scrollTop;
   pbody.textContent = '';
   if (panel.hint) pbody.appendChild(el('p', 'hint', panel.hint));
-  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
+  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
   pbody.scrollTop = top;
 }
 
@@ -6976,7 +7326,12 @@ function robNpc(e) {
   if (chance(p) && !crowd) {
     const got = [];
     if (e.money) { S.money += e.money; got.push(e.money + ' RU'); e.money = 0; }
-    Object.keys(e.inv).forEach(k => { give(k, e.inv[k]); got.push(ITEMS[k].n); }); e.inv = {};
+    const pockets={loot:e.inv,guns:e.guns,wcond:e.wcond};
+    for(const id of Object.keys(e.inv)) {
+      const n=collectStock(pockets,id);
+      if(n) got.push(ITEMS[id].n+' ×'+n);
+    }
+    e.traded=1;
     e.robbed = 1;
     say('Ладно, ладно! Подавись. Зона всё видит, Меченый.');
     sys(got.length ? 'Отобрано: ' + got.join(', ') + '. Одиночки об этом узнают.' : 'У него ничего не было. Одиночки об этом узнают.');
@@ -6990,7 +7345,7 @@ function talkWolf(e) {
     const o = [];
     if (S.q.flash === 1) o.push({ t: 'Я насчёт Шустрого', k: 'key', fn: () => {
       say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
-      give('w_pm', 1); give('a9', 16); S.mag.w_pm = 8; setWeapon('w_pm'); S.q.flash = 2;
+      const equipped=give('w_pm',1,{cond:85,mag:8}); give('a9',16); if (equipped) selectGun('w_pm',cnt('w_pm')-1); S.q.flash = 2;
       sys('Получено: ПМ, Патроны 9×18 ×24. Задание обновлено.');
       bulletin('Волк выдал ПМ. Цель: АТП на востоке.');
     } });
@@ -7048,9 +7403,9 @@ function traderOpts() {
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
-  const worn = WORDER.filter(w => w !== 'knife' && !WP[w].toss && has(w) && cond(w) < 95);
-  if (worn.length) { const cost = worn.reduce((a, w) => a + Math.ceil((100 - cond(w)) * ITEMS[w].price / 400 / 10) * 10, 0);
-    o.push({ t: 'Починить оружие · ' + cost + ' RU', d: S.money < cost, fn: () => { S.money -= cost; worn.forEach(w => S.cond[w] = 100); P.jam = 0; say('Почистил, смазал, пружины поменял. Стреляет как новый.'); sys('Оружие починено.'); } }); }
+  const worn = gunsBelow(95);
+  if (worn.length) { const cost = worn.reduce((a, w) => a + Math.ceil((100 - w.cond) * ITEMS[w.id].price / 400 / 10) * 10, 0);
+    o.push({ t: 'Починить оружие · ' + cost + ' RU', d: S.money < cost, fn: () => { S.money -= cost; repairCopies(worn,100); P.jam = 0; say('Почистил, смазал, пружины поменял. Стреляет как новый.'); sys('Оружие починено.'); } }); }
   { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
     o.push({ t: restLabel('Отоспаться до утра:', till, 'sleep'), d: blk, fn: () => {
       const b = restBlock(); if (b) { sys(b); return; }
@@ -7067,91 +7422,6 @@ function openTrade(e) {
   panel.e = e; refresh(); pbody.scrollTop = 0;
 }
 function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefined ? Math.floor(it.sell * (toNpc ? 0.8 : 1)) : Math.max(1, Math.floor((it.price || 0) * (toNpc ? 0.5 : 0.35))); }
-function drawTrade() {
-  const e = panel.e;
-  const top = el('div', 'cols');
-  top.appendChild(person(meCard()));
-  top.appendChild(person(e ? Object.assign(cardOf(e), { money: e.money }) : SIDCARD()));
-  pbody.appendChild(top);
-  const cols = el('div', 'cols');
-  const a = el('div'), b = el('div');
-  a.appendChild(el('h3', 'h3', 'Купить'));
-  const stock = e ? Object.keys(e.inv).map(id => ({ id: id, q: 1, p: Math.ceil(ITEMS[id].price * (S.rep >= 20 ? 1.1 : 1.3)), c: e.inv[id] })) : STOCK.map(s => Object.assign({ c: (ITEMS[s.id].weapon || ITEMS[s.id].armor) && has(s.id) ? 0 : 99 }, s));
-  if (!stock.length) a.appendChild(el('p', 'note', 'Ему нечего продать.'));
-  stock.forEach(s => {
-    const r = el('div', 'row'), t = el('div', 'tile'); t.appendChild(itemIcon(s.id)); r.appendChild(t);
-    const g = el('div', 'grow'); g.appendChild(el('div', 'nm', ITEMS[s.id].n + (s.q > 1 ? ' ×' + s.q : ''))); g.appendChild(el('div', 'price', s.p + ' RU')); r.appendChild(g);
-    r.appendChild(btn('', s.c <= 0 ? 'Есть' : 'Купить', () => {
-      if (S.money < s.p) { panel.hint = 'Не хватает ' + (s.p - S.money) + ' RU.'; refresh(); return; }
-      S.money -= s.p; give(s.id, s.q); if (e) { e.money += s.p; e.inv[s.id]--; if (!e.inv[s.id]) delete e.inv[s.id]; }
-      play('pick'); panel.hint = 'Куплено: ' + ITEMS[s.id].n + '.'; refresh();
-    }, s.c <= 0 || S.money < s.p));
-    a.appendChild(r);
-  });
-  b.appendChild(el('h3', 'h3', 'Продать'));
-  const mine = Object.keys(S.inv).filter(id => ITEMS[id] && !ITEMS[id].quest && (!e || !(ITEMS[id].weapon || ITEMS[id].armor)) && !(id === S.armor && cnt(id) === 1));
-  if (!mine.length) b.appendChild(el('p', 'note', 'Продавать нечего.'));
-  mine.forEach(id => {
-    const isAmmo = ITEMS[id].ammo, q = isAmmo ? Math.min(cnt(id), 10) : 1, p = sellPrice(id, !!e) * q;
-    const r = el('div', 'row'), t = el('div', 'tile'); t.appendChild(itemIcon(id)); r.appendChild(t);
-    const g = el('div', 'grow'); g.appendChild(el('div', 'nm', ITEMS[id].n + (cnt(id) > 1 ? ' (' + cnt(id) + ')' : ''))); g.appendChild(el('div', 'price', '+' + p + ' RU' + (q > 1 ? ' за ' + q : ''))); r.appendChild(g);
-    r.appendChild(btn('', 'Продать', () => {
-      if (e && e.money < p) { panel.hint = 'У него не хватает денег.'; refresh(); return; }
-      take(id, q); S.money += p; if (e) { e.money -= p; e.inv[id] = (e.inv[id] || 0) + q; }
-      play('pick'); panel.hint = 'Продано: ' + ITEMS[id].n + '.'; refresh();
-    }));
-    b.appendChild(r);
-  });
-  cols.appendChild(a); cols.appendChild(b); pbody.appendChild(cols);
-}
-
-/* ---------- рюкзак ---------- */
-function drawInv() {
-  pbody.appendChild(person(meCard()));
-  pbody.appendChild(el('p', 'note', 'Вес ' + weight() + ' из ' + MAXW + ' кг · защита ' + Math.round(def() * 100) + '% · радиация ' + Math.round(S.rad) + ' · сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '')));
-  const ids = ['knife'].concat(Object.keys(S.inv));
-  const g = el('div', 'grid');
-  ids.forEach(id => {
-    const c = el('button', 'cell' + (panel.sel === id ? ' sel' : '') + ((S.weapon === id || S.armor === id || beltCount(id)) ? ' on' : ''));
-    c.type = 'button'; c.appendChild(itemIcon(id));
-    if (cnt(id) > 1) c.appendChild(el('span', 'bd', String(cnt(id))));
-    c.setAttribute('aria-label', id === 'knife' ? 'Нож' : ITEMS[id].n);
-    c.addEventListener('click', () => { panel.sel = id; panel.hint = ''; refresh(); });
-    g.appendChild(c);
-  });
-  pbody.appendChild(g);
-  const id = panel.sel;
-  if (!id || (id !== 'knife' && !has(id))) { pbody.appendChild(el('p', 'note', 'Нажми на вещь, чтобы посмотреть её и применить. Артефакты вешаются на пояс, до трёх штук.')); return; }
-  const it = id === 'knife' ? { n: 'Нож', w: 0.3 } : ITEMS[id];
-  const d = el('div', 'detail');
-  d.appendChild(el('div', 'nm', it.n + (cnt(id) > 1 ? ' ×' + cnt(id) : '')));
-  let desc = it.d || '';
-  if (WP[id]) { const W = WP[id]; desc = W.toss ? 'Взрыв по площади, урон до ' + W.dmg + '. Выбери в ячейке оружия и жми «Огонь»' : W.melee ? 'Урон ' + W.dmg + ', только вплотную' : 'Урон ' + W.dmg + (W.pellets ? '×' + W.pellets : '') + ', магазин ' + W.mag + ', дальность ' + W.range + '. Состояние ' + Math.round(cond(id)) + '%' + (cond(id) < 65 ? ', может заклинить. Почини у Сидоровича' : ''); }
-  if (FOOD[id]) desc += ', сытость +' + FOOD[id];
-  if (it.armor) desc = 'Защита ' + Math.round(it.armor * 100) + '%';
-  if (ARTFX[id]) desc += '. ' + ARTFX[id];
-  d.appendChild(el('div', 'ds', desc));
-  d.appendChild(el('div', 'ds', 'Вес ' + (Math.round((it.w || 0) * Math.max(1, cnt(id)) * 100) / 100) + ' кг'));
-  const row = el('div', 'btnrow');
-  if (WP[id] && S.weapon !== id) row.appendChild(btn('go', 'Взять в руки', () => { setWeapon(id); refresh(); }));
-  if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { S.armor = id; refresh(); }));
-  if (it.heal !== undefined || it.rad !== undefined) row.appendChild(btn('go', 'Применить', () => { useItem(id); refresh(); }));
-  if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
-    if (beltCount(id)) S.belt.splice(S.belt.indexOf(id), 1);
-    else if (S.belt.length >= 3) panel.hint = 'Пояс занят: сначала сними другой артефакт.';
-    else S.belt.push(id);
-    refresh();
-  }));
-  if (id !== 'knife' && !it.quest && S.armor !== id) row.appendChild(btn('wide', 'Выбросить', () => {
-    const q = cnt(id); take(id, q);
-    objs.push({ k: 'body', kind: 'sack', x: P.x + rnd(-6, 6), y: P.y + 12, ang: 0, fac: 'loner', name: 'Рюкзак', seed: 1, loot: { [id]: q }, t: S.min });
-    panel.sel = null; refresh();
-  }));
-  d.appendChild(row);
-  pbody.appendChild(d);
-}
-
-/* ---------- обыск ---------- */
 function openLoot(o) {
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
   if (o.k === 'crate') return;
@@ -7163,18 +7433,17 @@ function drawLoot() {
   keys.forEach(k => {
     const r = el('div', 'row'), t = el('div', 'tile'); t.appendChild(k === 'money' ? icon('i-pack') : itemIcon(k)); r.appendChild(t);
     r.appendChild(el('div', 'grow nm', k === 'money' ? o.loot[k] + ' RU' : ITEMS[k].n + (o.loot[k] > 1 ? ' ×' + o.loot[k] : '')));
-    const dupW = k !== 'money' && WP[k] && !WP[k].melee && has(k);
-    if (dupW) r.appendChild(el('span', 'note', 'Такой ствол уже есть'));
+    const error=k==='money'?'':receiveError(k,1,lootGun(o,k));
+    if (error) r.appendChild(el('span','note',error));
     r.appendChild(btn('', 'Взять', () => {
-      // правило одного ствола каждого типа: дубликат не берётся, состояние брошенного ствола возвращается при подборе
-      if (k === 'money') S.money += o.loot[k]; else { give(k, o.loot[k]); if (WP[k] && !WP[k].melee) S.cond[k] = o.wcond && o.wcond[k] != null ? o.wcond[k] : (S.cond[k] == null ? 80 : S.cond[k]); }
-      delete o.loot[k]; play('pick');
-      recordContents(o);
-      refresh();
-    }, dupW));
+      const got=collectStock(o,k);
+      if (got) play('pick');
+      panel.hint=o.loot[k]?'Остаток в контейнере: '+o.loot[k]+' шт.':'';
+      recordContents(o); refresh();
+    }, !!error));
     pbody.appendChild(r);
   });
-  pbody.appendChild(btn('go', 'Взять всё', () => { lootAll(o); closePanel(); }));
+  pbody.appendChild(btn('go', 'Взять всё', () => { lootAll(o); if(Object.keys(o.loot).length) refresh(); else closePanel(); }));
 }
 
 /* ---------- ПДА ---------- */
@@ -7344,12 +7613,16 @@ const MAP_INK = {
   cache: '#e7bd79', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
 };
 function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
-  const color = MAP_INK[kind];
+  const color = kind==='locker' ? '#8ccac4' : MAP_INK[kind];
   g.save(); g.translate(x, y); g.scale(u, u);
   g.lineJoin = 'round'; g.fillStyle = color; g.strokeStyle = '#252823'; g.lineWidth = 1.3;
   g.beginPath();
   if (kind === 'player') {
     g.rotate(angle); g.moveTo(7, 0); g.lineTo(-4.7, -4.9); g.lineTo(-2.7, 0); g.lineTo(-4.7, 4.9); g.closePath();
+  } else if (kind === 'locker') {
+    g.rect(-5,-3.8,10,7.6); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(-4,-1); g.lineTo(4,-1); g.stroke();
+    g.fillStyle='#242a28'; g.fillRect(-1,-1,2,3); g.restore(); return;
   } else if (kind === 'hatch' || kind === 'cache') {
     g.rect(-2.8, -2.8, 5.6, 5.6);
   } else {
@@ -7368,7 +7641,7 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
 function mapLegend() {
   const legend = el('div', 'legend map-key');
   for (const [kind, name] of [['player','Вы'], ['neutral','Нейтрал'], ['enemy','Враг'], ['friend','Друг'],
-      ['target','Цель'], ['sos','SOS'], ['cache','Тайник'], ['hatch','Бункер']]) {
+      ['target','Цель'], ['sos','SOS'], ['locker','Личный ящик'], ['cache','Тайник'], ['hatch','Бункер']]) {
     const item = el('span'), icon = el('canvas'); icon.width = icon.height = 32;
     mapSymbol(icon.getContext('2d'), kind, 16, 16, 2);
     item.append(icon, document.createTextNode(name)); legend.appendChild(item);
@@ -7391,6 +7664,10 @@ function drawMapTo(g, s, full, o) {
   const mark = (x, y, r) => busy.push([x - r, y - r, x + r, y + r]);
   const hx = HATCH.x / T * s, hy = HATCH.y / T * s;
   mapSymbol(g, 'hatch', hx, hy, u); mark(hx, hy, 5 * u);
+  for (const c of objs) if(c.k==='locker') {
+    const x=(c.x+c.w/2)/T*s, y=(c.y+c.h/2)/T*s;
+    mapSymbol(g,'locker',x,y,u); mark(x,y,6*u);
+  }
   if (o.ppl) ents.forEach(e => {
     if (visibleContact(e)) mapSymbol(g, playerRelation(e), e.x / T * s, e.y / T * s, u);
   });
@@ -7452,6 +7729,7 @@ function drawMini() {
   }
   mapSymbol(mctx, 'hatch', HATCH.x / T * s, HATCH.y / T * s, 1.65);
   objs.forEach(o => {
+    if(o.k==='locker') mapSymbol(mctx,'locker',(o.x+o.w/2)/T*s,(o.y+o.h/2)/T*s,1.65);
     if (o.k === 'cache' && S.caches[o.cacheId] === 1) mapSymbol(mctx, 'cache', o.x / T * s, o.y / T * s, 1.65);
   });
   ents.forEach(e => {
@@ -7491,9 +7769,9 @@ function hud(dt) {
   H.sBleed.classList.toggle('on', !!S.bleed); H.sBleedN.textContent = S.bleed > 1 ? S.bleed : '';
   const sg = P.detD < 280 ? Math.ceil((1 - P.detD / 280) * 5) : 0;
   if (H.sig.dataset.v != sg) { H.sig.dataset.v = sg; [...H.sig.children].forEach((b, i) => b.classList.toggle('on', i < sg)); H.det.classList.toggle('on', sg > 0); }
-  H.st.style.width = P.st + '%'; H.stv.textContent = weight() > MAXW ? '!' : Math.round(P.st);
+  H.st.style.width = P.st + '%'; H.stv.textContent = weight() > carryLimit() ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
-  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > MAXW ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
+  const stt = [fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', P.detD < 280 ? 'аномалия ' + Math.round(P.detD / T * 1.5) + ' м' : ''].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.classList.toggle('on', S.torch !== false); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -7555,7 +7833,8 @@ function interact() {
     if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
   }
   else if (n.k === 'kill') takedown(n.e);
-  else if (n.k === 'pickupLoot' && n.o.broken) lootAll(n.o);
+  else if (n.k === 'groundItem') pickGroundItem(n);
+  else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);

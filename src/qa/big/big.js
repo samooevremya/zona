@@ -180,6 +180,17 @@ Tt('K13_pda_quest_bulletin', () => {
   const order = B.msgs();
   return { ok: shown && sosFirst && /приближается выброс/i.test(order[0]) && order[1]?.startsWith('SOS!') && order.includes(report.x), shown, sosFirst };
 });
+function approachDrop(o,drop) {
+  P().x=o.x+(o.w||0)/2+drop.dx; P().y=o.y+(o.h||0)/2+drop.dy; step(1);
+  return z.near?.k==='groundItem' && z.near.o===o && z.near.drop===drop;
+}
+function gatherCrate(o) {
+  for(const drop of [...(S().flags.groundItems?.[o.stash] || [])]) {
+    if(!approachDrop(o,drop)) return false;
+    z.interact();
+  }
+  return !Object.keys(o.loot).length;
+}
 Tt('K14_break_loot_search', () => {
   reset();
   const box = M.objs.find(o => o.stash === 'st9');
@@ -195,11 +206,18 @@ Tt('K14_break_loot_search', () => {
   left(box);
   const sealed = box.solid && z.near?.o !== box;
   attack('knife');
-  const knife = box.broken && !box.solid && z.near?.k === 'pickupLoot';
+  const knife = box.broken && !box.solid && S().flags.groundItems[box.stash].length===5;
   z.save(true); z.applyState(z.loadSave()); left(box);
-  const before = S().money, amount = box.loot.money;
-  z.interact(); step(1); z.interact();
-  const takenOnce = S().money === before + amount && box.looted && !Object.keys(box.loot).length;
+  const before = S().money, amount = box.loot.money, bandages=S().inv.bandage;
+  const layout=S().flags.groundItems[box.stash], bandage=layout.find(d=>d.id==='bandage');
+  const targeted=approachDrop(box,bandage); z.interact();
+  const justOne=targeted && box.loot.bandage===1 && box.loot.cans===2 && box.loot.money===amount &&
+    S().inv.bandage===bandages+1 && !layout.includes(bandage);
+  const remainingLayout=JSON.stringify(layout);
+  z.save(true); z.applyState(z.loadSave()); left(box);
+  const stable=JSON.stringify(S().flags.groundItems[box.stash])===remainingLayout;
+  const takenOnce=justOne && stable && gatherCrate(box) && S().money===before+amount && box.looted &&
+    !S().flags.groundItems?.[box.stash];
   z.save(true); z.applyState(z.loadSave());
   const emptyOnLoad = box.looted && box.broken && !box.solid;
   reset(); left(box); S().mag.w_pm = 6; attack('w_pm');
@@ -217,6 +235,30 @@ Tt('K14_break_loot_search', () => {
     search[kind] = !!(opens && take && !o.broken && Object.keys(o.loot).length === 1 && JSON.stringify(o.loot) === remaining);
   }
   return {ok: sealed && knife && takenOnce && emptyOnLoad && bullet && search.safe && search.hiding, sealed, knife, takenOnce, emptyOnLoad, bullet, search};
+});
+Tt('K14_individual_items_and_capacity', () => {
+  reset();
+  for(const e of z.ents) if(e!==P()) e.alive=false;
+  const box=M.objs.find(o=>o.stash==='st1');
+  P().x=box.x-20; P().y=box.y+box.h/2; P().ang=0; z.IN.touch=true;
+  z.IN.fire=true; step(1); z.IN.fire=false;
+  const layout=S().flags.groundItems[box.stash];
+  const ammo=layout.find(d=>d.id==='a9'), kit=layout.find(d=>d.id==='medkit');
+  S().inv={ar_jacket:1,cans:60,bandage:4,a9:7}; // 34,97 кг: ещё три патрона.
+  const n=box.loot.a9;
+  const aimed=approachDrop(box,ammo); z.interact();
+  const partial=aimed && S().inv.a9===10 && box.loot.a9===n-3 && layout.includes(ammo);
+  const blocked=approachDrop(box,kit); z.interact();
+  const kept=blocked && box.loot.medkit===1 && !S().inv.medkit && layout.includes(kit);
+  S().inv.cans=50; z.interact();
+  const selectedOnly=!box.loot.medkit && box.loot.a9===n-3 && box.loot.money===250;
+  S().inv.w_pm=1; S().cond.w_pm=62; S().mag.w_pm=4;
+  z.openPanel('inv','Рюкзак'); z.panel.sel='w_pm'; z.refresh();
+  [...document.querySelectorAll('.inv-detail button')].find(b=>b.textContent==='Выбросить').click(); z.closePanel();
+  const sack=M.objs.find(o=>o.kind==='sack'); step(1);
+  const gun=sack.groundItems[0], onGun=approachDrop(sack,gun); z.interact();
+  const droppedGun=onGun && !M.objs.includes(sack) && S().cond.w_pm===62 && S().mag.w_pm===4;
+  return {ok:partial && kept && selectedOnly && droppedGun,partial,kept,selectedOnly,droppedGun};
 });
 Tt('K15_all_prop_colliders_and_containers', () => {
   reset();
@@ -262,7 +304,7 @@ Tt('K16_roaming_field_crates', () => {
   const broken = !intact().length && timers.every(t=>t>=S().min+118 && t<=S().min+240);
   const first = initial[0], originalLoot = JSON.stringify(stock().drops[first.fieldTile]);
   // Забираем второй ящик. Содержимое первого ждёт игрока на старом месте даже после замены.
-  const second=initial[1]; P().x=second.x-19; P().y=second.y+13; step(1); z.interact();
+  const second=initial[1]; gatherCrate(second);
   const picked = !Object.keys(stock().drops[second.fieldTile]||{}).length;
   z.save(true); z.applyState(z.loadSave());
   S().min=Math.min(...timers)-1; step(1);
@@ -277,7 +319,7 @@ Tt('K16_roaming_field_crates', () => {
   const drops=M.objs.filter(o=>o.fieldTile===first.fieldTile && o.broken);
   const kept=drops.length===1 && JSON.stringify(drops[0].loot)===originalLoot && !Object.keys(stock().drops[second.fieldTile]).length;
   if (drops.length) {
-    P().x=drops[0].x-18; P().y=drops[0].y+13; step(1); z.interact();
+    gatherCrate(drops[0]);
   }
   const collected=!Object.keys(stock().drops[first.fieldTile]).length;
   return {ok:sectors.every(n=>n===4) && broken && waiting && renewed && restored && picked && kept && collected,
@@ -294,7 +336,7 @@ Tt('K17_crate_remains_expire', () => {
     P().x=o.x-20; P().y=o.y+13; P().ang=0; P().cool=0;
     z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
   };
-  hit(fixed); hit(full); hit(empty); z.interact();
+  hit(fixed); hit(full); hit(empty); gatherCrate(empty);
   const end = flags().crateCleanup[fixed.stash];
   const fullEnd = flags().crateCleanup[full.stash], emptyEnd = flags().crateCleanup[empty.stash];
   const snapshot = () => { z.save(true); return z.loadSave(); };
@@ -307,7 +349,7 @@ Tt('K17_crate_remains_expire', () => {
   S().min = end; step(1);
   const firstOnly = !lookup(fixed) && !!lookup(empty);
   S().food=100; z.plus.advanceWorldTime(60,'sleep');
-  const isClean = () => !flags().crateCleanup && !Object.keys(flags().fieldCrates.drops).length &&
+  const isClean = () => !flags().groundItems && !flags().crateCleanup && !Object.keys(flags().fieldCrates.drops).length &&
     flags()['st_'+fixed.stash]===2 && !('contents_'+fixed.stash in flags()) && !('broken_'+fixed.stash in flags()) &&
     !lookup(fixed) && !lookup(full) && !lookup(empty) && loose().filter(o=>!o.broken).length === 24;
   const rested = isClean(); z.applyState(snapshot()); const reloaded = isClean();
