@@ -1,9 +1,9 @@
-<div id="bootlog" style="position:fixed;left:50%;bottom:18%;transform:translateX(-50%);z-index:9999;color:#cfc7ad;font:600 14px Arial;background:rgba(0,0,0,.6);padding:8px 14px;border-radius:8px;pointer-events:none">Загрузка…</div>
 <script>/* ошибки на экране — для проверки на телефоне без компьютера */
 (function(){function show(t){var d=document.getElementById('errbox');if(!d){d=document.createElement('div');d.id='errbox';d.style.cssText='position:fixed;left:8px;right:8px;top:40px;z-index:10000;background:#5a140c;color:#fff;font:12px/1.35 monospace;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:60vh;overflow:auto';document.body.appendChild(d);}d.textContent+=(d.textContent?'\n':'')+t+'  [шаг: '+(window.__bootStep||'-')+']';}
 addEventListener('error',function(e){if(!e.filename&&!e.lineno)return;/* «Script error.» без файла — чужие скрипты Safari (меню «Поделиться», расширения), не игра */show('Ошибка: '+e.message+' @'+(e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno);});
 addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошибка: '+(r&&r.message||r)+'\n'+(r&&r.stack||'').split('\n').slice(0,4).join('\n'));});})();
 </script>
+<div id="field-world">
 <canvas id="cv" aria-label="Игровое поле"></canvas>
 <div class="hud zh">
   <div class="zh-corner">
@@ -48,6 +48,7 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
   <button type="button" class="rb c5" id="b-jump" aria-label="Прыжок"><svg viewBox="0 0 24 24"><circle cx="13" cy="3.6" r="2.4"/><path d="M9.5 7.5l5 .5 2.6 3.4 3.4.6-.4 2-4.4-.9-1.4-1.7-1.2 3 3.2 3.4-1.6 1.4-3.8-3.8-2.6 4.6-1.9-1 3-6.2-1.7.6-1.4 3-1.8-.8 2-4.5z"/><path d="M3 22h18" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 2"/></svg></button>
   <button type="button" class="rb w" id="b-wpn" aria-label="Сменить оружие" hidden></button>
 </div>
+</div>
 <div class="rotate" id="rotate"><div><div class="phone"></div><p>Поверни телефон горизонтально: так видно больше Зоны и удобнее стрелять.</p><button type="button" class="alt" id="rot-skip">Играть вертикально</button></div></div>
 <div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="ptitle">
   <div class="pda">
@@ -55,4 +56,14 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
     <div class="screen"><div class="tabs" id="ptabs" role="tablist"></div><div class="body" id="pbody"></div></div>
   </div>
 </div>
-<div class="title open" id="title"><div class="tcard" id="tcard"></div></div>
+<i id="layout-insets" aria-hidden="true"></i>
+<dialog id="control-editor" aria-labelledby="layout-heading">
+  <div id="layout-view" aria-label="Игровой экран"></div>
+  <div id="layout-tools">
+    <div class="layout-caption"><strong id="layout-heading">Управление</strong><span id="layout-hint" role="status">Перетащи кнопку на экране</span></div>
+    <label>Кнопка<select id="layout-choice"></select></label>
+    <label>Размер <output id="layout-size-value" for="layout-size"></output><input id="layout-size" type="range" min="44" max="164" step="1"></label>
+    <div class="layout-actions"><button id="layout-default">Сброс</button><button id="layout-cancel">Отмена</button><button id="layout-save">Сохранить</button></div>
+  </div>
+</dialog>
+<div class="title start open" id="title"><div class="tcard" id="tcard"><h1 class="start-name">ЗОНА<span class="start-region">КОРДОН</span></h1><div id="bootlog" role="status">Загрузка…</div></div></div>
