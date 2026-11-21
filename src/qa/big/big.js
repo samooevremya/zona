@@ -20,35 +20,35 @@ Tt('K1_paths_to_all_places_and_exits', () => {
     if (L < 0) bad.push(l.id); else tab[l.name] = Math.round(L / WALK / 6) / 10;
   });
   const ex = { 'Свалка (север)': [128, 2.5], 'Малая Зона (западная дорога)': [11, 124], 'Затон (восток)': [238.5, 92] };
-  Object.entries(ex).forEach(([n, p]) => { const L = pathLen(fx, fy, p[0] * T, p[1] * T); if (L < 0) bad.push(n); else tab[n] = Math.round(L / WALK / 6) / 10; });
+  Object.entries(ex).forEach(([n, p]) => { const L = pathLen(fx, fy, (240+p[0]) * T, p[1] * T); if (L < 0) bad.push(n); else tab[n] = Math.round(L / WALK / 6) / 10; });
   return { ok: bad.length === 0, unreachable: bad, walkMinutesFromVillage: tab };
 });
 Tt('K2_crossing_time', () => {
   reset();
-  const a = [128 * T, 2.5 * T], b = [128 * T, 216 * T], w = [11.5 * T, 124.5 * T], e = [238.5 * T, 92 * T];
+  const a = [368 * T, 2.5 * T], b = [368 * T, 216 * T], w = [251.5 * T, 124.5 * T], e = [478.5 * T, 92 * T];
   const ns = pathLen(a[0], a[1], b[0], b[1]), we = pathLen(w[0], w[1], e[0], e[1]);
   return { ok: ns > 0 && we > 0, note: 'справочно: время насквозь по дорогам без остановок', northSouth: { walkMin: +(ns / WALK / 60).toFixed(1), runMin: +(ns / RUN / 60).toFixed(1) }, westEast: { walkMin: +(we / WALK / 60).toFixed(1), runMin: +(we / RUN / 60).toFixed(1) } };
 });
 Tt('K3_ground_chunks', () => {
   reset();
   // ходьба: игрок идёт по шоссе с севера на юг, кадр за кадром; худший кадр = рывок при дорисовке
-  let WALKH = 0; P().x = 127 * T; P().y = 10 * T; z.cam.x = P().x; z.cam.y = P().y; window.__zRender();
-  for (let i = 0; i < 600; i++) { P().y += 190 / 30; P().x = (127 + 0.5) * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); WALKH = Math.max(WALKH, performance.now() - t0); }
+  let WALKH = 0; P().x = 367 * T; P().y = 10 * T; z.cam.x = P().x; z.cam.y = P().y; window.__zRender();
+  for (let i = 0; i < 600; i++) { P().y += 190 / 30; P().x = (367 + 0.5) * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); WALKH = Math.max(WALKH, performance.now() - t0); }
   WALKH = Math.round(WALKH);
   const spots = [[60, 168], [128, 8], [128, 60], [196, 142], [232, 92], [20, 118], [176, 30], [210, 40], [33, 131], [150, 106], [128, 206], [52, 100], [94, 44], [198, 186]];
   const times = [];
-  spots.forEach(s => { P().x = s[0] * T; P().y = s[1] * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); times.push(Math.round(performance.now() - t0)); });
+  spots.forEach(s => { P().x = (240+s[0]) * T; P().y = s[1] * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); times.push(Math.round(performance.now() - t0)); });
   const after = []; for (let i = 0; i < 5; i++) { const t0 = performance.now(); window.__zRender(); after.push(Math.round(performance.now() - t0)); }
   return { ok: B.cache() <= B.GMAX && Math.max(...after) < 60, walkHitchMs: WALKH, cached: B.cache(), max: B.GMAX, firstFrameMsPerSpot: times, steadyFrameMs: after, lastChunkMs: B.gStat.ms, chunksPainted: B.gStat.painted };
 });
 Tt('K4_overview_and_fog', () => {
   reset();
   const mini = B.mini(), fl = B.fogLen();
-  P().x = 128 * T; P().y = 100 * T; z.reveal();
+  P().x = 368 * T; P().y = 100 * T; z.reveal();
   z.save(true); const raw = localStorage.getItem('zona2d-kordon-qa') || '';
   const d = JSON.parse(raw), rev = d.fog.length;
   z.applyState(z.loadSave());
-  return { ok: mini[0] === B.PW() * 4 && mini[1] === B.MH() * 4 && fl === 252 * B.MH() && B.MH() > 220 && raw.length < 250000, mini, fogCells: fl, fogChars: rev, saveBytes: raw.length };
+  return { ok: mini[0] === B.PW() * 4 && mini[1] === B.MH() * 4 && fl === M.MW * 220 && B.PW() === 480 && raw.length < 250000, mini, fogCells: fl, fogChars: rev, saveBytes: raw.length };
 });
 Tt('K5_migrate_rc1_save', () => {
   reset();
@@ -57,11 +57,11 @@ Tt('K5_migrate_rc1_save', () => {
   z.applyState(d); step(2);
   const exp = RM.p(94 * T, 71.5 * T), dist = Math.hypot(P().x - exp[0], P().y - exp[1]);
   const tx = Math.floor(P().x / T), ty = Math.floor(P().y / T), onNav = !!M.nav[ty * M.MW + tx];
-  return { ok: S().mapVersion === 'kordon-big' && dist < 3 * T && onNav && S().money === 4321 && S().fog === '', playerAt: [tx, ty], expectedNear: [Math.round(exp[0] / T), Math.round(exp[1] / T)], onNav, news: S().news.slice(-1)[0].x };
+  return { ok: S().mapVersion === 'kordon-west' && dist < 3 * T && onNav && S().money === 4321 && S().fog === '', playerAt: [tx, ty], expectedNear: [Math.round(exp[0] / T), Math.round(exp[1] / T)], onNav, news: S().news.slice(-1)[0].x };
 });
 Tt('K6_exit_messages', () => {
   reset(); const out = {};
-  [['east', 237 * T, 92 * T], ['north', 128 * T, 3 * T]].forEach(([n, x, y]) => {
+  [['east', 477 * T, 92 * T], ['north', 368 * T, 3 * T]].forEach(([n, x, y]) => {
     z.clearMsgs(); P().x = x; P().y = y; for (let i = 0; i < 400 && !B.msgs().length; i++) step(1);
     out[n] = B.msgs().join(' | ');
   });
@@ -77,7 +77,7 @@ Tt('K7_static_objects_clear', () => {
 });
 Tt('K8_npcs_on_nav', () => {
   reset(); step(30);
-  const bad = z.ents.filter(e => e.alive && e !== P() && !(e.x > 240 * T)).filter(e => { const tx = Math.floor(e.x / T), ty = Math.floor(e.y / T); return !M.nav[ty * M.MW + tx]; }).map(e => (e.name || e.sid || e.kind) + '@' + Math.floor(e.x / T) + ',' + Math.floor(e.y / T));
+  const bad = z.ents.filter(e => e.alive && e !== P() && !(e.x > 480 * T)).filter(e => { const tx = Math.floor(e.x / T), ty = Math.floor(e.y / T); return !M.nav[ty * M.MW + tx]; }).map(e => (e.name || e.sid || e.kind) + '@' + Math.floor(e.x / T) + ',' + Math.floor(e.y / T));
   return { ok: bad.length === 0, count: z.ents.filter(e => e.alive).length, offNav: bad };
 });
 Tt('K9_new_places_registered', () => {
@@ -376,7 +376,7 @@ Tt('K17_crate_remains_expire', () => {
 Tt('K18_trader_counter_and_stairs', () => {
   reset();
   const sid = z.ents.find(e => e.sid === 'sid'), counter = M.objs.find(o => o.k === 'counter');
-  const stack = M.objs.find(o => o.shopStack) || M.objs.find(o => o.k==='crate' && o.x>240*T);
+  const stack = M.objs.find(o => o.shopStack) || M.objs.find(o => o.k==='crate' && o.x>480*T);
   const anchor = z.loc.locPt('sid','trader');
   const aligned = Math.abs(sid.y-anchor.y)<1 && Math.abs(sid.x-anchor.x)<1;
   P().x=sid.x; P().y=counter.y+counter.h+45;
@@ -392,7 +392,7 @@ Tt('K18_trader_counter_and_stairs', () => {
   P().x=stairs.x; P().y=stairs.y; step(1);
   const up=z.near?.k==='up'; z.interact(); step(30);
   const down=z.near?.k==='down'; z.interact(); step(30);
-  const returned=P().x>240*T;
+  const returned=P().x>480*T;
   return {ok:aligned && stopped && ready && talking && cratesSolid && up && down && returned,
     aligned,stopped,ready,talking,cratesSolid,up,down,returned};
 });
@@ -746,49 +746,40 @@ Tt('M1_continuous_world', () => {
   reset();
   const zales=M.LOC.zalissya.anchors.approach, west=M.LOC.exit_w.anchors.gate;
   const route=z.findPath(west[0]*T,west[1]*T,zales[0]*T,zales[1]*T);
-  const boundary=220*T;
-  const cross=(x,dir)=>{
-    const p=P(), identity=p;
-    p.x=(x+.5)*T;p.y=boundary-dir*60;
-    z.IN.moveX=0;z.IN.moveY=dir;
-    let maxDelta=0;
-    for(let i=0;i<38;i++){
-      const old=[p.x,p.y];step(1);
-      maxDelta=Math.max(maxDelta,Math.hypot(p.x-old[0],p.y-old[1]));
-    }
-    z.resetInput();
-    return z.P===identity && (p.y-boundary)*dir>40 && maxDelta<6 && !z.panel;
+  const cross=dir=>{
+    const p=P();p.x=240*T-dir*45;p.y=118.5*T;z.IN.moveX=dir;
+    step(30);z.resetInput();return (p.x-240*T)*dir>35 && z.P===p;
   };
-  const westLane=cross(23,1) && cross(23,-1);
-  const easternLane=cross(111,1) && cross(111,-1);
-  const oldFogLength=252*220/6;
-  z.save(true);const legacy=z.loadSave();
-  legacy.fog=legacy.fog.slice(0,oldFogLength);legacy.x=west[0]*T;legacy.y=west[1]*T;
-  z.applyState(legacy);const oldPos=P().x===legacy.x && P().y===legacy.y;
-  P().x=zales[0]*T;P().y=zales[1]*T;z.reveal();z.save(true);const saved=z.loadSave();z.applyState(saved);
-  const restored=P().x===saved.x && P().y===saved.y && saved.fog.length>oldFogLength;
-  return {ok:!!route?.length && westLane && easternLane && oldPos && restored,westLane,easternLane,oldPos,restored,routeCells:route?.length};
+  const seamless=cross(-1) && cross(1);
+  const migrated=[[11,124,251,124],[90,269,90,117]].every(([x,y,nx,ny])=>{
+    const old=z.freshS();old.x=x*T;old.y=y*T;old.mapVersion='kordon-big';old.money=1432;
+    const cell=y*252+x,bits=Array(Math.ceil((cell+1)/6)).fill(48);bits[Math.floor(cell/6)]+=1<<(cell%6);
+    old.fog=String.fromCharCode(...bits);z.applyState(old);
+    const idx=ny*M.MW+nx;
+    return P().x===nx*T && P().y===ny*T && S().money===1432 && !!((S().fog.charCodeAt(Math.floor(idx/6))-48)&(1<<(idx%6)));
+  });
+  return {ok:!!route?.length && seamless && migrated && B.MH()===220, seamless,migrated,routeCells:route?.length};
 });
 Tt('M2_lesser_zone_exploration', () => {
   reset();const p=P(), s=S(), hh=z.gfxSnap().HOUSES;
-  const sites=M.LOCATIONS.filter(l=>l.bounds[1]>=220), center=M.LOC.zalissya.anchors.approach;
+  const sites=M.LOCATIONS.filter(l=>l.bounds[2]<240), center=M.LOC.zalissya.anchors.approach;
   const reachable=sites.every(l=>{const [x,y]=l.anchors.approach;
     return !!z.findPath(center[0]*T,center[1]*T,x*T,y*T);});
-  p.x=90.5*T;p.y=269.5*T+35;step(1);
+  p.x=90.5*T;p.y=117.5*T+35;step(1);
   const camp=z.near?.k==='rest';if(camp) z.interact();
   const teller=document.getElementById('pbody').innerText;z.closePanel();
   const stash=M.objs.find(o=>o.k==='locker' && o.baseName==='Залесье');
-  const houses=hh.filter(h=>h.y>=220);
-  const contacts=z.ents.filter(e=>e.alive&&e.fac==='loner'&&e.y>=220*T).length;
-  p.x=40.5*T;p.y=243.5*T;p.st=75;step(30);const tired=p.st<73;
-  p.x=91.5*T;p.y=268.5*T;step(30);const recovered=p.st>75;
+  const houses=hh.filter(h=>h.x<240);
+  const contacts=z.ents.filter(e=>e.alive&&e.fac==='loner'&&e.x<240*T).length;
+  p.x=45.5*T;p.y=75.5*T;p.st=75;step(30);const tired=p.st<73;
+  p.x=91.5*T;p.y=116.5*T;step(30);const recovered=p.st>75;
   return {ok:sites.length>=12 && reachable && camp && !!teller && !!stash && houses.every(h=>h.entrances.length) && contacts>=4 && tired && recovered,
     sites:sites.length,houses:houses.length,reachable,camp,contacts,tired,recovered};
 });
 Tt('M3_walk_the_western_road', () => {
   reset();
-  const p=P(), s=S();p.x=12.5*T;p.y=124.5*T;
-  const checkpoints=[[11,124],[7,129],[9,139],[8,153],[15,167],[11,185],[17,202],[22,214],[25,230],[36,233],[48,247],[59,252],[60,264],[76,266],[90,266]];
+  const p=P(), s=S();p.x=249.5*T;p.y=120.5*T;
+  const checkpoints=[[240,118],[232,116],[229,107],[222,100],[204,99],[199,114],[190,126],[172,118],[155,116],[140,115],[120,110],[106,115],[91,114]];
   let walked=0, maxStep=0;
   for(const [x,y] of checkpoints){
     const path=z.findPath(p.x,p.y,(x+.5)*T,(y+.5)*T);
@@ -805,7 +796,7 @@ Tt('M3_walk_the_western_road', () => {
     }
   }
   z.resetInput();
-  return {ok:p===P() && s===S() && maxStep<7 && p.y>260*T && walked>120*T,
+  return {ok:p===P() && s===S() && maxStep<7 && p.x<100*T && walked>120*T,
     walkedTiles:Math.round(walked/T),maxStepPx:+maxStep.toFixed(2)};
 });
 Tt('M4_roadside_signs_and_barge_loot', () => {
@@ -816,8 +807,33 @@ Tt('M4_roadside_signs_and_barge_loot', () => {
   const verges=signs.length===2 && signs.every(o=>o.solid && tileAt(o)===0)
     && signs.some(o=>o.x/T<village[0]) && signs.some(o=>(o.x+o.w/2)/T>village[2]);
   const cargo=M.objs.find(o=>o.stash==='lz_barge');
-  const reach=cargo && tileAt(cargo)!==3 && !!z.findPath(46*T,297*T,cargo.x+T,cargo.y);
+  const reach=cargo && tileAt(cargo)!==3 && !!z.findPath(46*T,145*T,cargo.x+T,cargo.y);
   return {ok:!!(verges && reach),verges,reach:!!reach};
+});
+Tt('M5_sleep_and_energy',()=>{
+  reset();const p=P(),s=S();p.x=45.5*T;p.y=75.5*T;
+  step(420);const sleepy=s.flags.poppySleep>13 && p.alive;
+  s.inv.energy=1;document.getElementById('t-inv').click();
+  document.querySelector('.pack-grid [data-item="energy"]').click();
+  [...document.querySelectorAll('#pbody button')].find(b=>b.textContent==='Выпить').click();
+  z.closePanel();const drank=!s.inv.energy && !s.flags.poppySleep;
+  step(900);const protectedByDrink=p.alive && !s.flags.poppySleep;
+  s.flags.energyUntil=s.min;step(600);p.x=90*T;p.y=117*T;step(155);
+  const escaped=p.alive && !s.flags.poppySleep;
+  p.x=45.5*T;p.y=75.5*T;step(1263);const asleep=!p.alive;
+  return {ok:!!(sleepy&&drank&&protectedByDrink&&escaped&&asleep),sleepy,drank,protectedByDrink,escaped,asleep};
+});
+Tt('M6_village_bar_and_perimeter',()=>{
+  reset();const walls=M.objs.filter(o=>o.material==='stockade');
+  const blockedAt=(x,y)=>walls.some(w=>x*T>=w.x&&x*T<=w.x+w.w&&y*T>=w.y&&y*T<=w.y+w.h);
+  const gates=[76,106].every((x,i)=>Array.from({length:24},(_,n)=>35.5+n).every(y=>{
+    const inGate=i?y>45&&y<50:y>44&&y<49;
+    return blockedAt(x,68+y)!==inGate;
+  }));
+  const e=z.ents.find(e=>e.sid==='lz_barman');P().x=e.x+18;P().y=e.y+13;step(1);z.interact();
+  const serve=[...document.querySelectorAll('.dlg-opts button')].find(b=>b.textContent.includes('Покажи припасы'));
+  if(serve)serve.click();const trade=z.panel?.kind==='trade' && e.inv.energy>0;z.closePanel();
+  return {ok:!!(gates&&walls.length===6&&trade),gates,trade};
 });
 return JSON.stringify(R);
 })()

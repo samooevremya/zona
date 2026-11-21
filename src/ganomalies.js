@@ -1,6 +1,6 @@
 /* S.min advances by one game minute per second of unpaused play.
    Absolute deadlines keep probes and gravity pulses in sync across reloads and rest. */
-const ELECTRA_WINDOW = 5, GRAVITY_PERIOD = 8, GRAVITY_CALM = 3.5, GRAVITY_WARNING = 1.25;
+const ELECTRA_WINDOW = 3, GRAVITY_PERIOD = 8, GRAVITY_CALM = 3.5, GRAVITY_WARNING = 1.25;
 
 function spawnAnomaly(site) {
   const key = site.id || site.k+'_'+Math.round(site.x)+'_'+Math.round(site.y);
@@ -34,9 +34,7 @@ function anomalyHint() {
     if (phase === 'quiet') return 'Воронка · пыль осела, проходи';
     return phase === 'warning' ? 'Воронка · пыль поднимается!' : 'Воронка · пережди тягу';
   }
-  if (phase === 'active') return 'Электра · брось болт';
-  const seconds = Math.ceil(nearest.until-S.min);
-  return phase === 'warning' ? 'Электра · заряд через '+seconds+' с' : 'Проход открыт · '+seconds+' с';
+  return '';
 }
 
 function anomalyBurst(a) {

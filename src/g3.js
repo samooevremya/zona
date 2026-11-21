@@ -65,7 +65,7 @@ function setWeapon(w) {
 function useItem(id) {
   const it = ITEMS[id];
   if (id === 'energy' && has(id)) {
-    take(id,1); S.flags.energyUntil = S.min + 60; play('eat'); return true;
+    take(id,1); S.flags.energyUntil = S.min + 60; S.flags.poppySleep = 0; play('eat'); return true;
   }
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
   take(id, 1);
@@ -164,7 +164,7 @@ function update(dt) {
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
-  if (!cordonStage() && P.alive && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (!cordonStage() && P.alive && P.x>=WEST*T && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
   if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
@@ -272,7 +272,17 @@ function updatePlayer(dt) {
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
-  if (BIG && P.y >= CORDON_ROWS*T && poppyBed(P.x/T, P.y/T-CORDON_ROWS)<.88 && tAt(Math.floor(P.x/T), Math.floor(P.y/T))===GR) P.st = Math.max(0,P.st-20*dt);
+  if (BIG) {
+    const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
+      ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
+    const exposure=S.flags.poppySleep || 0;
+    if (inField && !energyActive()) {
+      S.flags.poppySleep=Math.min(42,exposure+dt);
+      P.st=Math.max(0,P.st-18*dt);
+      sp*=1-.37*S.flags.poppySleep/42;
+      if(S.flags.poppySleep>=42) {kill(P,'poppies');return;}
+    } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-4*dt);
+  }
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
@@ -435,6 +445,7 @@ function loadSave() {
 }
 function applyState(d) {
   S = d;
+  if (BIG && S.mapVersion==='kordon-big') migrateWesternWorld(S);
   restoreKit();
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
@@ -442,6 +453,11 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  // A saved position can be under an enlarged landmark after the world update.
+  if (BIG && objs.some(o=>(o.k==='installation'||o.k==='bargeHull') &&
+      P.x+P.r>o.x && P.x-P.r<o.x+o.w && P.y+P.r>o.y && P.y-P.r<o.y+o.h)) {
+    collide(P); S.x=P.x; S.y=P.y;
+  }
   if (SID_SHOP && inBunker(P.x,P.y)) {
     // Сохранения из более просторного подвала могли оставить героя за новой стеной.
     const inside = Math.abs(P.x-STAIRS.x) <= 3*T-P.r && P.y >= SHOP_ROOM.counterFront*T+P.r && P.y <= 10*T-P.r;

@@ -76,10 +76,19 @@ function buildFieldProps(){
     const r=ART.m.sprites[id].rect;
     addFootprint(id,tx*T,ty*T,w,w*r[3]/r[2],a);
   }
+  // Discard scattered solids whose rotated sprite would straddle a fence.
+  const fences=objs.filter(o=>o.k==='fence');
+  blockedScatter.clear();
   for(let y=3;y<=MH-4;y++) for(let x=3;x<=PW-4;x++){
     if(tAt(x,y)!==GR) continue;
     const p=scatterObject(x,y);
-    if(p && !p.id.startsWith('c1_decal')) addFootprint(p.id,p.cx,p.cy,p.w,p.hh,p.a);
+    if(!p || p.id.startsWith('c1_decal')) continue;
+    const c=Math.abs(Math.cos(p.a)),s=Math.abs(Math.sin(p.a));
+    const rx=(p.w*c+p.hh*s)/2,ry=(p.w*s+p.hh*c)/2;
+    if(fences.some(f=>p.cx+rx>f.x && p.cx-rx<f.x+f.w && p.cy+ry>f.y && p.cy-ry<f.y+f.h)){
+      blockedScatter.add(y*MW+x);continue;
+    }
+    addFootprint(p.id,p.cx,p.cy,p.w,p.hh,p.a);
   }
 }
 

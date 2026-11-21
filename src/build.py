@@ -45,7 +45,7 @@ art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
 if BIGF:
     lesser_art = {}
-    for name in ('dome', 'silo', 'tank', 'poppies', 'antenna', 'barge', 'village-sign', 'fingerpost', 'transformer', 'safe', 'splinters', 'energy', 'money'):
+    for name in ('mill', 'flowers', 'dome', 'silo', 'tank', 'poppies', 'antenna', 'barge', 'village-sign', 'fingerpost', 'transformer', 'safe', 'splinters', 'energy', 'money'):
         with open('art/lesser/' + name + '.webp', 'rb') as sprite:
             lesser_art[name] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
     art += '\nwindow.LESSER_ART=' + __import__('json').dumps(lesser_art) + ';'

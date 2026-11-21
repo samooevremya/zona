@@ -201,6 +201,11 @@ function drawDialog() {
   pbody.appendChild(O);
 }
 function talk(e) {
+  if (e.sid==='lz_barman') return dialog(cardOf(e),['Бар «Под стрехой». С дороги? Горячее кончилось, банка бодрящего найдётся.'],()=>[
+    {t:'Покажи припасы',k:'key',fn:()=>openTrade(e)},
+    {t:'Что слышно про маки?',fn:()=>say('Начнут слипаться глаза — выпей энергетик или выбирайся на дорогу. Кто лёг среди цветов, уже не встаёт.')},
+    {t:'До встречи',close:1}
+  ],'dialog',e);
   if (e.storyMan) return cordonSurvivor(e);
   if (cordonStage()==='voice' && e.sid==='shust') {
     cordonSet('confirm','Шустрый узнал свой голос, но такого приказа не давал. Сверь позывные у Волка.');
@@ -416,12 +421,17 @@ function drawPda() {
       r.appendChild(g); pbody.appendChild(r);
     });
   } else if (panel.tab === 'log') {
-    if (!S.news.length) pbody.appendChild(el('p', 'note', 'Записей пока нет.'));
+    for(const q of qList().filter(q=>q.st==='a')){
+      const row=el('div','row'),entry=el('div','grow');
+      entry.append(el('div','nm',q.n),el('div','ds',q.d));
+      row.appendChild(entry);pbody.appendChild(row);
+    }
+    if (!pbody.childElementCount && !S.news.length) pbody.appendChild(el('p', 'note', 'Записей пока нет.'));
     S.news.slice().reverse().forEach(n => { const r = el('div', 'row'), g = el('div', 'grow'); g.appendChild(el('div', 'tm', clockStr(n.t))); g.appendChild(el('div', 'ds lite', n.x)); r.appendChild(g); pbody.appendChild(r); });
   } else {
     pbody.appendChild(person(meCard()));
     pbody.appendChild(el('h3','','Полевые заметки'));
-    pbody.appendChild(el('p','note','Электра гаснет на пять секунд от болта. Первые искры предупреждают о возврате заряда.' + (MAP_ID==='rc1'?' Так можно пройти Восточную канаву справа от военного моста.':'')));
+    pbody.appendChild(el('p','note','Электра гаснет ненадолго от болта. Первые искры предупреждают о возврате заряда.' + (MAP_ID==='rc1'?' Так можно пройти Восточную канаву справа от военного моста.':'')));
     pbody.appendChild(el('p','note','Воронку выдаёт пыль: кружащийся мусор тянет к центру, осевший оставляет время пройти. Болт показывает границу.' + (BIG?' У разбитой колонны путеец спрятал вещи прямо под воронкой.':'')));
     const st = el('div', 'stat');
     [['Убито людей', S.stats.kS], ['Убито мутантов', S.stats.kM], ['Выполнено заданий', S.stats.q], ['Найдено артефактов', S.stats.art], ['Очки рейтинга', score()], ['Отношение одиночек', S.rep]].forEach(x => { st.appendChild(el('span', '', x[0])); st.appendChild(el('b', '', String(x[1]))); });
@@ -568,9 +578,9 @@ function buildBigMini() {
   if (BIG) {
     g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); g.restore();
     g.fillStyle='rgba(134,61,44,.65)';
-    for(let y=16;y<31;y+=.5) for(let x=31;x<54;x+=.5)
-      if (poppyBed(x,y)<.9 && tAt(Math.floor(x),CORDON_ROWS+Math.floor(y))===GR)
-        g.fillRect(x, CORDON_ROWS+y,.32,.32);
+    for(let y=-22;y<35;y+=.5) for(let x=18;x<71;x+=.5)
+      if (poppyBed(x,y)<.9 && tAt(Math.floor(x),LESSER_TOP+Math.floor(y))===GR)
+        g.fillRect(x, LESSER_TOP+y,.32,.32);
   }
   objs.forEach(o => {
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
@@ -745,12 +755,34 @@ function drawMapTo(g, s, full, o) {
   mapSymbol(g, 'player', px, py, u, P.ang);
 }
 const mini = $('mini'), mctx = mini.getContext('2d');
+function miniNavigation() {
+  const target=trackedTarget();
+  const underground=inBunker(P.x,P.y);
+  const point=target && (underground && !inBunker(target.x,target.y)?STAIRS:
+    !underground && inBunker(target.x,target.y)?HATCH:target);
+  const people=ents.filter(e=>e!==P && e.alive && e.kind==='human' &&
+    inBunker(e.x,e.y)===underground && dE(e,P)<=520).length;
+  $('mini-people').textContent=people;
+  $('mini-distance').textContent=point?Math.round(dE(P,point)/T*1.5)+' м':'';
+  return point;
+}
+function miniArrow(point,size,s) {
+  if(!point) return;
+  const dx=(point.x-P.x)*s/T,dy=(point.y-P.y)*s/T;
+  if(Math.hypot(dx,dy)<4) return;
+  const edge=(size/2-16)/Math.max(1,Math.abs(dx),Math.abs(dy));
+  const k=Math.min(1,edge);
+  mctx.save();mctx.translate(size/2+dx*k,size/2+dy*k);mctx.rotate(Math.atan2(dy,dx));
+  mctx.beginPath();mctx.moveTo(10,0);mctx.lineTo(-7,-7);mctx.lineTo(-3,0);mctx.lineTo(-7,7);mctx.closePath();
+  mctx.fillStyle='#eed7a0';mctx.fill();mctx.lineWidth=2;mctx.strokeStyle='#30291a';mctx.stroke();mctx.restore();
+}
 function drawMini() {
+  const destination=miniNavigation();
   const W = mini.clientWidth || 128;
   if (mini.width !== W * 2) { mini.width = W * 2; mini.height = W * 2; }
   const size = mini.width, s = size / 32;
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.fillStyle = '#0d120c'; mctx.fillRect(0, 0, size, size);
-  if (inBunker(P.x, P.y)) { mctx.fillStyle = '#7fb0c4'; mctx.font = '600 22px "Russo One", sans-serif'; mctx.textAlign = 'center'; mctx.fillText('БУНКЕР', size / 2, size / 2 - 6); mctx.font = '500 16px "IBM Plex Mono", monospace'; mctx.fillStyle = '#8f8c74'; mctx.fillText('под землёй', size / 2, size / 2 + 20); mctx.textAlign = 'start'; return; }
+  if (inBunker(P.x, P.y)) { mctx.fillStyle = '#7fb0c4'; mctx.font = '600 22px "Russo One", sans-serif'; mctx.textAlign = 'center'; mctx.fillText('БУНКЕР', size / 2, size / 2 - 6); mctx.font = '500 16px "IBM Plex Mono", monospace'; mctx.fillStyle = '#8f8c74'; mctx.fillText('под землёй', size / 2, size / 2 + 20); mctx.textAlign = 'start'; miniArrow(destination,size,s); return; }
   mctx.setTransform(1, 0, 0, 1, size / 2 - P.x / T * s, size / 2 - P.y / T * s);
   mctx.imageSmoothingEnabled = !!ART;
   mctx.drawImage(miniC, 0, 0, PW * s, MH * s); mctx.drawImage(fogC, 0, 0, PW * s, MH * s);
@@ -770,6 +802,7 @@ function drawMini() {
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   const tq = trackedTarget();
   qTargets().forEach(q => {
+    if(tq && q.qid===tq.qid && q.x===tq.x && q.y===tq.y) return;
     if (q !== tq && !(tq && q.qid === tq.qid && q.x === tq.x && q.y === tq.y) && q.qid !== 'sos') mctx.globalAlpha = 0.45; else mctx.globalAlpha = 1;
     let x = size / 2 + (q.x - P.x) / T * s, y = size / 2 + (q.y - P.y) / T * s;
     const edge = x < 10 || y < 10 || x > size - 10 || y > size - 10;
@@ -784,6 +817,7 @@ function drawMini() {
     const scale = Math.min(1, (size / 2 - 15) / Math.max(1, Math.abs(dx), Math.abs(dy)));
     mapSymbol(mctx, 'shelter', size/2 + dx*scale, size/2 + dy*scale, 2);
   }
+  miniArrow(destination,size,s);
   mapSymbol(mctx, 'player', size / 2, size / 2, 2, P.ang);
 }
 
@@ -799,6 +833,19 @@ const WSIL = {
 const H = { hp: $('hpb'), hpv: $('hpv'), fd: $('fdb'), fdv: $('fdv'), radv: $('radv'), sBleed: $('s-bleed'), sBleedN: $('s-bleedn'), sRad: $('s-rad'), wcn: $('wcn'), wcb: $('wcb'), det: $('det'), st: $('stb'), stv: $('stv'), belt: $('belt'), clock: $('clock'), money: $('money'),
   status: $('status'), quest: $('quest'), msgs: $('msgs'), feedback: $('field-feedback'), prompt: $('prompt'), wico: $('wico'), wn: $('wn'), am: $('am') };
 let hudT = 0, lastW = '', lastNotice;
+let taskState=null, previousTasks=new Set(), previousGoal='', taskUntil=0;
+function briefTask() {
+  const active=qList().filter(q=>q.st==='a'), target=trackedTarget();
+  const ids=new Set(active.map(q=>q.id)), goal=target?target.qid+'|'+target.n:'';
+  if(taskState!==S) {taskState=S;previousTasks=new Set();previousGoal='';taskUntil=0;H.quest.replaceChildren();}
+  const accepted=active.find(q=>!previousTasks.has(q.id));
+  if(accepted || (goal && goal!==previousGoal)){
+    H.quest.textContent=(accepted && accepted.id!==target?.qid)?accepted.n:target?.n||accepted.n;
+    taskUntil=S.min+5;
+  }
+  previousTasks=ids;previousGoal=goal;
+  if(S.min>=taskUntil && H.quest.textContent) H.quest.replaceChildren();
+}
 function hud(dt) {
   if (!P) return;
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
@@ -809,7 +856,7 @@ function hud(dt) {
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
   const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
-  const stt = [shelterStatus, energyActive() ? 'энергетик · ' + Math.ceil(S.flags.energyUntil-S.min) + ' с' : '', fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
+  const stt = [shelterStatus, S.flags.poppySleep>8 ? (S.flags.poppySleep>26?"Засыпаешь":"Слипаются глаза") : "", energyActive() ? 'энергетик · ' + Math.ceil(S.flags.energyUntil-S.min) + ' с' : '', fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
@@ -831,13 +878,9 @@ function hud(dt) {
   else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
   else if (W.melee) H.am.textContent = '∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
-  const q = trackedTarget();
-  H.quest.textContent = '';
-  if (q) {
-    const d = Math.round(dst(P.x, P.y, q.x, q.y) / T * 1.5), a = Math.atan2(q.y - P.y, q.x - P.x);
-    H.quest.appendChild(el('span', 'ex', '!')); H.quest.appendChild(el('span', 'qn', q.n));
-    const ar = el('span', 'arr', '➤'); ar.style.transform = 'rotate(' + a + 'rad)'; H.quest.appendChild(ar); H.quest.appendChild(el('span', 'qd', d + ' м'));
-  }
+  briefTask();
+  const sleep=S.flags.poppySleep||0;
+  $('poppy-veil').style.opacity=String(clamp((sleep-4)/38,0,.94));
   const message = radioQueue[0];
   if (message !== lastNotice) {
     lastNotice = message;

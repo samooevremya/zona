@@ -187,6 +187,8 @@ function g7Human(e, extra, target) {
       const rise = e.campRise || 0, frame = Math.round(rise * 16);
       const sw = sheet.naturalWidth / 17, sh = 168;
       target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
+      const seatScale=.74+.26*rise;
+      target.scale(seatScale,seatScale);
       const alpha = target.globalAlpha * opacity;
       const w = rise > 0.75 ? weaponLocal(e) : null;
       const images = jacketFor(e)?.images || G3.images;

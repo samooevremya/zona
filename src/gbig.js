@@ -40,7 +40,7 @@ function stampAt(x, y, pad) {
   return null;
 }
 /* старые клетки → новые клетки. hint: id места (его штамп главнее) */
-function RMt(x, y, hint) {
+function cordonTile(x, y, hint) {
   if (!BIG) return [x, y];
   const bun = STAMPS.bunker.r;
   if (x >= bun[0]) return [x + STAMPS.bunker.d[0], y + STAMPS.bunker.d[1]];
@@ -49,6 +49,11 @@ function RMt(x, y, hint) {
   if (!st) st = stampAt(x, y, 0) || stampAt(x, y, 2);
   if (st) return [x + st.d[0], y + st.d[1]];
   return [x * 2, y * 2];
+}
+function RMt(x,y,hint) {
+  const pt=cordonTile(x,y,hint);
+  pt[0]+=cordonOrigin();
+  return pt;
 }
 /* старые пиксели → новые пиксели */
 function RMp(px, py, hint) { const r = RMt(px / T, py / T, hint); return [r[0] * T, r[1] * T]; }
@@ -76,7 +81,7 @@ function bigPath(pts, rad, tile) {
     }
   }
 }
-const streamCenter = y => 230 + 2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1);
+const streamCenter = y => cordonOrigin() + 230 + 2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1);
 const STREAM_X = y => Math.round(streamCenter(y));
 const FORD = [89, 95];
 const BIG_EXITS = { north: { x: 128, y: 0 }, west: { x: 0, y: 118 }, east: { x: 239, y: 92 } };
@@ -256,7 +261,7 @@ function bigNewObjects(R) {
     anchors: { clear: [122, 25], sos: [[133, 22]], wreck: [131.5,22.5] } });
   bigLoc('tower', { name: 'Охотничья вышка', gen: 'охотничьей вышки', type: 'story', bounds: [11, 24, 22, 35], entrances: [[19, 31]],
     anchors: { top: [16.5, 29.5], clear: [18, 33] } });
-  bigLoc('exit_w', { name: 'Дорога в Малую Зону', gen: 'дороги в Малую Зону', type: 'story', bounds: [5, 119, 19, 130], entrances: [[11, 124]], anchors: { gate: [11, 124] } });
+  bigLoc('exit_w', { name: 'Дорога в Малую Зону', gen: 'дороги в Малую Зону', type: 'story', bounds: [0, 115, 15, 122], entrances: [[4, 118]], anchors: { gate: [1, 118] } });
   bigLoc('exit_e', { name: 'Дорога на Затон', gen: 'дороги на Затон', type: 'story', bounds: [232, 86, 239, 98], entrances: [[233, 92]], anchors: { gate: [237, 92] } });
   SOS_SPOTS.push([38, 137, 'hutor'], [224, 99, 'ford'], [133, 22, 'column']);
   CLEAR_SPOTS.push([33, 131, 'у хутора', 'hutor'], [226, 97, 'у брода', 'ford'], [122, 25, 'у разбитой колонны', 'column']);
@@ -333,9 +338,9 @@ const CORDON_DETAILS = [
   ['c1_trace_stump', 15.5, 32.5, 43, -0.35],
   // Северный переход
   ['c1_sandbags', 130, 6.5, 45, -0.2],
-  ['c1_trace_wheel', 131.5, 6.5, 26, 0.14],
+  ['c1_trace_wheel', 131.5, 6.5, 22, 0.14],
   // Колонна
-  ['c1_trace_wheel', 121.5, 23.5, 29, 0.18],
+  ['c1_trace_wheel', 121.5, 23.5, 24, 0.18],
   ['c1_junk', 119, 26, 27, -0.4],
   ['c1_trace_reel', 123.5, 22, 30, 0.2],
   // Свиноферма
@@ -350,14 +355,14 @@ const CORDON_DETAILS = [
   ['c1_log2', 210, 45, 45, 0.28],
   // Туннель и трансформаторная
   ['c1_trace_sleepers', 70, 61, 61, 0.06],
-  ['c1_trace_reel', 65, 65, 39, 0.09],
+  ['c1_trace_reel', 65, 65, 31, 0.09],
   ['c1_bricks', 66.3, 65.4, 24, -0.36],
   // Мост
   ['c1_trace_pipes', 123, 60, 59, -0.2],
   ['c1_sandbags', 122, 62, 44, 0.12],
   // Восточная канава и релейная будка
   ['c1_trace_pipes', 206.5, 53, 48, 0.67],
-  ['c1_trace_reel', 210, 67, 37, -0.11],
+  ['c1_trace_reel', 210, 67, 30, -0.11],
   ['c1_junk', 211.5, 67.7, 24, 0.34],
   // Логово псов
   ['c1_trace_stump', 23, 86, 50, 0.2],
@@ -384,21 +389,21 @@ const CORDON_DETAILS = [
   ['c1_trace_pipes', 78.5, 126, 62, -0.12],
   ['c1_trace_reel', 79, 127.5, 31, 0.16],
   // Обочины шоссе
-  ['c1_trace_wheel', 122, 88, 28, 0.47],
+  ['c1_trace_wheel', 122, 88, 23, 0.47],
   ['c1_junk', 118.5, 149, 34, -0.2],
-  ['c1_trace_wheel', 127.5, 178, 27, -0.25],
+  ['c1_trace_wheel', 127.5, 178, 23, -0.25],
   // АТП
-  ['c1_trace_wheel', 193, 141, 34, -0.12],
+  ['c1_trace_wheel', 193, 141, 25, -0.12],
   ['c1_tires', 194.4, 141.4, 36, 0.1],
   ['c1_trace_pipes', 200, 148, 49, 0.2],
   // Автобус
   ...(TOLIK_AT_JUNCTION ? [
-    ['c1_trace_wheel', 81, 160, 25, 0.18],
+    ['c1_trace_wheel', 81, 160, 22, 0.18],
     ['c1_junk', 75, 160.6, 34, -0.27],
     ['c1_trace_kettle', 78, 161, 22, 0.22],
   ].map(([id, x, y, width, angle]) =>
     [id, x + TOLIK_SCENE_SHIFT[0], y + TOLIK_SCENE_SHIFT[1], width, angle]
-  ) : [['c1_trace_wheel', 81, 160, 25, 0.18]]),
+  ) : [['c1_trace_wheel', 81, 160, 22, 0.18]]),
   // Восточные сады
   ['c1_trace_apples', 195, 187, 37, -0.13],
   ['c1_trace_apples', 197.4, 187.9, 25, 0.56],
@@ -408,5 +413,5 @@ const CORDON_DETAILS = [
   ['c1_log1', 147.5, 192.6, 44, -0.38],
   // Южный блокпост
   ['c1_sandbags', 131, 205, 51, 0.23],
-  ['c1_trace_reel', 133, 204.5, 32, -0.32],
+  ['c1_trace_reel', 133, 204.5, 30, -0.32],
 ];
