@@ -3,7 +3,11 @@ from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parent
 ROOT = SOURCE.parents[1]
-page = (ROOT / "index.html").read_text()
+# Keep the approved single-station comparison reproducible after the campaign renderer changes.
+import subprocess
+page = subprocess.check_output(
+    ["git", "show", "38bc09cbffd26b6cffc57979ff65e19dc687340f:index.html"], cwd=ROOT
+).decode()
 
 
 def replace(old, new):

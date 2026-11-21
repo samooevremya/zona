@@ -2495,6 +2495,7 @@ function* paintGroundWin(g, R) {
     }
   }
   if (ART) yield* artGround(g, R);
+  if (perspective && ART) paintHills(g);
   yield;
   // мягкие пятна цвета поверх клеток, чтобы не было шахматки
   if (!ART) {
@@ -2639,6 +2640,13 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if (perspective && ART && objectHeight[o.k]) {
+    groundShadow(g,o.x+o.w*.5,o.y+o.h*.5,o.w*.49,o.h*.44,0,2);
+    return;
+  }
+  paintStaticObject(g,o);
+}
+function paintStaticObject(g,o) {
   if (o.k==='freightWagon' && lesserSprites[o.sprite]) {
     g.save();spriteShadow(g,3,2);g.drawImage(lesserSprites[o.sprite],o.x,o.y,o.w,o.h);g.restore();return;
   }
@@ -3038,6 +3046,7 @@ function render() {
   }
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
+  if (perspective && ART && !shopVisible) drawWorldRelief(inView);
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
     if (d.burn) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.28); ctx.fill(); continue; }
@@ -3050,8 +3059,13 @@ function render() {
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
-    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
+    if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
+      if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
+      else containerDraw(o);
+    }
+    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
+      if(perspective) liftContainer(o,crateDraw); else crateDraw(o);
+    }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x,o.y,48)) {
@@ -3108,12 +3122,22 @@ function render() {
       }
       ctx.globalAlpha = h.a; ctx.drawImage(h.shadow, h.x*T-8, h.y*T-4);
     }
-    ctx.globalAlpha = h.a; drawHouseRoof(ctx, h, i, 1); ctx.globalAlpha = 1;
+    ctx.globalAlpha = h.a;
+    if (perspective && ART) drawRaisedHouse(h, i);
+    else drawHouseRoof(ctx, h, i, 1);
+    ctx.globalAlpha = 1;
   });
   // провода ЛЭП
   const py0 = objs.filter(o => o.k === 'pylon');
   ctx.strokeStyle = 'rgba(20,20,18,0.55)'; ctx.lineWidth = 1;
+  ctx.save();
+  if (perspective) {
+    const k=objectHeight.pylon;
+    ctx.transform(1+k,0,0,1+k,-cam.x*k,-cam.y*k);
+  }
   for (let i = 0; i + 1 < py0.length; i++) { const a = py0[i], b = py0[i + 1]; if (!inView(a.x, a.y, 600) && !inView(b.x, b.y, 600)) continue; [-6, 0, 6].forEach(o => { ctx.beginPath(); ctx.moveTo(a.x + 10 + o, a.y + 10 - o); ctx.quadraticCurveTo((a.x + b.x) / 2 + 10 + o, (a.y + b.y) / 2 + 30, b.x + 10 + o, b.y + 10 - o); ctx.stroke(); }); }
+  ctx.restore();
+  if (perspective && ART && !shopVisible) drawCheckpointSpan(inView);
   drawCloudShadows();
   // кроны
   const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
@@ -3136,7 +3160,9 @@ function render() {
       const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
       const width = height * (.77 + .30 * hash2(y + 31, x));
       const crown = yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[ci];
-      drawAutumnCrown(crown, cx + sw, cy, width, height);
+      if (perspective) drawLayeredCrown(crown, cx + sw, cy, width, height,
+        crown === yardTreeCrown ? 'yard' : edge ? edgeCrowns[ci-forestCrowns.length] : forestCrowns[ci]);
+      else drawAutumnCrown(crown, cx + sw, cy, width, height);
     } else {
       const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
       ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;
@@ -3701,6 +3727,7 @@ function drawRailStrip(g,x,top,h){
   const c = PATS[key], ox = ((x * T) % c.width + c.width) % c.width;
   g.save();g.beginPath();g.rect(0,top,T,h);g.clip();
   g.drawImage(c,-ox,top);g.drawImage(c,c.width-ox,top);
+  if (perspective) ballastSlope(g,0,top,T,h);
   g.restore();
 }
 /* дёшево сравнить, относится ли клетка к земле, на которой лежит текстура */
@@ -4363,6 +4390,12 @@ function drawBridgeGate(g, o) {
   g.translate(o.x, o.y + o.h / 2);
   g.drawImage(sheet, sx, sy, 106, 129, -12, -11, 18, 22);
   g.drawImage(sheet, sx + 382, sy, 103, 129, o.w - 6, -11, 18, 22);
+  if (perspective) {
+    const [px,py] = roofPoint(o.x,o.y + o.h/2,.026);
+    const dx=px-o.x,dy=py-o.y-o.h/2;
+    g.strokeStyle='#564b3e';g.lineWidth=4;g.beginPath();g.moveTo(3,0);g.lineTo(3+dx,dy);
+    g.moveTo(o.w,0);g.lineTo(o.w+dx,dy);g.stroke();g.translate(dx,dy);
+  }
   g.translate(3, 0);
   if (!o.solid) g.rotate(-1.35);
   g.drawImage(sheet, sx + 106, sy + 53, 276, 16, 0, -2.5, o.w - 7, 5);
@@ -4434,7 +4467,8 @@ function drawCordonDetails(g) {
     const x = tx * T, y = ty * T;
     // Захватываем и соседний кусок, если повёрнутый рисунок пересекает границу.
     if (x + width < GWP.x0 || x - width > GWP.x1 || y + width < GWP.y0 || y - width > GWP.y1) continue;
-    c1Draw(g, id, x, y, width, angle);
+    if (perspective && detailHeight(id)) groundShadow(g,x,y,width*.39,width*.18,angle,2);
+    else c1Draw(g, id, x, y, width, angle);
   }
   g.restore();
 }
@@ -4509,7 +4543,8 @@ function artDecor0(g) {
       else if (d[0] !== 'fence') {
         g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill();
       }
-      c1Draw(g, id, x, y, width, d[3], 1, log ? 3 : 9); return;
+      if (!perspective || !detailHeight(id)) c1Draw(g, id, x, y, width, d[3], 1, log ? 3 : 9);
+      return;
     }
     if (d[0] !== 'fence') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill(); }
     ART.draw(g, d[0], x, y, undefined, undefined, d[3]);
@@ -4560,6 +4595,7 @@ function artCanopy() {
       g.drawImage(autumnBirch(pick[v], v, CAN_SZ * 2), -w / 2, -w / 2, w, w);
     } else ART.draw(g, pick[v], 0, 0, w, w);
     c1Grade(c, 0, 0, c.width, c.height);
+    if (perspective) cacheCrownLayers(c, g.getTransform(), pick[v], v, w);
     if (pick[v] === 'c1_yard_tree') yardTreeCrown = c;
     else CANOPY.push(c);
   }
@@ -4587,7 +4623,7 @@ function c1Grade(c, x, y, w, h) {
 /* спрайт C1 по ширине с сохранением пропорций */
 let C1SH = 0;   // тень силуэта для объектов, запекаемых в землю (машины, автобус, люк, столбы, декор)
 function spriteShadow(g, length, blur) {
-  if (!SHADOWS) return;
+  if (!SHADOWS || (perspective && unshadowedSurface.has(g))) return;
   const k = g.getTransform().a;
   g.shadowColor = 'rgba(15,13,10,.52)'; g.shadowBlur = blur * k;
   g.shadowOffsetX = SUN_DX * length * k; g.shadowOffsetY = SUN_DY * length * k;
@@ -4682,7 +4718,7 @@ function artRoof(h, idx) {
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
   if(h.mat==='depot' && lesserSprites['depot-roof']){
-    const rw=W-7,rh=Hh-16;
+    const rw=W-7,rh=Hh-16; h.roofSurface=[rw,rh];
     artFill(g,'wall_brick',2,rh-3,rw,11);
     g.drawImage(lesserSprites['depot-roof'],0,0,rw,rh);
     g.shadowColor='transparent';
@@ -4697,6 +4733,7 @@ function artRoof(h, idx) {
     // объём: снизу видна полоса передней стены, крыша над ней чуть короче и бросает тень на стену
     const flat = id === 'c1_tower' || id.startsWith('c1_booth');
     const wallH = flat ? 6 : Math.min(20, 10 + h.h * 1.4), RW = W - 6, RH = Hh - 6 - wallH;
+    h.roofSurface=[RW,RH];
     if (wallH) {
       g.shadowColor = 'transparent';
       const wy = RH - 2, wood = h.mat !== 'conc';
@@ -7173,12 +7210,17 @@ const trailSigns = [
   {x:107.35,y:LESSER_TOP+50.75,village:true,angle:.18}
 ];
 function drawTrailSigns(g) {
-  if (!BIG) return;
+  if (!BIG || (perspective && ART)) return;
   for (const sign of trailSigns) {
     const x=sign.x*T, y=sign.y*T, width=sign.village?36:32;
     if (x+width<GWP.x0 || x-width>GWP.x1 || y+width<GWP.y0 || y-width>GWP.y1) continue;
+    drawTrailSign(g,sign);
+  }
+}
+function drawTrailSign(g,sign) {
+    const x=sign.x*T,y=sign.y*T,width=sign.village?36:32;
     const sprite=lesserSprites[sign.village?'village-sign':'fingerpost'];
-    if (!sprite) continue;
+    if (!sprite) return;
     const height=width*sprite.height/sprite.width;
     g.save(); g.translate(x,y); g.rotate(sign.angle);
     g.save(); spriteShadow(g,2,1);
@@ -7191,7 +7233,6 @@ function drawTrailSigns(g) {
       g.fillText(sign.label,0,-height*.78,width*.84);
     }
     g.restore();
-  }
 }
 // Окраска соцветий, рёбра оболочек и тени попадают в те же кэшированные
 // куски земли, что и местные декорации. На мини-карте используется тот же план.
@@ -7215,12 +7256,12 @@ function drawLesserDetails(g) {
       }
     }
   const bx=35.1*T, by=(top+82)*T, hull=lesserSprites.barge;
-  if (hull && bx+172>=GWP.x0 && bx-172<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
+  if (!perspective && hull && bx+172>=GWP.x0 && bx-172<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
     const h=324*hull.height/hull.width;
     g.save(); g.translate(bx,by); spriteShadow(g,3,2);
     g.drawImage(hull,-162,-h/2,324,h); g.restore();
   }
-  drawLesserInstallations(g,GWP);
+  if (!perspective) drawLesserInstallations(g,GWP);
 }
 function drawLesserInstallations(g,win) {
   for (const l of lesserLandmarks) {
@@ -7560,6 +7601,7 @@ function drawFreightTrack(g,line,win,steelOnly=false) {
       }
       g.translate(-phase,-1.5*T-9);g.fillStyle=pattern;
       g.fillRect(phase-pad*T,0,(len+2*pad)*T,3*T+18);
+      if(perspective && !steelOnly && win) ballastSlope(g,phase-pad*T,0,(len+2*pad)*T,3*T+18);
       g.restore();
     }
     phase+=len*T;
@@ -7578,7 +7620,7 @@ function drawDumpDetails(g,win) {
   if(!BIG || (win && (win.y0>(NORTH_ROWS+60)*T || win.x0>425*T || win.x1<77*T))) return;
   const visible=(x,y,r)=>!win || x+r>=win.x0 && x-r<=win.x1 && y+r>=win.y0 && y-r<=win.y1;
   for(const [x,y,w,h,a] of dumpHills){
-    if(!visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
+    if((perspective && win) || !visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
     g.save();g.globalAlpha=.66;g.translate(x*T,y*T);g.rotate(a);
     g.drawImage(lesserSprites.slag,-w*T/2,-h*T/2,w*T,h*T);g.restore();
   }
@@ -7598,7 +7640,7 @@ function drawDumpDetails(g,win) {
   for(const [kind,centres,width] of [['tank',dumpTanks,2.25]]){
     const sprite=lesserSprites[kind]; if(!sprite) continue;
     for(const [x,y] of centres){
-      if(!visible(x*T,y*T,width*T)) continue;
+      if((perspective && win) || !visible(x*T,y*T,width*T)) continue;
       const w=width*T,h=w*sprite.height/sprite.width;
       g.save();spriteShadow(g,3,2);g.drawImage(sprite,x*T-w/2,y*T-h/2,w,h);g.restore();
     }
@@ -8872,6 +8914,646 @@ function setupControlEditor() {
   controlEditor.oncancel=e=>{e.preventDefault();closeControlEditor(false);};
   addEventListener('resize',()=>{padDrag=null;placeControls();updateLayoutPreview();});
   new ResizeObserver(updateLayoutPreview).observe(view);
+}
+
+// Perspective only affects world-space drawing. Save data, collision and PDA coordinates stay on the ground
+// plane.
+const perspective = BIG && C1 && !/perspective-off/.test(location.hash);
+const houseHeight = .16;
+const walls = new Map(), canopyLayers = new WeakMap();
+function roofPoint(x, y, k) {
+  return [x + (x - cam.x) * k, y + (y - cam.y) * k];
+}
+function wallTexture(h, side, len, wood, kind) {
+  const key = [h.x, h.y, side, kind].join('/');
+  if (walls.has(key)) return walls.get(key);
+  const c = document.createElement('canvas');
+  c.width = len;
+  c.height = 88;
+  const g = c.getContext('2d'), rand = mulberry32(h.x * 173 + h.y * 31 + side);
+  artFill(g, wood ? 'floor_wood' : 'wall_concrete', 0, 0, len, 88);
+  g.fillStyle = wood ? 'rgba(74,61,44,.40)' : 'rgba(119,111,92,.33)';
+  g.fillRect(0, 0, len, 88);
+  for (let i = 0; i < len * 8; i++) {
+    g.fillStyle = rand() < .48 ? 'rgba(35,30,24,.17)' : 'rgba(188,180,151,.16)';
+    g.fillRect(rand() * len, rand() * 88, rand() * 2 + 0.3, 1);
+  }
+  if (wood)
+    for (let y = 6; y < 88; y += 7) {
+      g.fillStyle = 'rgba(37,33,27,.57)';
+      g.fillRect(0, y, len, 1.4);
+      g.fillStyle = 'rgba(203,185,151,.26)';
+      g.fillRect(0, y + 1.5, len, 1);
+    }
+  if (!wood) {
+    for (let x = 18; x < len; x += 45) {
+      g.fillStyle = 'rgba(65,60,50,.3)';
+      g.fillRect(x, 0, 1, 78);
+      g.fillStyle = 'rgba(172,161,137,.30)';
+      g.fillRect(x + 1, 0, 1, 78);
+    }
+    for (let i = 0; i < 36; i++) {
+      const x = rand() * len, y = rand() * 45, r = rand() * 4 + 1;
+      const streak = g.createLinearGradient(0, y, 0, y + 22);
+      streak.addColorStop(0, 'rgba(57,51,40,.30)');
+      streak.addColorStop(1, 'rgba(57,51,40,0)');
+      g.fillStyle = streak;
+      g.fillRect(x, y, r, 22);
+    }
+    g.save();
+    g.beginPath();
+    const cr = len * .12;
+    g.moveTo(cr, 76);
+    g.lineTo(cr + 4, 69);
+    g.lineTo(cr + 9, 68);
+    g.lineTo(cr + 10, 63);
+    g.lineTo(cr + 19, 61);
+    g.lineTo(cr + 24, 74);
+    g.lineTo(cr + 31, 76);
+    g.lineTo(cr + 30, 80);
+    g.lineTo(cr, 80);
+    g.clip();
+    artFill(g, 'wall_brick', 0, 0, len, 88);
+    g.restore();
+  }
+  const sideDir = [[0, -1], [1, 0], [0, 1], [-1, 0]][side];
+  const ds = (h.entrances || [])
+                 .filter(e => e.nx === sideDir[0] && e.ny === sideDir[1])
+                 .map(e => ({u: side % 2 ? e.y : e.x, w: e.width}));
+  for (const door of ds) {
+    const w = Math.min(door.w, len - 4), l = door.u - w / 2;
+    g.fillStyle = '#766b56';
+    g.fillRect(l - 3, 22, w + 6, 66);
+    g.fillStyle = '#211f1a';
+    g.fillRect(l, 25, w, 63);
+    g.fillStyle = '#4f483a';
+    g.fillRect(l + 1, 27, w * .27, 59);
+    g.fillStyle = '#a69b7f';
+    g.fillRect(l + w * .19, 57, 2, 3);
+  }
+  for (let i = 0, n = Math.max(1, Math.floor(len / 65)); i < n; i++) {
+    const u = (i + .5) * len / n;
+    if (ds.some(d => Math.abs(d.u - u) < d.w / 2 + 18)) continue;
+    let l = u - 13;
+    g.fillStyle = '#252623';
+    g.fillRect(l - 3, 19, 32, 36);
+    g.fillStyle = '#827965';
+    g.fillRect(l - 2, 20, 30, 32);
+    const glass = g.createLinearGradient(0, 23, 0, 51);
+    glass.addColorStop(0, '#252c2a');
+    glass.addColorStop(.6, '#414a45');
+    glass.addColorStop(1, '#65685a');
+    g.fillStyle = glass;
+    g.fillRect(l, 23, 26, 27);
+    g.fillStyle = '#736c5b';
+    g.fillRect(u - 1, 22, 2, 29);
+    g.fillRect(l, 32, 26, 2);
+    g.fillStyle = '#a1987f';
+    g.fillRect(l - 4, 52, 34, 2);
+    g.fillStyle = 'rgba(26,23,19,.5)';
+    g.fillRect(l - 3, 54, 32, 2);
+  }
+  g.fillStyle = 'rgba(50,44,36,.55)';
+  g.fillRect(0, 79, len, 9);
+  const dim = g.createLinearGradient(0, 0, 0, 88);
+  dim.addColorStop(0, 'rgba(23,21,16,.64)');
+  dim.addColorStop(.22, 'rgba(23,21,16,.10)');
+  dim.addColorStop(1, 'rgba(23,21,16,.04)');
+  g.fillStyle = dim;
+  g.fillRect(0, 0, len, 88);
+  walls.set(key, c);
+  return c;
+}
+function texturedFace(a, b, k, tex) {
+  // Horizontal strips follow the four projected corners; doors meet their original sill.
+  const u = roofPoint(...a, k), v = roofPoint(...b, k);
+  const N = 8;
+  for (let j = 0; j < N; j++) {
+    let t = j / N, s = (j + 1) / N, ax = lerp(u[0], a[0], t), ay = lerp(u[1], a[1], t),
+        bx = lerp(v[0], b[0], t), by = lerp(v[1], b[1], t), dx = lerp(u[0], a[0], s),
+        dy = lerp(u[1], a[1], s);
+    ctx.save();
+    ctx.transform((bx - ax) / tex.width, (by - ay) / tex.width, dx - ax, dy - ay, ax, ay);
+    ctx.drawImage(tex, 0, t * tex.height, tex.width, tex.height / N, 0, 0, tex.width, 1.1);
+    ctx.restore();
+  }
+}
+function drawRaisedHouse(h, i) {
+  const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
+  const k = houseHeight *
+      (h.ruin                ? .72 :
+           h.mat === 'depot' ? 1.23 :
+           w < 110           ? .68 :
+           w > 300           ? 1.12 :
+                               1),
+        corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
+  const ends = [[0, 1], [1, 2], [3, 2], [0, 3]], vis = [cam.y<y, cam.x>x + w, cam.y > y + d, cam.x < x];
+  for (let s = 0; s < 4; s++)
+    if (vis[s]) {
+      const [a, b] = ends[s];
+      texturedFace(
+          corners[a], corners[b], k,
+          wallTexture(h, s, s % 2 ? d : w, h.mat !== 'conc' && h.mat !== 'depot', 'house'));
+    }
+  const porch = h.entrances?.find(e => e.approach === 'porch');
+  if (porch && h.porchDepth && cam.y > y + d) {
+    const [u, v] = roofPoint(x + porch.x, y + d, k * .62);
+    ctx.save();
+    ctx.translate(u - porch.x - 3, v);
+    drawPorch(ctx, porch, -2, 11);
+    ctx.restore();
+  }
+  const roof = ROOFS[i], [rx, ry] = roofPoint(x - 3, y - 3, k);
+  const surface = h.roofSurface || [w + 4, d + 4];
+  const density = roof.width / (w + 10);
+  ctx.drawImage(
+      roof, 0, 0, surface[0] * density, surface[1] * density, rx, ry, (w + 6) * (1 + k), (d + 6) * (1 + k));
+}
+function makeLeaves(c, clean) {
+  const w = c.width, h = c.height, base = c.getContext('2d').getImageData(0, 0, w, h),
+        fol = clean.getContext('2d').getImageData(0, 0, w, h);
+  const frames = Array.from({length: 4}, () => {
+    let a = document.createElement('canvas');
+    a.width = w;
+    a.height = h;
+    return a;
+  });
+  const pix = frames.map(a => a.getContext('2d').createImageData(w, h));
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let i = (y * w + x) * 4, A = base.data[i + 3] / 255, F = fol.data[i + 3] / 255;
+      const shade = pix[0].data;
+      shade[i] = 5;
+      shade[i + 1] = 6;
+      shade[i + 2] = 4;
+      shade[i + 3] = 255 * Math.max(0, (A - F) / Math.max(.002, 1 - F));
+      if (!F) continue;
+      let nx = (x - w * .51) / w, ny = (y - h * .46) / h, r = Math.hypot(nx, ny);
+      let z = r + .036 * Math.sin(nx * 24 + ny * 11) + .026 * Math.sin(ny * 23 - nx * 14);
+      let layer = z < .18 ? 3 : z < .305 ? 2 : 1;
+      for (let j = 1; j <= layer; j++) {
+        const main = j === layer;
+        const daylight = .965 + .034 * (j - 1) - .10 * (nx + ny);
+        const gain = main ? daylight : .78, alpha = main ? 1 : .59;
+        const target = pix[j].data;
+        for (let channel = 0; channel < 3; channel++) target[i + channel] = fol.data[i + channel] * gain;
+        target[i + 3] = fol.data[i + 3] * alpha;
+      }
+    }
+  frames.forEach((a, j) => a.getContext('2d').putImageData(pix[j], 0, 0));
+  canopyLayers.set(c, frames);
+}
+function drawLayeredCrown(s, x, y, w, h, kind) {
+  const layers = canopyLayers.get(s);
+  if (!layers) return drawAutumnCrown(s, x, y, w, h);
+  const height = (kind.startsWith('c1_pine')     ? .12 :
+                      kind.startsWith('c1_dead') ? .065 :
+                                                   .096) *
+      clamp(h / 150, .72, 1.2);
+  // The trunk stays rooted; the pale upper branch and leaf clusters travel with the crown.
+  drawAutumnCrown(layers[0], x, y, w, h);
+  const tip = roofPoint(x, y, height * .68);
+  ctx.save();
+  ctx.strokeStyle = kind.startsWith('c1_birch') ? '#938975' : '#4c4537';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(...tip);
+  ctx.stroke();
+  ctx.restore();
+  for (let j = 1; j < 4; j++) {
+    const k = height * [0, .25, .63, 1][j], p = roofPoint(x, y, k);
+    drawAutumnCrown(layers[j], ...p, w * (1 + k * .22), h * (1 + k * .22));
+  }
+}
+function posts(x, y, k, half, col) {
+  let [u, v] = roofPoint(x, y, k);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = half * 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(u, v);
+  ctx.stroke();
+  ctx.fillStyle = '#a59b83';
+  ctx.fillRect(u - half, v - half, half * 2, half * 2);
+}
+// Build the clean counterpart with the same transform used by the original tree stamp.
+function cacheCrownLayers(c, transform, spriteName, variant, width) {
+  const clean = document.createElement('canvas');
+  clean.width = c.width;
+  clean.height = c.height;
+  const cleanG = clean.getContext('2d');
+  cleanG.setTransform(transform);
+  if (spriteName.startsWith('c1_birch')) {
+    cleanG.drawImage(autumnBirch(spriteName, variant, CAN_SZ * 2), -width / 2, -width / 2, width, width);
+  } else
+    ART.draw(cleanG, spriteName, 0, 0, width, width);
+  c1Grade(clean, 0, 0, clean.width, clean.height);
+  makeLeaves(c, clean);
+}
+
+// Heights are fractions of the camera distance. Draw silhouettes against their actual footprint.
+const objectHeight = {
+  bus: .043,
+  car: .027,
+  trafo: .049,
+  freightWagon: .049,
+  scrapCrane: .066,
+  hatch: .05,
+  pylon: .078,
+  blocks: .015,
+  sand: .012,
+  bed: .009,
+  table: .017,
+  shelf: .032,
+  bars: .023
+};
+const objectSurfaces = new WeakMap(), detailSurfaces = new Map(), unshadowedSurface = new WeakSet();
+function detailHeight(id) {
+  if (/yard_car|tractor|truck/.test(id)) return .03;
+  if (/pole|reel|barrel|drum/.test(id)) return .017;
+  if (/rock|bricks|log|sleepers|pipes|sandbags|boat|stump|junk|kettle|tires|wheel|churn|crate/.test(id))
+    return .009;
+  return 0;
+}
+function makeSurface(width, height, paint) {
+  const top = document.createElement('canvas');
+  top.width = Math.ceil(width * 1.5);
+  top.height = Math.ceil(height * 1.5);
+  const g = top.getContext('2d');
+  g.scale(top.width / width, top.height / height);
+  paint(g);
+  c1Grade(top, 0, 0, top.width, top.height);
+  const side = document.createElement('canvas');
+  side.width = top.width;
+  side.height = top.height;
+  const flank = side.getContext('2d');
+  flank.drawImage(top, 0, 0);
+  flank.globalCompositeOperation = 'source-atop';
+  flank.fillStyle = 'rgba(30,26,21,.49)';
+  flank.fillRect(0, 0, side.width, side.height);
+  return {top, side, width, height};
+}
+function raisedSprite(surface, x, y, k, angle = 0) {
+  const {width: w, height: h, side, top} = surface;
+  const [u, v] = roofPoint(x, y, k), dx = u - x, dy = v - y;
+  const steps = Math.min(7, Math.max(1, Math.ceil(Math.hypot(dx, dy) / 1.8)));
+  ctx.save();
+  ctx.translate(x, y);
+  for (let j = 0; j <= steps; j++) {
+    const t = j / steps, scale = 1 + k * t;
+    ctx.save();
+    ctx.translate(dx * t, dy * t);
+    ctx.rotate(angle);
+    ctx.drawImage(j === steps ? top : side, -w * scale / 2, -h * scale / 2, w * scale, h * scale);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function worldDetail(id, x, y, w, angle) {
+  const k = detailHeight(id);
+  if (!k) return;
+  const key = id + '/' + w;
+  let surface = detailSurfaces.get(key);
+  if (!surface) {
+    const rect = ART.m.sprites[id].rect, h = w * rect[3] / rect[2];
+    surface = makeSurface(w, h, g => c1Draw(g, id, w / 2, h / 2, w));
+    detailSurfaces.set(key, surface);
+  }
+  raisedSprite(surface, x, y, k, angle);
+}
+function objectSurface(o) {
+  let surface = objectSurfaces.get(o);
+  if (surface) return surface;
+  // Include the overhang of the crane jib, the bus bonnet and chipped concrete caps.
+  const pad = o.k === 'scrapCrane' ? 4 * T : 18, w = o.w + 2 * pad, h = o.h + 2 * pad;
+  surface = makeSurface(w, h, g => {
+    g.translate(pad - o.x, pad - o.y);
+    // The silhouette supplies side faces. Its ground shadow is already in the terrain chunk.
+    unshadowedSurface.add(g);
+    try {
+      paintStaticObject(g, o);
+    } finally {
+      unshadowedSurface.delete(g);
+    }
+  });
+  objectSurfaces.set(o, surface);
+  return surface;
+}
+// Pre-cut feathered height bands once. The full-resolution silhouette and its contact
+// point stay intact as the upper parts move. Canvas doesn't have to tessellate alpha sprites.
+const reliefBands = new WeakMap();
+function reliefPatch(image, x, y, w, h, angle, profile, amplitude) {
+  let bands = reliefBands.get(image);
+  if (!bands) {
+    const size = Math.min(1, 640 / Math.max(image.width, image.height));
+    const base = document.createElement('canvas');
+    base.width = Math.round(image.width * size);
+    base.height = Math.round(image.height * size);
+    const g = base.getContext('2d');
+    g.drawImage(image, 0, 0, base.width, base.height);
+    c1Grade(base, 0, 0, base.width, base.height);
+    const pixels = g.getImageData(0, 0, base.width, base.height), levels = 6;
+    const heights = new Float32Array(base.width * base.height);
+    let low = 0, high = 0;
+    for (let j = 0; j < base.height; j++)
+      for (let i = 0; i < base.width; i++) {
+        const z = profile(i / (base.width - 1), j / (base.height - 1));
+        heights[j * base.width + i] = z;
+        low = Math.min(low, z);
+        high = Math.max(high, z);
+      }
+    bands = [];
+    for (let n = 0; n < levels; n++) {
+      const z = low + (high - low) * n / (levels - 1);
+      const c = document.createElement('canvas');
+      c.width = base.width;
+      c.height = base.height;
+      const cg = c.getContext('2d'), p = cg.createImageData(c.width, c.height);
+      for (let i = 0; i < heights.length; i++) {
+        const t = (heights[i] - low) * (levels - 1) / (high - low || 1);
+        const coverage = n === 0 ? 1 : clamp(t - n + 1, 0, 1);
+        if (!coverage) continue;
+        const ix = i * 4;
+        p.data[ix] = pixels.data[ix];
+        p.data[ix + 1] = pixels.data[ix + 1];
+        p.data[ix + 2] = pixels.data[ix + 2];
+        // Feathering inside the same surface fills newly visible back slopes.
+        // On transparent fringes distribute coverage to avoid darkening the outline.
+        const alpha = pixels.data[ix + 3] / 255;
+        p.data[ix + 3] =
+            255 * coverage * (alpha > .96 ? alpha : 1 - (1 - alpha) ** (1 / Math.max(1, 1 + t)));
+      }
+      cg.putImageData(p, 0, 0);
+      bands.push({image: c, z});
+    }
+    reliefBands.set(image, bands);
+  }
+  for (const layer of bands) {
+    const k = amplitude * layer.z, [cx, cy] = roofPoint(x, y, k);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.scale(1 + k, 1 + k);
+    ctx.drawImage(layer.image, -w * .5, -h * .5, w, h);
+    ctx.restore();
+  }
+}
+function ridge(u, v) {
+  const xx = 2 * u - 1, yy = 2 * v - 1;
+  return Math.max(0, 1 - xx * xx - yy * yy) ** 2 * (1 + .16 * Math.sin(8 * u + 4 * v));
+}
+function gateHeightAt(u, v) {
+  const hill = .038 * ridge(u, v);
+  const inner = clamp((.18 - Math.abs(u - .5)) / .075, 0, 1);
+  const stairs = clamp((v - .19) / .11, 0, 1) * clamp((.85 - v) / .45, 0, 1);
+  const leaf = Math.max(0, 1 - Math.abs(Math.abs(u - .5) - .285) / .12) * clamp((v - .14) / .14, 0, 1) *
+      clamp((.82 - v) / .14, 0, 1);
+  return hill + .032 * leaf - .075 * inner * stairs;
+}
+function drawWorldRelief(inView) {
+  const visible = (x, y, r) => inView(x, y, r + 35);
+  for (const [x, y, w, h, a] of dumpHills) {
+    if (!lesserSprites.slag || !visible(x * T, y * T, w * T * .6)) continue;
+    ctx.save();
+    reliefPatch(lesserSprites.slag, x * T, y * T, w * T, h * T, a, ridge, .084);
+    ctx.restore();
+  }
+  for (const [id, tx, ty, w, a] of CORDON_DETAILS)
+    if (visible(tx * T, ty * T, w)) worldDetail(id, tx * T, ty * T, w, a);
+  for (const [kind, tx, ty, a] of DECOR) {
+    const entry = C1DECOR[kind];
+    if (entry && visible(tx * T, ty * T, entry[1])) worldDetail(entry[0], tx * T, ty * T, entry[1], a);
+  }
+  for (const o of objs) {
+    const x = o.x + o.w / 2, y = o.y + o.h / 2, k = objectHeight[o.k];
+    if (!(k || o.k === 'fence') || !visible(x, y, Math.max(o.w, o.h) / 2 + 64)) continue;
+    if (o.k === 'fence') {
+      const vertical = o.h > o.w, len = vertical ? o.h : o.w, n = Math.ceil(len / 52),
+            height = o.material === 'stockade' ? .043 : .024;
+      for (let i = 0; i <= n; i++)
+        posts(vertical ? x : o.x + len * i / n, vertical ? o.y + len * i / n : y, height, 1.45, '#595448');
+      const a = roofPoint(vertical ? x : o.x, vertical ? o.y : y, height);
+      const b = roofPoint(vertical ? x : o.x + len, vertical ? o.y + len : y, height);
+      ctx.strokeStyle = '#777364';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(...a);
+      ctx.lineTo(...b);
+      ctx.stroke();
+    } else if (o.k === 'freightWagon' && o.sprite === 'wagon' && lesserSprites.wagon) {
+      drawFreightBody(o);
+    } else if (o.k === 'hatch' && gateTerrain) {
+      reliefPatch(gateTerrain, x, y, o.w, o.h, 0, gateHeightAt, 1);
+    } else {
+      if (o.k === 'pylon') posts(x, y, k, 2, '#787364');
+      if (o.k === 'pylon') {
+        const top = roofPoint(x, y, k);
+        c1Draw(ctx, 'c1_pole_conc', ...top, 44, (o.x * 7 % 3) * .2);
+      } else
+        raisedSprite(objectSurface(o), x, y, k);
+    }
+  }
+  if (lesserSprites.barge && visible(35.1 * T, (LESSER_TOP + 82) * T, 180)) {
+    const hull = lesserSprites.barge;
+    reliefPatch(hull, 35.1 * T, (LESSER_TOP + 82) * T, 324, 324 * hull.height / hull.width, 0, ridge, .033);
+  }
+  for (const sign of trailSigns) {
+    const x = sign.x * T, y = sign.y * T;
+    if (!visible(x, y, 50)) continue;
+    const [u, v] = roofPoint(x, y, .025), sx = (x - u) / 30, sy = (y - v) / 30;
+    // Shear about the foot of the sign; its lettering travels with the board.
+    ctx.save();
+    ctx.transform(1, 0, sx, 1 + sy, -sx * y, -sy * y);
+    drawTrailSign(ctx, sign);
+    ctx.restore();
+  }
+  for (const {kind, x, y, radius} of lesserLandmarks)
+    if (visible(x * T, (LESSER_TOP + y) * T, radius * 1.3))
+      raisedLandmark(kind, x * T, (LESSER_TOP + y) * T, radius);
+  for (const [x, y] of dumpTanks)
+    if (visible(x * T, y * T, 76)) raisedLandmark('tank', x * T, y * T, 1.125 * T);
+}
+function raisedLandmark(kind, x, y, r) {
+  const image = lesserSprites[kind];
+  if (!image) return;
+  const k = 2 * r / Math.max(image.width, image.height), w = image.width * k, h = image.height * k;
+  const height = {mill: .118, dome: .103, antenna: .14, silo: .085, tank: .047}[kind];
+  groundShadow(ctx, x, y, w * .42, h * .31, 0, 4);
+  reliefPatch(image, x, y, w, h, 0, ridge, height);
+}
+function ballastSlope(g, x, y, w, h) {
+  const side = g.createLinearGradient(0, y, 0, y + h);
+  for (const [at, c] of [
+           [0, 'transparent'], [.1, 'rgba(196,173,121,.29)'], [.29, 'transparent'], [.66, 'transparent'],
+           [.82, 'rgba(43,35,26,.23)'], [.94, 'rgba(34,31,23,.38)'], [1, 'transparent']])
+    side.addColorStop(at, c);
+  g.fillStyle = side;
+  g.fillRect(x, y, w, h);
+}
+// Sample relief in world coordinates, before roads and props. The light comes from the north-west.
+// Local landforms are in tile coordinates. Roads, wetlands and yards taper back to level.
+const knolls = [
+  [WEST + 39, NORTH_ROWS + 43, 13, 6, -.3], [WEST + 74, NORTH_ROWS + 105, 10, 7, .5],
+  [WEST + 177, NORTH_ROWS + 78, 19, 8, -.65], [WEST + 197, NORTH_ROWS + 174, 14, 6, .32],
+  [64, LESSER_TOP + 20, 14, 5, .35], [117, LESSER_TOP + 62, 12, 8, -.45], [143, LESSER_TOP + 2, 18, 5, -.4],
+  [313, 67, 14, 6, .23], [354, 88, 9, 5, -.73]
+];
+let hillshade;
+function paintHills(g) {
+  if (!hillshade) {
+    const step = 2, im = document.createElement('canvas');
+    im.width = PW * step;
+    im.height = MH * step;
+    const gc = im.getContext('2d'), pix = gc.createImageData(im.width, im.height);
+    const terrain = autumnTerrain();
+    for (let y = 0; y < im.height; y++)
+      for (let x = 0; x < im.width; x++) {
+        const tx = Math.floor(x / step), ty = Math.floor(y / step), tile = ty * MW + tx;
+        if (!GROUNDISH(map[tile])) continue;
+        const region = ty < NORTH_ROWS ? 1.5 : tx < WEST ? .91 : 1.1;
+        const exposure = Math.min(1, terrain.water[tile] / 5, terrain.verge[tile] / 3);
+        const slope = (vnoise(x * 2 + 2, y * 2 + 2, 43) - vnoise(x * 2 - 2, y * 2 - 2, 43)) * .94 +
+            (vnoise(x * 2 + 2, y * 2 + 1, 20) - vnoise(x * 2 - 2, y * 2 - 1, 20)) * .34;
+        const i = (y * im.width + x) * 4, lit = slope > 0;
+        pix.data[i] = lit ? 212 : 38;
+        pix.data[i + 1] = lit ? 190 : 34;
+        pix.data[i + 2] = lit ? 143 : 26;
+        pix.data[i + 3] = Math.min(66, Math.abs(slope) * 450 * region) * exposure;
+      }
+    for (const [cx, cy, rx, ry, a] of knolls) {
+      const radius = Math.ceil(Math.max(rx, ry) * 1.15), sn = Math.sin(a), cs = Math.cos(a);
+      for (let j = (cy - radius) * step; j < (cy + radius) * step; j++)
+        for (let i = (cx - radius) * step; i < (cx + radius) * step; i++) {
+          if (j < 0 || i < 0 || j >= im.height || i >= im.width) continue;
+          const tile = (j / step | 0) * MW + (i / step | 0);
+          if (!GROUNDISH(map[tile])) continue;
+          const dx = i / step - cx, dy = j / step - cy, u = (dx * cs + dy * sn) / rx,
+                v = (dy * cs - dx * sn) / ry;
+          const r = u * u + v * v + .09 * Math.sin(4 * u + 3 * v);
+          if (r >= 1) continue;
+          const light = -(u * (cs + sn) + v * (cs - sn)) * (1 - r);
+          const ix = (j * im.width + i) * 4;
+          const weight = Math.min(1, terrain.water[tile] / 5, terrain.verge[tile] / 3);
+          pix.data[ix] = light > 0 ? 220 : 36;
+          pix.data[ix + 1] = light > 0 ? 198 : 32;
+          pix.data[ix + 2] = light > 0 ? 157 : 27;
+          pix.data[ix + 3] = Math.min(85, Math.abs(light) * 175) * weight;
+        }
+    }
+    gc.putImageData(pix, 0, 0);
+    hillshade = im;
+  }
+  const {x0, y0, x1, y1} = GWP, k = hillshade.width / (PW * T);
+  g.drawImage(hillshade, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
+}
+
+// The rail goes over the Cordon highway. Abutments sit on the existing railway banks.
+// Fade the deck locally underfoot as with house roofs, so the gate and actors remain readable.
+let checkpointDeck;
+function drawCheckpointSpan(inView) {
+  const y = (NORTH_ROWS + 57.5) * T, cx = (roadX[NORTH_ROWS + 57] + .5) * T;
+  if (!inView(cx, y, 6 * T)) return;
+  let left = Math.floor(cx / T) - 1, right = left + 2;
+  while (left > WEST && tAt(left, NORTH_ROWS + 57) !== RA && left > cx / T - 8) left--;
+  while (right < PW && tAt(right, NORTH_ROWS + 57) !== RA && right < cx / T + 8) right++;
+  const x = (left + .38) * T, w = (right + .62) * T - x, h = 49, k = .068;
+  if (!checkpointDeck) {
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w * 2);
+    c.height = h * 2;
+    const g = c.getContext('2d');
+    g.scale(2, 2);
+    artFill(g, 'wall_concrete', 0, 0, w, h);
+    const rail = ART.m.sprites.rail, img = ART.images[rail.atlas], r = rail.rect;
+    // Use the same sleeper spacing and steel gauge as the embankment.
+    const full = 3 * T + 18, period = r[2] * full / r[3], sy = r[1] + (full - h) * .5 * r[3] / full;
+    for (let i = -(x % period); i < w; i += period)
+      g.drawImage(img, r[0], sy, r[2], h * r[3] / full, i, 0, period, h);
+    for (const edge of [0, h - 4]) {
+      g.fillStyle = '#504a40';
+      g.fillRect(0, edge, w, 4);
+      g.fillStyle = '#97917b';
+      g.fillRect(0, edge, w, 1);
+      for (let i = 5; i < w; i += 13) {
+        g.fillStyle = '#aaa28c';
+        g.fillRect(i, edge + 1, 2, 1);
+      }
+    }
+    c1Grade(c, 0, 0, c.width, c.height);
+    checkpointDeck = c;
+  }
+  const depth = y - h / 2, bottom = y + h / 2;
+  for (const foot of [x, x + w - 7]) {
+    ctx.fillStyle = '#544f43';
+    ctx.fillRect(foot, depth, 7, h + 4);
+    ctx.fillStyle = '#96917e';
+    ctx.fillRect(foot, depth, 2, h);
+  }
+  const a = roofPoint(x, depth, k), b = roofPoint(x + w, bottom, k);
+  const dist = Math.max(Math.abs(P.y - y) - h * .5, Math.abs(P.x - cx) - w * .5);
+  ctx.save();
+  ctx.globalAlpha = .29 + .71 * clamp(dist / 32, 0, 1);
+  const near = cam.y >= y ? bottom : depth;
+  const edge = roofPoint(x, near, k);
+  ctx.drawImage(checkpointDeck, ...a, b[0] - a[0], b[1] - a[1]);
+  const dir = cam.y >= y ? 1 : -1, face = Math.min(11, 3 + Math.abs(cam.y - y) * .024);
+  ctx.save();
+  ctx.translate(a[0], edge[1]);
+  ctx.scale(1, dir);
+  const length = b[0] - a[0], faceShade = ctx.createLinearGradient(0, 0, 0, face);
+  faceShade.addColorStop(0, '#aaa18a');
+  faceShade.addColorStop(.24, '#62594d');
+  faceShade.addColorStop(.75, '#454139');
+  faceShade.addColorStop(1, '#7a715f');
+  ctx.fillStyle = faceShade;
+  ctx.fillRect(0, 0, length, face);
+  for (let t = 5; t < length; t += 14) {
+    ctx.fillStyle = '#433e35';
+    ctx.fillRect(t, 1, 1.4, face - 1);
+    ctx.fillStyle = '#a2967f';
+    ctx.fillRect(t + 2, 2, 1, 1);
+  }
+  ctx.restore();
+  ctx.restore();
+}
+function liftContainer(o, paint) {
+  const height = o.k === 'safe' ? .026 : .014, x = o.x + o.w / 2, y = o.y + o.h / 2;
+  const [u, v] = roofPoint(x, y, height);
+  const dx = u - x, dy = v - y;
+  ctx.save();
+  ctx.translate(dx * .4, dy * .4);
+  paint(o);
+  ctx.translate(dx * .6, dy * .6);
+  paint(o);
+  ctx.restore();
+}
+
+// Wheelsets and buffers sit on the track independently of the raised wagon body.
+function drawFreightBody(o) {
+  const k = objectHeight.freightWagon, img = lesserSprites[o.sprite], x0 = o.x + o.w * .05,
+        x1 = o.x + o.w * .95, y0 = o.y + o.h * .09, y1 = o.y + o.h * .90;
+  for (const [u, v, w, h] of [[0, .9, 1, .1], [0, .32, .049, .32], [.951, .32, .049, .32]])
+    ctx.drawImage(
+        img, u * img.width, v * img.height, w * img.width, h * img.height, o.x + u * o.w, o.y + v * o.h,
+        w * o.w, h * o.h);
+  let tex = walls.get('gondola');
+  if (!tex) {
+    tex = document.createElement('canvas');
+    tex.width = 408;
+    tex.height = 32;
+    tex.getContext('2d').drawImage(
+        img, img.width * .055, img.height * .60, img.width * .885, img.height * .29, 0, 0, 408, 32);
+    walls.set('gondola', tex);
+  }
+  if (cam.y > y1) texturedFace([x0, y1], [x1, y1], k, tex);
+  if (cam.y < y0) texturedFace([x0, y0], [x1, y0], k, tex);
+  if (cam.x < x0) texturedFace([x0, y0], [x0, y1], k, tex);
+  if (cam.x > x1) texturedFace([x1, y0], [x1, y1], k, tex);
+  const p = roofPoint(x0, y0, k);
+  ctx.drawImage(
+      img, img.width * .045, 0, img.width * .91, img.height * .61, ...p, (x1 - x0) * (1 + k),
+      (y1 - y0) * (1 + k));
 }
 
 /* ===================== звук ===================== */

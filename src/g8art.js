@@ -46,6 +46,7 @@ function drawRailStrip(g,x,top,h){
   const c = PATS[key], ox = ((x * T) % c.width + c.width) % c.width;
   g.save();g.beginPath();g.rect(0,top,T,h);g.clip();
   g.drawImage(c,-ox,top);g.drawImage(c,c.width-ox,top);
+  if (perspective) ballastSlope(g,0,top,T,h);
   g.restore();
 }
 /* дёшево сравнить, относится ли клетка к земле, на которой лежит текстура */
@@ -708,6 +709,12 @@ function drawBridgeGate(g, o) {
   g.translate(o.x, o.y + o.h / 2);
   g.drawImage(sheet, sx, sy, 106, 129, -12, -11, 18, 22);
   g.drawImage(sheet, sx + 382, sy, 103, 129, o.w - 6, -11, 18, 22);
+  if (perspective) {
+    const [px,py] = roofPoint(o.x,o.y + o.h/2,.026);
+    const dx=px-o.x,dy=py-o.y-o.h/2;
+    g.strokeStyle='#564b3e';g.lineWidth=4;g.beginPath();g.moveTo(3,0);g.lineTo(3+dx,dy);
+    g.moveTo(o.w,0);g.lineTo(o.w+dx,dy);g.stroke();g.translate(dx,dy);
+  }
   g.translate(3, 0);
   if (!o.solid) g.rotate(-1.35);
   g.drawImage(sheet, sx + 106, sy + 53, 276, 16, 0, -2.5, o.w - 7, 5);
@@ -779,7 +786,8 @@ function drawCordonDetails(g) {
     const x = tx * T, y = ty * T;
     // Захватываем и соседний кусок, если повёрнутый рисунок пересекает границу.
     if (x + width < GWP.x0 || x - width > GWP.x1 || y + width < GWP.y0 || y - width > GWP.y1) continue;
-    c1Draw(g, id, x, y, width, angle);
+    if (perspective && detailHeight(id)) groundShadow(g,x,y,width*.39,width*.18,angle,2);
+    else c1Draw(g, id, x, y, width, angle);
   }
   g.restore();
 }
@@ -854,7 +862,8 @@ function artDecor0(g) {
       else if (d[0] !== 'fence') {
         g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill();
       }
-      c1Draw(g, id, x, y, width, d[3], 1, log ? 3 : 9); return;
+      if (!perspective || !detailHeight(id)) c1Draw(g, id, x, y, width, d[3], 1, log ? 3 : 9);
+      return;
     }
     if (d[0] !== 'fence') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 3, y + 4, 14, 8, d[3], 0, 6.28); g.fill(); }
     ART.draw(g, d[0], x, y, undefined, undefined, d[3]);
@@ -905,6 +914,7 @@ function artCanopy() {
       g.drawImage(autumnBirch(pick[v], v, CAN_SZ * 2), -w / 2, -w / 2, w, w);
     } else ART.draw(g, pick[v], 0, 0, w, w);
     c1Grade(c, 0, 0, c.width, c.height);
+    if (perspective) cacheCrownLayers(c, g.getTransform(), pick[v], v, w);
     if (pick[v] === 'c1_yard_tree') yardTreeCrown = c;
     else CANOPY.push(c);
   }
@@ -932,7 +942,7 @@ function c1Grade(c, x, y, w, h) {
 /* спрайт C1 по ширине с сохранением пропорций */
 let C1SH = 0;   // тень силуэта для объектов, запекаемых в землю (машины, автобус, люк, столбы, декор)
 function spriteShadow(g, length, blur) {
-  if (!SHADOWS) return;
+  if (!SHADOWS || (perspective && unshadowedSurface.has(g))) return;
   const k = g.getTransform().a;
   g.shadowColor = 'rgba(15,13,10,.52)'; g.shadowBlur = blur * k;
   g.shadowOffsetX = SUN_DX * length * k; g.shadowOffsetY = SUN_DY * length * k;
@@ -1027,7 +1037,7 @@ function artRoof(h, idx) {
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
   if(h.mat==='depot' && lesserSprites['depot-roof']){
-    const rw=W-7,rh=Hh-16;
+    const rw=W-7,rh=Hh-16; h.roofSurface=[rw,rh];
     artFill(g,'wall_brick',2,rh-3,rw,11);
     g.drawImage(lesserSprites['depot-roof'],0,0,rw,rh);
     g.shadowColor='transparent';
@@ -1042,6 +1052,7 @@ function artRoof(h, idx) {
     // объём: снизу видна полоса передней стены, крыша над ней чуть короче и бросает тень на стену
     const flat = id === 'c1_tower' || id.startsWith('c1_booth');
     const wallH = flat ? 6 : Math.min(20, 10 + h.h * 1.4), RW = W - 6, RH = Hh - 6 - wallH;
+    h.roofSurface=[RW,RH];
     if (wallH) {
       g.shadowColor = 'transparent';
       const wy = RH - 2, wood = h.mat !== 'conc';

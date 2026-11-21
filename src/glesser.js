@@ -277,12 +277,17 @@ const trailSigns = [
   {x:107.35,y:LESSER_TOP+50.75,village:true,angle:.18}
 ];
 function drawTrailSigns(g) {
-  if (!BIG) return;
+  if (!BIG || (perspective && ART)) return;
   for (const sign of trailSigns) {
     const x=sign.x*T, y=sign.y*T, width=sign.village?36:32;
     if (x+width<GWP.x0 || x-width>GWP.x1 || y+width<GWP.y0 || y-width>GWP.y1) continue;
+    drawTrailSign(g,sign);
+  }
+}
+function drawTrailSign(g,sign) {
+    const x=sign.x*T,y=sign.y*T,width=sign.village?36:32;
     const sprite=lesserSprites[sign.village?'village-sign':'fingerpost'];
-    if (!sprite) continue;
+    if (!sprite) return;
     const height=width*sprite.height/sprite.width;
     g.save(); g.translate(x,y); g.rotate(sign.angle);
     g.save(); spriteShadow(g,2,1);
@@ -295,7 +300,6 @@ function drawTrailSigns(g) {
       g.fillText(sign.label,0,-height*.78,width*.84);
     }
     g.restore();
-  }
 }
 // Окраска соцветий, рёбра оболочек и тени попадают в те же кэшированные
 // куски земли, что и местные декорации. На мини-карте используется тот же план.
@@ -319,12 +323,12 @@ function drawLesserDetails(g) {
       }
     }
   const bx=35.1*T, by=(top+82)*T, hull=lesserSprites.barge;
-  if (hull && bx+172>=GWP.x0 && bx-172<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
+  if (!perspective && hull && bx+172>=GWP.x0 && bx-172<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
     const h=324*hull.height/hull.width;
     g.save(); g.translate(bx,by); spriteShadow(g,3,2);
     g.drawImage(hull,-162,-h/2,324,h); g.restore();
   }
-  drawLesserInstallations(g,GWP);
+  if (!perspective) drawLesserInstallations(g,GWP);
 }
 function drawLesserInstallations(g,win) {
   for (const l of lesserLandmarks) {
