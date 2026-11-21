@@ -210,7 +210,7 @@ function trailPrint(wet, variant) {
 }
 
 function drawVillageLanes(g) {
-  if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < 159*T || GWP.y0 > 184*T) return;
+  if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < (NORTH_ROWS+159)*T || GWP.y0 > (NORTH_ROWS+184)*T) return;
   g.save();
   VILLAGE_LANES.forEach((lane, l) => {
     for (let i = 1; i < lane.length; i++) {
@@ -948,7 +948,7 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 /* крыша C1 по размеру и материалу дома */
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
-  if (BIG && h.x === WEST+15 && h.y === 28) return 'c1_tower';
+  if (BIG && h.x === WEST+15 && h.y === NORTH_ROWS+28) return 'c1_tower';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (BIG && (h.x<WEST || h.ok?.startsWith('dump_'))) {

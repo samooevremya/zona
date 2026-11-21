@@ -47,19 +47,28 @@ const riverAt = y => 21 + 11*Math.sin((y-10)/17) + 6*Math.sin(y/8);
 // Assemble the stamped Cordon once in its own coordinate frame, then place it in
 // the eastern half of the final grid. Paths, collision and camera share that grid.
 function placeCordon() {
+  WORLD.map.fill(VO);
   for (let y=0;y<BIGW.MH;y++) {
-    const start=y*BIGW.MW, dest=y*WORLD.MW+WEST;
-    WORLD.map.set(BIGW.map.subarray(start,start+BIGW.MW),dest);
-    WORLD.keep.set(BIGW.keep.subarray(start,start+BIGW.MW),dest);
-    WORLD.roadX[y]=WEST+BIGW.roadX[y];
+    const start=y*BIGW.MW, dest=(NORTH_ROWS+y)*WORLD.MW+WEST;
+    WORLD.map.set(BIGW.map.subarray(start,start+BIGW.PW),dest);
+    WORLD.keep.set(BIGW.keep.subarray(start,start+BIGW.PW),dest);
+    // The trader's interior lives outside the outdoor rectangle in its own room coordinates.
+    const room=y*WORLD.MW+WORLD.PW;
+    WORLD.map.set(BIGW.map.subarray(start+BIGW.PW,start+BIGW.MW),room);
+    WORLD.keep.set(BIGW.keep.subarray(start+BIGW.PW,start+BIGW.MW),room);
+    WORLD.roadX[NORTH_ROWS+y]=WEST+BIGW.roadX[y];
   }
-  const shift=p=>{p.x+=WEST*T;};
-  [...objs,...ANOM0,...ARTS0,...rads,HATCH,STAIRS,FIRE,FIRE2,SUCKER_HOME,...Object.values(POI)].forEach(shift);
+  const shift=(p,unit)=>{
+    if(p.x<BIGW.PW*unit) p.y+=NORTH_ROWS*unit;
+    p.x+=WEST*unit;
+  };
+  const tile=p=>{if(p[0]<BIGW.PW)p[1]+=NORTH_ROWS;p[0]+=WEST;};
+  [...objs,...ANOM0,...ARTS0,...rads,HATCH,STAIRS,FIRE,FIRE2,SUCKER_HOME,...Object.values(POI)].forEach(p=>shift(p,T));
   BUNK.x0+=WEST*T; BUNK.x1+=WEST*T;
-  for(const h of HOUSES) {h.ok ||= h.x+','+h.y;h.x+=WEST;}
-  for(const d of [...NPCDEF,...DOGDEF,...CACHES]) d.x+=WEST;
-  const tile=p=>{p[0]+=WEST;};
+  for(const h of HOUSES) {h.ok ||= h.x+','+h.y;shift(h,1);}
+  for(const d of [...NPCDEF,...DOGDEF,...CACHES]) shift(d,1);
   for(const l of LOCATIONS){
+    if(l.bounds[0]<BIGW.PW){ l.bounds[1]+=NORTH_ROWS;l.bounds[3]+=NORTH_ROWS; }
     l.bounds[0]+=WEST;l.bounds[2]+=WEST;
     const points=new Set(l.entrances||[]);
     for(const v of Object.values(l.anchors||{})) (Array.isArray(v[0])?v:[v]).forEach(p=>points.add(p));
@@ -67,12 +76,13 @@ function placeCordon() {
   }
   RC1.boars.forEach(b=>tile(b.at));
   SOS_SPOTS.forEach(tile); CLEAR_SPOTS.forEach(tile);
-  for(const d of [...DECOR,...CORDON_DETAILS]) d[1]+=WEST;
-  for(const f of CORDON_FENCES) { f[1]+=WEST;f[3]+=WEST; }
+  for(const d of [...DECOR,...CORDON_DETAILS]) {d[1]+=WEST;d[2]+=NORTH_ROWS;}
+  for(const f of CORDON_FENCES) { f[1]+=WEST;f[3]+=WEST;f[2]+=NORTH_ROWS;f[4]+=NORTH_ROWS; }
   for(const line of [...VILLAGE_LANES,...VEHICLE_ROUTES]) line.forEach(tile);
-  for(const p of Object.values(BIG_EXITS)) p.x+=WEST;
+  for(const p of Object.values(BIG_EXITS)) shift(p,1);
+  for(let i=0;i<FORD.length;i++) FORD[i]+=NORTH_ROWS;
   const oldTrees=[...yardTreeCells];yardTreeCells.clear();
-  for(const i of oldTrees) yardTreeCells.add(Math.floor(i/BIGW.MW)*WORLD.MW+i%BIGW.MW+WEST);
+  for(const i of oldTrees) yardTreeCells.add((NORTH_ROWS+Math.floor(i/BIGW.MW))*WORLD.MW+i%BIGW.MW+WEST);
   useGrid(WORLD);
 }
 function makeLesserZone() {
@@ -80,14 +90,14 @@ function makeLesserZone() {
   placeCordon();
   const random = mulberry32(927731);
   const Y = LESSER_TOP;
-  for (let y=-Y; y<MH-Y; y++) {
+  for (let y=NORTH_ROWS-Y; y<MH-Y; y++) {
     for (let x=0; x<WEST; x++) {
       let tile = GR;
       const stream = Math.abs(x-riverAt(y));
       const backwater = ((x-30)/10)**2 + ((y-84)/7)**2 < 1;
       const woodland = vnoise(x+73,y+31,12)*.6 + vnoise(x+306,y,5)*.4;
       const roll = random();
-      if (x<2 || x>=WEST-2 || y<=1-Y || y>=MH-Y-2) tile = TR;
+      if (x<2 || x>=WEST-2 || y<=NORTH_ROWS+1-Y || y>=MH-Y-2) tile = TR;
       else if (stream < 1.6 || backwater) tile=SW;
       else if (roll < Math.max(.012,(woodland-.42)*1.43)) tile=TR;
       else if (roll > .91) tile=BU;
@@ -113,8 +123,7 @@ function makeLesserZone() {
   // From the cowsheds the northern track crosses the embankment to the future boundary.
   lane([[123,26],[133,15],[142,2],[145,-8],[145,-21],[151,-34],[148,-50],[150,-68]],1.15);
   bigLoc('lesser_dump',{name:'Северная тропа на Свалку',gen:'северной тропы',type:'story',
-    bounds:[147,0,153,5],entrances:[[150,3]],anchors:{approach:[150,3]}});
-  buildLesserRail();
+    bounds:[147,NORTH_ROWS,153,NORTH_ROWS+5],entrances:[[150,NORTH_ROWS+3]],anchors:{approach:[150,NORTH_ROWS+3]}});
   lane([[90,35],[90,46]],1.4);
   lane([[29,10],[30,-8],[44,-17],[62,-11],[69,5],[65,22],[59,32]],1.1);
   lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[146,56],[152,62],[169,64],[181,62],[190,58],[191,69]],2);
@@ -148,7 +157,7 @@ function makeLesserZone() {
     house(x,Y+y,w,h,[[Math.floor(w/2),h-1]],roof==='conc'?CO:BR,0,roof,random);
     const doorX=x+Math.floor(w/2);
     for (let j=0;j<3;j++) setT(doorX,Y+y+h+j,DI);
-    HOUSES[HOUSES.length-1].ok = x+','+(Y+y);
+    HOUSES[HOUSES.length-1].ok = x+','+(Y+y-NORTH_ROWS);
   }
   // Open strips between the pens and yards are actual walkable gates.
   for (const [kind,x1,y1,x2,y2] of [
@@ -220,7 +229,7 @@ function makeLesserZone() {
   DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
 }
 // World tiles. The east end shares both gauge and sleeper phase with the Cordon.
-const railAxis = x => 57.5-.0034*Math.max(0,176-x)**2;
+const railAxis = x => NORTH_ROWS+57.5-.0034*Math.max(0,176-x)**2;
 const levelCrossing = x => x>=143 && x<=147;
 function buildLesserRail() {
   for(let x=0;x<WEST;x++){
@@ -259,9 +268,9 @@ async function loadLesserSprites() {
 }
 // Foot positions, in world tiles. Lettering stays on the face as the board turns.
 const trailSigns = [
-  {x:360.3,y:5.85,label:'← СВАЛКА',angle:.08},
-  {x:147.2,y:33.4,label:'ДЕПО ↖',angle:-.14},
-  {x:WEST+8.45,y:121.35,label:'← МАЛАЯ ЗОНА',angle:-.12},
+  {x:369.2,y:NORTH_ROWS+4,label:'СВАЛКА ↑',angle:.08},
+  {x:361,y:53.4,label:'← ДЕПО',angle:-.14},
+  {x:WEST+8.45,y:NORTH_ROWS+121.35,label:'← МАЛАЯ ЗОНА',angle:-.12},
   {x:58.6,y:LESSER_TOP+45.75,label:'← МЕЛЬНИЦА',angle:-.12},
   {x:112.5,y:LESSER_TOP+50.45,label:'СФЕРА →',angle:.14},
   {x:74.65,y:LESSER_TOP+43.8,village:true,angle:-.22},
@@ -335,16 +344,36 @@ function drawLesserInstallations(g,win) {
   }
 }
 
-// v48 used 252 columns, with the Lesser Zone south of row 220. Convert before
-// spawning actors or decoding fog, including tile keys referenced by field loot.
-function migrateWesternWorld(s) {
+// Old maps used either stacked regions (252 columns) or a western region (492 columns).
+// Move coordinates, explored cells and tile-keyed loot before restoring actors.
+function migrateNorthernWorld(s) {
+  const stacked=s.mapVersion==='kordon-big', columns=stacked?252:MW;
+  // These landmarks only existed in the preview of the east-west belt.
+  const oldPlaces=[
+    ['dump_depot',101,8,141,31],['dump_yard',181,31,202,47],['dump_market',221,8,238,22],
+    ['dump_mounds',163,29,183,42],['dump_stop',206,19,214,25],['dump_pumps',210,10,220,18],
+    ['dump_ditch',155,34,167,42],['dump_checkpoint',196,2,205,10],['dump_watch',244,8,255,16]
+  ];
   const point=(p,unit)=>{
     if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-    if(p.y>=CORDON_ROWS*unit) p.y+=(LESSER_TOP-CORDON_ROWS)*unit;
-    else p.x+=WEST*unit;
+    if(stacked){
+      if(p.y>=CORDON_ROWS*unit) p.y+=(LESSER_TOP-CORDON_ROWS)*unit;
+      else { if(p.x<BIGW.PW*unit)p.y+=NORTH_ROWS*unit;p.x+=WEST*unit; }
+      return;
+    }
+    if(p.x>=PW*unit) return;
+    if(s.flags?.visitedDump){
+      const x=p.x/unit,y=p.y/unit;
+      const site=oldPlaces.find(([,l,t,r,b])=>x>=l && x<r+1 && y>=t && y<b+1);
+      if(site){
+        const [id,l,t]=site, bounds=LOC[id].bounds;
+        p.x+=(bounds[0]-l)*unit;p.y+=(bounds[1]-t)*unit;return;
+      }
+    }
+    p.y+=NORTH_ROWS*unit;
   };
   const index=i=>{
-    const p={x:i%252,y:Math.floor(i/252)};
+    const p={x:i%columns,y:Math.floor(i/columns)};
     point(p,1);return p.y*MW+p.x;
   };
   point(s,T);
@@ -362,6 +391,12 @@ function migrateWesternWorld(s) {
     flags[key]=Object.fromEntries(Object.entries(flags[key]).map(([k,v])=>[
       /^field_\d+$/.test(k)?'field_'+index(+k.slice(6)):k,v]));
   }
+  const renamed=[];
+  for(const key of Object.keys(flags)){
+    const match=/^(broken_|contents_|st_)field_(\d+)$/.exec(key);
+    if(match){renamed.push([match[1]+'field_'+index(+match[2]),flags[key]]);delete flags[key];}
+  }
+  Object.assign(flags,Object.fromEntries(renamed));
   const bits=new Uint8Array(Math.ceil(MW*MH/6));
   for(let i=0;i<(s.fog||'').length;i++){
     const mask=s.fog.charCodeAt(i)-48;
