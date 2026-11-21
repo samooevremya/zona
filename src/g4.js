@@ -238,6 +238,7 @@ function* paintGroundWin(g, R) {
     }
   }
   if (ART) yield* artGround(g, R);
+  if (perspective && ART) paintHills(g);
   yield;
   // мягкие пятна цвета поверх клеток, чтобы не было шахматки
   if (!ART) {
@@ -382,6 +383,13 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if (perspective && ART && objectHeight[o.k]) {
+    groundShadow(g,o.x+o.w*.5,o.y+o.h*.5,o.w*.49,o.h*.44,0,2);
+    return;
+  }
+  paintStaticObject(g,o);
+}
+function paintStaticObject(g,o) {
   if (o.k==='freightWagon' && lesserSprites[o.sprite]) {
     g.save();spriteShadow(g,3,2);g.drawImage(lesserSprites[o.sprite],o.x,o.y,o.w,o.h);g.restore();return;
   }
@@ -781,6 +789,7 @@ function render() {
   }
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
+  if (perspective && ART && !shopVisible) drawWorldRelief(inView);
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
     if (d.burn) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.28); ctx.fill(); continue; }
@@ -793,8 +802,13 @@ function render() {
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
-    if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) containerDraw(o);
-    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) crateDraw(o);
+    if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
+      if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
+      else containerDraw(o);
+    }
+    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
+      if(perspective) liftContainer(o,crateDraw); else crateDraw(o);
+    }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
     if (o.k === 'body' && inView(o.x,o.y,48)) {
@@ -851,12 +865,22 @@ function render() {
       }
       ctx.globalAlpha = h.a; ctx.drawImage(h.shadow, h.x*T-8, h.y*T-4);
     }
-    ctx.globalAlpha = h.a; drawHouseRoof(ctx, h, i, 1); ctx.globalAlpha = 1;
+    ctx.globalAlpha = h.a;
+    if (perspective && ART) drawRaisedHouse(h, i);
+    else drawHouseRoof(ctx, h, i, 1);
+    ctx.globalAlpha = 1;
   });
   // провода ЛЭП
   const py0 = objs.filter(o => o.k === 'pylon');
   ctx.strokeStyle = 'rgba(20,20,18,0.55)'; ctx.lineWidth = 1;
+  ctx.save();
+  if (perspective) {
+    const k=objectHeight.pylon;
+    ctx.transform(1+k,0,0,1+k,-cam.x*k,-cam.y*k);
+  }
   for (let i = 0; i + 1 < py0.length; i++) { const a = py0[i], b = py0[i + 1]; if (!inView(a.x, a.y, 600) && !inView(b.x, b.y, 600)) continue; [-6, 0, 6].forEach(o => { ctx.beginPath(); ctx.moveTo(a.x + 10 + o, a.y + 10 - o); ctx.quadraticCurveTo((a.x + b.x) / 2 + 10 + o, (a.y + b.y) / 2 + 30, b.x + 10 + o, b.y + 10 - o); ctx.stroke(); }); }
+  ctx.restore();
+  if (perspective && ART && !shopVisible) drawCheckpointSpan(inView);
   drawCloudShadows();
   // кроны
   const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
@@ -879,7 +903,9 @@ function render() {
       const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
       const width = height * (.77 + .30 * hash2(y + 31, x));
       const crown = yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[ci];
-      drawAutumnCrown(crown, cx + sw, cy, width, height);
+      if (perspective) drawLayeredCrown(crown, cx + sw, cy, width, height,
+        crown === yardTreeCrown ? 'yard' : edge ? edgeCrowns[ci-forestCrowns.length] : forestCrowns[ci]);
+      else drawAutumnCrown(crown, cx + sw, cy, width, height);
     } else {
       const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
       ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;

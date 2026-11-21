@@ -254,6 +254,7 @@ function drawFreightTrack(g,line,win,steelOnly=false) {
       }
       g.translate(-phase,-1.5*T-9);g.fillStyle=pattern;
       g.fillRect(phase-pad*T,0,(len+2*pad)*T,3*T+18);
+      if(perspective && !steelOnly && win) ballastSlope(g,phase-pad*T,0,(len+2*pad)*T,3*T+18);
       g.restore();
     }
     phase+=len*T;
@@ -272,7 +273,7 @@ function drawDumpDetails(g,win) {
   if(!BIG || (win && (win.y0>(NORTH_ROWS+60)*T || win.x0>425*T || win.x1<77*T))) return;
   const visible=(x,y,r)=>!win || x+r>=win.x0 && x-r<=win.x1 && y+r>=win.y0 && y-r<=win.y1;
   for(const [x,y,w,h,a] of dumpHills){
-    if(!visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
+    if((perspective && win) || !visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
     g.save();g.globalAlpha=.66;g.translate(x*T,y*T);g.rotate(a);
     g.drawImage(lesserSprites.slag,-w*T/2,-h*T/2,w*T,h*T);g.restore();
   }
@@ -292,7 +293,7 @@ function drawDumpDetails(g,win) {
   for(const [kind,centres,width] of [['tank',dumpTanks,2.25]]){
     const sprite=lesserSprites[kind]; if(!sprite) continue;
     for(const [x,y] of centres){
-      if(!visible(x*T,y*T,width*T)) continue;
+      if((perspective && win) || !visible(x*T,y*T,width*T)) continue;
       const w=width*T,h=w*sprite.height/sprite.width;
       g.save();spriteShadow(g,3,2);g.drawImage(sprite,x*T-w/2,y*T-h/2,w,h);g.restore();
     }
