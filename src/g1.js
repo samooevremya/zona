@@ -1,8 +1,8 @@
 /* ===================== основа ===================== */
 const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 /* BIG: большой Кордон 240×220 (+12 клеток под бункер). Старая карта генерируется в свои массивы 132×110, затем gbig.js переносит её по частям. */
-const CORDON_ROWS = BIG ? 220 : 110, WORLD_ROWS = CORDON_ROWS + (BIG ? 102 : 0);
-let MW = BIG ? 252 : 132, MH = WORLD_ROWS, PW = BIG ? 240 : 120, WW = MW * T, WH = MH * T;
+const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, LESSER_TOP = 68, WORLD_ROWS = CORDON_ROWS;
+let MW = BIG ? WEST + 252 : 132, MH = WORLD_ROWS, PW = BIG ? WEST + 240 : 120, WW = MW * T, WH = MH * T;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
 const chance = p => Math.random() < p;
@@ -111,7 +111,10 @@ for (let y = 0; y < MH; y++) roadX[y] = 62 + Math.round(3 * Math.sin(y / 12));
 const OLD = BIG ? { MW: 132, MH: 110, PW: 120, map: new Uint8Array(132 * 110), keep: new Uint8Array(132 * 110), roadX: new Int16Array(110) } : null;
 if (BIG) for (let y = 0; y < 110; y++) OLD.roadX[y] = 62 + Math.round(3 * Math.sin(y / 12));
 /* переключение глобальной сетки: старая (для прежнего генератора) или большая */
-const BIGW = BIG ? { MW: MW, MH: CORDON_ROWS, PW: PW, map: map, keep: keep, roadX: roadX } : null;
+const WORLD = { MW, MH, PW, map, keep, roadX };
+const BIGW = BIG ? { MW:252, MH:CORDON_ROWS, PW:240, map:new Uint8Array(252*CORDON_ROWS),
+  keep:new Uint8Array(252*CORDON_ROWS), roadX:new Int16Array(roadX) } : null;
+const cordonOrigin = () => BIG && map===WORLD.map ? WEST : 0;
 function useGrid(g) { MW = g.MW; MH = g.MH; PW = g.PW; WW = MW * T; WH = MH * T; map = g.map; keep = g.keep; roadX = g.roadX; }
 const inb = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH;
 const tAt = (x, y) => inb(x, y) ? map[y * MW + x] : VO;

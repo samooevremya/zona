@@ -204,7 +204,7 @@ function trailPrint(wet, variant) {
 }
 
 function drawVillageLanes(g) {
-  if (GWP.x1 < 40*T || GWP.x0 > 86*T || GWP.y1 < 159*T || GWP.y0 > 184*T) return;
+  if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < 159*T || GWP.y0 > 184*T) return;
   g.save();
   VILLAGE_LANES.forEach((lane, l) => {
     for (let i = 1; i < lane.length; i++) {
@@ -272,7 +272,7 @@ function* artGround(g, R) {
     const t = tiles[y * MW + x], px = x * T, py = y * T;
     let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
     if (C1 && t === SW) {
-      id = shoulders && y >= CORDON_ROWS ? 'grass' : BIG && x >= 224 ? 'water' : 'swamp';
+      id = shoulders && x < WEST ? 'grass' : BIG && x >= WEST+224 ? 'water' : 'swamp';
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
@@ -320,7 +320,7 @@ function* artGround(g, R) {
   yield;
   // 3. Мягкие края грунта и асфальта: маска 4 точки на клетку, размытая и с шумом, только поверх травы
   const surfaces = [[DI, shoulders ? 'bare_soil' : 'dirt'], [AS, 'asphalt']];
-  if (shoulders && GW.y1>=CORDON_ROWS) surfaces.push([SW,'water']);
+  if (shoulders && GW.x0<WEST) surfaces.push([SW,'water']);
   for (const [tt, id] of surfaces) {
     // Гравий заходит под полотно и выступает за его края.
     const coverage = t => t === tt || (shoulders && tt === DI && t === AS);
@@ -336,7 +336,7 @@ function* artGround(g, R) {
     const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
     for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
       const t = tiles[(y / K | 0) * MW + (x / K | 0)];
-      if (tt === SW && y < CORDON_ROWS*K) continue;
+      if (tt === SW && x >= WEST*K) continue;
       if (!GROUNDISH(t) && !(tt === SW && t === SW) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
       const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
       const alpha = tt === SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
@@ -462,11 +462,14 @@ function scatterAutumnPlants(g, x, y, terrain) {
 }
 
 /* разброс C1: брёвна, пни, камни, пятна. Место выбирается по хешу клетки, так что соседние куски рисуют одно и то же */
+const blockedScatter = new Set();
 function scatterObject(x,y) {
-    const h = hash2(x * 3 + 11, y * 7 + 5); if (h > 0.03) return null;
+    if(blockedScatter.has(y*MW+x)) return null;
+    const seedX = BIG && x>=WEST ? x-WEST : x;
+    const h = hash2(seedX * 3 + 11, y * 7 + 5); if (h > 0.03) return null;
     let road = false; for (let dy = -2; dy <= 2 && !road; dy++) for (let dx = -2; dx <= 2; dx++) { const t = tAt(x + dx, y + dy); if (t === DI || t === AS || t === BR || t === CO || t === FL || t === CF || t === RA) { road = true; break; } }
     if (road) return null;
-    const h2 = hash2(y + 31, x + 17), cx = x * T + 16, cy = y * T + 16, a = h2 * 6.28;
+    const h2 = hash2(y + 31, seedX + 17), cx = x * T + 16, cy = y * T + 16, a = h2 * 6.28;
     let id, w, hh, al = 1;
     if (h < 0.007) { id = 'c1_log' + Math.floor(h2 * 3); w = 110; hh = 36; }
     else if (h < 0.013) { id = 'c1_stump' + Math.floor(h2 * 3); w = hh = 26; }
@@ -480,8 +483,8 @@ function c1Scatter(g) {
   for (let y = Math.max(3, GW.y0 - M); y <= Math.min(MH - 4, GW.y1 + M); y++) for (let x = Math.max(3, GW.x0 - M); x <= Math.min(PW - 4, GW.x1 + M); x++) {
     const t0 = map[y * MW + x];
     if (t0 === SW) {   // Камыш и лужи у кромки воды.
-      if (BIG && x>=224) continue;
-      if (BIG && y>=CORDON_ROWS && tAt(x-1,y)===SW && tAt(x+1,y)===SW &&
+      if (BIG && x>=WEST+224) continue;
+      if (BIG && x<WEST && tAt(x-1,y)===SW && tAt(x+1,y)===SW &&
           tAt(x,y-1)===SW && tAt(x,y+1)===SW) continue;
       const q = hash2(x * 5 + 3, y * 3 + 1);
       if (q < 0.3) { const q2 = hash2(y + 9, x + 4); ART.draw(g, 'c1_pool' + Math.floor(q2 * 3), x * T + 16, y * T + 16, 70 + q2 * 50, 60 + q * 120, q2 * 6.28); }
@@ -645,7 +648,7 @@ function drawCheckpointWall(g, length, bays, upright) {
 // Секции рисуются один раз на кусок земли, по оси того же препятствия, что и коллизия.
 function drawFenceRun(g, o) {
   const upright = o.h > o.w, length = Math.max(o.w, o.h);
-  const wood = o.material === 'picket' || o.material === 'rail';
+  const wood = (o.material === 'picket' || o.material === 'stockade') || o.material === 'rail';
   const bays = Math.ceil(length / 55), bay = length / bays;
   g.save();
   g.translate(o.x + o.w / 2, o.y + o.h / 2);
@@ -661,7 +664,7 @@ function drawFenceRun(g, o) {
   if (o.material === 'concreteWire') {
     drawCheckpointWall(g, length, bays, upright); g.restore(); return;
   }
-  if (o.material === 'picket') {
+  if ((o.material === 'picket' || o.material === 'stockade')) {
     for (let x = 2; x < length - 2; x += 5) {
       const wear = hash2(o.x + x, o.y), h = 5 + 3 * wear;
       g.fillStyle = wear < .3 ? '#6d6250' : '#897860';
@@ -717,6 +720,13 @@ function artStatic0(g, o) {
     spriteShadow(g, 2, 1.5);
     g.drawImage(ART.images.furniture, bed ? 0 : 64, 0, 64, bed ? 43 : 38,
       o.x, o.y, o.w, o.h);
+    if (o.barService) {
+      for(const [id,dx,dy] of [['vodka',6,4],['energy',15,7],['bread',24,6]]) {
+        const item=G3.pack?.manifest.items?.[id];
+        const im=lesserSprites[id] || (item && packImage(item.file));
+        if(im?.naturalWidth) g.drawImage(im,o.x+dx-5,o.y+dy-3,10,9);
+      }
+    }
     g.restore();
     return true;
   }
@@ -776,7 +786,7 @@ const DECOR = [
   ['bench', 16.7, 76.3, 0], ['barrel', 21.6, 75.2, 0], ['barrel', 31.3, 72.4, 0.5], ['bench', 30.8, 74.8, 0], ['barrel', 43.3, 77.1, 0], ['rubble', 40.5, 76.6, 0.8],
   ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['barrel', 44.1, 91.2, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
-  ['rubble', 34.3, 92.4, 0.5], ['rubble', 11.6, 90.4, 2.1], ['rubble', 25.6, 18.6, 1], ['rubble', 95.5, 18.2, 0.3],
+  ['rubble', 34.3, 92.4, 0.5], ['rubble', 11.6, 90.4, 2.1], ['rubble', 25.6, 18.6, 1], ['rubble', 94.3, 18.2, 0.3],
   ['fence', 16.5, 70.7, 0], ['fence', 18.5, 70.7, 0], ['fence', 20.5, 70.7, 0.04],
   ['fence', 44.45, 71.7, 0], ['fence', 40.5, 71.7, -0.03], ['fence', 42.5, 71.7, 0],
   ['fence', 12.6, 75.5, Math.PI / 2], ['fence', 12.6, 77.5, Math.PI / 2], ['fence', 12.6, 89.5, Math.PI / 2]
@@ -931,7 +941,7 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 /* крыша C1 по размеру и материалу дома */
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
-  if (BIG && !h.ok && h.x === 15 && h.y === 28) return 'c1_tower';
+  if (BIG && h.x === WEST+15 && h.y === 28) return 'c1_tower';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (long > 2.1 && big > 40) return 'c1_roof_barn';

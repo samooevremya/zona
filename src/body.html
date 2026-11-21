@@ -5,10 +5,11 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
 </script>
 <div id="field-world">
 <canvas id="cv" aria-label="Игровое поле"></canvas>
+<div id="poppy-veil" aria-hidden="true"></div>
 <div class="hud zh">
   <div class="zh-corner">
     <div class="zh-map-group">
-    <div class="zh-map rust"><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
+    <div class="zh-map rust"><span id="mini-distance" aria-label="Расстояние до цели"></span><span id="mini-people" aria-label="Сталкеров поблизости" title="Сталкеров поблизости"></span><canvas id="mini" width="256" height="256"></canvas><i class="rv a"></i><i class="rv b"></i><i class="rv c"></i><i class="rv d"></i></div>
       <div class="zh-feed">
         <div class="quest zh-q rust" id="quest"></div>
         <div class="msgs" id="msgs" role="status" aria-live="polite" aria-atomic="true"></div>

@@ -184,7 +184,7 @@ T_('Q1_generator_items_flow', () => {
 T_('G_fence_cover', () => {
   reset(); isolate();
   // Северный створ КПП. Влево от дороги — настоящий пролёт, на дороге — разрыв.
-  const p = P(), y = 201.5 * T, x = 124 * T;
+  const p = P(), y = 201.5 * T, x = 364 * T;
   place(p, x, y + 20); const guard = tgt(x, y - 80, 'army');
   const trace = (from, to) => G.shotTrace(from, Math.atan2(to.y - from.y, to.x - from.x), G.WP.w_pm);
   const cases = { concreteAtCheckpoint: M.objs.some(o => o.material === 'concreteWire' &&
@@ -195,7 +195,7 @@ T_('G_fence_cover', () => {
   cases.returnFireBlocked = trace(p, guard).wall;
   guard.x += 45; cases.diagonal = trace(guard, p).wall;
   place(guard, x + 75, p.y); cases.flank = trace(guard, p).best === p;
-  place(p, 129 * T, y + 20); place(guard, p.x, y - 80); cases.gate = trace(guard, p).best === p;
+  place(p, 369 * T, y + 20); place(guard, p.x, y - 80); cases.gate = trace(guard, p).best === p;
   place(p, x, y + 80); place(guard, x, y - 80); cases.awayFromFence = trace(guard, p).best === p;
 
   // Сначала часовой не знает о герое. После обнаружения присед прерывает уже начатый огонь.
