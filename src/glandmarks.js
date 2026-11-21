@@ -26,13 +26,13 @@ function buildLandmarks(){
     for(const y of [34,39])addObj({k:'depotPier',x:x*T+7,y:y*T+7,w:13,h:13,solid:1});
   }
   for(const [id,x,y,w,a] of [['c1_trace_reel',266,36,38,.16],['c1_crate_army',270,33.7,30,.18],
-      ['c1_barrel',282,34,24,.04],['c1_trace_sleepers',277,35,47,-.15],['c1_trace_pipes',290,37,52,.2]])
+      ['c1_barrel',282,34,24,.04],['c1_trace_sleepers',277,35,47,-.15],['c1_trace_pipes',288.8,35.6,52,.2]])
     CORDON_DETAILS.push([id,x,y,w,a]);
   for(const [id,name,y,h,stair] of [
-    ['atp','Чердак АТП',65,9,tilePoint(438.5,267.5)],
-    ['depot','Галерея депо',99,17,tilePoint(285.5,40.5)]
+    ['atp','Чердак АТП',65,9,tilePoint(438.5,266.73)],
+    ['depot','Галерея депо',99,17,tilePoint(290.26,40.25)]
   ]){
-    const r={id,name,x:PW+1,y,w:10,h,stair,landing:tilePoint(PW+3.5,y+h-2.5)};
+    const r={id,name,x:PW+1,y,w:10,h,stair,landing:id==='atp'?tilePoint(PW+3.5,y+h-1.75):tilePoint(PW+2.72,y+h-5.1)};
     lofts.push(r);
     for(let j=0;j<h;j++) for(let i=0;i<r.w;i++){
       const wall=!i||!j||i===r.w-1||j===h-1;
@@ -41,27 +41,19 @@ function buildLandmarks(){
     }
     if(id==='atp') Object.assign(NPCDEF.find(e=>e.sid==='shust'),{x:r.x+7.2,y:y+2.8});
   }
+  buildWorkshopRooms();
 }
 function drawLoftMap(g,r,size){
   const k=Math.min((size-18)/r.w,(size-18)/r.h),ox=(size-r.w*k)/2,oy=(size-r.h*k)/2;
   g.save();g.translate(ox,oy);
   for(let j=0;j<r.h;j++)for(let i=0;i<r.w;i++){
-    g.fillStyle=tAt(r.x+i,r.y+j)===CO?'#35352e':'#787158';g.fillRect(i*k,j*k,k+.3,k+.3);
+    g.fillStyle=tAt(r.x+i,r.y+j)===CO?'#35352e':nav[(r.y+j)*MW+r.x+i]?'#787158':'#5a5546';g.fillRect(i*k,j*k,k+.3,k+.3);
   }
   const dot=(p,color)=>{g.fillStyle=color;g.beginPath();g.arc((p.x/T-r.x)*k,(p.y/T-r.y)*k,Math.max(3,k*.34),0,Math.PI*2);g.fill();};
   dot(r.landing,'#d5b16b');if(r.id==='atp' && byS('shust')?.captive)dot(byS('shust'),'#d0bc79');dot(P,'#70dbdc');g.restore();
 }
 function beam(g,x,y,x1,y1,w,color){
   g.strokeStyle=color;g.lineWidth=w;g.beginPath();g.moveTo(x,y);g.lineTo(x1,y1);g.stroke();
-}
-function drawIronStairs(g,p){
-  g.save();g.translate(p.x,p.y);g.fillStyle='#25241d';g.fillRect(-15,-22,33,46);
-  artFill(g,'floor_concrete',-14,-23,27,44);
-  for(let i=0;i<8;i++){
-    const y=-21+i*5.4;beam(g,-13,y,13,y,2,'#292922');beam(g,-12,y+2,12,y+2,1,'#b1a389');
-  }
-  for(const x of [-16,16]){beam(g,x,-25,x,22,3,'#67523f');for(const y of [-22,17])beam(g,x+3,y+5,x,y,2,'#352e25');}
-  g.restore();
 }
 function loftSurface(r){
   const c=document.createElement('canvas');c.width=r.w*T;c.height=r.h*T;
@@ -92,8 +84,25 @@ function loftSurface(r){
     g.fillStyle='#4c5041';g.fillRect(-25,-16,50,32);
     for(let i=-20;i<20;i+=7)beam(g,i,-14,i+4,14,1,'#72705a');
     g.restore();
-    for(const [x,y] of [[54,52],[77,52],[53,77]]) ART.draw(g,'c1_crate_army',x,y,24,22);
+    if(ART?.images.roomFittings){
+      g.save();g.translate(w-90,89);g.rotate(1.48);
+      g.drawImage(ART.images.roomFittings,...roomFittings.bedroll[0],-15,-29,30,58);g.restore();
+      const pool=g.createRadialGradient(w-65,3*T,3,w-65,3*T,85);
+      pool.addColorStop(0,'rgba(242,210,147,.18)');pool.addColorStop(1,'rgba(242,210,147,0)');
+      g.fillStyle=pool;g.fillRect(w-150,T,150,5*T);
+    }
+    // Scuffed linoleum and a strip of bare boards mark the former dispatch office.
+    const wash=g.createLinearGradient(4.7*T,T,w-T,5.6*T);
+    wash.addColorStop(0,'rgba(114,114,84,.16)');wash.addColorStop(1,'rgba(102,90,61,.03)');
+    g.fillStyle=wash;g.fillRect(4.75*T,T,w-5.75*T,4.6*T);
   }
+  g.save();g.translate(-r.x*T,-r.y*T);
+  for(const o of objs){
+    if(o.x<r.x*T || o.x>=(r.x+r.w)*T || o.y<r.y*T || o.y>=(r.y+r.h)*T)continue;
+    if(o.k==='roomFitting')drawRoomFitting(g,o);
+    else if(o.k==='partition')paintPartition(g,o);
+  }
+  g.restore();
   const mat=industrial?'wall_brick':'floor_wood';
   artFill(g,mat,0,0,w,T);artFill(g,mat,0,h-T,w,T);
   for(const x of [0,w-T])artFill(g,mat,x,T,T,h-2*T);

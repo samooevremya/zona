@@ -363,7 +363,9 @@ function findInteract() {
   for(const room of lofts) {
     const upstairs=loftAt(P)===room, p=upstairs?room.landing:room.stair;
     const dist=dE(P,p);
-    if(dist<40) cand(dist-4,{k:'floor',room,upstairs,label:upstairs?'Спуститься на первый этаж':'Подняться · '+room.name});
+    const a=stairAngle(room,upstairs);
+    const u=(P.x-p.x)*Math.cos(a)+(P.y-p.y)*Math.sin(a);
+    if(dist<41 && u<17 && los(P.x,P.y,p.x,p.y)) cand(dist-4,{k:'floor',room,upstairs,label:upstairs?'Спуститься на первый этаж':'Подняться · '+room.name});
   }
   const sd = byS('sid');
   if (sd && inBunker(P.x, P.y) && dE(sd, P) < 120) cand(dE(sd, P) - 30, { k: 'trader', label: 'Поговорить: Сидорович' });
@@ -497,6 +499,21 @@ function applyState(d) {
   if (BIG && objs.some(o=>(o.k==='installation'||o.k==='bargeHull') &&
       P.x+P.r>o.x && P.x-P.r<o.x+o.w && P.y+P.r>o.y && P.y-P.r<o.y+o.h)) {
     collide(P); S.x=P.x; S.y=P.y;
+  }
+  if(BIG && objs.some(o=>o.solid && (o.home || ['stairRun','partition'].includes(o.k)) &&
+      P.x+P.r>o.x && P.x-P.r<o.x+o.w && P.y+P.r>o.y && P.y-P.r<o.y+o.h)){
+    const bounds=loftAt(P) || HOUSES.find(h=>P.x>=h.x*T && P.x<(h.x+h.w)*T && P.y>=h.y*T && P.y<(h.y+h.h)*T);
+    if(bounds){
+      let best=Infinity,position=null;
+      for(let ty=bounds.y+1;ty<bounds.y+bounds.h-1;ty++)for(let tx=bounds.x+1;tx<bounds.x+bounds.w-1;tx++){
+        if(!nav[ty*MW+tx])continue;
+        const x=(tx+.5)*T,y=(ty+.5)*T,d=dst(P.x,P.y,x,y),probe={x,y,r:P.r};
+        if(d>=best)continue;
+        collide(probe);if(dst(x,y,probe.x,probe.y)>.1)continue;
+        best=d;position={x,y};
+      }
+      if(position){P.x=S.x=position.x;P.y=S.y=position.y;}
+    }
   }
   if (SID_SHOP && inBunker(P.x,P.y)) {
     // Сохранения из более просторного подвала могли оставить героя за новой стеной.

@@ -1147,7 +1147,7 @@ async function boot() {
   bootStep('мир'); gen(); bigWorld(); makeLesserZone(); makeGarbage(); buildLandmarks(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
-  bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
+  bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); furnishHouses(); buildGrids(); buildFieldCrateSites();
   bootStep('деревья'); buildCanopy(); bootStep('земля'); paintGround(); bootStep('крыши'); buildRoofs(); bootStep('карта'); await buildMini();
   bootStep('сохранение');
   let sv = null; try { sv = loadSave(); if (sv) applyState(sv); } catch (e) {

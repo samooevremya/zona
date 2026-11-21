@@ -294,6 +294,7 @@ function* paintGroundWin(g, R) {
     else { g.fillStyle = 'rgba(255,255,240,0.06)'; g.fillRect(px, py, T, 3); if (R() < 0.3) { g.fillStyle = 'rgba(60,45,30,0.4)'; g.fillRect(px + R() * 20, py + R() * 20, 8, 10); } }
     if (below !== CO && below !== BR) { g.fillStyle = face; g.fillRect(px, py + T - 7, T, 7); }
   }
+  for(const h of HOUSES)if(h.interior && h.x<=GW.x1 && h.x+h.w>=GW.x0 && h.y<=GW.y1 && h.y+h.h>=GW.y0)drawRoomMarks(g,h);
   drawThresholds(g);
   yield;
   drawLesserDetails(g);
@@ -387,6 +388,9 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if(o.k==='roomFitting'){drawRoomFitting(g,o);return;}
+  if(o.k==='partition'){paintPartition(g,o);return;}
+  if(o.k==='stairRun')return;
   if (perspective && ART && objectHeight[o.k]) {
     groundShadow(g,o.x+o.w*.5,o.y+o.h*.5,o.w*.49,o.h*.44,0,2);
     return;
@@ -797,7 +801,7 @@ function render() {
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
-  for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,45)) drawIronStairs(ctx,p);}
+  for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
     if (d.burn) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.28); ctx.fill(); continue; }
@@ -810,6 +814,7 @@ function render() {
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
+    if (BIG && o.x>=PW*T && loftAt(o)!==loft) continue;
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
       if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
       else containerDraw(o);

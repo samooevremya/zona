@@ -275,6 +275,8 @@ Tt('K15_all_prop_colliders_and_containers', () => {
   }
   for (const o of M.objs.filter(o=>o.stash)) {
     const cx=o.x+o.w/2, cy=o.y+o.h/2;
+    const room=o.x>=480*T && (o.stash==='room_atp_up'?[483.5,72.25]:o.stash==='room_depot_up'?[482.72,110.9]:null);
+    const origin=room?room.map(v=>v*T):start;
     let reachable=false;
     for(let i=0;i<16 && !reachable;i++){
       const x=cx+35*Math.cos(i*Math.PI/8), y=cy+35*Math.sin(i*Math.PI/8);
@@ -283,7 +285,7 @@ Tt('K15_all_prop_colliders_and_containers', () => {
       // stash must be physically walkable from the closest safe approach.
       const reach=field ? field.r+2*T : 35;
       const sx=cx+reach*Math.cos(i*Math.PI/8), sy=cy+reach*Math.sin(i*Math.PI/8);
-      if(!M.nav[Math.floor(sy/T)*M.MW+Math.floor(sx/T)] || !M.los(x,y,cx,cy) || !z.findPath(...start,sx,sy)) continue;
+      if(!M.nav[Math.floor(sy/T)*M.MW+Math.floor(sx/T)] || !M.los(x,y,cx,cy) || !z.findPath(...origin,sx,sy)) continue;
       reachable=true;
       const n=Math.max(1,Math.ceil((reach-35)/4));
       for(let j=0;j<=n;j++){
@@ -918,18 +920,27 @@ Tt('L1_upstairs_rescue_and_depot_gallery',()=>{
   reset();const p=P();
   const stand=(x,y)=>{Object.assign(p,{x:x*T,y:y*T});step(1);};
   const use=(kind)=>{if(z.near?.k!==kind)throw Error('Ожидалось '+kind+', получено '+z.near?.k);z.interact();step(20);};
-  stand(438.5,267.5);use('floor');
+  stand(438.5,266.73);use('floor');
   let prisoner=z.ents.find(e=>e.sid==='shust');
   const linked=p.x>480*T && prisoner.captive && z.findPath(p.x,p.y,prisoner.x,prisoner.y)?.length;
   z.save(true);z.applyState(z.loadSave());const saved=P().x>480*T;
   prisoner=z.ents.find(e=>e.sid==='shust');P().x=prisoner.x-18;P().y=prisoner.y;step(1);use('free');
   const freed=S().flags.shustFree && prisoner.x<480*T && S().q.flash===3;
-  P().x=483.5*T;P().y=71.5*T;step(1);use('floor');
-  const back=Math.hypot(P().x/T-438.5,P().y/T-267.5)<1;
-  Object.assign(P(),{x:285.5*T,y:40.5*T});step(1);use('floor');
+  P().x=483.5*T;P().y=72.25*T;step(1);use('floor');
+  const back=Math.hypot(P().x/T-438.5,P().y/T-266.73)<1;
+  Object.assign(P(),{x:290.26*T,y:40.25*T});step(1);use('floor');
   const gallery=M.nav[103*M.MW+486]===0 && z.findPath(P().x,P().y,488.5*T,101.5*T)?.length;
   use('floor');const depotDown=P().x<480*T;
   return {ok:!!(linked&&saved&&freed&&back&&gallery&&depotDown),linked,saved,freed,back,gallery,depotDown};
+});
+Tt('L4_interior_clearance',()=>{
+  reset();
+  const houses=z.gfxSnap().HOUSES, decorated=houses.filter(h=>h.interior && (h.interior.count || h.interior.mounts.length)).length;
+  const flights=M.objs.filter(o=>o.k==='stairRun'), p=P();
+  // Standing by the middle of the flight must not activate it through its side rail.
+  p.x=436.3*T;p.y=267.65*T;step(1);
+  const sideClear=z.near?.k!=='floor';
+  return {ok:decorated===houses.length && flights.length===4 && sideClear,decorated,flights:flights.length,sideClear};
 });
 Tt('L2_tavern_technician',()=>{
   reset();const tech=z.ents.find(e=>e.sid==='lz_tech'),s=S();s.inv.w_pm=1;s.cond.w_pm=63;s.money=6000;
