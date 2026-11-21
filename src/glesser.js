@@ -5,7 +5,7 @@ const lesserPlaces = [
   // id, название, границы, общедоступная точка подхода
   ['zalissya','Залесье',[78,36,104,57],[91,49]],
   ['poppies','Маковое поле',[20,-21,70,35],[48,27]],
-  ['mill','Старая мельница',[43,62,60,74],[55,69]],
+  ['mill','Старая мельница',[40,62,60,79],[55,69]],
   ['cowsheds','Коровники',[111,17,132,33],[123,26]],
   ['tower_lz','Водонапорная башня',[73,25,81,32],[78,31]],
   ['sphere','Комплекс «Сфера»',[152,37,176,54],[155,48]],
@@ -29,14 +29,14 @@ const lesserLore = {
 };
 const poppyBed = (x,y) => ((x-45)/23)**2 + ((y-7)/27)**2 + .09*Math.sin(.24*x+.16*y);
 const lesserLandmarks = [
-  {kind:'mill', x:48, y:70.7, radius:68},
-  {kind:'tank', x:77, y:28, radius:36},
+  {kind:'mill', x:46.8, y:73.4, radius:136, baseWidth:161, baseHeight:222, baseOffset:11},
+  {kind:'tank', x:77, y:28, radius:48},
   {kind:'antenna', x:85.6, y:44.6, radius:27},
-  {kind:'dome', x:166, y:43, radius:62},
+  {kind:'dome', x:165.8, y:43.4, radius:83},
   {kind:'silo', x:128, y:20, radius:28},
-  {kind:'silo', x:131, y:20, radius:26},
-  {kind:'silo', x:151, y:80, radius:37},
-  {kind:'silo', x:151, y:83, radius:36},
+  {kind:'silo', x:131, y:20, radius:28},
+  {kind:'silo', x:151, y:79.7, radius:40},
+  {kind:'silo', x:151, y:83.2, radius:40},
   {kind:'tank', x:193, y:64, radius:31},
   {kind:'tank', x:196, y:64, radius:31}
 ];
@@ -169,10 +169,11 @@ function makeLesserZone() {
     addObj({k:'signpost',village:!!sign.village,x:sign.x*T-span/2,y:sign.y*T-3,w:span,h:6,solid:1});
   }
   // The hull rests across the reed line. Boxes and sleepers are ashore.
-  addObj({k:'bargeHull',x:37*T-76,y:(Y+82)*T-20,w:152,h:40,solid:1});
+  addObj({k:'bargeHull',x:35.1*T-140,y:(Y+82)*T-26,w:280,h:52,solid:1});
   for (const l of lesserLandmarks) {
     const x=l.x*T,y=(Y+l.y)*T,r=l.radius*(l.kind==='antenna'?.38:.78);
-    addObj({k:'installation',x:x-r,y:y-r,w:r*2,h:r*2,solid:1,opaque:1});
+    const w=l.baseWidth || r*2,h=l.baseHeight || r*2;
+    addObj({k:'installation',x:x-w/2,y:y-h/2+(l.baseOffset||0),w,h,solid:1,opaque:1});
   }
   addObj({k:'fire',x:LESSER_FIRE.x-10,y:LESSER_FIRE.y-10,w:20,h:20,solid:1});
   addObj({k:'locker',baseName:'Залесье',x:92*T,y:(Y+41)*T,w:26,h:18,solid:true});
@@ -182,15 +183,15 @@ function makeLesserZone() {
   ]) addObj({k:'crate',stash,x:x*T+3,y:(Y+y)*T+3,w:26,h:26,solid:1,loot});
   CORDON_DETAILS.push(...[
     ['c1_crate_army',85.7,52.4,24,.04],['c1_barrel',80.2,54.9,19,-.06],
-    ['c1_trace_reel',53,71,44,.25],
-    ['c1_trace_pipes',208,31,65,.1],['c1_trace_reel',143,81,41,.3],
+    ['c1_trace_reel',52.4,72.2,29,.25],
+    ['c1_trace_pipes',208,31,65,.1],['c1_trace_reel',143,81,31,.3],
     ['c1_rock1',99,84,98,-.68],['c1_rock0',101,83.7,68,-.64],
     ['c1_rock1',102.7,84.2,76,-.57],['c1_rock0',104.7,85,52,-.51],
     ['c1_tractor',116.5,25.7,80,-.38],['c1_trace_churn',125,26.6,25,-.16],
     ['c1_trace_pipes',160,47,72,.57],['c1_sandbags',153.2,46,52,.08],
-    ['c1_barrel',95,46,25,.06],['c1_tires',62,44,39,.17],
-    ['c1_trace_wheel',46,69,45,-.2],['c1_trace_sleepers',41.6,83.4,61,-.28],
-    ['c1_crate_army',69,82,37,.04],['c1_trace_stump',39,25,35,.8],
+    ['c1_barrel',95,46,22,.06],['c1_tires',62,44,39,.17],
+    ['c1_trace_wheel',42.7,69.7,23,-.2],['c1_trace_sleepers',41.6,83.4,61,-.28],
+    ['c1_crate_army',69,82,30,.04],['c1_trace_stump',39,25,35,.8],
     ['c1_yard_car',83,46,69,-.56],['c1_trace_pipes',195,70,75,.2]
   ].map(([id,x,y,width,a])=>[id,x,Y+y,width,a]));
   ANOM0.push({id:'lz-ribs',k:'e',x:102*T,y:(Y+82)*T,r:31},{id:'lz-pool',k:'g',x:124*T,y:(Y+69)*T,r:70},
@@ -262,11 +263,11 @@ function drawLesserDetails(g) {
         g.drawImage(sprite,-size/2,-size/2,size,size);g.restore();
       }
     }
-  const bx=37*T, by=(top+82)*T, hull=lesserSprites.barge;
-  if (hull && bx+96>=GWP.x0 && bx-96<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
-    const h=182*hull.height/hull.width;
+  const bx=35.1*T, by=(top+82)*T, hull=lesserSprites.barge;
+  if (hull && bx+172>=GWP.x0 && bx-172<=GWP.x1 && by+48>=GWP.y0 && by-48<=GWP.y1) {
+    const h=324*hull.height/hull.width;
     g.save(); g.translate(bx,by); spriteShadow(g,3,2);
-    g.drawImage(hull,-91,-h/2,182,h); g.restore();
+    g.drawImage(hull,-162,-h/2,324,h); g.restore();
   }
   drawLesserInstallations(g,GWP);
 }
@@ -275,7 +276,7 @@ function drawLesserInstallations(g,win) {
     const x=l.x*T,y=(LESSER_TOP+l.y)*T,r=l.radius;
     if(win && (x+r*2<win.x0 || x-r>win.x1 || y+r*2<win.y0 || y-r>win.y1)) continue;
     g.save();g.translate(x,y);
-    spriteShadow(g,l.kind==='antenna'?5:r*.42,r*.16);
+    spriteShadow(g,l.kind==='antenna'?5:Math.min(14,r*.2),Math.min(8,r*.1));
     const sprite=lesserSprites[l.kind];
     if(sprite) {
       const scale=2*r/Math.max(sprite.width,sprite.height), w=sprite.width*scale,h=sprite.height*scale;

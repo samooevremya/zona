@@ -453,6 +453,11 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  // A saved position can be under an enlarged landmark after the world update.
+  if (BIG && objs.some(o=>(o.k==='installation'||o.k==='bargeHull') &&
+      P.x+P.r>o.x && P.x-P.r<o.x+o.w && P.y+P.r>o.y && P.y-P.r<o.y+o.h)) {
+    collide(P); S.x=P.x; S.y=P.y;
+  }
   if (SID_SHOP && inBunker(P.x,P.y)) {
     // Сохранения из более просторного подвала могли оставить героя за новой стеной.
     const inside = Math.abs(P.x-STAIRS.x) <= 3*T-P.r && P.y >= SHOP_ROOM.counterFront*T+P.r && P.y <= 10*T-P.r;
