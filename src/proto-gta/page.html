@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Зона · прототип «объём как в GTA»</title>
+<style>
+html,body{margin:0;height:100%;background:#16150f;overflow:hidden;touch-action:none;font-family:-apple-system,Arial,sans-serif;color:#e8e0c8;-webkit-user-select:none;user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(10,8,4,.55) 100%)}
+#top{position:fixed;left:12px;top:calc(8px + env(safe-area-inset-top));right:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+#top b{font-size:13px;letter-spacing:.5px;background:rgba(14,14,11,.6);padding:6px 10px;border-radius:8px}
+#top button{pointer-events:auto;min-width:44px;min-height:40px;border-radius:10px;border:1.5px solid rgba(236,229,206,.3);background:rgba(14,14,11,.6);color:#ece6d3;font:600 13px Arial;padding:0 10px}
+#fps{font:12px monospace;opacity:.7;margin-left:auto}
+#hint{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));text-align:center;font-size:12px;opacity:.75;pointer-events:none}
+#joy{position:fixed;left:30px;bottom:40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(14,14,11,.2),rgba(14,14,11,.5) 72%);border:1.5px solid rgba(236,229,206,.3);pointer-events:none;opacity:.55}
+#joy.on{opacity:1}#joy b{position:absolute;left:37px;top:37px;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(200,196,182,.7),rgba(120,117,106,.55))}
+#load{position:fixed;inset:0;display:grid;place-items:center;background:#16150f;font-size:15px}#err{position:fixed;top:40%;left:0;right:0;text-align:center;color:#ff8a70}
+</style></head><body>
+<canvas id="c"></canvas><div id="vig"></div>
+<div id="top"><b>Прототип · объём как в первых GTA</b><button id="b-vol">Объём</button><button id="b-zi">＋</button><button id="b-zo">－</button><span id="fps"></span></div>
+<div id="joy"><b></b></div>
+<div id="hint">Палец в любом месте — джойстик · кнопка «Объём» переключает силу эффекта · на компьютере WASD и колесо</div>
+<div id="load">Загрузка деревни…</div><div id="err"></div>
+<script>window.VILLAGE=__DATA__;</script>
+<script>__JS__</script>
+</body></html>
