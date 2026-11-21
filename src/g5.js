@@ -200,7 +200,19 @@ function drawDialog() {
   }, o.d)));
   pbody.appendChild(O);
 }
+function repairOffer() {
+  const worn=gunsBelow(95);
+  if(!worn.length) return null;
+  const cost=worn.reduce((sum,w)=>sum+Math.ceil((100-w.cond)*ITEMS[w.id].price/4000)*10,0);
+  return {t:'Починить оружие · '+cost+' RU',d:S.money<cost,fn:()=>{
+    if(S.money<cost || !gunsBelow(95).length) return;
+    S.money-=cost; repairCopies(worn,100); P.jam=0; say('Готово. Можешь забирать.'); sys('Оружие починено.');
+  }};
+}
 function talk(e) {
+  if(e.sid==='lz_tech') return dialog(cardOf(e),['Клемма, местный техник. Давай посмотрим, с чем пришёл.'],()=>[
+    repairOffer() || {t:'Оружие в порядке',d:true},{t:'До встречи',close:1}
+  ],'dialog',e);
   if (e.sid==='lz_barman') return dialog(cardOf(e),['Бар «Под стрехой». С дороги? Горячее кончилось, банка бодрящего найдётся.'],()=>[
     {t:'Покажи припасы',k:'key',fn:()=>openTrade(e)},
     {t:'Что слышно про маки?',fn:()=>say('Начнут слипаться глаза — выпей энергетик или выбирайся на дорогу. Кто лёг среди цветов, уже не встаёт.')},
@@ -352,9 +364,7 @@ function traderOpts() {
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
-  const worn = gunsBelow(95);
-  if (worn.length) { const cost = worn.reduce((a, w) => a + Math.ceil((100 - w.cond) * ITEMS[w.id].price / 400 / 10) * 10, 0);
-    o.push({ t: 'Починить оружие · ' + cost + ' RU', d: S.money < cost, fn: () => { S.money -= cost; repairCopies(worn,100); P.jam = 0; say('Почистил, смазал, пружины поменял. Стреляет как новый.'); sys('Оружие починено.'); } }); }
+  const repair=repairOffer(); if(repair) o.push(repair);
   { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
     o.push({ t: restLabel('Отоспаться до утра:', till, 'sleep'), d: blk, fn: () => {
       const b = restBlock(); if (b) { sys(b); return; }
@@ -414,7 +424,7 @@ function drawPda() {
     const w = el('div', 'mapwrap' + (panel.zoom ? ' zoom' : '')), c = el('canvas'); c.id = 'bigmap'; c.width = PW * 6; c.height = MH * 6;
     w.appendChild(c); pbody.appendChild(w);
     drawMapTo(c.getContext('2d'), 6, true);
-    if (panel.zoom) requestAnimationFrame(() => { const pp = inBunker(P.x, P.y) ? HATCH : P; w.scrollLeft = pp.x / (PW * T) * w.scrollWidth - w.clientWidth / 2; w.scrollTop = pp.y / (MH * T) * w.scrollHeight - w.clientHeight / 2; });
+    if (panel.zoom) requestAnimationFrame(() => { const pp = worldMapPoint(P); w.scrollLeft = pp.x / (PW * T) * w.scrollWidth - w.clientWidth / 2; w.scrollTop = pp.y / (MH * T) * w.scrollHeight - w.clientHeight / 2; });
     pbody.appendChild(mapLegend());
   } else if (panel.tab === 'tasks') {
     const L = qList();
@@ -718,7 +728,7 @@ function drawMapTo(g, s, full, o) {
   });
   const selQ = o.sel || [], tracked = trackedTarget(), labs = [];
   qTargets().forEach(q => {
-    const point = inBunker(q.x, q.y) ? HATCH : q;
+    const point = worldMapPoint(q);
     const x = point.x / T * s, y = point.y / T * s;
     const selected = selQ.some(t => t.qid === q.qid && t.x === q.x && t.y === q.y);
     g.globalAlpha = selected || q.qid === 'sos' || (tracked && q.qid === tracked.qid) ? 1 : 0.68;
@@ -733,7 +743,7 @@ function drawMapTo(g, s, full, o) {
     mapSymbol(g, 'shelter', x, y, 1.25*u); mark(x, y, 7*u);
     labs.push({t:'Укрытие', x, y, gap:9*u, pri:-1, font:'700 '+Math.round(13*u)+'px Arial', c:MAP_INK.shelter});
   }
-  const pp = inBunker(P.x, P.y) ? HATCH : P;
+  const pp = worldMapPoint(P);
   const px = pp.x / T * s, py = pp.y / T * s;
   mark(px, py, 8 * u);
   if (full) LOCATIONS.forEach(l => {
@@ -764,10 +774,11 @@ const mini = $('mini'), mctx = mini.getContext('2d');
 function miniNavigation() {
   const target=trackedTarget();
   const underground=inBunker(P.x,P.y);
-  const point=target && (underground && !inBunker(target.x,target.y)?STAIRS:
+  const floor=loftAt(P);
+  const point=target && (floor && loftAt(target)!==floor?floor.landing:underground && !inBunker(target.x,target.y)?STAIRS:
     !underground && inBunker(target.x,target.y)?HATCH:target);
   const people=ents.filter(e=>e!==P && e.alive && e.kind==='human' &&
-    inBunker(e.x,e.y)===underground && dE(e,P)<=520).length;
+    loftAt(e)===floor && inBunker(e.x,e.y)===underground && dE(e,P)<=520).length;
   $('mini-people').textContent=people;
   $('mini-distance').textContent=point?Math.round(dE(P,point)/T*1.5)+' м':'';
   return point;
@@ -788,6 +799,7 @@ function drawMini() {
   if (mini.width !== W * 2) { mini.width = W * 2; mini.height = W * 2; }
   const size = mini.width, s = size / 32;
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.fillStyle = '#0d120c'; mctx.fillRect(0, 0, size, size);
+  if(loftAt(P)){drawLoftMap(mctx,loftAt(P),size);return;}
   if (inBunker(P.x, P.y)) { mctx.fillStyle = '#7fb0c4'; mctx.font = '600 22px "Russo One", sans-serif'; mctx.textAlign = 'center'; mctx.fillText('БУНКЕР', size / 2, size / 2 - 6); mctx.font = '500 16px "IBM Plex Mono", monospace'; mctx.fillStyle = '#8f8c74'; mctx.fillText('под землёй', size / 2, size / 2 + 20); mctx.textAlign = 'start'; miniArrow(destination,size,s); return; }
   mctx.setTransform(1, 0, 0, 1, size / 2 - P.x / T * s, size / 2 - P.y / T * s);
   mctx.imageSmoothingEnabled = !!ART;
@@ -886,7 +898,10 @@ function hud(dt) {
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
   briefTask();
   const sleep=S.flags.poppySleep||0;
-  $('poppy-veil').style.opacity=String(clamp((sleep-4)/38,0,.94));
+  const veil=$('poppy-veil'), fatigue=clamp(sleep/42,0,1);
+  const blink=reducedCameraMotion.matches ? .24 : (.5+.5*Math.cos(sleep*(2.3-.014*sleep)))**(3.4-2*fatigue);
+  veil.style.opacity=sleep>0?String(.36+.64*fatigue):'0';
+  veil.style.setProperty('--lid',String((.07+.40*fatigue+blink*(.38+.15*fatigue))*100)+'%');
   const message = radioQueue[0];
   if (message !== lastNotice) {
     lastNotice = message;
@@ -912,7 +927,10 @@ function hud(dt) {
 /* ===================== ввод ===================== */
 function interact() {
   const n = G.near; if (!n || !P.alive) return;
-  if (n.k === 'talk') talk(n.e);
+  if(n.k==='floor' && fadeT<=0){
+    const p=n.upstairs?n.room.stair:n.room.landing;
+    fadeT=.5;fadeTo={x:p.x,y:p.y,a:P.ang};
+  } else if (n.k === 'talk') talk(n.e);
   else if (n.k === 'trader') { save(true); talkTrader(); }
   else if (n.k === 'down') goThrough(true);
   else if (n.k === 'up') goThrough(false);
@@ -1126,7 +1144,7 @@ function frame(now) {
 /* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
 function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); makeGarbage(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); makeGarbage(); buildLandmarks(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
   bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();

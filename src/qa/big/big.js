@@ -572,18 +572,13 @@ Tt('K25_bridge_toll', () => {
     z.IN.moveX=0; z.IN.moveY=dir;
   };
   const jump=()=>{window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyV'}));step(14);z.IN.moveY=0;};
-  const shots=()=>guards().reduce((n,e)=>n+e.mag,0);
   const crossings=[];
   for(const dir of [-1,1]){
-    reset(); enter(dir); step(12); // Попытка пройти пешком упирается в балку.
-    const stopped=(P().y-y)*dir<0 && guards().every(e=>!e.angry);
-    const rounds=shots();jump();
-    const crossed=(P().y-y)*dir>0, alarm=guards().every(e=>e.angry);
-    step(75);
-    crossings.push(stopped && crossed && alarm && shots()<rounds);
+    reset(); enter(dir); step(12);
+    const stopped=(P().y-y)*dir<0; jump();
+    crossings.push(stopped && (P().y-y)*dir<0 && guards().every(e=>!e.angry));
   }
-  z.save(true);z.applyState(z.loadSave());
-  const local=guards().every(e=>e.angry) && !S().flags.armyAngry && z.ents.filter(e=>e.guard==='south').every(e=>!e.angry);
+  const local=guards().some(e=>e.y<y) && guards().some(e=>e.y>y);
   reset(); S().money=700;
   const post=guards()[0];Object.assign(P(),{x:post.x,y:post.y+24});step(1);z.interact();
   const pay=[...document.querySelectorAll('#pbody .opt')].find(el=>el.textContent.includes('Пропусти за 500'));
@@ -911,12 +906,57 @@ Tt('G4_station_crossing_and_western_cut',()=>{
   const tiles=window.__bigTiles(),at=(x,y)=>tiles[y*M.MW+x];
   const deck=path([241,61],[252,71]);
   const crossesOnDeck=deck?.length<24 && deck.some(p=>Math.hypot(p.x/T-247,p.y/T-66.52)<2);
-  const closedBank=at(200,135)===9 && at(230,87)===9;
+  const walkableBank=[[200,135],[230,87]].every(([x,y])=>{
+    const crossing=path([x-2,y],[x+2,y]);return at(x,y)!==9 && crossing?.length<=7;
+  });
   const closedWest=!path([145.5,191.5],[50,44]) && !path([180,60],[50,44]);
   const saved=z.freshS();saved.x=50*T;saved.y=44*T;z.applyState(saved);
   const restored=!!path([P().x/T,P().y/T],[180,60]);
-  return {ok:!!(crossesOnDeck && closedBank && closedWest && restored),crossesOnDeck,closedBank,closedWest,restored};
+  return {ok:!!(crossesOnDeck && walkableBank && closedWest && restored),crossesOnDeck,walkableBank,closedWest,restored};
 });
+Tt('L1_upstairs_rescue_and_depot_gallery',()=>{
+  reset();const p=P();
+  const stand=(x,y)=>{Object.assign(p,{x:x*T,y:y*T});step(1);};
+  const use=(kind)=>{if(z.near?.k!==kind)throw Error('Ожидалось '+kind+', получено '+z.near?.k);z.interact();step(20);};
+  stand(438.5,267.5);use('floor');
+  let prisoner=z.ents.find(e=>e.sid==='shust');
+  const linked=p.x>480*T && prisoner.captive && z.findPath(p.x,p.y,prisoner.x,prisoner.y)?.length;
+  z.save(true);z.applyState(z.loadSave());const saved=P().x>480*T;
+  prisoner=z.ents.find(e=>e.sid==='shust');P().x=prisoner.x-18;P().y=prisoner.y;step(1);use('free');
+  const freed=S().flags.shustFree && prisoner.x<480*T && S().q.flash===3;
+  P().x=483.5*T;P().y=71.5*T;step(1);use('floor');
+  const back=Math.hypot(P().x/T-438.5,P().y/T-267.5)<1;
+  Object.assign(P(),{x:285.5*T,y:40.5*T});step(1);use('floor');
+  const gallery=M.nav[103*M.MW+486]===0 && z.findPath(P().x,P().y,488.5*T,101.5*T)?.length;
+  use('floor');const depotDown=P().x<480*T;
+  return {ok:!!(linked&&saved&&freed&&back&&gallery&&depotDown),linked,saved,freed,back,gallery,depotDown};
+});
+Tt('L2_tavern_technician',()=>{
+  reset();const tech=z.ents.find(e=>e.sid==='lz_tech'),s=S();s.inv.w_pm=1;s.cond.w_pm=63;s.money=6000;
+  P().x=tech.x-18;P().y=tech.y;step(1);z.interact();
+  const fix=[...document.querySelectorAll('#pbody button')].find(b=>b.textContent.includes('Починить оружие'));
+  fix?.click();const repaired=s.cond.w_pm===100 && s.money<6000;z.closePanel();
+  return {ok:!!fix && repaired,repaired};
+});
+Tt('L3_mesh_and_vaults',()=>{
+  reset();const fences=M.objs.filter(o=>o.material==='railMesh');
+  const gap=x=>!fences.some(o=>o.x<=x*T&&o.x+o.w>=x*T);
+  const mesh=fences.length>40 && [312.5,368.5,447.5].every(gap) && [319,330,455,470].every(x=>!gap(x));
+  const probe=id=>{
+    const props=M.fieldProps.filter(p=>id.test(p.id));
+    for(const p of props){
+      const x=p.vertices.reduce((a,v)=>a+v[0],0)/p.vertices.length,y=p.vertices.reduce((a,v)=>a+v[1],0)/p.vertices.length;
+      const displacement=t=>{const e={x,y,r:8,jumpT:t};M.collide(e);return Math.hypot(e.x-x,e.y-y);};
+      if(displacement(0)>4 && (p.vaultable?displacement(.3)<.1:displacement(.3)>4))return true;
+    }
+    return false;
+  };
+  const log=probe(/c1_log/), vehicle=probe(/tractor|yard_car/);
+  const bus=M.objs.find(o=>o.k==='bus'),jumper={x:bus.x+bus.w/2,y:bus.y+5,r:9,jumpT:.2};
+  M.collide(jumper);const busBlocks=jumper.y<bus.y;
+  return {ok:mesh&&log&&vehicle&&busBlocks,mesh,log,vehicle,busBlocks};
+});
+
 Tt('G3_saved_world_origin',()=>{
   reset();
   for(const [x,y,nx,ny] of [[91,116,91,north+116],[367,102,367,north+102],[228,18,389,33]]){

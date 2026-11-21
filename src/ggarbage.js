@@ -61,7 +61,7 @@ function cuttingDepth(x,y) {
   return Math.min(80+2*Math.sin(y*.12)-x,72+3*Math.sin(x*.10)-y);
 }
 function stampFreightBank() {
-  // Only the raised approach is a barrier. The flat sorting yard is walkable.
+  // Clear the ballast under the visible branch. The wooded cutting bounds the route.
   for(let i=1;i<freightLine.length;i++){
     const [ax,ay]=freightLine[i-1],[bx,by]=freightLine[i];
     const slope=(by-ay)/(bx-ax),normal=Math.hypot(1,slope);
@@ -69,8 +69,7 @@ function stampFreightBank() {
       const cy=ay+(x+.5-ax)*slope;
       for(let y=Math.floor(cy-normal);y<=Math.ceil(cy+normal);y++){
         if(Math.abs(y+.5-cy)>.86*normal) continue;
-        const along=(x+.5-depotDeck.x)*Math.cos(depotDeck.angle)+(y+.5-depotDeck.y)*Math.sin(depotDeck.angle);
-        setT(x,y,Math.abs(along)<1.75?DI:RA);
+        if(x>165 || tAt(x,y)!==RA) setT(x,y,DI);
       }
     }
   }

@@ -13,7 +13,7 @@ g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
 g5=g5[:pos]+bridge+'\n'+g5[pos:]
-js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gstory.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gprops.js','gcontrols.js','gheight.js'])+"\n"+g5+"\n})();\n"
+js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gstory.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gprops.js','gcontrols.js','gheight.js','glandmarks.js'])+"\n"+g5+"\n})();\n"
 open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os

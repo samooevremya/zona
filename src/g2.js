@@ -161,7 +161,7 @@ function mkHuman(d) {
   if (d.sid==='lz_barman') {e.inv={energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
   e.maxhp = e.hp;
   if (e.sit) e.ang = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
-  if (e.guard === 'bridge') e.ang = Math.PI / 2;
+  if (e.guard === 'bridge') e.ang = (BIG && e.sid==='a1' ? -1 : 1)*Math.PI/2;
   if (e.guard === 'south') e.ang = -Math.PI / 2;
   return e;
 }
@@ -336,10 +336,10 @@ function collide(e) {
   const x0 = Math.floor((e.x - e.r) / T), x1 = Math.floor((e.x + e.r) / T), y0 = Math.floor((e.y - e.r) / T), y1 = Math.floor((e.y + e.r) / T);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!inb(x, y) || SOLID[map[y * MW + x]]) pushOut(e, x * T, y * T, T, T);
   const hop = e.jumpT > 0;   // в прыжке низкие препятствия не держат
-  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && LOW_K.has(o.k) && o.material!=='stockade') && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
+  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && canVaultObject(o)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
   for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
     const nearby=propCells.get(y*MW+x);
-    if(nearby) for(const p of nearby) touchesProp(p,e,true);
+    if(nearby) for(const p of nearby) if(!hop || !p.vaultable) touchesProp(p,e,true);
   }
   e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r);
 }
@@ -815,7 +815,7 @@ function idleHuman(e, dt) {
   if (followTick(e, dt)) return;
   if (e.guard) {
     if (dE(e, e.home) > 8) goTo(e, e.home.x, e.home.y, 70, dt);
-    else { e.ang += angD(e.ang, e.guard === 'south' ? -Math.PI / 2 : Math.PI / 2) * dt * 2; }
+    else { e.ang += angD(e.ang, (e.guard === 'south' || (BIG && e.sid==='a1')) ? -Math.PI / 2 : Math.PI / 2) * dt * 2; }
     return;
   }
   if (e.sit) {
@@ -906,7 +906,7 @@ function qTargets() {
   if (BIG && q.flash===4 && !S.q2.fox && S.flags.flashDone && !cordonStage()) sidT('foxLead','Спросить Сидоровича о Стрелке');
   if (!q.flash) sidT('flash', 'Поговорить с Сидоровичем');
   if (q.flash === 1 && w) at('flash', w, 'Найти Волка в деревне');
-  if (q.flash === 2) { const s = byS('shust'); at('flash', s || locPt('atp', 'garage'), S.flags.shustFree?'Забрать флешку у Шустрого':'Освободить Шустрого на АТП'); }
+  if (q.flash === 2) { const s = byS('shust'); at('flash', (s && routeToActor(s)) || locPt('atp', 'garage'), S.flags.shustFree?'Забрать флешку у Шустрого':'Освободить Шустрого на АТП'); }
   if (q.flash === 3) {
     const box=!has('flash') && objs.find(o=>o.k==='locker' && personalStock().loot.flash);
     if(box) at('flash',{x:box.x+box.w/2,y:box.y+box.h/2},'Забрать флешку из личного ящика');

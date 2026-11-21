@@ -34,7 +34,9 @@ function addFootprint(id,x,y,w,h,angle=0) {
   });
   if (vertices.length < 3) return;
   const xs=vertices.map(p=>p[0]), ys=vertices.map(p=>p[1]);
-  const p={id,vertices}; fieldProps.push(p);
+  const vaultable = /log|stump|sandbag|crate|sack|wheel|tire|bench|sleeper|pipe|junk/.test(id) ||
+    (/rock|stone|barrel|drum/.test(id) && Math.min(w,h)<42);
+  const p={id,vertices,vaultable}; fieldProps.push(p);
   for(let ty=Math.floor(Math.min(...ys)/T);ty<=Math.floor(Math.max(...ys)/T);ty++)
     for(let tx=Math.floor(Math.min(...xs)/T);tx<=Math.floor(Math.max(...xs)/T);tx++) {
       if (!inb(tx,ty)) continue;

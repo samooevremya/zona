@@ -105,7 +105,10 @@ function throwBolt() {
 /* фонарик: ночью светит конусом; выключенный — почти темнота вокруг, зато тебя хуже видно издалека */
 function toggleTorch() { S.torch = S.torch === false; play('click'); }
 /* прыжок: короткий рывок по направлению движения; ящики, мешки, блоки и барьеры перепрыгиваются */
-const LOW_K = new Set(['crate', 'sand', 'blocks', 'barrier', 'fence']);
+function canVaultObject(o) {
+  if(o.k==='fence') return !o.material || ['picket','rail'].includes(o.material);
+  return o.k==='crate' || o.k==='sand' || o.k==='blocks' || o.k==='bench';
+}
 function energyActive() { return S.flags.energyUntil > S.min; }
 function exertion(kg) {
   return (1 + .8 * clamp(kg / carryLimit(), 0, 1)) * (energyActive() ? .65 : 1);
@@ -164,7 +167,7 @@ function update(dt) {
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
-  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x < PW*T && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
@@ -283,11 +286,11 @@ function updatePlayer(dt) {
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
     const exposure=S.flags.poppySleep || 0;
     if (inField && !energyActive()) {
-      S.flags.poppySleep=Math.min(42,exposure+dt);
+      S.flags.poppySleep=Math.min(42,exposure+dt*(1+.35*exposure/42));
       P.st=Math.max(0,P.st-18*dt);
       sp*=1-.37*S.flags.poppySleep/42;
       if(S.flags.poppySleep>=42) {kill(P,'poppies');return;}
-    } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-4*dt);
+    } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-5*dt);
   }
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
@@ -357,6 +360,11 @@ function findInteract() {
     else if (e.captive) cand(d, { k: 'free', e: e, label: 'Освободить: ' + e.name });
     else if (e.kind === 'human' && !hostile(e, P) && !e.tgt && e.fac !== 'trader') cand(d, { k: 'talk', e: e, label: 'Поговорить: ' + e.name });
   }
+  for(const room of lofts) {
+    const upstairs=loftAt(P)===room, p=upstairs?room.landing:room.stair;
+    const dist=dE(P,p);
+    if(dist<40) cand(dist-4,{k:'floor',room,upstairs,label:upstairs?'Спуститься на первый этаж':'Подняться · '+room.name});
+  }
   const sd = byS('sid');
   if (sd && inBunker(P.x, P.y) && dE(sd, P) < 120) cand(dE(sd, P) - 30, { k: 'trader', label: 'Поговорить: Сидорович' });
   const dh = dst(P.x, P.y, HATCH.x, HATCH.y);
@@ -406,6 +414,7 @@ function takeArt(a) {
   news('Найден ' + ITEMS[a.id].n + '.');
 }
 function freeShust(e) {
+  const room=loftAt(e); if(room) {e.x=room.stair.x;e.y=room.stair.y;}
   e.captive = 0; S.flags.shustFree = 1;
   e.home = (h => ({ x: h[0], y: h[1] }))(RMp(34.5 * T, 80.5 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
   if (S.q.flash === 2 || S.q.flash === 1) { const moved=give('flash',1); S.q.flash=3; bulletin(moved?'Шустрый освобождён. Флешка у тебя.':'Флешка Шустрого в личном ящике. Забери её для Сидоровича.'); }
@@ -458,6 +467,16 @@ function applyState(d) {
   fogDirty = true;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
+  if(BIG){
+    // A trader snapshot from the old bar also stores its old home and seat.
+    for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust']){
+      const e=byS(sid), d=NPCDEF.find(n=>n.sid===sid);
+      if(!e?.alive || !d || e.evacuating || e.follow || (sid==='shust' && !e.captive))continue;
+      if(e.home && (e.home.x!==d.x*T || e.home.y!==d.y*T)){
+        e.home={x:d.x*T,y:d.y*T};e.x=e.home.x;e.y=e.home.y;e.path=null;
+      }
+    }
+  }
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
   // Older northern-map saves could stand inside the now closed western cutting.
   if(BIG && cuttingDepth(Math.floor(P.x/T),Math.floor(P.y/T))>=0){

@@ -7,7 +7,7 @@ function pickWeather() {
   const k = r < 0.34 ? 'clear' : r < 0.58 ? 'cloudy' : r < 0.78 ? 'rain' : r < 0.87 ? 'storm' : (h < 9 || h > 18 ? 'fog' : 'cloudy');
   S.wx = { k: k, until: S.min + rnd(120, 300) };
 }
-const sheltered = (x, y) => inBunker(x, y) || HOUSES.some(h => !h.ruin && x > (h.x + 0.6) * T && x < (h.x + h.w - 0.6) * T && y > (h.y + 0.6) * T && y < (h.y + h.h - 0.6) * T);
+const sheltered = (x, y) => !!loftAt({x,y}) || inBunker(x, y) || HOUSES.some(h => !h.ruin && x > (h.x + 0.6) * T && x < (h.x + h.w - 0.6) * T && y > (h.y + 0.6) * T && y < (h.y + h.h - 0.6) * T);
 const safeFromBlow = e => e.guard || ['wolf', 'sid', 'petr', 'petr2', 'fox', 'shust', 'tolik'].indexOf(e.sid) >= 0;
 
 const CALL = {
@@ -62,7 +62,7 @@ function pluck(f, vol) {
   s.connect(lp); lp.connect(g); g.connect(master); s.start();
 }
 function guitar(dt) {
-  if (!AC || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow?.stage) return;
+  if (!AC || loftAt(P) || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow?.stage) return;
   const d = dst(P.x, P.y, FIRE.x, FIRE.y);
   if (d > 520) return;
   const player = ents.find(e => e.alive && e.sit && e.fireRef === FIRE && e.fac === 'loner');
@@ -88,7 +88,7 @@ function rainSound() {
     src.connect(f); f.connect(rainG); rainG.connect(master); src.start();
   }
   const under = sheltered(P.x, P.y) ? 0.45 : 1;
-  rainG.gain.value = inBunker(P.x, P.y) ? 0 : WX.rain * 0.16 * under;
+  rainG.gain.value = (loftAt(P) || inBunker(P.x, P.y)) ? 0 : WX.rain * 0.16 * under;
 }
 
 /* ---------- главный шаг атмосферы ---------- */
@@ -251,7 +251,7 @@ function blowout(dt) {
 
 /* ---------- отрисовка атмосферы ---------- */
 function drawCloudShadows() {
-  if (WX.cloud < 0.2 || (P && inBunker(P.x, P.y))) return;
+  if (WX.cloud < 0.2 || (P && (loftAt(P) || inBunker(P.x, P.y)))) return;
   WX.clouds.forEach(c => {
     const g = ctx.createRadialGradient(c.x, c.y, c.r * 0.2, c.x, c.y, c.r);
     g.addColorStop(0, 'rgba(0,0,0,' + (WX.cloud * 0.22) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -274,7 +274,7 @@ function drawBubbles(inView) {
   ctx.globalAlpha = 1;
 }
 function drawWeatherScreen() {
-  const bunk = P && inBunker(P.x, P.y);
+  const bunk = P && (loftAt(P) || inBunker(P.x, P.y));
   if (!bunk) {
     if (WX.cloud > 0.3 || WX.rain > 0.1) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(' + Math.round(255 - WX.cloud * 45) + ',' + Math.round(255 - WX.cloud * 40) + ',' + Math.round(255 - WX.cloud * 25) + ')'; ctx.fillRect(0, 0, VW, VH); ctx.globalCompositeOperation = 'source-over'; }
     if (WX.fog > 0.05) {

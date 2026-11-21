@@ -669,6 +669,9 @@ function drawFenceRun(g, o) {
   }
   if (upright) g.rotate(Math.PI / 2);
   g.translate(-length / 2, 0);
+  if(o.material==='railMesh' && perspective){
+    beam(g,0,0,length,0,1.4,'#504a3c');g.restore();return;
+  }
   if (o.material === 'concreteWire') {
     drawCheckpointWall(g, length, bays, upright); g.restore(); return;
   }
@@ -728,12 +731,19 @@ function artStatic0(g, o) {
     ART.draw(g, 'c1_sandbags', cx, cy, o.w + 2, o.h + 2);
     return true;
   }
+  if(o.k==='depotPier'){
+    artFill(g,'wall_concrete',o.x-3,o.y-3,o.w+6,o.h+6);
+    g.fillStyle='#514235';g.fillRect(o.x+2,o.y+1,8,11);
+    beam(g,o.x+1,o.y+1,o.x+12,o.y+1,2,'#a1896a');
+    beam(g,o.x+1,o.y+11,o.x+12,o.y+11,2,'#91785c');return true;
+  }
   if (C1 && (o.k === 'bed' || o.k === 'table')) {
     const bed = o.k === 'bed';
     g.save();
     spriteShadow(g, 2, 1.5);
     g.drawImage(ART.images.furniture, bed ? 0 : 64, 0, 64, bed ? 43 : 38,
       o.x, o.y, o.w, o.h);
+    if (o.barRole) drawTavernTable(g,o);
     if (o.barService) {
       for(const [id,dx,dy] of [['vodka',6,4],['energy',15,7],['bread',24,6]]) {
         const item=G3.pack?.manifest.items?.[id];
@@ -1093,6 +1103,7 @@ function artRoof(h, idx) {
       g.shadowColor = 'transparent'; hipEnd(g, image, sx, sy, sw, sh, tw, th);
     }
     g.restore();
+    if(BIG && gable && !h.ruin) weatherRoof(g,h,RW,RH);
     if (porch) drawPorch(g, porch, RH, Hh - 7);
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;

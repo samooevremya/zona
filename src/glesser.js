@@ -145,7 +145,7 @@ function makeLesserZone() {
   }
   const cottages = [
     [78,37,7,5,'slate'],[89,38,7,6,'plank'],[98,41,6,5,'slate'],
-    [79,51,8,5,'plank'],[94,53,7,5,'slate'],[56,37,7,5,'plank'],
+    [78,50,12,8,'plank'],[94,53,7,5,'slate'],[56,37,7,5,'plank'],
     [42,17,5,4,'plank'],[45,63,10,5,'plank'],
     [111,18,13,5,'slate'],[117,29,13,5,'slate'],
     [153,39,8,5,'conc'],[168,50,9,5,'conc'],[67,75,7,5,'conc'],
@@ -179,9 +179,10 @@ function makeLesserZone() {
     if(tAt(x,Y+y)===GR) setT(x,Y+y,t);
   }
   // Bar in the southwest plank house; leave the southern doorway clear.
-  for (const [x,y] of [[80.3,53.3],[81.3,53.3],[84.8,54.3]]) {
-    addObj({k:'table',barService:x===80.3,x:x*T,y:(Y+y)*T,w:32,h:15,solid:1});
-  }
+  for (const [barRole,x,y,w,h] of [
+    ['counter',80,53.02,96,20],['bench',87.3,52.4,41,19],
+    ['guests',80.5,55.2,44,24],['guests',86.3,55.5,35,23],['shelf',79.2,51.1,83,12],['shelf',82,51.1,61,12]
+  ]) addObj({k:'table',barRole,barService:barRole==='counter',x:x*T,y:(Y+y)*T,w,h,solid:1});
   for (const sign of trailSigns) {
     const tx=Math.floor(sign.x),ty=Math.floor(sign.y);
     if(tAt(tx,ty)===TR || tAt(tx,ty)===BU) setT(tx,ty,GR);
@@ -202,7 +203,6 @@ function makeLesserZone() {
     ['lz_post',58,39,{bread:1,antirad:1}], ['lz_barge',42,81,{money:75,cans:1}]
   ]) addObj({k:'crate',stash,x:x*T+3,y:(Y+y)*T+3,w:26,h:26,solid:1,loot});
   CORDON_DETAILS.push(...[
-    ['c1_crate_army',85.7,52.4,24,.04],['c1_barrel',80.2,54.9,19,-.06],
     ['c1_trace_reel',52.4,72.2,29,.25],
     ['c1_trace_pipes',208,31,65,.1],['c1_trace_reel',143,81,31,.3],
     ['c1_rock1',99,84,98,-.68],['c1_rock0',101,83.7,68,-.64],
@@ -219,13 +219,13 @@ function makeLesserZone() {
   ARTS0.push({key:'lz_pool',id:'art_medusa',x:126*T,y:(Y+69)*T},
     {key:'lz_yard',id:'art_bengal',x:163*T,y:(Y+51)*T});
   for(const [sid,name,x,y,wpn,fac] of [
-    ['lz_barman','Клён',80.8,52,'w_pm','loner'],['lz_guest','Лист',84.8,53.4,'w_pm','loner'],
-    ['lz_guest2','Уголёк',82.7,52,'w_obrez','loner'],
-    ['lz_spool','Катушка',89,49,'w_pm','loner'],['lz_sieve','Сито',92,50,'w_obrez','loner'],
+    ['lz_barman','Клён',81,51.75,'w_pm','loner'],['lz_guest','Лист',80.2,54.2,'w_pm','loner'],
+    ['lz_guest2','Уголёк',81,56,'w_obrez','loner'],
+    ['lz_tech','Клемма',86.5,52.8,'w_pm','loner'],['lz_spool','Катушка',89,49,'w_pm','loner'],['lz_sieve','Сито',92,50,'w_obrez','loner'],
     ['lz_millhand','Мельник',54,70,'w_pm','loner'],['lz_meter','Шкала',75,80,'w_pm','loner'],
     ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
     ['lz_rivet','Радист',170,48,'w_obrez','army']
-  ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:85.1*T,y:(Y+54.4)*T}:LESSER_FIRE});
+  ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:81.2*T,y:(Y+55.55)*T}:LESSER_FIRE});
   DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
 }
 // World tiles. The east end shares both gauge and sleeper phase with the Cordon.
@@ -315,7 +315,8 @@ function drawLesserDetails(g) {
       const sprite=lesserSprites.flowers;
       if(!sprite) continue;
       const clump=vnoise(x+33,y+79,3.5);
-      const clusters=Math.floor(density*(.25+3.9*clump**1.4)+rand());
+      const clusters=Math.floor(Math.sqrt(density)*(.8+4.7*clump)+rand());
+      paintPoppyHeads(g,x,y);
       for(let i=0;i<clusters;i++){
         const px=(x+rand())*T, py=(top+y+rand())*T, size=21+rand()*19;
         g.save();g.translate(px,py);g.rotate(rand()*Math.PI*2);

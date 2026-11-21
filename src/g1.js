@@ -187,7 +187,7 @@ const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
 const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
 const BUNK = { x0: 121 * T, y0: 1 * T, x1: 132 * T, y1: 13 * T };
-const inBunker = (x, y) => x > BUNK.x0;
+const inBunker = (x, y) => x > BUNK.x0 && (!BIG || y < 16*T);
 const POI = {
   field: { x: 80 * T, y: 61 * T }, cross: { x: 64.5 * T, y: 60 * T }, atp: { x: 79 * T, y: 71 * T },
   bridge: { x: 57 * T, y: 36 * T }, swamp: { x: 26 * T, y: 50 * T }, trafo: { x: 34 * T, y: 37 * T }, cars: { x: 58 * T, y: 89 * T }
