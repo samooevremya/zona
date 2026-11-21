@@ -62,8 +62,8 @@ const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
-  let fire = FIRE;
-  if (Math.abs(e.x - fire.x) >= FIRE_REACH || Math.abs(e.y - fire.y) >= FIRE_REACH) fire = FIRE2;
+  const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
+  if(!fire){drawHuman(e,ctx);return;}
   const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
   if (distance >= FIRE_REACH) { drawHuman(e, ctx); return; }
 
@@ -324,6 +324,12 @@ function gensetProc(g, o) {   // прежняя процедурная отри�
 function drawRoadblock(g, o) {
   const w = o.w, h = o.h;
   g.save(); g.translate(o.x, o.y);
+  if (lesserSprites.block) {
+    spriteShadow(g,2,1);
+    const sprite=lesserSprites.block, height=Math.max(h+3,w*sprite.height/sprite.width);
+    g.drawImage(sprite,0,h-height,w,height);
+    g.restore();return;
+  }
   if (SHADOWS) {
     g.fillStyle = 'rgba(27,24,19,.35)';
     g.beginPath(); g.ellipse(w / 2 + SUN_DX * 5, h / 2 + SUN_DY * 5, w * .54, h * .68, 0, 0, 2 * Math.PI); g.fill();
@@ -376,6 +382,13 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if (o.k==='freightWagon' && lesserSprites[o.sprite]) {
+    g.save();spriteShadow(g,3,2);g.drawImage(lesserSprites[o.sprite],o.x,o.y,o.w,o.h);g.restore();return;
+  }
+  if(o.k==='scrapCrane' && lesserSprites['scrap-crane']){
+    const im=lesserSprites['scrap-crane'],w=4.6*T,h=w*im.height/im.width;
+    g.save();spriteShadow(g,3,2);g.drawImage(im,o.x-.12*T,o.y+o.h-h,w,h);g.restore();return;
+  }
   if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
   if (o.k==='trafo' && lesserSprites.transformer) {
     g.save(); spriteShadow(g,6,2);
@@ -935,7 +948,7 @@ function render() {
     }
     hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
-    hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
+    for(const f of WORLD_FIRES) if(f!==FIRE) hole(f.x,f.y,170+Math.sin(S.min*8)*8,.9);
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }

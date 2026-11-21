@@ -868,8 +868,8 @@ Tt('M8_sphere_guard',()=>{
 Tt('G1_garbage_approaches_and_return',()=>{
   reset();
   const p=P(),state=S(), routes=[
-    [[367.5,10.5],[367,5],[355,4],[332,9],[310,11],[286,11],[271,14],[251,14],[237,19],[225,25],[211,22],[183,15],[168,20],[143,22],[118,21]],
-    [[145.5,59.5],[145.5,48],[151,34],[149,25],[143,22],[118,21]]
+    [[367.5,10.5],[367,5],[355,4],[332,9],[310,11],[286,11],[271,14],[251,14],[241,22],[238,33],[232,41],[221,46],[209,46],[205,42],[206,35],[202,29],[195,29],[184,26],[171,27],[161,29],[150,29],[138,29],[133,28]],
+    [[145.5,59.5],[145.5,48],[149,39],[151,34],[150,29],[144,29],[138,29],[133,28]]
   ];
   for(const points of routes){
     p.x=points[0][0]*T;p.y=points[0][1]*T;
@@ -890,11 +890,31 @@ Tt('G1_garbage_approaches_and_return',()=>{
     z.resetInput();
   }
   const places=M.LOCATIONS.filter(l=>l.id.startsWith('dump_'));
-  const linked=places.every(l=>{const [x,y]=l.anchors.approach;return z.findPath(168*T,20*T,x*T,y*T)?.length;});
+  const linked=places.every(l=>{const [x,y]=l.anchors.approach;return z.findPath(222*T,18*T,x*T,y*T)?.length;});
   const seamless=p===P() && state===S() && !z.panel;
-  p.x=168.5*T;p.y=20.5*T;z.save(true);z.applyState(z.loadSave());
+  p.x=228.5*T;p.y=18.5*T;z.save(true);z.applyState(z.loadSave());
   return {ok:seamless && state.flags.visitedDump===1 && linked && places.length===9 &&
-    Math.abs(P().x-168.5*T)<1 && Math.abs(P().y-20.5*T)<1,places:places.length,linked};
+    Math.abs(P().x-228.5*T)<1 && Math.abs(P().y-18.5*T)<1,places:places.length,linked};
+});
+Tt('G2_wagon_footprints',()=>{
+  reset();
+  const cars=M.objs.filter(o=>o.k==='freightWagon'), p=P();
+  const npc=z.rc.mk.mkHuman({fac:'loner',x:133,y:28,wpn:'w_pm'});
+  for(const car of cars){
+    const x=car.x+car.w/2;
+    for(const e of [p,npc]) for(const side of [-1,1]){
+      const edge=side<0?car.y:car.y+car.h;
+      e.x=x;e.y=edge+side*(e.r+12);e.jumpT=1;
+      for(let i=0;i<35;i++) M.moveE(e,0,-side*3);
+      if((e.y-edge)*side<e.r-.05)return {ok:false,crossed:car.x/T};
+    }
+    const y=car.y+car.h/2;
+    if(M.nav[Math.floor(y/T)*M.MW+Math.floor(x/T)])return {ok:false,navOpen:x/T};
+  }
+  const car=cars[2],x=car.x+car.w/2,ty=car.y+car.h+28;
+  npc.x=x;npc.y=car.y-30;npc.jumpT=0;
+  for(let i=0;i<900 && Math.hypot(npc.x-x,npc.y-ty)>14;i++)M.goTo(npc,x,ty,90,1/30);
+  return {ok:cars.length===6 && Math.hypot(npc.x-x,npc.y-ty)<=14,wagons:cars.length,npcArrived:Math.hypot(npc.x-x,npc.y-ty)<=14};
 });
 return JSON.stringify(R);
 })()

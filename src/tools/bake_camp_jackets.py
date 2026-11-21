@@ -102,14 +102,24 @@ def bake():
             atlas.paste(standing[pose], (i * 192, 168))
         keys = [jacket(source.crop((i*576,0,i*576+144,168)), shapes, palette)
                 for i, shapes in enumerate(SEAT)]
-        # Extended boot, folded leg, and a low one-knee crouch. Keep left/right
+        # Folded legs and a low one-knee crouch. Keep left/right
         # handedness consistent at the join to the common standing frame.
         if name == "white":
-            rest, middle = keys[0], keys[1]
+            rest, middle = keys[2], keys[1]
         elif name == "beige":
             rest, middle = ImageOps.mirror(keys[1]), ImageOps.mirror(keys[2])
         else:
-            rest, middle = lean(keys[2], -5, 4), keys[2]
+            rest, middle = lean(keys[3], -4, 2), keys[2]
+        # Register the seated shoulders against the upright jacket. Boots can
+        # extend beyond the torso without magnifying the entire person.
+        def register(frame, factor):
+            size=tuple(round(v*factor) for v in frame.size)
+            small=frame.resize(size, Image.Resampling.LANCZOS)
+            cell=Image.new('RGBA', frame.size)
+            cell.paste(small, tuple((a-b)//2 for a,b in zip(frame.size,size)))
+            return cell
+        rest=register(rest, .85)
+        middle=register(middle, .90)
         knots = [(0, rest), (3, lean(rest, 2, 6)), (7, middle),
                  (12, keys[3]), (16, standing["idle"])]
         for (start, a), (end, b) in zip(knots, knots[1:]):

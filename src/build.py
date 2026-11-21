@@ -48,7 +48,7 @@ if BIGF:
     for name in ('mill', 'flowers', 'dome', 'silo', 'tank', 'poppies', 'antenna', 'barge', 'village-sign', 'fingerpost', 'transformer', 'safe', 'splinters', 'energy', 'money'):
         with open('art/lesser/' + name + '.webp', 'rb') as sprite:
             lesser_art[name] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
-    for name in ('slag', 'wagon'):
+    for name in ('slag', 'wagon', 'depot-roof', 'block', 'shunter', 'scrap-crane'):
         with open('art/garbage/' + name + '.webp','rb') as sprite:
             lesser_art[name] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
     art += '\nwindow.LESSER_ART=' + __import__('json').dumps(lesser_art) + ';'

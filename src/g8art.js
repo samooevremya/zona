@@ -628,8 +628,8 @@ function drawCheckpointWall(g, length, bays, upright) {
   g.lineTo(length + topX, topY - 4); g.closePath(); g.fill();
   g.translate(topX, topY);
   artFill(g, 'floor_concrete', 0, -4, length, 8);
-  g.fillStyle = 'rgba(186,183,163,.47)'; g.fillRect(0, -4, length, 8);
-  g.fillStyle = '#b3af9c'; g.fillRect(0, -edge, length, 1);
+  g.fillStyle = 'rgba(114,108,92,.22)'; g.fillRect(0, -4, length, 8);
+  g.fillStyle = '#898273'; g.fillRect(0, -edge, length, 1);
   for (let i = 0; i <= bays; i++) {
     const x = i * bay;
     g.fillStyle = '#514c44'; g.fillRect(x - 2.5, -5, 5, 10);
@@ -639,12 +639,12 @@ function drawCheckpointWall(g, length, bays, upright) {
   g.translate(topX / 4, topY / 4);
   g.fillStyle = '#5b4e42'; g.fillRect(0, -.75, length, 1.5);
   const turns = Math.ceil(length / 7), pitch = length / turns;
-  g.strokeStyle = '#443b35'; g.lineWidth = 1.8; g.beginPath();
+  g.strokeStyle = '#51483e'; g.lineWidth = 1.2; g.beginPath();
   for (let i = 0; i < turns; i++) {
     const x = (i + .5) * pitch;
     g.moveTo(x + 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, 0, 2 * Math.PI);
   }
-  g.stroke(); g.beginPath(); g.lineWidth = 1; g.strokeStyle = '#b4aaa0';
+  g.stroke(); g.beginPath(); g.lineWidth = .65; g.strokeStyle = '#8d8071';
   for (let i = 0; i < turns; i++) {
     const x = (i + .5) * pitch;
     g.moveTo(x - 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, Math.PI, Math.PI * 1.8);
@@ -951,6 +951,10 @@ function c1RoofId(h, idx, old) {
   if (BIG && h.x === WEST+15 && h.y === 28) return 'c1_tower';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
+  if (BIG && (h.x<WEST || h.ok?.startsWith('dump_'))) {
+    if (h.mat==='plank') return 'c1_roof_plank';
+    if (h.mat==='slate') return 'c1_roof_slate';
+  }
   if (long > 2.1 && big > 40) return 'c1_roof_barn';
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
   return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
@@ -1022,6 +1026,16 @@ function artRoof(h, idx) {
   c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
+  if(h.mat==='depot' && lesserSprites['depot-roof']){
+    const rw=W-7,rh=Hh-16;
+    artFill(g,'wall_brick',2,rh-3,rw,11);
+    g.drawImage(lesserSprites['depot-roof'],0,0,rw,rh);
+    g.shadowColor='transparent';
+    for(const gate of h.entrances) if(gate.ny===1){
+      g.fillStyle='#38342e';g.fillRect(gate.x-gate.width/2+3,rh,gate.width,7);
+    }
+    g.setTransform(1,0,0,1,0,0);c1Grade(c,0,0,c.width,c.height);return c;
+  }
   const crossRidge = BIG && gable && (home === '15,87' || home === '26,71');
   const along = crossRidge ? false : h.w >= h.h, sp = ART.m.sprites[id];
   if (C1 && id.startsWith('c1_')) {   // крыша C1: вырезать середину под пропорции дома, не растягивать

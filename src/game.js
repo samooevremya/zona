@@ -2313,8 +2313,8 @@ const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
-  let fire = FIRE;
-  if (Math.abs(e.x - fire.x) >= FIRE_REACH || Math.abs(e.y - fire.y) >= FIRE_REACH) fire = FIRE2;
+  const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
+  if(!fire){drawHuman(e,ctx);return;}
   const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
   if (distance >= FIRE_REACH) { drawHuman(e, ctx); return; }
 
@@ -2575,6 +2575,12 @@ function gensetProc(g, o) {   // прежняя процедурная отри�
 function drawRoadblock(g, o) {
   const w = o.w, h = o.h;
   g.save(); g.translate(o.x, o.y);
+  if (lesserSprites.block) {
+    spriteShadow(g,2,1);
+    const sprite=lesserSprites.block, height=Math.max(h+3,w*sprite.height/sprite.width);
+    g.drawImage(sprite,0,h-height,w,height);
+    g.restore();return;
+  }
   if (SHADOWS) {
     g.fillStyle = 'rgba(27,24,19,.35)';
     g.beginPath(); g.ellipse(w / 2 + SUN_DX * 5, h / 2 + SUN_DY * 5, w * .54, h * .68, 0, 0, 2 * Math.PI); g.fill();
@@ -2627,6 +2633,13 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if (o.k==='freightWagon' && lesserSprites[o.sprite]) {
+    g.save();spriteShadow(g,3,2);g.drawImage(lesserSprites[o.sprite],o.x,o.y,o.w,o.h);g.restore();return;
+  }
+  if(o.k==='scrapCrane' && lesserSprites['scrap-crane']){
+    const im=lesserSprites['scrap-crane'],w=4.6*T,h=w*im.height/im.width;
+    g.save();spriteShadow(g,3,2);g.drawImage(im,o.x-.12*T,o.y+o.h-h,w,h);g.restore();return;
+  }
   if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
   if (o.k==='trafo' && lesserSprites.transformer) {
     g.save(); spriteShadow(g,6,2);
@@ -3186,7 +3199,7 @@ function render() {
     }
     hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
-    hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
+    for(const f of WORLD_FIRES) if(f!==FIRE) hole(f.x,f.y,170+Math.sin(S.min*8)*8,.9);
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
@@ -4264,8 +4277,8 @@ function drawCheckpointWall(g, length, bays, upright) {
   g.lineTo(length + topX, topY - 4); g.closePath(); g.fill();
   g.translate(topX, topY);
   artFill(g, 'floor_concrete', 0, -4, length, 8);
-  g.fillStyle = 'rgba(186,183,163,.47)'; g.fillRect(0, -4, length, 8);
-  g.fillStyle = '#b3af9c'; g.fillRect(0, -edge, length, 1);
+  g.fillStyle = 'rgba(114,108,92,.22)'; g.fillRect(0, -4, length, 8);
+  g.fillStyle = '#898273'; g.fillRect(0, -edge, length, 1);
   for (let i = 0; i <= bays; i++) {
     const x = i * bay;
     g.fillStyle = '#514c44'; g.fillRect(x - 2.5, -5, 5, 10);
@@ -4275,12 +4288,12 @@ function drawCheckpointWall(g, length, bays, upright) {
   g.translate(topX / 4, topY / 4);
   g.fillStyle = '#5b4e42'; g.fillRect(0, -.75, length, 1.5);
   const turns = Math.ceil(length / 7), pitch = length / turns;
-  g.strokeStyle = '#443b35'; g.lineWidth = 1.8; g.beginPath();
+  g.strokeStyle = '#51483e'; g.lineWidth = 1.2; g.beginPath();
   for (let i = 0; i < turns; i++) {
     const x = (i + .5) * pitch;
     g.moveTo(x + 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, 0, 2 * Math.PI);
   }
-  g.stroke(); g.beginPath(); g.lineWidth = 1; g.strokeStyle = '#b4aaa0';
+  g.stroke(); g.beginPath(); g.lineWidth = .65; g.strokeStyle = '#8d8071';
   for (let i = 0; i < turns; i++) {
     const x = (i + .5) * pitch;
     g.moveTo(x - 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, Math.PI, Math.PI * 1.8);
@@ -4587,6 +4600,10 @@ function c1RoofId(h, idx, old) {
   if (BIG && h.x === WEST+15 && h.y === 28) return 'c1_tower';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
+  if (BIG && (h.x<WEST || h.ok?.startsWith('dump_'))) {
+    if (h.mat==='plank') return 'c1_roof_plank';
+    if (h.mat==='slate') return 'c1_roof_slate';
+  }
   if (long > 2.1 && big > 40) return 'c1_roof_barn';
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
   return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
@@ -4658,6 +4675,16 @@ function artRoof(h, idx) {
   c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
+  if(h.mat==='depot' && lesserSprites['depot-roof']){
+    const rw=W-7,rh=Hh-16;
+    artFill(g,'wall_brick',2,rh-3,rw,11);
+    g.drawImage(lesserSprites['depot-roof'],0,0,rw,rh);
+    g.shadowColor='transparent';
+    for(const gate of h.entrances) if(gate.ny===1){
+      g.fillStyle='#38342e';g.fillRect(gate.x-gate.width/2+3,rh,gate.width,7);
+    }
+    g.setTransform(1,0,0,1,0,0);c1Grade(c,0,0,c.width,c.height);return c;
+  }
   const crossRidge = BIG && gable && (home === '15,87' || home === '26,71');
   const along = crossRidge ? false : h.w >= h.h, sp = ART.m.sprites[id];
   if (C1 && id.startsWith('c1_')) {   // крыша C1: вырезать середину под пропорции дома, не растягивать
@@ -6284,7 +6311,7 @@ function cordonExit() {
       '«Я Серый. Из деревни передали, что ты вывел людей. По поводу Стрелка поговорим лично. Найдёшь меня в ангаре».';
   S.stats.q++; S.flags.reachedExit=1;
   cordonSet('done','Глава «Кордон» завершена. Серый на связи, встреча назначена в ангаре на Свалке.');
-  cordonMessage('Серый · северный канал',[line,'Связь обрывается. Координаты ангара записаны в КПК. За северным постом дорога поворачивает к брошенной технике.']);
+  cordonMessage('Серый · северный канал',[line,'Связь обрывается. Координаты ангара записаны в КПК. До открытия Свалки можно остаться на Кордоне.']);
   return true;
 }
 // Тёмная колея и раздельные отпечатки связывают крышку с машиной.
@@ -6882,7 +6909,7 @@ const lesserPlaces = [
 const lesserLore = {
   dump_scale:'Костёр держим под стеной старой конторы. Отсюда к депо иди вдоль разгрузочной дороги на запад.',
   dump_sorter:'Сухая канава огибает южный отвал. На гребне дозиметр трещит, а внизу можно пройти.',
-  dump_driver:'Смотри по колее. Кузова слева — идёшь к Кордону, справа — назад к Барахолке.',
+  dump_driver:'На Кордон держись колеи мимо южных ворот кладбища. К ангару поворачивай на запад у остановки.',
   lz_spool: 'Ящик с зелёным замком стоит в доме у костра. Сюда доходят вещи из твоего ящика на Кордоне.',
   lz_sieve: 'Видишь старую водонапорку за крышами? От неё одна колея идёт к коровникам, другая возвращается в деревню.',
   lz_meter: 'В старице маятник детектора тянет к воде. В самом центре завихрения лучше не задерживаться.',
@@ -7234,7 +7261,7 @@ function migrateWesternWorld(s) {
 
 // Northern industrial belt. Coordinates stay in the shared world so saves, NPCs,
 // projectiles, the camera and both roads use the same navigation grid.
-const dumpEdge = [[95,21],[108,35],[141,38],[153,42],[198,48],[228,49],
+const dumpEdge = [[80,23],[92,27],[108,35],[141,38],[153,42],[198,48],[228,49],
   [242,27],[265,17],[300,16],[325,16],[347,11],[361,7],[369,3]];
 function inGarbage(x,y) {
   if (!BIG || x<dumpEdge[0][0] || x>369 || y<0 || y>50) return false;
@@ -7244,27 +7271,42 @@ function inGarbage(x,y) {
   }
   return false;
 }
-const dumpFire = {x:170.3*T,y:17.5*T};
+const dumpFire = {x:228*T,y:16.6*T};
 const dumpHills = [
-  [121,8,15,9,.11],[137,29,11,7,-.26],[157,9,10,6,.24],
-  [186,22,14,9,-.13],[199,33,19,12,.23],[210,9,12,8,-.19],
-  [231,15,13,7,.29],[259,7,10,5,-.15],[290,6.6,8,5,.12]
+  [173,36,17,8,-.18],[215,26,13,7,.20],[171,9,16,6,.11],
+  [259,8,9,4,-.26],[208,36,8,4,.32]
 ];
-const dumpWagons = [[124,24],[131.1,24],[131,28]];
-const dumpTanks = [[192,11],[195.4,11]];
+const dumpTanks = [[213,15],[216.3,15]];
 const dumpPlaces = [
-  ['dump_yard','Кладбище техники',[214,22,234,42],[221,30]],
-  ['dump_depot','Перегрузочное депо',[106,13,140,30],[118,21]],
-  ['dump_market','Барахолка',[160,12,177,24],[169,19]],
-  ['dump_mounds','Шлаковые отвалы',[186,24,209,41],[191,31]],
-  ['dump_stop','Старая автостанция',[301,6,314,14],[308,11]],
-  ['dump_pumps','Мазутная эстакада',[188,6,200,14],[193,14]],
-  ['dump_ditch','Водоотводный коллектор',[177,34,189,41],[183,36]],
-  ['dump_checkpoint','Северная застава',[141,3,153,10],[149,7]],
+  ['dump_yard','Кладбище техники',[181,31,202,47],[197,38]],
+  ['dump_depot','Перегрузочное депо',[101,8,141,31],[133,28]],
+  ['dump_market','Барахолка',[221,8,238,22],[228,18]],
+  ['dump_mounds','Шлаковые отвалы',[163,29,183,42],[180,35]],
+  ['dump_stop','Старая автостанция',[206,19,214,25],[208,24]],
+  ['dump_pumps','Мазутная эстакада',[210,10,220,18],[215,18]],
+  ['dump_ditch','Водоотводный коллектор',[155,34,167,42],[161,36]],
+  ['dump_checkpoint','Северная застава',[196,2,205,10],[199,7]],
   ['dump_watch','Сторожка весовой',[244,8,255,16],[249,13]]
 ];
-const dumpHighway=[[367,9],[367,5],[364,3],[357,3],[346,6],[332,9],[310,11],[286,11],[271,14],[251,14],[237,19],[225,25],[211,22],[202,18],[183,15],[175,18],[168,20],[154,24],[143,22],[133,20],[118,21]];
-const dumpTrail=[[149,39],[151,34],[148,25],[143,22]];
+// The approach from the Cordon curves around the ridge into the southern yard.
+// The main road then passes the depot turn and ends at the northern weigh station.
+const dumpHighway=[[367,9],[367,5],[364,3],[357,3],[346,6],[332,9],[310,11],
+  [286,11],[271,14],[251,14],[241,22],[238,33],[232,41],[221,46],[209,46],
+  [205,42],[206,35],[202,29],[204,23],[204,17],[201,12],[199,7]];
+const dumpTrail=[[149,39],[151,34],[150,29],[144,29],[138,29],[133,28]];
+const sidings=[
+  [[97,railAxis(97)],[100,27],[105,26],[144,26]],
+  [[97,railAxis(97)],[99,24],[102,20],[155,20]],
+  [[84,20],[103,20]]
+];
+const wagonWidth=5.75, wagonDepth=1.43;
+// Store a wagon on a named horizontal siding. Rail axis, body, collision and PDA
+// are derived from this placement. The wheelsets sit underneath the body centre.
+function addRailVehicle(siding,x,sprite='wagon',width=wagonWidth,depth=wagonDepth) {
+  const line=sidings[siding],y=line[line.length-1][1];
+  addObj({k:'freightWagon',sprite,x:(x-width/2)*T,y:(y-depth/2)*T,
+    w:width*T,h:depth*T,solid:1,opaque:1});
+}
 function makeGarbage() {
   if (!BIG) return;
   const random=mulberry32(452788);
@@ -7282,105 +7324,105 @@ function makeGarbage() {
   for(const [x,y,w,h] of dumpHills) rcClear(Math.floor(x-w/2),Math.floor(y-h/2),Math.ceil(x+w/2),Math.ceil(y+h/2));
   // A shallow drainage cut runs along the outer toe of the heap. The two
   // banks meet at a dry service ramp beside the concrete pipes.
-  for(let x=178;x<=189;x++){
-    const mid=38+1.4*Math.sin((x-180)*.4);
+  for(let x=156;x<=167;x++){
+    const mid=38+1.4*Math.sin((x-158)*.4);
     for(let y=35;y<=41;y++){
       const d=Math.abs(y-mid);
-      if(d<1.3 && x!==183 && x!==184) setT(x,y,SW);
+      if(d<1.3 && x!==161 && x!==162) setT(x,y,SW);
       else if(d<2.3) setT(x,y,DI);
     }
   }
   bigPath(dumpHighway,1.55,AS);
   bigPath(dumpTrail,1.25);
-  bigPath([[150,4],[152,6],[156,13],[164,18],[168,20]],1.1);
-  // The old highway turned into a dead end at the map edge. Its northern tip is now a verge.
   for(let y=0;y<=1;y++) for(let x=364;x<=370;x++) setT(x,y,TR);
-  // Vehicle tracks around the heaps and separate foot entrances for the safe yards.
   const lanes=[
-    [[225,25],[228,29],[227,36],[220,39],[211,40],[207,43],[196,43],[186,37],[184,29],[178,23],[168,20]],
-    [[225,25],[221,30],[217,32],[216,35]],
-    [[183,15],[187,14],[193,14],[199,14],[203,18]],
-    [[184,29],[191,31],[192,36],[196,43]],
-    [[118,21],[113,22],[111,27],[117,31],[130,32],[141,31],[149,26]],
-    [[308,11],[308,9],[303,9]],[[184,29],[183,36],[184,39],[191,42],[196,43]],
-    [[168,20],[168,16],[165,16]],[[168,20],[173,21],[175,22]]
+    [[205,42],[199,41],[197,38],[193,38],[187,38],[184,40]],
+    [[199,41],[201,46],[190,48],[180,44],[173,43],[162,40],[161,36]],
+    [[202,29],[195,29],[184,26],[171,27],[161,29],[150,29],[138,29],[130,29]],
+    [[150,29],[152,22],[153,15],[145,11],[136,12],[134,16]],
+    [[133,28],[126,31],[119,31],[109,29],[104,27]],
+    [[149,25],[149,16],[150,4],[157,8],[171,15],[185,12],[199,7]],
+    [[204,23],[208,24],[217,21],[228,18],[236,17]],
+    [[201,12],[209,11],[215,18],[220,18],[228,18]],
+    [[161,36],[161,29]],[[180,35],[185,31],[195,29]]
   ];
   for(const line of lanes) bigPath(line,1.2);
   for(const [x,y,w,h,doors,mat] of [
-    [106,13,15,7,[[11,6],[12,6],[0,3]],'conc'],
-    [122,15,6,4,[[2,3]],'conc'],[161,12,8,4,[[4,3]],'slate'],
-    [172,13,5,4,[[2,3]],'plank'],[170,22,7,4,[[3,0]],'ruin'],
-    [230,34,5,5,[[0,2]],'conc'],[244,8,8,4,[[5,3]],'conc'],
-    [303,6,6,3,[[4,2]],'slate'],[142,4,5,4,[[2,3]],'conc']
+    [103,10,28,13,[[0,9],[0,10],[27,9],[27,10],[21,12],[22,12]],'depot'],
+    [133,10,7,5,[[3,4]],'conc'],[137,22,6,3,[[2,2]],'slate'],
+    [222,8,8,5,[[4,4]],'slate'],[232,11,6,4,[[2,3]],'plank'],
+    [230,19,8,5,[[4,0]],'ruin'],[181,40,5,5,[[4,2]],'conc'],
+    [244,8,8,4,[[5,3]],'conc'],[208,19,6,3,[[2,2]],'slate'],
+    [196,3,5,3,[[2,2]],'conc']
   ]) {
-    house(x,y,w,h,doors,mat==='plank'?BR:CO,mat==='ruin'?.28:0,mat,random);
+    house(x,y,w,h,doors,mat==='plank'||mat==='depot'?BR:CO,mat==='ruin'?.28:0,mat,random);
     HOUSES[HOUSES.length-1].ok='dump_'+x+'_'+y;
   }
   // The two sidings diverge from the existing embankment and end at wheel stops.
-  for(const line of dumpSidings) bigPath(line,1.1);
-  for(const [x,y] of dumpWagons)
-    addObj({k:'installation',x:(x-2.6)*T,y:(y-.65)*T,w:5.2*T,h:1.3*T,solid:1,opaque:1});
+  rcClear(84,18,101,26);
+  for(const line of sidings) bigPath(line,1.1);
+  for(const [track,x] of [[0,119.5],[0,126.1],[1,136.3],[1,143.3],[1,150.3]]) addRailVehicle(track,x);
+  addRailVehicle(2,91,'shunter',5.2,1.45);
+  addObj({k:'scrapCrane',x:89.4*T,y:23.6*T,w:1.65*T,h:1.2*T,solid:1,opaque:1});
   for(const [x,y] of dumpTanks)
     addObj({k:'installation',x:(x-.87)*T,y:(y-.87)*T,w:1.74*T,h:1.74*T,solid:1});
   for(const fence of [
-    ['mesh',214,26,219,26],['mesh',225,26,231,26],['mesh',214,26,214,31],
-    ['mesh',214,35,214,40],['mesh',214,40,222,40],['mesh',227,40,234,40],
-    ['concreteWire',141,3,148,3],['concreteWire',152.5,3,154.5,3],
-    ['rail',110,30.5,114,30.5],['mesh',190,8,198,8],['mesh',198,8,198,12]
+    ['mesh',181,31,190,31],['mesh',195,31,202,31],['mesh',181,31,181,39],
+    ['mesh',183,46.5,191,46.5],['mesh',196,46.5,202,46.5],
+    ['mesh',101,8,140,8],['mesh',101,8,101,17],['mesh',101,24,101,31],
+    ['mesh',101,31,116,31],['mesh',139,31,144,31],
+    ['concreteWire',195,2.5,200,2.5],['concreteWire',203,2.5,205,2.5],
+    ['mesh',211,10,219,10],['mesh',219,10,219,14]
   ]) CORDON_FENCES.push(fence);
-  for(const [x,y,w,h] of [[216,27,3.9,1.5],[221,32,3.9,1.5],[302,12.7,3.9,1.5]])
+  for(const [x,y,w,h] of [[183,33,3.9,1.5],[192,34,3.9,1.5],[211.6,25.7,3.9,1.5]])
     addObj({k:'bus',x:x*T,y:y*T,w:w*T,h:h*T,solid:1,opaque:1});
   CORDON_DETAILS.push(
-    ['c1_trace_pipes',180,37.4,75,.29],['c1_trace_pipes',186.5,39.5,60,-.18],
-    ['c1_bricks',185.3,37.4,31,.24],['c1_sandbags',147.5,4.4,44,-.17],
-    ['c1_crate_army',143.7,5.5,25,0],
+    ['c1_trace_pipes',158,37.4,66,.29],['c1_trace_pipes',164.5,39.5,56,-.18],
+    ['c1_bricks',163.7,37.4,30,.24],['c1_sandbags',202.3,5,42,-.17],
     ['c1_yard_car',340.5,9.8,72,-.18],['c1_trace_wheel',338.8,10.1,24,.13],
-    ['c1_trace_pipes',322,7.4,67,-.22],['c1_yard_car',277,9.3,66,.24],
-    ['c1_tractor',230.8,28.4,85,-.42],['c1_yard_car',217.4,36.2,73,.27],
-    ['c1_yard_car',220.5,37.3,66,-.32],['c1_tires',226.7,33,37,.2],
-    ['c1_trace_wheel',219.5,30,23,.12],['c1_junk',222,35.8,31,-.22],
-    ['c1_trace_pipes',231,31.2,73,.35],['c1_trace_reel',229.4,39.5,35,.13],
-    ['c1_trace_sleepers',135,26,57,.12],['c1_crate_army',111,17,31,0],
-    ['c1_trace_reel',123.3,19.7,34,-.04],['c1_trace_pipes',190.6,13.6,54,.12],
-    ['c1_barrel',197,12,24,0],['c1_trace_kettle',169.4,17.6,22,.1],
-    ['c1_crate',165,13.5,32,.04],['c1_barrel',172.3,21.3,23,.21],
-    ['c1_bricks',179.4,26.3,33,-.19],['c1_sandbags',246,13.8,41,.08],
-    ['c1_tires',310,8.8,36,.24],['c1_trace_reel',312,9.2,26,.1]
+    ['c1_trace_pipes',322,7.4,64,-.22],['c1_yard_car',277,9.3,66,.24],
+    ['c1_tractor',198.7,32.8,83,-.42],['c1_yard_car',188,42.4,74,.27],
+    ['c1_yard_car',190.6,43.3,68,-.32],['c1_tires',200,36,35,.2],
+    ['c1_trace_wheel',188.8,35.1,21,.12],['c1_junk',194,40,30,-.22],
+    ['c1_trace_pipes',198,44,68,.35],['c1_trace_reel',183.8,38,32,.13],
+    ['c1_trace_sleepers',140,28,57,.12],['c1_crate_army',107,15,31,0],
+    ['c1_trace_reel',133,23,34,-.04],['c1_trace_pipes',211.4,17.5,52,.12],
+    ['c1_barrel',218,12,24,0],['c1_trace_kettle',227.2,16.6,20,.1],
+    ['c1_crate',224,10,32,.04],['c1_barrel',231,17.1,23,.21],
+    ['c1_bricks',239.5,24,32,-.19],['c1_sandbags',246,13.8,41,.08],
+    ['c1_tires',214.8,21.3,34,.24],['c1_trace_reel',216.2,21.4,25,.1]
   );
   WORLD_FIRES.push(dumpFire);
   addObj({k:'fire',x:dumpFire.x-10,y:dumpFire.y-10,w:20,h:20,solid:1});
   for(const [stash,k,x,y,loot] of [
-    ['dump_manifest','safe',108,15,{money:95,bandage:2}],
-    ['dump_tools','crate',228.6,37.2,{a9:12,antirad:1}],
-    ['dump_drain','hiding',194,35.8,{medkit:1,energy:1}]
+    ['dump_manifest','safe',106,13,{money:95,bandage:2}],
+    ['dump_tools','crate',183.1,41.5,{a9:12,antirad:1}],
+    ['dump_drain','hiding',163.3,36.2,{medkit:1,energy:1}]
   ]) addObj({k,stash,x:x*T,y:y*T,w:24,h:18,solid:k!=='hiding',loot});
   for(const [sid,name,x,y,fac,wpn] of [
-    ['dump_dispatch','Серый',115,17,'loner','w_obrez'],
-    ['dump_sentry','Обходчик',147.5,7.7,'loner','w_obrez'],
-    ['dump_scale','Латунь',166,14,'loner','w_pm'],
-    ['dump_sorter','Скоба',171.5,18.8,'loner','w_pm'],
-    ['dump_driver','Букса',217.4,32.5,'loner','w_obrez'],
-    ['dump_band1','Шкурник',247,10,'bandit','w_pm'],
-    ['dump_band2','Крюк',253.4,10.8,'bandit','w_obrez']
+    ['dump_loader','Клин',232,20.5,'loner','w_obrez'],
+    ['dump_sentry','Обходчик',201.5,7.6,'loner','w_obrez'],
+    ['dump_scale','Латунь',225.4,10.4,'loner','w_pm'],
+    ['dump_sorter','Скоба',229.3,16.4,'loner','w_pm'],
+    ['dump_driver','Букса',194,38.2,'loner','w_obrez'],
+    ['dump_band1','Шкурник',112,16,'bandit','w_pm'],
+    ['dump_band2','Крюк',136,12,'bandit','w_obrez'],
+    ['dump_band3','Копоть',129.1,24,'bandit','w_pm']
   ]) NPCDEF.push({sid,name,x:x+.5,y:y+.5,fac,wpn,named:1,stay:1,sit:sid==='dump_sorter',localFire:dumpFire});
-  for(const [x,y] of [[199,33],[185,22],[231,16]]) rads.push({x:x*T,y:y*T,r:85,p:2.2});
-  ANOM0.push({id:'dump_sink',k:'g',x:194.5*T,y:34.1*T,r:39},
-    {id:'dump_coil',k:'e',x:198*T,y:10*T,r:29});
-  ARTS0.push({key:'dump_coil',id:'art_bengal',x:198.5*T,y:10.6*T});
+  for(const [x,y] of [[173,36],[215,26],[171,9]]) rads.push({x:x*T,y:y*T,r:85,p:2.2});
+  ANOM0.push({id:'dump_sink',k:'g',x:164.5*T,y:38.1*T,r:39},
+    {id:'dump_coil',k:'e',x:218*T,y:14*T,r:29});
+  ARTS0.push({key:'dump_coil',id:'art_bengal',x:218.5*T,y:14.6*T});
 }
-const dumpSidings=[
-  [[97,railAxis(97)],[104,31],[111,25],[117,24],[136,24]],
-  [[106,29.3],[114,28],[136,28]]
-];
 function drawDumpDetails(g,win) {
-  if(!BIG || (win && (win.y0>52*T || win.x0>370*T || win.x1<92*T))) return;
+  if(!BIG || (win && (win.y0>52*T || win.x0>370*T || win.x1<78*T))) return;
   const visible=(x,y,r)=>!win || x+r>=win.x0 && x-r<=win.x1 && y+r>=win.y0 && y-r<=win.y1;
   for(const [x,y,w,h,a] of dumpHills){
     if(!visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
-    g.save();g.translate(x*T,y*T);g.rotate(a);
+    g.save();g.globalAlpha=.66;g.translate(x*T,y*T);g.rotate(a);
     g.drawImage(lesserSprites.slag,-w*T/2,-h*T/2,w*T,h*T);g.restore();
   }
-  if(ART) for(const line of dumpSidings) for(let i=1;i<line.length;i++){
+  if(ART) for(const line of sidings) for(let i=1;i<line.length;i++){
     const [ax,ay]=line[i-1],[bx,by]=line[i],slope=(by-ay)/(bx-ax);
     for(let x=ax;x<bx;x++){
       const y=ay+(x-ax)*slope;
@@ -7389,7 +7431,7 @@ function drawDumpDetails(g,win) {
       drawRailStrip(g,x,-1.5*T-9,3*T+18);g.restore();
     }
   }
-  for(const [kind,centres,width] of [['wagon',dumpWagons,5.8],['tank',dumpTanks,2.25]]){
+  for(const [kind,centres,width] of [['tank',dumpTanks,2.25]]){
     const sprite=lesserSprites[kind]; if(!sprite) continue;
     for(const [x,y] of centres){
       if(!visible(x*T,y*T,width*T)) continue;
@@ -8947,9 +8989,6 @@ function talk(e) {
   const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
   dialog(cardOf(e), lines, () => {
     const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
-    if (e.sid==='dump_dispatch') o.push({t:'Про северный переход', fn:()=>say(cordonStage()==='done' ?
-      'Узнал голос. Держи журнал при себе. На Барахолке есть костёр, а за мазутными баками фонит даже пустая тара.' :
-      'До Кордона иди вдоль кузовов на восток. Если нужен западный переезд, за путями держись тропы к коровникам.')});
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
     if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
@@ -9285,6 +9324,8 @@ function buildBigMini() {
         g.fillRect(x, LESSER_TOP+y,.32,.32);
   }
   objs.forEach(o => {
+    if (o.k==='freightWagon' && lesserSprites[o.sprite])
+      g.drawImage(lesserSprites[o.sprite],o.x/T,o.y/T,o.w/T,o.h/T);
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
       g.fillStyle = o.k === 'bus' ? '#8a6a2a' : '#6b6a5e';
       g.fillRect(o.x / T, o.y / T, Math.max(1, o.w / T), Math.max(1, o.h / T));
@@ -9843,7 +9884,7 @@ window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
 window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, moveE, goTo, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 /* мост: тип открытой панели для стилей */
 (function(){ const oldHUD = hud; hud = function(dt){ oldHUD(dt); ov.dataset.kind = panel ? panel.kind : ''; }; })();
 
