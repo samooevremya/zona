@@ -219,6 +219,10 @@ function talk(e) {
   if (e.sid === 'wolf') return talkWolf(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
+    if(e.guard!=='bridge' && e.guard!=='south'){
+      const line=e.guard==='sphere'?SPHERE_WARNING:'Военный патруль. Проходи мимо.';
+      return dialog(cardOf(e),[line],()=>[{t:'Уйти',close:1}],'dialog',e);
+    }
     const south = e.guard === 'south';
     return dialog(cardOf(e), [south ? 'Назад. Здесь граница Зоны, проход закрыт.' : S.flags.bridgePaid ? 'А, это ты. Проходи.' : 'Стоять. Пятьсот за проход в обе стороны. Пересечёшь шлагбаум без оплаты — откроем огонь.'], () => [
       south ? { t: 'А если договоримся?', fn: () => say('Не договоримся. Свободен.') }
