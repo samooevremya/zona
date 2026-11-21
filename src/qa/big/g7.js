@@ -184,7 +184,7 @@ T_('Q1_generator_items_flow', () => {
 T_('G_fence_cover', () => {
   reset(); isolate();
   // Северный створ КПП. Влево от дороги — настоящий пролёт, на дороге — разрыв.
-  const p = P(), y = 201.5 * T, x = 364 * T;
+  const p = P(), y = RPy(60*T,98.5*T), x = 364*T;
   place(p, x, y + 20); const guard = tgt(x, y - 80, 'army');
   const trace = (from, to) => G.shotTrace(from, Math.atan2(to.y - from.y, to.x - from.x), G.WP.w_pm);
   const cases = { concreteAtCheckpoint: M.objs.some(o => o.material === 'concreteWire' &&

@@ -3,7 +3,8 @@
 /* ===================== основа ===================== */
 const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 /* BIG: большой Кордон 240×220 (+12 клеток под бункер). Старая карта генерируется в свои массивы 132×110, затем gbig.js переносит её по частям. */
-const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, LESSER_TOP = 68, WORLD_ROWS = CORDON_ROWS;
+const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, NORTH_ROWS = BIG ? 132 : 0,
+  LESSER_TOP = NORTH_ROWS + 68, WORLD_ROWS = NORTH_ROWS + CORDON_ROWS;
 let MW = BIG ? WEST + 252 : 132, MH = WORLD_ROWS, PW = BIG ? WEST + 240 : 120, WW = MW * T, WH = MH * T;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
@@ -407,7 +408,7 @@ function findPath(sx, sy, tx, ty) {
    код заданий и сохранения ссылаются на id и имена якорей, а не на числа.
    bounds: [x0, y0, x1, y1]; entrances: точки входа; anchors: именованные точки или списки точек. */
 const MAP_ID = (typeof window !== 'undefined' && window.ZONA_MAP) || 'k07';
-const MAP_VERSION = (typeof window !== 'undefined' && window.ZONA_BIG === 1) ? 'kordon-west' : MAP_ID === 'rc1' ? 'kordon-rc1' : 'kordon-0.7';
+const MAP_VERSION = (typeof window !== 'undefined' && window.ZONA_BIG === 1) ? 'kordon-north' : MAP_ID === 'rc1' ? 'kordon-rc1' : 'kordon-0.7';
 const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
     anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
@@ -808,6 +809,7 @@ function mkHuman(d) {
     money: (d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120, inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null, score: [ri(2, 14), ri(15, 44), ri(45, 80)][Math.min(rank, 2)] };
+  if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
   if (d.sid==='lz_barman') {e.inv={energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
   e.maxhp = e.hp;
   if (e.sit) e.ang = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
@@ -1925,15 +1927,17 @@ function update(dt) {
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
-  if (!cordonStage() && P.alive && (!BIG || Math.abs(P.x/T-BIG_EXITS.north.x)<5) && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
-  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
-  if(BIG && P.alive && Math.abs(P.x/T-150)<4 && P.y<5*T && warnT<=0){
-    warnT=6;msg('Северная тропа ведёт на Свалку. Дальше путь пока закрыт.','say');
-  }
+  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
-  if(BIG) checkSpherePerimeter();
+  if(BIG) {
+    checkSpherePerimeter();
+    if(P.alive && !S.flags.visitedDump && inGarbage(P.x/T,P.y/T)){
+      S.flags.visitedDump=1;
+      bulletin('Свалка. На западной дороге работает перегрузочное депо.');
+    }
+  }
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
@@ -2210,7 +2214,7 @@ function loadSave() {
 }
 function applyState(d) {
   S = d;
-  if (BIG && S.mapVersion==='kordon-big') migrateWesternWorld(S);
+  if (BIG && (S.mapVersion==='kordon-big' || S.mapVersion==='kordon-west')) migrateNorthernWorld(S);
   restoreKit();
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
@@ -2218,9 +2222,20 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  // Older northern-map saves could stand inside the now closed western cutting.
+  if(BIG && cuttingDepth(Math.floor(P.x/T),Math.floor(P.y/T))>=0){
+    const verge=freeTile(122,61);
+    P.x=S.x=verge.x*T;P.y=S.y=verge.y*T;
+  }
   if(BIG && P.x<WEST*T && tAt(Math.floor(P.x/T),Math.floor(P.y/T))===RA){
     const verge=freeTile(P.x/T,P.y/T);
     P.x=S.x=verge.x*T;P.y=S.y=verge.y*T;
+  }
+  if(inGarbage(P.x/T,P.y/T) && !nav[Math.floor(P.y/T)*MW+Math.floor(P.x/T)]){
+    const probe={x:P.x,y:P.y,r:P.r}; collide(probe);
+    if(Math.hypot(probe.x-P.x,probe.y-P.y)>.1){
+      const free=freeTile(P.x/T,P.y/T); P.x=S.x=free.x*T; P.y=S.y=free.y*T;
+    }
   }
   // A saved position can be under an enlarged landmark after the world update.
   if (BIG && objs.some(o=>(o.k==='installation'||o.k==='bargeHull') &&
@@ -2304,8 +2319,8 @@ const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
-  let fire = FIRE;
-  if (Math.abs(e.x - fire.x) >= FIRE_REACH || Math.abs(e.y - fire.y) >= FIRE_REACH) fire = FIRE2;
+  const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
+  if(!fire){drawHuman(e,ctx);return;}
   const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
   if (distance >= FIRE_REACH) { drawHuman(e, ctx); return; }
 
@@ -2537,8 +2552,9 @@ function* paintGroundWin(g, R) {
   }
   drawThresholds(g);
   yield;
-  drawCordonDetails(g);
   drawLesserDetails(g);
+  drawDumpDetails(g,GWP);
+  drawCordonDetails(g);
   drawTrailSigns(g);
   // кусты и пни деревьев
   for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
@@ -2565,6 +2581,12 @@ function gensetProc(g, o) {   // прежняя процедурная отри�
 function drawRoadblock(g, o) {
   const w = o.w, h = o.h;
   g.save(); g.translate(o.x, o.y);
+  if (lesserSprites.block) {
+    spriteShadow(g,2,1);
+    const sprite=lesserSprites.block, height=Math.max(h+3,w*sprite.height/sprite.width);
+    g.drawImage(sprite,0,h-height,w,height);
+    g.restore();return;
+  }
   if (SHADOWS) {
     g.fillStyle = 'rgba(27,24,19,.35)';
     g.beginPath(); g.ellipse(w / 2 + SUN_DX * 5, h / 2 + SUN_DY * 5, w * .54, h * .68, 0, 0, 2 * Math.PI); g.fill();
@@ -2617,6 +2639,13 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if (o.k==='freightWagon' && lesserSprites[o.sprite]) {
+    g.save();spriteShadow(g,3,2);g.drawImage(lesserSprites[o.sprite],o.x,o.y,o.w,o.h);g.restore();return;
+  }
+  if(o.k==='scrapCrane' && lesserSprites['scrap-crane']){
+    const im=lesserSprites['scrap-crane'],w=4.6*T,h=w*im.height/im.width;
+    g.save();spriteShadow(g,3,2);g.drawImage(im,o.x-.12*T,o.y+o.h-h,w,h);g.restore();return;
+  }
   if (o.k==='hatch' && gateTerrain) { g.drawImage(gateTerrain,o.x,o.y,o.w,o.h); return; }
   if (o.k==='trafo' && lesserSprites.transformer) {
     g.save(); spriteShadow(g,6,2);
@@ -3176,7 +3205,7 @@ function render() {
     }
     hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
     if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
-    hole(FIRE2.x, FIRE2.y, 170 + Math.sin(S.min * 8) * 8, 0.9);
+    for(const f of WORLD_FIRES) if(f!==FIRE) hole(f.x,f.y,170+Math.sin(S.min*8)*8,.9);
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
@@ -3836,7 +3865,7 @@ function trailPrint(wet, variant) {
 }
 
 function drawVillageLanes(g) {
-  if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < 159*T || GWP.y0 > 184*T) return;
+  if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < (NORTH_ROWS+159)*T || GWP.y0 > (NORTH_ROWS+184)*T) return;
   g.save();
   VILLAGE_LANES.forEach((lane, l) => {
     for (let i = 1; i < lane.length; i++) {
@@ -3908,7 +3937,7 @@ function* artGround(g, R) {
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
-    if (t===RA && BIG && x<WEST) artFill(g,'grass',px,py,T,T);
+    if (t===RA && BIG && (x<WEST || y<NORTH_ROWS)) artFill(g,'grass',px,py,T,T);
     else if (C1 && t === RA) c1Rail(g,x,y);
     if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
     if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
@@ -4254,8 +4283,8 @@ function drawCheckpointWall(g, length, bays, upright) {
   g.lineTo(length + topX, topY - 4); g.closePath(); g.fill();
   g.translate(topX, topY);
   artFill(g, 'floor_concrete', 0, -4, length, 8);
-  g.fillStyle = 'rgba(186,183,163,.47)'; g.fillRect(0, -4, length, 8);
-  g.fillStyle = '#b3af9c'; g.fillRect(0, -edge, length, 1);
+  g.fillStyle = 'rgba(114,108,92,.22)'; g.fillRect(0, -4, length, 8);
+  g.fillStyle = '#898273'; g.fillRect(0, -edge, length, 1);
   for (let i = 0; i <= bays; i++) {
     const x = i * bay;
     g.fillStyle = '#514c44'; g.fillRect(x - 2.5, -5, 5, 10);
@@ -4265,12 +4294,12 @@ function drawCheckpointWall(g, length, bays, upright) {
   g.translate(topX / 4, topY / 4);
   g.fillStyle = '#5b4e42'; g.fillRect(0, -.75, length, 1.5);
   const turns = Math.ceil(length / 7), pitch = length / turns;
-  g.strokeStyle = '#443b35'; g.lineWidth = 1.8; g.beginPath();
+  g.strokeStyle = '#51483e'; g.lineWidth = 1.2; g.beginPath();
   for (let i = 0; i < turns; i++) {
     const x = (i + .5) * pitch;
     g.moveTo(x + 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, 0, 2 * Math.PI);
   }
-  g.stroke(); g.beginPath(); g.lineWidth = 1; g.strokeStyle = '#b4aaa0';
+  g.stroke(); g.beginPath(); g.lineWidth = .65; g.strokeStyle = '#8d8071';
   for (let i = 0; i < turns; i++) {
     const x = (i + .5) * pitch;
     g.moveTo(x - 4.4, 0); g.ellipse(x, 0, 4.4, 5, 0, Math.PI, Math.PI * 1.8);
@@ -4574,9 +4603,13 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 /* крыша C1 по размеру и материалу дома */
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
-  if (BIG && h.x === WEST+15 && h.y === 28) return 'c1_tower';
+  if (BIG && h.x === WEST+15 && h.y === NORTH_ROWS+28) return 'c1_tower';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
+  if (BIG && (h.x<WEST || h.ok?.startsWith('dump_'))) {
+    if (h.mat==='plank') return 'c1_roof_plank';
+    if (h.mat==='slate') return 'c1_roof_slate';
+  }
   if (long > 2.1 && big > 40) return 'c1_roof_barn';
   if (big <= 16) return 'c1_roof_shed' + (idx % 2);
   return old === 'roof_patch' ? 'c1_roof_plank' : 'c1_roof_slate';
@@ -4648,6 +4681,16 @@ function artRoof(h, idx) {
   c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
   const g = c.getContext('2d'); g.scale(2, 2);
   g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 9; g.shadowOffsetX = 4; g.shadowOffsetY = 6;
+  if(h.mat==='depot' && lesserSprites['depot-roof']){
+    const rw=W-7,rh=Hh-16;
+    artFill(g,'wall_brick',2,rh-3,rw,11);
+    g.drawImage(lesserSprites['depot-roof'],0,0,rw,rh);
+    g.shadowColor='transparent';
+    for(const gate of h.entrances) if(gate.ny===1){
+      g.fillStyle='#38342e';g.fillRect(gate.x-gate.width/2+3,rh,gate.width,7);
+    }
+    g.setTransform(1,0,0,1,0,0);c1Grade(c,0,0,c.width,c.height);return c;
+  }
   const crossRidge = BIG && gable && (home === '15,87' || home === '26,71');
   const along = crossRidge ? false : h.w >= h.h, sp = ART.m.sprites[id];
   if (C1 && id.startsWith('c1_')) {   // крыша C1: вырезать середину под пропорции дома, не растягивать
@@ -5469,7 +5512,7 @@ function drawPda2() {
   bar.appendChild(btn('chip', 'К игроку', () => { panel.focus = 'me'; if (panel.zl < 2) panel.zl = 2; refresh(); }));
   bar.appendChild(btn('chip', 'К цели', () => { panel.focus = 'target'; if (panel.zl < 2) panel.zl = 2; refresh(); }, !selT.length));
   [['ppl', 'Люди'], ['cache', 'Тайники'], ['loc', 'Подписи']].forEach(f => bar.appendChild(btn('chip' + (panel.f[f[0]] ? ' on' : ''), f[1], () => { panel.f[f[0]] = !panel.f[f[0]]; refresh(); })));
-  if (BIG) bar.prepend(el('span','zl', P.x < WEST*T ? 'Малая Зона' : 'Кордон'));
+  if (BIG) bar.prepend(el('span','zl', inGarbage(P.x/T,P.y/T) ? 'Свалка' : P.x < WEST*T ? 'Малая Зона' : 'Кордон'));
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);
@@ -6055,8 +6098,8 @@ function cluesTick() {
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
   if (cordonExit()) return;
-  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
-  msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
+  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до северного перехода на Свалку.'); save(true); }
+  msg(BIG ? 'За поворотом начинается дорога к кладбищу техники.' : 'Северный переход.', 'say');
 }
 function interactRC1(cand) {
   if (MAP_ID !== 'rc1') return;
@@ -6065,7 +6108,7 @@ function interactRC1(cand) {
   const g = locPt('village', 'generator'), dg = dst(P.x, P.y, g.x, g.y);
   if (dg < 56) cand(dg - 5, { k: 'genset', label: q5().st === 'completed' ? 'Верстак у генератора' : 'Генератор' });
   const ex = locPt('exit', 'gate'), de = dst(P.x, P.y, ex.x, ex.y);
-  if (de < 90) cand(de, { k: 'exit', label: cordonStage()==='north'?'Вызвать Серого':'Переход на Свалку' });
+  if (de < 90) cand(de, { k: 'exit', label: cordonStage()==='north'?'Вызвать Серого':BIG?'Сверить маршрут':'Переход на Свалку' });
 }
 
 /* Большой Кордон. Строковый этап и выбранный канал живут в обычных flags.
@@ -6483,6 +6526,7 @@ function cordonTile(x, y, hint) {
 }
 function RMt(x,y,hint) {
   const pt=cordonTile(x,y,hint);
+  if (cordonOrigin() && pt[0]<BIGW.PW) pt[1]+=NORTH_ROWS;
   pt[0]+=cordonOrigin();
   return pt;
 }
@@ -6512,7 +6556,10 @@ function bigPath(pts, rad, tile) {
     }
   }
 }
-const streamCenter = y => cordonOrigin() + 230 + 2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1);
+function streamCenter(y) {
+  const origin=cordonOrigin(), row=y-(origin?NORTH_ROWS:0);
+  return origin+230+2*Math.sin(row/17)+1.5*Math.sin(row/7+1);
+}
 const STREAM_X = y => Math.round(streamCenter(y));
 const FORD = [89, 95];
 const BIG_EXITS = { north: { x: 128, y: 0 }, west: { x: 0, y: 118 }, east: { x: 239, y: 92 } };
@@ -6848,7 +6895,7 @@ const CORDON_DETAILS = [
 ];
 
 const LESSER_FIRE = { x: 90.5*T, y: (LESSER_TOP+49.5)*T };
-const campOf = e => BIG && e.x < WEST*T ? LESSER_FIRE : FIRE;
+const campOf = e => inGarbage(e.x/T,e.y/T) ? dumpFire : BIG && e.x < WEST*T ? LESSER_FIRE : FIRE;
 const WORLD_FIRES = BIG ? [FIRE, FIRE2, LESSER_FIRE] : [FIRE, FIRE2];
 const lesserPlaces = [
   // id, название, границы, общедоступная точка подхода
@@ -6870,6 +6917,9 @@ const lesserPlaces = [
   ['north_lz','Лесной кордон',[18,2,32,13],[25,10]]
 ];
 const lesserLore = {
+  dump_scale:'Костёр держим под стеной старой конторы. Отсюда к депо иди вдоль разгрузочной дороги на запад.',
+  dump_sorter:'Сухая канава огибает южный отвал. На гребне дозиметр трещит, а внизу можно пройти.',
+  dump_driver:'На Кордон держись колеи мимо южных ворот кладбища. К ангару поворачивай на запад у остановки.',
   lz_spool: 'Ящик с зелёным замком стоит в доме у костра. Сюда доходят вещи из твоего ящика на Кордоне.',
   lz_sieve: 'Видишь старую водонапорку за крышами? От неё одна колея идёт к коровникам, другая возвращается в деревню.',
   lz_meter: 'В старице маятник детектора тянет к воде. В самом центре завихрения лучше не задерживаться.',
@@ -6893,19 +6943,28 @@ const riverAt = y => 21 + 11*Math.sin((y-10)/17) + 6*Math.sin(y/8);
 // Assemble the stamped Cordon once in its own coordinate frame, then place it in
 // the eastern half of the final grid. Paths, collision and camera share that grid.
 function placeCordon() {
+  WORLD.map.fill(VO);
   for (let y=0;y<BIGW.MH;y++) {
-    const start=y*BIGW.MW, dest=y*WORLD.MW+WEST;
-    WORLD.map.set(BIGW.map.subarray(start,start+BIGW.MW),dest);
-    WORLD.keep.set(BIGW.keep.subarray(start,start+BIGW.MW),dest);
-    WORLD.roadX[y]=WEST+BIGW.roadX[y];
+    const start=y*BIGW.MW, dest=(NORTH_ROWS+y)*WORLD.MW+WEST;
+    WORLD.map.set(BIGW.map.subarray(start,start+BIGW.PW),dest);
+    WORLD.keep.set(BIGW.keep.subarray(start,start+BIGW.PW),dest);
+    // The trader's interior lives outside the outdoor rectangle in its own room coordinates.
+    const room=y*WORLD.MW+WORLD.PW;
+    WORLD.map.set(BIGW.map.subarray(start+BIGW.PW,start+BIGW.MW),room);
+    WORLD.keep.set(BIGW.keep.subarray(start+BIGW.PW,start+BIGW.MW),room);
+    WORLD.roadX[NORTH_ROWS+y]=WEST+BIGW.roadX[y];
   }
-  const shift=p=>{p.x+=WEST*T;};
-  [...objs,...ANOM0,...ARTS0,...rads,HATCH,STAIRS,FIRE,FIRE2,SUCKER_HOME,...Object.values(POI)].forEach(shift);
+  const shift=(p,unit)=>{
+    if(p.x<BIGW.PW*unit) p.y+=NORTH_ROWS*unit;
+    p.x+=WEST*unit;
+  };
+  const tile=p=>{if(p[0]<BIGW.PW)p[1]+=NORTH_ROWS;p[0]+=WEST;};
+  [...objs,...ANOM0,...ARTS0,...rads,HATCH,STAIRS,FIRE,FIRE2,SUCKER_HOME,...Object.values(POI)].forEach(p=>shift(p,T));
   BUNK.x0+=WEST*T; BUNK.x1+=WEST*T;
-  for(const h of HOUSES) {h.ok ||= h.x+','+h.y;h.x+=WEST;}
-  for(const d of [...NPCDEF,...DOGDEF,...CACHES]) d.x+=WEST;
-  const tile=p=>{p[0]+=WEST;};
+  for(const h of HOUSES) {h.ok ||= h.x+','+h.y;shift(h,1);}
+  for(const d of [...NPCDEF,...DOGDEF,...CACHES]) shift(d,1);
   for(const l of LOCATIONS){
+    if(l.bounds[0]<BIGW.PW){ l.bounds[1]+=NORTH_ROWS;l.bounds[3]+=NORTH_ROWS; }
     l.bounds[0]+=WEST;l.bounds[2]+=WEST;
     const points=new Set(l.entrances||[]);
     for(const v of Object.values(l.anchors||{})) (Array.isArray(v[0])?v:[v]).forEach(p=>points.add(p));
@@ -6913,12 +6972,13 @@ function placeCordon() {
   }
   RC1.boars.forEach(b=>tile(b.at));
   SOS_SPOTS.forEach(tile); CLEAR_SPOTS.forEach(tile);
-  for(const d of [...DECOR,...CORDON_DETAILS]) d[1]+=WEST;
-  for(const f of CORDON_FENCES) { f[1]+=WEST;f[3]+=WEST; }
+  for(const d of [...DECOR,...CORDON_DETAILS]) {d[1]+=WEST;d[2]+=NORTH_ROWS;}
+  for(const f of CORDON_FENCES) { f[1]+=WEST;f[3]+=WEST;f[2]+=NORTH_ROWS;f[4]+=NORTH_ROWS; }
   for(const line of [...VILLAGE_LANES,...VEHICLE_ROUTES]) line.forEach(tile);
-  for(const p of Object.values(BIG_EXITS)) p.x+=WEST;
+  for(const p of Object.values(BIG_EXITS)) shift(p,1);
+  for(let i=0;i<FORD.length;i++) FORD[i]+=NORTH_ROWS;
   const oldTrees=[...yardTreeCells];yardTreeCells.clear();
-  for(const i of oldTrees) yardTreeCells.add(Math.floor(i/BIGW.MW)*WORLD.MW+i%BIGW.MW+WEST);
+  for(const i of oldTrees) yardTreeCells.add((NORTH_ROWS+Math.floor(i/BIGW.MW))*WORLD.MW+i%BIGW.MW+WEST);
   useGrid(WORLD);
 }
 function makeLesserZone() {
@@ -6926,14 +6986,14 @@ function makeLesserZone() {
   placeCordon();
   const random = mulberry32(927731);
   const Y = LESSER_TOP;
-  for (let y=-Y; y<MH-Y; y++) {
+  for (let y=NORTH_ROWS-Y; y<MH-Y; y++) {
     for (let x=0; x<WEST; x++) {
       let tile = GR;
       const stream = Math.abs(x-riverAt(y));
       const backwater = ((x-30)/10)**2 + ((y-84)/7)**2 < 1;
       const woodland = vnoise(x+73,y+31,12)*.6 + vnoise(x+306,y,5)*.4;
       const roll = random();
-      if (x<2 || x>=WEST-2 || y<=1-Y || y>=MH-Y-2) tile = TR;
+      if (x<2 || x>=WEST-2 || y<=NORTH_ROWS+1-Y || y>=MH-Y-2) tile = TR;
       else if (stream < 1.6 || backwater) tile=SW;
       else if (roll < Math.max(.012,(woodland-.42)*1.43)) tile=TR;
       else if (roll > .91) tile=BU;
@@ -6956,11 +7016,10 @@ function makeLesserZone() {
   for(let y=-22;y<=35;y++) for(let x=18;x<=71;x++)
     if(poppyBed(x+.5,y+.5)<1.15 && tAt(x,Y+y)!==SW) setT(x,Y+y,GR);
   lane([[204,31],[222,32],[229,39],[232,48],[240,50],[250,52]],1.05);
-  // From the cowsheds the northern track crosses the embankment to the future boundary.
-  lane([[123,26],[133,15],[142,2],[145,-8],[145,-21],[151,-34],[148,-50],[150,-68]],1.15);
+  // The cowshed trail crosses the main line on its original timber deck.
+  lane([[123,26],[133,15],[142,2],[145,-8],[145,-19]],1.15);
   bigLoc('lesser_dump',{name:'Северная тропа на Свалку',gen:'северной тропы',type:'story',
-    bounds:[147,0,153,5],entrances:[[150,3]],anchors:{approach:[150,3]}});
-  buildLesserRail();
+    bounds:[191,NORTH_ROWS,199,NORTH_ROWS+5],entrances:[[194,135]],anchors:{approach:[194,135]}});
   lane([[90,35],[90,46]],1.4);
   lane([[29,10],[30,-8],[44,-17],[62,-11],[69,5],[65,22],[59,32]],1.1);
   lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[146,56],[152,62],[169,64],[181,62],[190,58],[191,69]],2);
@@ -6994,7 +7053,7 @@ function makeLesserZone() {
     house(x,Y+y,w,h,[[Math.floor(w/2),h-1]],roof==='conc'?CO:BR,0,roof,random);
     const doorX=x+Math.floor(w/2);
     for (let j=0;j<3;j++) setT(doorX,Y+y+h+j,DI);
-    HOUSES[HOUSES.length-1].ok = x+','+(Y+y);
+    HOUSES[HOUSES.length-1].ok = x+','+(Y+y-NORTH_ROWS);
   }
   // Open strips between the pens and yards are actual walkable gates.
   for (const [kind,x1,y1,x2,y2] of [
@@ -7020,6 +7079,8 @@ function makeLesserZone() {
     addObj({k:'table',barService:x===80.3,x:x*T,y:(Y+y)*T,w:32,h:15,solid:1});
   }
   for (const sign of trailSigns) {
+    const tx=Math.floor(sign.x),ty=Math.floor(sign.y);
+    if(tAt(tx,ty)===TR || tAt(tx,ty)===BU) setT(tx,ty,GR);
     const span=sign.village?16:4;
     addObj({k:'signpost',village:!!sign.village,x:sign.x*T-span/2,y:sign.y*T-3,w:span,h:6,solid:1});
   }
@@ -7064,7 +7125,7 @@ function makeLesserZone() {
   DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
 }
 // World tiles. The east end shares both gauge and sleeper phase with the Cordon.
-const railAxis = x => 57.5-.0034*Math.max(0,176-x)**2;
+const railAxis = x => NORTH_ROWS+57.5-.0034*Math.max(0,176-x)**2;
 const levelCrossing = x => x>=143 && x<=147;
 function buildLesserRail() {
   for(let x=0;x<WEST;x++){
@@ -7103,7 +7164,9 @@ async function loadLesserSprites() {
 }
 // Foot positions, in world tiles. Lettering stays on the face as the board turns.
 const trailSigns = [
-  {x:WEST+8.45,y:121.35,label:'← МАЛАЯ ЗОНА',angle:-.12},
+  {x:369.2,y:NORTH_ROWS+4,label:'СВАЛКА ↑',angle:.08},
+  {x:361,y:53.4,label:'← ДЕПО',angle:-.14},
+  {x:WEST+8.45,y:NORTH_ROWS+121.35,label:'← МАЛАЯ ЗОНА',angle:-.12},
   {x:58.6,y:LESSER_TOP+45.75,label:'← МЕЛЬНИЦА',angle:-.12},
   {x:112.5,y:LESSER_TOP+50.45,label:'СФЕРА →',angle:.14},
   {x:74.65,y:LESSER_TOP+43.8,village:true,angle:-.22},
@@ -7177,16 +7240,36 @@ function drawLesserInstallations(g,win) {
   }
 }
 
-// v48 used 252 columns, with the Lesser Zone south of row 220. Convert before
-// spawning actors or decoding fog, including tile keys referenced by field loot.
-function migrateWesternWorld(s) {
+// Old maps used either stacked regions (252 columns) or a western region (492 columns).
+// Move coordinates, explored cells and tile-keyed loot before restoring actors.
+function migrateNorthernWorld(s) {
+  const stacked=s.mapVersion==='kordon-big', columns=stacked?252:MW;
+  // These landmarks only existed in the preview of the east-west belt.
+  const oldPlaces=[
+    ['dump_depot',101,8,141,31],['dump_yard',181,31,202,47],['dump_market',221,8,238,22],
+    ['dump_mounds',163,29,183,42],['dump_stop',206,19,214,25],['dump_pumps',210,10,220,18],
+    ['dump_ditch',155,34,167,42],['dump_checkpoint',196,2,205,10],['dump_watch',244,8,255,16]
+  ];
   const point=(p,unit)=>{
     if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-    if(p.y>=CORDON_ROWS*unit) p.y+=(LESSER_TOP-CORDON_ROWS)*unit;
-    else p.x+=WEST*unit;
+    if(stacked){
+      if(p.y>=CORDON_ROWS*unit) p.y+=(LESSER_TOP-CORDON_ROWS)*unit;
+      else { if(p.x<BIGW.PW*unit)p.y+=NORTH_ROWS*unit;p.x+=WEST*unit; }
+      return;
+    }
+    if(p.x>=PW*unit) return;
+    if(s.flags?.visitedDump){
+      const x=p.x/unit,y=p.y/unit;
+      const site=oldPlaces.find(([,l,t,r,b])=>x>=l && x<r+1 && y>=t && y<b+1);
+      if(site){
+        const [id,l,t]=site, bounds=LOC[id].bounds;
+        p.x+=(bounds[0]-l)*unit;p.y+=(bounds[1]-t)*unit;return;
+      }
+    }
+    p.y+=NORTH_ROWS*unit;
   };
   const index=i=>{
-    const p={x:i%252,y:Math.floor(i/252)};
+    const p={x:i%columns,y:Math.floor(i/columns)};
     point(p,1);return p.y*MW+p.x;
   };
   point(s,T);
@@ -7204,6 +7287,12 @@ function migrateWesternWorld(s) {
     flags[key]=Object.fromEntries(Object.entries(flags[key]).map(([k,v])=>[
       /^field_\d+$/.test(k)?'field_'+index(+k.slice(6)):k,v]));
   }
+  const renamed=[];
+  for(const key of Object.keys(flags)){
+    const match=/^(broken_|contents_|st_)field_(\d+)$/.exec(key);
+    if(match){renamed.push([match[1]+'field_'+index(+match[2]),flags[key]]);delete flags[key];}
+  }
+  Object.assign(flags,Object.fromEntries(renamed));
   const bits=new Uint8Array(Math.ceil(MW*MH/6));
   for(let i=0;i<(s.fog||'').length;i++){
     const mask=s.fog.charCodeAt(i)-48;
@@ -7213,6 +7302,307 @@ function migrateWesternWorld(s) {
   }
   s.fog=Array.from(bits,n=>String.fromCharCode(48+n)).join('');
   s.mapVersion=MAP_VERSION;
+}
+
+// The northern extension is part of the same world grid as both southern regions.
+function inGarbage(x,y) {
+  return BIG && x>=0 && x<PW && y>=0 && y<NORTH_ROWS;
+}
+const dumpFire = {x:389*T,y:31.6*T};
+const dumpHills = [
+  [334,84,17,8,-.18],[376,41,13,7,.20],[332,31,16,6,.11],
+  [420,23,9,4,-.26],[369,58,8,4,.32]
+];
+const dumpTanks = [[374,30],[377.3,30]];
+const dumpPlaces = [
+  ['dump_yard','Кладбище техники',[342,95,363,111],[358,102]],
+  ['dump_depot','Перегрузочное депо',[262,30,302,53],[294,50]],
+  ['dump_market','Барахолка',[382,23,399,37],[389,33]],
+  ['dump_mounds','Шлаковые отвалы',[324,77,344,90],[341,83]],
+  ['dump_stop','Старая автостанция',[367,34,375,40],[369,39]],
+  ['dump_pumps','Мазутная эстакада',[371,25,381,33],[376,33]],
+  ['dump_ditch','Водоотводный коллектор',[316,82,328,90],[322,84]],
+  ['dump_checkpoint','Северная застава',[357,9,366,17],[360,14]],
+  ['dump_watch','Сторожка весовой',[405,23,416,31],[410,28]],
+  ['dump_sorting','Сортировочная станция',[161,47,204,68],[180,60]]
+];
+// The post, the cemetery entrance and the depot junction lie on the same northbound road.
+const dumpHighway=[[367,NORTH_ROWS+10],[367,119],[367,103],
+  [366,95],[365,81],[363,66],[363,51],[365,42],[365,30],[362,22],[360,14]];
+// The trail stays on the north-west toe of the freight embankment up to the depot deck.
+const dumpTrail=[[145,181],[151,178],[165,178],[177,173],[183,162],[188,148],
+  [194,135],[200,123],[208,110],[216,99],[225,85],[233,74],[241,61],
+  [247,66.52],[252,71],[260,64],[270,58],[279,55],[285,52],[294,50]];
+const sortingRoad=[[241,61],[224,63],[207,68],[195,65],[180,60],[161,61],[147,64],[132,64],[122,61]];
+function easeRailBends(points) {
+  const result=[points[0]];
+  for(let i=1;i<points.length-1;i++){
+    const [x,y]=points[i], [ax,ay]=points[i-1], [bx,by]=points[i+1];
+    const enter=Math.hypot(x-ax,y-ay), leave=Math.hypot(bx-x,by-y);
+    const trim=Math.min(4,enter*.44,leave*.44);
+    for(let j=0;j<=4;j++){
+      const before=(1-j/4)**2*trim/enter, after=(j/4)**2*trim/leave;
+      result.push([x+(ax-x)*before+(bx-x)*after,y+(ay-y)*before+(by-y)*after]);
+    }
+  }
+  return [...result,points[points.length-1]];
+}
+const sidings=[
+  [[258,55],[261,49],[266,48],[305,48]],
+  [[258,55],[260,46],[263,42],[316,42]],
+  [[245,42],[263,42]],
+  // Single-track branch from the Lesser Zone embankment into the freight yard.
+  easeRailBends([[154,railAxis(154)],[160,188.55],[166,188.7],[172,187.4],[178,183.5],
+   [183,177.5],[187,170],[191,160],[195,149],[200,137],[206,125],
+   [213,113],[221,102],[230,88],[237,77],[258,55]]),
+  // Outbound line and two double-ended sorting roads. Points are ordered west to east.
+  [[81,48],[127,48],[143,48],[155,47],[174,45],[197,45],[207,44.6],[222,42.4],[229,42],[245,42]],
+  [[135,48],[141,48.4],[149,50],[156,50.6],[198,50.6],[205,50.2],[216,46.5],[224,43.5],[230,42]],
+  [[149,50],[155,51.8],[163,54.3],[170,54.7],[194,54.7],[201,54.1],[209,51.4],[217,47.6],[223,43.875]]
+];
+const freightLine=sidings[3];
+const depotDeck={x:247,y:77-10*22/21,angle:Math.atan2(-22,21)};
+// Keep the future works beyond a wooded cutting. Its south rim ends north of the old main line.
+function cuttingDepth(x,y) {
+  return Math.min(80+2*Math.sin(y*.12)-x,72+3*Math.sin(x*.10)-y);
+}
+function stampFreightBank() {
+  // Only the raised approach is a barrier. The flat sorting yard is walkable.
+  for(let i=1;i<freightLine.length;i++){
+    const [ax,ay]=freightLine[i-1],[bx,by]=freightLine[i];
+    const slope=(by-ay)/(bx-ax),normal=Math.hypot(1,slope);
+    for(let x=Math.ceil(ax-.5);x+.5<bx;x++){
+      const cy=ay+(x+.5-ax)*slope;
+      for(let y=Math.floor(cy-normal);y<=Math.ceil(cy+normal);y++){
+        if(Math.abs(y+.5-cy)>.86*normal) continue;
+        const along=(x+.5-depotDeck.x)*Math.cos(depotDeck.angle)+(y+.5-depotDeck.y)*Math.sin(depotDeck.angle);
+        setT(x,y,Math.abs(along)<1.75?DI:RA);
+      }
+    }
+  }
+}
+const wagonWidth=5.75, wagonDepth=1.43;
+// Store a wagon on a named horizontal siding. Rail axis, body, collision and PDA
+// are derived from this placement. The wheelsets sit underneath the body centre.
+function addRailVehicle(siding,x,sprite='wagon',width=wagonWidth,depth=wagonDepth) {
+  const line=sidings[siding];
+  const segment=line.findIndex(([bx,by],i)=>i>0 && line[i-1][1]===by &&
+    line[i-1][0]<=x-width/2 && bx>=x+width/2);
+  if(segment<0) throw new Error('No straight track for vehicle at '+x);
+  const y=line[segment][1];
+  addObj({k:'freightWagon',sprite,x:(x-width/2)*T,y:(y-depth/2)*T,
+    w:width*T,h:depth*T,solid:1,opaque:1});
+}
+function makeGarbage() {
+  if (!BIG) return;
+  const random=mulberry32(452788);
+  // Continuous northern terrain, with open clearings separated by wooded ridges.
+  for(let y=0;y<NORTH_ROWS;y++)for(let x=0;x<PW;x++){
+    const woodland=.72*vnoise(x+98,y+34,16)+.28*vnoise(x+63,y+70,6);
+    const depth=cuttingDepth(x,y);
+    const roll=random(), edge=y<2 || x<2 || x>=PW-2 || (depth>=0 && depth<4);
+    setT(x,y,edge || roll<Math.max(.018,(woodland-.34)*.97)?TR:roll>.93?BU:GR);
+  }
+  // Soften the old forest border where the southern maps used to end.
+  for(let y=NORTH_ROWS;y<NORTH_ROWS+2;y++)for(let x=3;x<PW-3;x++){
+    const cover=vnoise(x+98,y+34,16);
+    if(tAt(x,y)===TR && random()>cover*.38) setT(x,y,GR);
+  }
+  buildLesserRail();
+  for(const [id,name,bounds,gate] of dumpPlaces){
+    rcClear(...bounds);
+    bigLoc(id,{name,gen:name,type:id==='dump_mounds'?'anomaly':'story',
+      bounds,entrances:[gate],anchors:{approach:gate}});
+  }
+  for(const [x,y,w,h] of dumpHills) rcClear(Math.floor(x-w/2),Math.floor(y-h/2),Math.ceil(x+w/2),Math.ceil(y+h/2));
+  // A shallow drainage cut runs along the outer toe of the heap. The two
+  // banks meet at a dry service ramp beside the concrete pipes.
+  for(let x=317;x<=328;x++){
+    const mid=86+1.4*Math.sin((x-319)*.4);
+    for(let y=83;y<=89;y++){
+      const d=Math.abs(y-mid);
+      if(d<1.3 && x!==322 && x!==323) setT(x,y,SW);
+      else if(d<2.3) setT(x,y,DI);
+    }
+  }
+  bigPath(dumpHighway,1.55,AS);
+  for(let i=1;i<dumpHighway.length;i++){
+    const [ax,ay]=dumpHighway[i-1],[bx,by]=dumpHighway[i];
+    for(let row=by;row<ay && row<NORTH_ROWS;row++) roadX[row]=Math.round(lerp(bx,ax,(row-by)/(ay-by)));
+  }
+  bigPath(dumpTrail,1.25);
+  bigPath(sortingRoad,1.35);
+  const lanes=[
+    [[367,105],[360,106],[358,102],[354,102],[348,102],[345,104]],
+    [[365,96],[358,93],[353,95],[350,100]],
+    [[360,106],[357,112],[344,110],[337,102],[331,94],[322,84]],
+    [[363,51],[356,51],[345,48],[332,49],[322,51],[311,51],[299,51],[291,51]],
+    [[311,51],[313,44],[314,37],[306,33],[297,34],[295,38]],
+    [[294,50],[287,53],[280,53],[270,51],[265,49]],
+    [[310,47],[310,38],[311,26],[318,25],[332,33],[346,24],[360,14]],
+    [[365,42],[369,39],[378,36],[389,33],[397,32]],
+    [[362,22],[370,26],[376,33],[381,33],[389,33]],
+    [[389,33],[398,33],[405,29],[410,28]],
+    [[322,84],[322,66],[322,51]],[[341,83],[352,78],[363,66]]
+  ];
+  for(const line of lanes) bigPath(line,1.2);
+  for(const [x,y,w,h,doors,mat] of [
+    [264,32,28,13,[[0,9],[0,10],[27,9],[27,10],[21,12],[22,12]],'depot'],
+    [294,32,7,5,[[3,4]],'conc'],[298,44,6,3,[[2,2]],'slate'],
+    [383,23,8,5,[[4,4]],'slate'],[393,26,6,4,[[2,3]],'plank'],
+    [391,34,8,5,[[4,0]],'ruin'],[342,104,5,5,[[4,2]],'conc'],
+    [405,23,8,4,[[5,3]],'conc'],[369,34,6,3,[[2,2]],'slate'],
+    [357,10,5,3,[[2,2]],'conc'],
+    [230,55,6,4,[[3,3]],'conc'],[174,63,15,6,[[4,0],[11,0]],'slate'],
+    [197,57,5,4,[[2,3]],'plank'],[123,55,5,4,[[2,3]],'conc']
+  ]) {
+    for(let row=y-2;row<=y+h+1;row++)for(let col=x-2;col<=x+w+1;col++){
+      if(tAt(col,row)===TR || tAt(col,row)===BU) setT(col,row,GR);
+    }
+    house(x,y,w,h,doors,mat==='plank'||mat==='depot'?BR:CO,mat==='ruin'?.28:0,mat,random);
+    HOUSES[HOUSES.length-1].ok='dump_'+x+'_'+y;
+  }
+  // The two sidings diverge from the existing embankment and end at wheel stops.
+  rcClear(245,40,262,48);
+  for(const line of sidings) bigPath(line,1.1);
+  stampFreightBank();
+  for(const spur of [[[233,59],[233,62]],[[178,63],[178,60]],[[199,61],[199,66]],[[125,59],[125,62]]])
+    bigPath(spur,1.1);
+  for(const [track,x] of [[0,280.5],[0,287.1],[1,297.3],[1,304.3],[1,311.3]]) addRailVehicle(track,x);
+  addRailVehicle(2,252,'shunter',5.2,1.45);
+  for(const x of [181.5,188.3]) addRailVehicle(6,x);
+  addObj({k:'scrapCrane',x:250.4*T,y:45.6*T,w:1.65*T,h:1.2*T,solid:1,opaque:1});
+  for(const [x,y] of dumpTanks)
+    addObj({k:'installation',x:(x-.87)*T,y:(y-.87)*T,w:1.74*T,h:1.74*T,solid:1});
+  for(const fence of [
+    ['mesh',342,95,351,95],['mesh',356,95,363,95],['mesh',342,95,342,103],
+    ['mesh',344,110.5,352,110.5],['mesh',357,110.5,363,110.5],
+    ['mesh',262,30,301,30],['mesh',262,30,262,39],['mesh',262,46,262,53],
+    ['mesh',262,53,277,53],['mesh',300,53,305,53],
+    ['concreteWire',356,9.5,361,9.5],['concreteWire',364,9.5,366,9.5],
+    ['mesh',372,25,380,25],['mesh',380,25,380,29],
+    ['mesh',170,69.8,194,69.8],['mesh',170,64,170,69.8],['mesh',194,67,194,69.8]
+  ]) CORDON_FENCES.push(fence);
+  for(const [x,y,w,h] of [[344,97,3.9,1.5],[353,98,3.9,1.5],[372.6,40.7,3.9,1.5]])
+    addObj({k:'bus',x:x*T,y:y*T,w:w*T,h:h*T,solid:1,opaque:1});
+  CORDON_DETAILS.push(
+    ['c1_trace_sleepers',191,146.5,56,-.25],['c1_trace_reel',211,109,31,-.15],
+    ['c1_trace_pipes',227.5,84.8,60,-.3],['c1_yard_car',241,57,63,-.27],
+    ['c1_trace_sleepers',162,57.4,52,.09],['c1_trace_reel',172.4,65.6,33,-.15],
+    ['c1_crate_army',188.9,61.5,29,-.04],['c1_trace_pipes',192,64,57,.08],
+    ['c1_bricks',130,58.5,28,-.12],['c1_rock0',80,47.6,106,-.3],
+    ['c1_rock1',79.5,49.3,86,.22],['c1_trace_sleepers',82.6,50.4,46,.35],
+    ['c1_trace_pipes',319,85.4,66,.29],['c1_trace_pipes',325.5,87.5,56,-.18],
+    ['c1_bricks',324.7,85.4,30,.24],['c1_sandbags',363.3,12,42,-.17],
+    ['c1_yard_car',370,109.8,72,-.18],['c1_trace_wheel',369.1,108.7,24,.13],
+    ['c1_trace_pipes',362,87.4,64,-.22],['c1_yard_car',362.5,64.3,66,.24],
+    ['c1_tractor',359.7,96.8,83,-.42],['c1_yard_car',349,106.4,74,.27],
+    ['c1_yard_car',351.6,107.3,68,-.32],['c1_tires',361,100,35,.2],
+    ['c1_trace_wheel',349.8,99.1,21,.12],['c1_junk',355,104,30,-.22],
+    ['c1_trace_pipes',359,108,68,.35],['c1_trace_reel',344.8,102,32,.13],
+    ['c1_trace_sleepers',301,50,57,.12],['c1_crate_army',268,37,31,0],
+    ['c1_trace_reel',294,45,34,-.04],['c1_trace_pipes',372.4,32.5,52,.12],
+    ['c1_barrel',379,27,24,0],['c1_trace_kettle',388.2,31.6,20,.1],
+    ['c1_crate',385,25,32,.04],['c1_barrel',392,32.1,23,.21],
+    ['c1_bricks',400.5,39,32,-.19],['c1_sandbags',407,28.8,41,.08],
+    ['c1_tires',375.8,36.3,34,.24],['c1_trace_reel',377.2,36.4,25,.1]
+  );
+  WORLD_FIRES.push(dumpFire);
+  addObj({k:'fire',x:dumpFire.x-10,y:dumpFire.y-10,w:20,h:20,solid:1});
+  for(const [stash,k,x,y,loot] of [
+    ['dump_manifest','safe',267,35,{money:95,bandage:2}],
+    ['dump_tools','crate',344.1,105.5,{a9:12,antirad:1}],
+    ['dump_drain','hiding',324.3,84.2,{medkit:1,energy:1}]
+  ]) addObj({k,stash,x:x*T,y:y*T,w:24,h:18,solid:k!=='hiding',loot});
+  for(const [sid,name,x,y,fac,wpn] of [
+    ['dump_loader','Клин',393,35.5,'loner','w_obrez'],
+    ['dump_sentry','Обходчик',362.5,14.6,'loner','w_obrez'],
+    ['dump_scale','Латунь',386.4,25.4,'loner','w_pm'],
+    ['dump_sorter','Скоба',390.3,31.4,'loner','w_pm'],
+    ['dump_driver','Букса',355,102.2,'loner','w_obrez'],
+    ['dump_band1','Шкурник',273,38,'bandit','w_pm'],
+    ['dump_band2','Крюк',297,34,'bandit','w_obrez'],
+    ['dump_band3','Копоть',290.1,46,'bandit','w_pm']
+  ]) NPCDEF.push({sid,name,x:x+.5,y:y+.5,fac,wpn,named:1,stay:1,sit:sid==='dump_sorter',localFire:dumpFire});
+  for(const [x,y] of [[334,84],[376,41],[332,31]]) rads.push({x:x*T,y:y*T,r:85,p:2.2});
+  ANOM0.push({id:'dump_sink',k:'g',x:325.5*T,y:86.1*T,r:39},
+    {id:'dump_coil',k:'e',x:379*T,y:29*T,r:29});
+  ARTS0.push({key:'dump_coil',id:'art_bengal',x:379.5*T,y:29.6*T});
+}
+function freightBallast(g) {
+  if(!PATS.freightBallast){
+    const h=3*T+18,s=ART.m.sprites.rail;
+    const strip=document.createElement('canvas');
+    strip.height=h;strip.width=Math.round(h*s.rect[2]/s.rect[3]);
+    const ctx=strip.getContext('2d');
+    ctx.drawImage(ART.images[s.atlas],...s.rect,0,0,strip.width,h);
+    const edge=ctx.createLinearGradient(0,0,0,h);
+    for(const [at,alpha] of [[0,0],[.18,1],[.82,1],[1,0]])edge.addColorStop(at,'rgba(0,0,0,'+alpha+')');
+    ctx.globalCompositeOperation='destination-in';ctx.fillStyle=edge;ctx.fillRect(0,0,strip.width,h);
+    PATS.freightBallast=g.createPattern(strip,'repeat-x');
+  }
+  return PATS.freightBallast;
+}
+// Clip each straight to its join planes, keeping a constant gauge on steep grades.
+function drawFreightTrack(g,line,win,steelOnly=false) {
+  const pattern=freightBallast(g);
+  let phase=line[0][0]*T;
+  for(let i=1;i<line.length;i++){
+    const [ax,ay]=line[i-1],[bx,by]=line[i],dx=bx-ax,dy=by-ay;
+    const len=Math.hypot(dx,dy),slope=dy/dx,pad=2*Math.abs(slope)+1;
+    if(!win || (bx*T>=win.x0 && ax*T<=win.x1 && (Math.max(ay,by)+pad+2)*T>=win.y0 && (Math.min(ay,by)-pad-2)*T<=win.y1)){
+      g.save();g.beginPath();
+      g.rect(ax*T,(Math.min(ay,by)-pad-2)*T,dx*T,(Math.abs(dy)+2*pad+4)*T);g.clip();
+      g.translate(ax*T,ay*T);g.rotate(Math.atan2(dy,dx));
+      if(steelOnly){
+        g.beginPath();for(const y of [-17,7])g.rect(-pad*T,y,(len+2*pad)*T,5);
+        g.clip();
+      }
+      g.translate(-phase,-1.5*T-9);g.fillStyle=pattern;
+      g.fillRect(phase-pad*T,0,(len+2*pad)*T,3*T+18);
+      g.restore();
+    }
+    phase+=len*T;
+  }
+}
+function drawDepotDeck(g) {
+  g.save();g.translate(depotDeck.x*T,depotDeck.y*T);g.rotate(depotDeck.angle);
+  for(const [y,h] of [[-48,29],[-11,17],[13,35]]){
+    artFill(g,'floor_wood',-52,y,104,h);
+    g.fillStyle='rgba(45,38,31,.35)';g.fillRect(-52,y,104,h);
+    for(let x=-51;x<52;x+=12)g.fillRect(x,y,1,h);
+  }
+  g.restore();
+}
+function drawDumpDetails(g,win) {
+  if(!BIG || (win && (win.y0>(NORTH_ROWS+60)*T || win.x0>425*T || win.x1<77*T))) return;
+  const visible=(x,y,r)=>!win || x+r>=win.x0 && x-r<=win.x1 && y+r>=win.y0 && y-r<=win.y1;
+  for(const [x,y,w,h,a] of dumpHills){
+    if(!visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
+    g.save();g.globalAlpha=.66;g.translate(x*T,y*T);g.rotate(a);
+    g.drawImage(lesserSprites.slag,-w*T/2,-h*T/2,w*T,h*T);g.restore();
+  }
+  if(ART){
+    for(const line of sidings) drawFreightTrack(g,line,win);
+    // Keep both pairs of steel rails visible through the shared ballast at a turnout.
+    for(const line of sidings) drawFreightTrack(g,line,win,true);
+    if(visible(165*T,188*T,14*T)){
+      for(let x=154;x<177;x++){
+        g.save();g.translate(x*T,railAxis(x)*T);g.transform(1,railAxis(x+1)-railAxis(x),0,1,0,0);
+        g.beginPath();for(const y of [-17,7])g.rect(0,y,T,5);g.clip();
+        drawRailStrip(g,x,-1.5*T-9,3*T+18);g.restore();
+      }
+    }
+    if(visible(depotDeck.x*T,depotDeck.y*T,4*T)) drawDepotDeck(g);
+  }
+  for(const [kind,centres,width] of [['tank',dumpTanks,2.25]]){
+    const sprite=lesserSprites[kind]; if(!sprite) continue;
+    for(const [x,y] of centres){
+      if(!visible(x*T,y*T,width*T)) continue;
+      const w=width*T,h=w*sprite.height/sprite.width;
+      g.save();spriteShadow(g,3,2);g.drawImage(sprite,x*T-w/2,y*T-h/2,w,h);g.restore();
+    }
+  }
 }
 
 /* Measured glove centres in the 48 × 56 south-facing G8 animation frames.
@@ -8919,7 +9309,7 @@ function drawLoot() {
 const PDA_TABS = [['map', 'Карта'], ['tasks', 'Задания'], ['log', 'Журнал'], ['stat', 'Данные']];
 function drawPda() {
   if (panel.tab === 'map') {
-    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Кордон и Малая Зона.'));
+    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Кордон, Малая Зона и Свалка.'));
     bar.appendChild(btn('chip', panel.zoom ? 'Отдалить' : 'Приблизить', () => { panel.zoom = !panel.zoom; refresh(); }));
     pbody.appendChild(bar);
     const w = el('div', 'mapwrap' + (panel.zoom ? ' zoom' : '')), c = el('canvas'); c.id = 'bigmap'; c.width = PW * 6; c.height = MH * 6;
@@ -9091,13 +9481,15 @@ function buildBigMini() {
     if (ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
   if (BIG) {
-    g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); g.restore();
+    g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); drawDumpDetails(g); g.restore();
     g.fillStyle='rgba(134,61,44,.65)';
     for(let y=-22;y<35;y+=.5) for(let x=18;x<71;x+=.5)
       if (poppyBed(x,y)<.9 && tAt(Math.floor(x),LESSER_TOP+Math.floor(y))===GR)
         g.fillRect(x, LESSER_TOP+y,.32,.32);
   }
   objs.forEach(o => {
+    if (o.k==='freightWagon' && lesserSprites[o.sprite])
+      g.drawImage(lesserSprites[o.sprite],o.x/T,o.y/T,o.w/T,o.h/T);
     if (o.static && o.solid && o.x < PW * T && (o.k === 'bus' || o.k === 'car')) {
       g.fillStyle = o.k === 'bus' ? '#8a6a2a' : '#6b6a5e';
       g.fillRect(o.x / T, o.y / T, Math.max(1, o.w / T), Math.max(1, o.h / T));
@@ -9635,7 +10027,7 @@ function frame(now) {
 /* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
 function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); makeGarbage(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
   bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
@@ -9656,7 +10048,7 @@ window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
 window.__zBig = { aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, moveE, goTo, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 /* мост: тип открытой панели для стилей */
 (function(){ const oldHUD = hud; hud = function(dt){ oldHUD(dt); ov.dataset.kind = panel ? panel.kind : ''; }; })();
 

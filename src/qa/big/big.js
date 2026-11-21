@@ -3,6 +3,7 @@
    обзорная карта и туман, перенос сохранения со старой карты, выходы, расстановка. */
 const z = __z, M = z.map, B = window.__zBig, RM = window.__zRM, R = {}, T = 32;
 const S = () => z.S, P = () => z.P;
+const north = B.MH()-220;
 let SEEDN = 9000;
 const step = n => { for (let i = 0; i < n; i++) { P().hp = Math.max(P().hp, 70); z.update(1 / 30); } };
 const reset = () => { z.seed(++SEEDN); z.closePanel(); z.applyState(z.freshS()); const s = S(); s.flags.intro = 1; s.q.flash = 2; const v = M.LOC.village.anchors.safe; P().x = v[0] * T; P().y = v[1] * T; step(3); };
@@ -20,35 +21,35 @@ Tt('K1_paths_to_all_places_and_exits', () => {
     if (L < 0) bad.push(l.id); else tab[l.name] = Math.round(L / WALK / 6) / 10;
   });
   const ex = { 'Свалка (север)': [128, 2.5], 'Малая Зона (западная дорога)': [11, 124], 'Затон (восток)': [238.5, 92] };
-  Object.entries(ex).forEach(([n, p]) => { const L = pathLen(fx, fy, (240+p[0]) * T, p[1] * T); if (L < 0) bad.push(n); else tab[n] = Math.round(L / WALK / 6) / 10; });
+  Object.entries(ex).forEach(([n, p]) => { const L = pathLen(fx, fy, (240+p[0]) * T, (north+p[1]) * T); if (L < 0) bad.push(n); else tab[n] = Math.round(L / WALK / 6) / 10; });
   return { ok: bad.length === 0, unreachable: bad, walkMinutesFromVillage: tab };
 });
 Tt('K2_crossing_time', () => {
   reset();
-  const a = [368 * T, 2.5 * T], b = [368 * T, 216 * T], w = [251.5 * T, 124.5 * T], e = [478.5 * T, 92 * T];
+  const a = [368 * T, (north+2.5) * T], b = [368 * T, (north+216) * T], w = [251.5 * T, (north+124.5) * T], e = [478.5 * T, (north+92) * T];
   const ns = pathLen(a[0], a[1], b[0], b[1]), we = pathLen(w[0], w[1], e[0], e[1]);
   return { ok: ns > 0 && we > 0, note: 'справочно: время насквозь по дорогам без остановок', northSouth: { walkMin: +(ns / WALK / 60).toFixed(1), runMin: +(ns / RUN / 60).toFixed(1) }, westEast: { walkMin: +(we / WALK / 60).toFixed(1), runMin: +(we / RUN / 60).toFixed(1) } };
 });
 Tt('K3_ground_chunks', () => {
   reset();
   // ходьба: игрок идёт по шоссе с севера на юг, кадр за кадром; худший кадр = рывок при дорисовке
-  let WALKH = 0; P().x = 367 * T; P().y = 10 * T; z.cam.x = P().x; z.cam.y = P().y; window.__zRender();
+  let WALKH = 0; P().x = 367 * T; P().y = (north+10) * T; z.cam.x = P().x; z.cam.y = P().y; window.__zRender();
   for (let i = 0; i < 600; i++) { P().y += 190 / 30; P().x = (367 + 0.5) * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); WALKH = Math.max(WALKH, performance.now() - t0); }
   WALKH = Math.round(WALKH);
   const spots = [[60, 168], [128, 8], [128, 60], [196, 142], [232, 92], [20, 118], [176, 30], [210, 40], [33, 131], [150, 106], [128, 206], [52, 100], [94, 44], [198, 186]];
   const times = [];
-  spots.forEach(s => { P().x = (240+s[0]) * T; P().y = s[1] * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); times.push(Math.round(performance.now() - t0)); });
+  spots.forEach(s => { P().x = (240+s[0]) * T; P().y = (north+s[1]) * T; z.cam.x = P().x; z.cam.y = P().y; const t0 = performance.now(); window.__zRender(); times.push(Math.round(performance.now() - t0)); });
   const after = []; for (let i = 0; i < 5; i++) { const t0 = performance.now(); window.__zRender(); after.push(Math.round(performance.now() - t0)); }
   return { ok: B.cache() <= B.GMAX && Math.max(...after) < 60, walkHitchMs: WALKH, cached: B.cache(), max: B.GMAX, firstFrameMsPerSpot: times, steadyFrameMs: after, lastChunkMs: B.gStat.ms, chunksPainted: B.gStat.painted };
 });
 Tt('K4_overview_and_fog', () => {
   reset();
   const mini = B.mini(), fl = B.fogLen();
-  P().x = 368 * T; P().y = 100 * T; z.reveal();
+  P().x = 368 * T; P().y = (north+100) * T; z.reveal();
   z.save(true); const raw = localStorage.getItem('zona2d-kordon-qa') || '';
   const d = JSON.parse(raw), rev = d.fog.length;
   z.applyState(z.loadSave());
-  return { ok: mini[0] === B.PW() * 4 && mini[1] === B.MH() * 4 && fl === M.MW * 220 && B.PW() === 480 && raw.length < 250000, mini, fogCells: fl, fogChars: rev, saveBytes: raw.length };
+  return { ok: mini[0] === B.PW() * 4 && mini[1] === B.MH() * 4 && fl === M.MW * B.MH() && B.PW() === 480 && raw.length < 250000, mini, fogCells: fl, fogChars: rev, saveBytes: raw.length };
 });
 Tt('K5_migrate_rc1_save', () => {
   reset();
@@ -57,11 +58,11 @@ Tt('K5_migrate_rc1_save', () => {
   z.applyState(d); step(2);
   const exp = RM.p(94 * T, 71.5 * T), dist = Math.hypot(P().x - exp[0], P().y - exp[1]);
   const tx = Math.floor(P().x / T), ty = Math.floor(P().y / T), onNav = !!M.nav[ty * M.MW + tx];
-  return { ok: S().mapVersion === 'kordon-west' && dist < 3 * T && onNav && S().money === 4321 && S().fog === '', playerAt: [tx, ty], expectedNear: [Math.round(exp[0] / T), Math.round(exp[1] / T)], onNav, news: S().news.slice(-1)[0].x };
+  return { ok: S().mapVersion === 'kordon-north' && dist < 3 * T && onNav && S().money === 4321 && S().fog === '', playerAt: [tx, ty], expectedNear: [Math.round(exp[0] / T), Math.round(exp[1] / T)], onNav, news: S().news.slice(-1)[0].x };
 });
 Tt('K6_exit_messages', () => {
   reset(); const out = {};
-  [['east', 477 * T, 92 * T], ['north', 368 * T, 3 * T]].forEach(([n, x, y]) => {
+  [['east', 477 * T, (north+92) * T], ['north', 368 * T, (north-3) * T]].forEach(([n, x, y]) => {
     z.clearMsgs(); P().x = x; P().y = y; for (let i = 0; i < 400 && !B.msgs().length; i++) step(1);
     out[n] = B.msgs().join(' | ');
   });
@@ -747,7 +748,7 @@ Tt('M1_continuous_world', () => {
   const zales=M.LOC.zalissya.anchors.approach, west=M.LOC.exit_w.anchors.gate;
   const route=z.findPath(west[0]*T,west[1]*T,zales[0]*T,zales[1]*T);
   const cross=dir=>{
-    const p=P();p.x=240*T-dir*45;p.y=118.5*T;z.IN.moveX=dir;
+    const p=P();p.x=240*T-dir*45;p.y=(north+118.5)*T;z.IN.moveX=dir;
     step(30);z.resetInput();return (p.x-240*T)*dir>35 && z.P===p;
   };
   const seamless=cross(-1) && cross(1);
@@ -755,34 +756,34 @@ Tt('M1_continuous_world', () => {
     const old=z.freshS();old.x=x*T;old.y=y*T;old.mapVersion='kordon-big';old.money=1432;
     const cell=y*252+x,bits=Array(Math.ceil((cell+1)/6)).fill(48);bits[Math.floor(cell/6)]+=1<<(cell%6);
     old.fog=String.fromCharCode(...bits);z.applyState(old);
-    const idx=ny*M.MW+nx;
-    return P().x===nx*T && P().y===ny*T && S().money===1432 && !!((S().fog.charCodeAt(Math.floor(idx/6))-48)&(1<<(idx%6)));
+    const idx=(north+ny)*M.MW+nx;
+    return P().x===nx*T && P().y===(north+ny)*T && S().money===1432 && !!((S().fog.charCodeAt(Math.floor(idx/6))-48)&(1<<(idx%6)));
   });
-  return {ok:!!route?.length && seamless && migrated && B.MH()===220, seamless,migrated,routeCells:route?.length};
+  return {ok:!!route?.length && seamless && migrated && north===132, seamless,migrated,routeCells:route?.length};
 });
 Tt('M2_lesser_zone_exploration', () => {
   reset();const p=P(), s=S(), hh=z.gfxSnap().HOUSES;
   const sites=M.LOCATIONS.filter(l=>l.bounds[2]<240), center=M.LOC.zalissya.anchors.approach;
   const reachable=sites.every(l=>{const [x,y]=l.anchors.approach;
     return !!z.findPath(center[0]*T,center[1]*T,x*T,y*T);});
-  p.x=90.5*T;p.y=117.5*T+35;step(1);
+  p.x=90.5*T;p.y=(north+117.5)*T+35;step(1);
   const camp=z.near?.k==='rest';if(camp) z.interact();
   const teller=document.getElementById('pbody').innerText;z.closePanel();
   const stash=M.objs.find(o=>o.k==='locker' && o.baseName==='Залесье');
   const houses=hh.filter(h=>h.x<240);
   const contacts=z.ents.filter(e=>e.alive&&e.fac==='loner'&&e.x<240*T).length;
-  p.x=45.5*T;p.y=75.5*T;p.st=75;step(30);const tired=p.st<73;
-  p.x=91.5*T;p.y=116.5*T;step(30);const recovered=p.st>75;
+  p.x=45.5*T;p.y=(north+75.5)*T;p.st=75;step(30);const tired=p.st<73;
+  p.x=91.5*T;p.y=(north+116.5)*T;step(30);const recovered=p.st>75;
   return {ok:sites.length>=12 && reachable && camp && !!teller && !!stash && houses.every(h=>h.entrances.length) && contacts>=4 && tired && recovered,
     sites:sites.length,houses:houses.length,reachable,camp,contacts,tired,recovered};
 });
 Tt('M3_walk_the_western_road', () => {
   reset();
-  const p=P(), s=S();p.x=249.5*T;p.y=120.5*T;
+  const p=P(), s=S();p.x=249.5*T;p.y=(north+120.5)*T;
   const checkpoints=[[240,118],[232,116],[229,107],[222,100],[204,99],[199,114],[190,126],[181,130],[169,132],[152,130],[146,124],[140,115],[120,110],[106,115],[91,114]];
   let walked=0, maxStep=0;
   for(const [x,y] of checkpoints){
-    const path=z.findPath(p.x,p.y,(x+.5)*T,(y+.5)*T);
+    const path=z.findPath(p.x,p.y,(x+.5)*T,(north+y+.5)*T);
     if(!path) return {ok:false,missing:[x,y]};
     for(const goal of path){
       let n=0;
@@ -807,20 +808,20 @@ Tt('M4_roadside_signs_and_barge_loot', () => {
   const verges=signs.length===2 && signs.every(o=>o.solid && tileAt(o)===0)
     && signs.some(o=>o.x/T<village[0]) && signs.some(o=>(o.x+o.w/2)/T>village[2]);
   const cargo=M.objs.find(o=>o.stash==='lz_barge');
-  const reach=cargo && tileAt(cargo)!==3 && !!z.findPath(46*T,145*T,cargo.x+T,cargo.y);
+  const reach=cargo && tileAt(cargo)!==3 && !!z.findPath(46*T,(north+145)*T,cargo.x+T,cargo.y);
   return {ok:!!(verges && reach),verges,reach:!!reach};
 });
 Tt('M5_sleep_and_energy',()=>{
-  reset();const p=P(),s=S();p.x=45.5*T;p.y=75.5*T;
+  reset();const p=P(),s=S();p.x=45.5*T;p.y=(north+75.5)*T;
   step(420);const sleepy=s.flags.poppySleep>13 && p.alive;
   s.inv.energy=1;document.getElementById('t-inv').click();
   document.querySelector('.pack-grid [data-item="energy"]').click();
   [...document.querySelectorAll('#pbody button')].find(b=>b.textContent==='Выпить').click();
   z.closePanel();const drank=!s.inv.energy && !s.flags.poppySleep;
   step(900);const protectedByDrink=p.alive && !s.flags.poppySleep;
-  s.flags.energyUntil=s.min;step(600);p.x=90*T;p.y=117*T;step(155);
+  s.flags.energyUntil=s.min;step(600);p.x=90*T;p.y=(north+117)*T;step(155);
   const escaped=p.alive && !s.flags.poppySleep;
-  p.x=45.5*T;p.y=75.5*T;step(1263);const asleep=!p.alive;
+  p.x=45.5*T;p.y=(north+75.5)*T;step(1263);const asleep=!p.alive;
   return {ok:!!(sleepy&&drank&&protectedByDrink&&escaped&&asleep),sleepy,drank,protectedByDrink,escaped,asleep};
 });
 Tt('M6_village_bar_and_perimeter',()=>{
@@ -828,7 +829,7 @@ Tt('M6_village_bar_and_perimeter',()=>{
   const blockedAt=(x,y)=>walls.some(w=>x*T>=w.x&&x*T<=w.x+w.w&&y*T>=w.y&&y*T<=w.y+w.h);
   const gates=[76,106].every((x,i)=>Array.from({length:24},(_,n)=>35.5+n).every(y=>{
     const inGate=i?y>45&&y<50:y>44&&y<49;
-    return blockedAt(x,68+y)!==inGate;
+    return blockedAt(x,north+68+y)!==inGate;
   }));
   const e=z.ents.find(e=>e.sid==='lz_barman');P().x=e.x+18;P().y=e.y+13;step(1);z.interact();
   const serve=[...document.querySelectorAll('.dlg-opts button')].find(b=>b.textContent.includes('Покажи припасы'));
@@ -836,16 +837,16 @@ Tt('M6_village_bar_and_perimeter',()=>{
   return {ok:!!(gates&&walls.length===6&&trade),gates,trade};
 });
 Tt('M7_rail_crossing_and_dry_trail',()=>{
-  reset();const tiles=window.__bigTiles(),at=(x,y)=>tiles[y*M.MW+x];
+  reset();const tiles=window.__bigTiles(),at=(x,y)=>tiles[(north+y)*M.MW+x];
   const seam=[238,239,240,241].every(x=>[56,57,58].every(y=>at(x,y)===9));
-  const path=z.findPath(145.5*T,59.5*T,145.5*T,48.5*T);
-  const crossing=path?.some(pt=>pt.x>=143*T&&pt.x<148*T&&pt.y<56*T&&pt.y>51*T);
+  const path=z.findPath(145.5*T,(north+59.5)*T,145.5*T,(north+48.5)*T);
+  const crossing=path?.some(pt=>pt.x>=143*T&&pt.x<148*T&&pt.y<(north+56)*T&&pt.y>(north+51)*T);
   const dry=[[250,120],[240,118],[232,116],[229,107],[222,100],[204,99]].every(([x,y])=>
     at(x,y)===1&&[-1,0,1].every(a=>[-1,0,1].every(b=>at(x+a,y+b)!==3)));
-  const saved=z.freshS();saved.x=225.5*T;saved.y=57.5*T;saved.money=421;
+  const saved=z.freshS();saved.x=225.5*T;saved.y=(north+57.5)*T;saved.money=421;
   z.applyState(saved);
   const restored=!!M.nav[Math.floor(P().y/T)*M.MW+Math.floor(P().x/T)] &&
-    Math.hypot(P().x/T-225.5,P().y/T-57.5)<5 && S().money===421;
+    Math.hypot(P().x/T-225.5,P().y/T-north-57.5)<5 && S().money===421;
   return {ok:!!(seam&&crossing&&dry&&restored),seam,crossing,dry,restored};
 });
 Tt('M8_sphere_guard',()=>{
@@ -854,16 +855,102 @@ Tt('M8_sphere_guard',()=>{
   const guard=guards[0];move(guard.x/T+.65,guard.y/T);step(1);z.interact();
   const dialogue=document.getElementById('pbody').innerText;
   const noToll=z.panel?.kind==='dialog' && dialogue.includes('Территория под охраной') && !/шлагбаум|500 RU|пятьсот/i.test(dialogue);
-  z.closePanel();move(140,116);step(2);z.clearMsgs();
-  move(148,116);step(90);
+  z.closePanel();move(140,north+116);step(2);z.clearMsgs();
+  move(148,north+116);step(90);
   const warned=B.msgs().some(t=>t.includes('Территория под охраной'))&&safe();
-  move(141,116);step(2);const withdrew=s.flags.sphereWarnAt==null&&safe();
-  s.flags.bridgePaid=1;move(149,116);step(60);move(155,116);step(1);
+  move(141,north+116);step(2);const withdrew=s.flags.sphereWarnAt==null&&safe();
+  s.flags.bridgePaid=1;move(149,north+116);step(60);move(155,north+116);step(1);
   const alarm=!!s.flags.sphereAlarm && guards.every(e=>e.tgt===p) && !s.flags.armyAngry;
   const mags=guards.map(e=>e.mag);step(90);
   const fired=guards.some((e,i)=>e.mag<mags[i]);
-  move(141,116);step(20);const cleared=safe();
+  move(141,north+116);step(20);const cleared=safe();
   return {ok:guards.length===2&&noToll&&warned&&withdrew&&alarm&&fired&&cleared,noToll,warned,withdrew,alarm,fired,cleared};
+});
+Tt('G1_garbage_approaches_and_return',()=>{
+  reset();
+  const p=P(),state=S(), routes=[
+    [[367.5,north+10.5],[367,130],[366,119],[367,103],[366,95],[365,81],[363,66],[363,51],
+     [356,51],[345,48],[332,49],[322,51],[311,51],[299,51],[294,50]],
+    [[145.5,north+59.5],[145,181],[151,178],[165,178],[177,173],[183,162],[188,148],
+     [194,135],[200,123],[208,110],[216,99],[225,85],[233,74],[241,61],[247,66.52],
+     [252,71],[260,64],[270,58],[279,55],[285,52],[294,50]],
+    [[294,50],[285,52],[279,55],[270,58],[260,64],[252,71],[247,66.52],[241,61],
+     [233,62],[224,63],[207,68],[195,65],[180,60],[161,61],[147,64],[132,64],[122,61]]
+  ];
+  const lengths=[];
+  for(const points of routes){
+    let walked=0;
+    p.x=points[0][0]*T;p.y=points[0][1]*T;
+    for(const [x,y] of [...points.slice(1),...points.slice(0,-1).reverse()]){
+      const path=z.findPath(p.x,p.y,x*T,y*T);
+      if(!path?.length) return {ok:false,noPath:[x,y]};
+      for(const goal of path){
+        let count=0;
+        while(Math.hypot(goal.x-p.x,goal.y-p.y)>6 && count++<80){
+          const dx=goal.x-p.x,dy=goal.y-p.y,d=Math.hypot(dx,dy);
+          z.IN.moveX=dx/d;z.IN.moveY=dy/d;
+          const oldX=p.x,oldY=p.y;step(1);
+          walked+=Math.hypot(p.x-oldX,p.y-oldY);
+          if(Math.hypot(p.x-oldX,p.y-oldY)>T) return {ok:false,jump:[oldX/T,oldY/T,p.x/T,p.y/T]};
+        }
+        if(count>=80){z.resetInput();return {ok:false,blocked:[goal.x/T,goal.y/T],player:[p.x/T,p.y/T]};}
+      }
+    }
+    z.resetInput();lengths.push(Math.round(walked/(2*T)));
+  }
+  const places=M.LOCATIONS.filter(l=>l.id.startsWith('dump_'));
+  const linked=places.every(l=>{const [x,y]=l.anchors.approach;return z.findPath(391*T,32*T,x*T,y*T)?.length;});
+  const seamless=p===P() && state===S() && !z.panel;
+  p.x=389.5*T;p.y=33.5*T;z.save(true);z.applyState(z.loadSave());
+  return {ok:seamless && state.flags.visitedDump===1 && linked && places.length===10 && lengths[0]>145 && lengths[1]>195 && lengths[2]>150 &&
+    Math.abs(P().x-389.5*T)<1 && Math.abs(P().y-33.5*T)<1,places:places.length,linked,oneWayTiles:lengths};
+});
+Tt('G4_station_crossing_and_western_cut',()=>{
+  reset();
+  const path=(a,b)=>z.findPath(a[0]*T,a[1]*T,b[0]*T,b[1]*T);
+  const tiles=window.__bigTiles(),at=(x,y)=>tiles[y*M.MW+x];
+  const deck=path([241,61],[252,71]);
+  const crossesOnDeck=deck?.length<24 && deck.some(p=>Math.hypot(p.x/T-247,p.y/T-66.52)<2);
+  const closedBank=at(200,135)===9 && at(230,87)===9;
+  const closedWest=!path([145.5,191.5],[50,44]) && !path([180,60],[50,44]);
+  const saved=z.freshS();saved.x=50*T;saved.y=44*T;z.applyState(saved);
+  const restored=!!path([P().x/T,P().y/T],[180,60]);
+  return {ok:!!(crossesOnDeck && closedBank && closedWest && restored),crossesOnDeck,closedBank,closedWest,restored};
+});
+Tt('G3_saved_world_origin',()=>{
+  reset();
+  for(const [x,y,nx,ny] of [[91,116,91,north+116],[367,102,367,north+102],[228,18,389,33]]){
+    const old=z.freshS();
+    old.mapVersion='kordon-west';old.flags.visitedDump=1;old.money=1507;old.q.flash=2;
+    old.x=x*T;old.y=y*T;
+    const tile=y*M.MW+x, dest=ny*M.MW+nx;
+    const bits=Array(Math.floor(tile/6)+1).fill(48);bits[bits.length-1]+=1<<(tile%6);
+    old.fog=String.fromCharCode(...bits);
+    z.applyState(old);z.save(true);z.applyState(z.loadSave());
+    if(Math.hypot(P().x-nx*T,P().y-ny*T)>T || S().q.flash!==2 || S().money!==1507 ||
+        !((S().fog.charCodeAt(Math.floor(dest/6))-48)&(1<<(dest%6))))return {ok:false,x,y,nx,ny};
+  }
+  return {ok:true};
+});
+Tt('G2_wagon_footprints',()=>{
+  reset();
+  const cars=M.objs.filter(o=>o.k==='freightWagon'), p=P();
+  const npc=z.rc.mk.mkHuman({fac:'loner',x:133,y:28,wpn:'w_pm'});
+  for(const car of cars){
+    const x=car.x+car.w/2;
+    for(const e of [p,npc]) for(const side of [-1,1]){
+      const edge=side<0?car.y:car.y+car.h;
+      e.x=x;e.y=edge+side*(e.r+12);e.jumpT=1;
+      for(let i=0;i<35;i++) M.moveE(e,0,-side*3);
+      if((e.y-edge)*side<e.r-.05)return {ok:false,crossed:car.x/T};
+    }
+    const y=car.y+car.h/2;
+    if(M.nav[Math.floor(y/T)*M.MW+Math.floor(x/T)])return {ok:false,navOpen:x/T};
+  }
+  const car=cars[2],x=car.x+car.w/2,ty=car.y+car.h+28;
+  npc.x=x;npc.y=car.y-30;npc.jumpT=0;
+  for(let i=0;i<900 && Math.hypot(npc.x-x,npc.y-ty)>14;i++)M.goTo(npc,x,ty,90,1/30);
+  return {ok:cars.length===8 && Math.hypot(npc.x-x,npc.y-ty)<=14,wagons:cars.length,npcArrived:Math.hypot(npc.x-x,npc.y-ty)<=14};
 });
 return JSON.stringify(R);
 })()

@@ -1,7 +1,8 @@
 /* ===================== основа ===================== */
 const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 /* BIG: большой Кордон 240×220 (+12 клеток под бункер). Старая карта генерируется в свои массивы 132×110, затем gbig.js переносит её по частям. */
-const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, LESSER_TOP = 68, WORLD_ROWS = CORDON_ROWS;
+const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, NORTH_ROWS = BIG ? 132 : 0,
+  LESSER_TOP = NORTH_ROWS + 68, WORLD_ROWS = NORTH_ROWS + CORDON_ROWS;
 let MW = BIG ? WEST + 252 : 132, MH = WORLD_ROWS, PW = BIG ? WEST + 240 : 120, WW = MW * T, WH = MH * T;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));

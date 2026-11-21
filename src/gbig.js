@@ -52,6 +52,7 @@ function cordonTile(x, y, hint) {
 }
 function RMt(x,y,hint) {
   const pt=cordonTile(x,y,hint);
+  if (cordonOrigin() && pt[0]<BIGW.PW) pt[1]+=NORTH_ROWS;
   pt[0]+=cordonOrigin();
   return pt;
 }
@@ -81,7 +82,10 @@ function bigPath(pts, rad, tile) {
     }
   }
 }
-const streamCenter = y => cordonOrigin() + 230 + 2 * Math.sin(y / 17) + 1.5 * Math.sin(y / 7 + 1);
+function streamCenter(y) {
+  const origin=cordonOrigin(), row=y-(origin?NORTH_ROWS:0);
+  return origin+230+2*Math.sin(row/17)+1.5*Math.sin(row/7+1);
+}
 const STREAM_X = y => Math.round(streamCenter(y));
 const FORD = [89, 95];
 const BIG_EXITS = { north: { x: 128, y: 0 }, west: { x: 0, y: 118 }, east: { x: 239, y: 92 } };
