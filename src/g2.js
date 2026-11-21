@@ -211,7 +211,7 @@ function hostile(a, b) {
   if (fa === fb) return false;
   const pair = (x, y) => (fa === x && fb === y) || (fa === y && fb === x);
   if (pair('bandit', 'loner') || pair('bandit', 'player') || pair('bandit', 'army')) return true;
-  if (pair('army', 'player')) { const s = fa === 'army' ? a : b; return armyAngry || !!s.angry; }
+  if (pair('army', 'player')) { const s = fa === 'army' ? a : b; return armyAngry || !!s.angry || (s.guard==='sphere' && !!S.flags.sphereAlarm); }
   if (pair('loner', 'player')) { const l = fa === 'loner' ? a : b; return S.rep <= -30 || !!l.angry; }
   return false;
 }
@@ -272,6 +272,29 @@ function anger(e) {
     msg('Ты напал на своего. Одиночки этого не простят.', 'bad');
   }
   if (e.fac === 'army' && !armyAngry) { armyAngry = true; S.flags.armyAngry = 1; msg('Военные открывают огонь!', 'bad'); }
+}
+const SPHERE_WARNING='Охрана «Сферы»: Стой! Территория под охраной. Войдёшь за ограду — откроем огонь.';
+function checkSpherePerimeter(){
+  if(!P.alive) return;
+  const x=P.x/T,y=P.y/T-LESSER_TOP;
+  const gap=Math.max(151.5-x,x-176.8,37-y,y-56);
+  const flags=S.flags;
+  if(gap>7){
+    if(flags.sphereWarnAt!=null){delete flags.sphereWarnAt;delete flags.sphereAlarm;}
+    return;
+  }
+  if(gap>5 || flags.sphereAlarm || armyAngry) return;
+  const guards=ents.filter(e=>e.guard==='sphere' && e.alive);
+  if(!guards.length) return;
+  if(flags.sphereWarnAt==null){
+    flags.sphereWarnAt=S.min;radioNotice(SPHERE_WARNING);
+    return;
+  }
+  if(gap>=0 || S.min-flags.sphereWarnAt<1.5) return;
+  flags.sphereAlarm=1;
+  for(const guard of guards){
+    guard.aw=1;guard.tgt=P;guard.mem=6;guard.lastSeen={x:P.x,y:P.y};
+  }
 }
 function checkBridgeCrossing(oldX, oldY) {
   if (!bridgeBarrier?.solid || S.flags.bridgePaid || !P.alive) return;

@@ -34,12 +34,18 @@ function artFill(g, id, x, y, w, h) {
 function c1Rail(g, x, y) {
   let y0 = y; while (tAt(x, y0 - 1) === RA) y0--;
   let y1 = y; while (tAt(x, y1 + 1) === RA) y1++;
-  const s = ART.m.sprites.rail, h = (y1 - y0 + 1) * T + 18, k = h / s.rect[3], pw = s.rect[2] * k;
+  const h=(y1-y0+1)*T+18,top=y0*T-9;
+  g.save();g.translate(x*T,0);g.beginPath();
+  g.rect(0,y*T-(y===y0?9:0),T,T+(y===y0?9:0)+(y===y1?9:0));g.clip();
+  drawRailStrip(g,x,top,h);g.restore();
+}
+function drawRailStrip(g,x,top,h){
+  const s=ART.m.sprites.rail,k=h/s.rect[3],pw=s.rect[2]*k;
   const key = 'rail:' + h;
   if (!PATS[key]) { const c = document.createElement('canvas'); c.width = Math.round(pw); c.height = Math.round(h); c.getContext('2d').drawImage(ART.images[s.atlas], ...s.rect, 0, 0, c.width, c.height); PATS[key] = c; }
   const c = PATS[key], ox = ((x * T) % c.width + c.width) % c.width;
-  g.save(); g.beginPath(); g.rect(x * T, y * T - (y === y0 ? 9 : 0), T, T + (y === y0 ? 9 : 0) + (y === y1 ? 9 : 0)); g.clip();
-  g.drawImage(c, x * T - ox, y0 * T - 9); g.drawImage(c, x * T - ox + c.width, y0 * T - 9);
+  g.save();g.beginPath();g.rect(0,top,T,h);g.clip();
+  g.drawImage(c,-ox,top);g.drawImage(c,c.width-ox,top);
   g.restore();
 }
 /* дёшево сравнить, относится ли клетка к земле, на которой лежит текстура */
@@ -276,7 +282,8 @@ function* artGround(g, R) {
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
-    if (C1 && t === RA) c1Rail(g, x, y);
+    if (t===RA && BIG && x<WEST) artFill(g,'grass',px,py,T,T);
+    else if (C1 && t === RA) c1Rail(g,x,y);
     if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
     if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
   }

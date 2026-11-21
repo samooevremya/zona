@@ -862,7 +862,7 @@ function hostile(a, b) {
   if (fa === fb) return false;
   const pair = (x, y) => (fa === x && fb === y) || (fa === y && fb === x);
   if (pair('bandit', 'loner') || pair('bandit', 'player') || pair('bandit', 'army')) return true;
-  if (pair('army', 'player')) { const s = fa === 'army' ? a : b; return armyAngry || !!s.angry; }
+  if (pair('army', 'player')) { const s = fa === 'army' ? a : b; return armyAngry || !!s.angry || (s.guard==='sphere' && !!S.flags.sphereAlarm); }
   if (pair('loner', 'player')) { const l = fa === 'loner' ? a : b; return S.rep <= -30 || !!l.angry; }
   return false;
 }
@@ -923,6 +923,29 @@ function anger(e) {
     msg('Ты напал на своего. Одиночки этого не простят.', 'bad');
   }
   if (e.fac === 'army' && !armyAngry) { armyAngry = true; S.flags.armyAngry = 1; msg('Военные открывают огонь!', 'bad'); }
+}
+const SPHERE_WARNING='Охрана «Сферы»: Стой! Территория под охраной. Войдёшь за ограду — откроем огонь.';
+function checkSpherePerimeter(){
+  if(!P.alive) return;
+  const x=P.x/T,y=P.y/T-LESSER_TOP;
+  const gap=Math.max(151.5-x,x-176.8,37-y,y-56);
+  const flags=S.flags;
+  if(gap>7){
+    if(flags.sphereWarnAt!=null){delete flags.sphereWarnAt;delete flags.sphereAlarm;}
+    return;
+  }
+  if(gap>5 || flags.sphereAlarm || armyAngry) return;
+  const guards=ents.filter(e=>e.guard==='sphere' && e.alive);
+  if(!guards.length) return;
+  if(flags.sphereWarnAt==null){
+    flags.sphereWarnAt=S.min;radioNotice(SPHERE_WARNING);
+    return;
+  }
+  if(gap>=0 || S.min-flags.sphereWarnAt<1.5) return;
+  flags.sphereAlarm=1;
+  for(const guard of guards){
+    guard.aw=1;guard.tgt=P;guard.mem=6;guard.lastSeen={x:P.x,y:P.y};
+  }
 }
 function checkBridgeCrossing(oldX, oldY) {
   if (!bridgeBarrier?.solid || S.flags.bridgePaid || !P.alive) return;
@@ -1902,11 +1925,15 @@ function update(dt) {
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
-  if (!cordonStage() && P.alive && P.x>=WEST*T && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
-  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (!cordonStage() && P.alive && (!BIG || Math.abs(P.x/T-BIG_EXITS.north.x)<5) && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if(BIG && P.alive && Math.abs(P.x/T-150)<4 && P.y<5*T && warnT<=0){
+    warnT=6;msg('Северная тропа ведёт на Свалку. Дальше путь пока закрыт.','say');
+  }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
+  if(BIG) checkSpherePerimeter();
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
@@ -2191,6 +2218,10 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  if(BIG && P.x<WEST*T && tAt(Math.floor(P.x/T),Math.floor(P.y/T))===RA){
+    const verge=freeTile(P.x/T,P.y/T);
+    P.x=S.x=verge.x*T;P.y=S.y=verge.y*T;
+  }
   // A saved position can be under an enlarged landmark after the world update.
   if (BIG && objs.some(o=>(o.k==='installation'||o.k==='bargeHull') &&
       P.x+P.r>o.x && P.x-P.r<o.x+o.w && P.y+P.r>o.y && P.y-P.r<o.y+o.h)) {
@@ -3629,12 +3660,18 @@ function artFill(g, id, x, y, w, h) {
 function c1Rail(g, x, y) {
   let y0 = y; while (tAt(x, y0 - 1) === RA) y0--;
   let y1 = y; while (tAt(x, y1 + 1) === RA) y1++;
-  const s = ART.m.sprites.rail, h = (y1 - y0 + 1) * T + 18, k = h / s.rect[3], pw = s.rect[2] * k;
+  const h=(y1-y0+1)*T+18,top=y0*T-9;
+  g.save();g.translate(x*T,0);g.beginPath();
+  g.rect(0,y*T-(y===y0?9:0),T,T+(y===y0?9:0)+(y===y1?9:0));g.clip();
+  drawRailStrip(g,x,top,h);g.restore();
+}
+function drawRailStrip(g,x,top,h){
+  const s=ART.m.sprites.rail,k=h/s.rect[3],pw=s.rect[2]*k;
   const key = 'rail:' + h;
   if (!PATS[key]) { const c = document.createElement('canvas'); c.width = Math.round(pw); c.height = Math.round(h); c.getContext('2d').drawImage(ART.images[s.atlas], ...s.rect, 0, 0, c.width, c.height); PATS[key] = c; }
   const c = PATS[key], ox = ((x * T) % c.width + c.width) % c.width;
-  g.save(); g.beginPath(); g.rect(x * T, y * T - (y === y0 ? 9 : 0), T, T + (y === y0 ? 9 : 0) + (y === y1 ? 9 : 0)); g.clip();
-  g.drawImage(c, x * T - ox, y0 * T - 9); g.drawImage(c, x * T - ox + c.width, y0 * T - 9);
+  g.save();g.beginPath();g.rect(0,top,T,h);g.clip();
+  g.drawImage(c,-ox,top);g.drawImage(c,c.width-ox,top);
   g.restore();
 }
 /* дёшево сравнить, относится ли клетка к земле, на которой лежит текстура */
@@ -3871,7 +3908,8 @@ function* artGround(g, R) {
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
-    if (C1 && t === RA) c1Rail(g, x, y);
+    if (t===RA && BIG && x<WEST) artFill(g,'grass',px,py,T,T);
+    else if (C1 && t === RA) c1Rail(g,x,y);
     if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
     if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
   }
@@ -6896,7 +6934,7 @@ function makeLesserZone() {
       const woodland = vnoise(x+73,y+31,12)*.6 + vnoise(x+306,y,5)*.4;
       const roll = random();
       if (x<2 || x>=WEST-2 || y<=1-Y || y>=MH-Y-2) tile = TR;
-      else if (stream < 1.6 || backwater || ((x-214)/17)**2+((y-50)/29)**2<1) tile=SW;
+      else if (stream < 1.6 || backwater) tile=SW;
       else if (roll < Math.max(.012,(woodland-.42)*1.43)) tile=TR;
       else if (roll > .91) tile=BU;
       setT(x,Y+y,tile);
@@ -6917,16 +6955,22 @@ function makeLesserZone() {
     if(((x-124)/5.5)**2+((y-69)/4.2)**2+vnoise(x,y,2)*.19<1) setT(x,Y+y,SW);
   for(let y=-22;y<=35;y++) for(let x=18;x<=71;x++)
     if(poppyBed(x+.5,y+.5)<1.15 && tAt(x,Y+y)!==SW) setT(x,Y+y,GR);
-  lane([[204,31],[222,32],[229,39],[232,48],[240,50],[250,52]],1.6);
+  lane([[204,31],[222,32],[229,39],[232,48],[240,50],[250,52]],1.05);
+  // From the cowsheds the northern track crosses the embankment to the future boundary.
+  lane([[123,26],[133,15],[142,2],[145,-8],[145,-21],[151,-34],[148,-50],[150,-68]],1.15);
+  bigLoc('lesser_dump',{name:'Северная тропа на Свалку',gen:'северной тропы',type:'story',
+    bounds:[147,0,153,5],entrances:[[150,3]],anchors:{approach:[150,3]}});
+  buildLesserRail();
   lane([[90,35],[90,46]],1.4);
   lane([[29,10],[30,-8],[44,-17],[62,-11],[69,5],[65,22],[59,32]],1.1);
-  lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[155,48],[172,50],[190,58],[191,69]],2);
+  lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[146,56],[152,62],[169,64],[181,62],[190,58],[191,69]],2);
   lane([[48,27],[39,29],[32,38],[29,51],[38,59],[55,69],[67,61],[82,56],[88,51],[90,46]],1.1);
   lane([[55,69],[46,77],[40,80]],1.2);
   lane([[55,69],[64,75],[74,81],[92,77],[107,75],[126,75],[144,69],[154,55],[155,48]],1.2);
   lane([[78,31],[88,33],[94,23],[108,24],[123,26],[138,30],[155,48]],1.35);
   lane([[191,69],[182,82],[164,85],[146,81],[126,75]],1.1);
   lane([[36,13],[47,11],[56,11],[70,16],[78,31]],1.2);
+  lane([[146,56],[149,48],[155,48],[172,50]],1);
   lane([[172,50],[183,40],[191,36],[204,31],[222,32]],1.35);
   lane([[204,31],[199,46],[190,58]],1.1);
   lane([[92,77],[98,82],[105,82],[112,78]],1.15);
@@ -6976,7 +7020,7 @@ function makeLesserZone() {
     addObj({k:'table',barService:x===80.3,x:x*T,y:(Y+y)*T,w:32,h:15,solid:1});
   }
   for (const sign of trailSigns) {
-    const span=sign.village?40:6;
+    const span=sign.village?16:4;
     addObj({k:'signpost',village:!!sign.village,x:sign.x*T-span/2,y:sign.y*T-3,w:span,h:6,solid:1});
   }
   // The hull rests across the reed line. Boxes and sleepers are ashore.
@@ -7016,8 +7060,39 @@ function makeLesserZone() {
     ['lz_millhand','Мельник',54,70,'w_pm','loner'],['lz_meter','Шкала',75,80,'w_pm','loner'],
     ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
     ['lz_rivet','Радист',170,48,'w_obrez','army']
-  ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:85.1*T,y:(Y+54.4)*T}:LESSER_FIRE});
+  ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:85.1*T,y:(Y+54.4)*T}:LESSER_FIRE});
   DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
+}
+// World tiles. The east end shares both gauge and sleeper phase with the Cordon.
+const railAxis = x => 57.5-.0034*Math.max(0,176-x)**2;
+const levelCrossing = x => x>=143 && x<=147;
+function buildLesserRail() {
+  for(let x=0;x<WEST;x++){
+    const mid=Math.floor(railAxis(x+.5));
+    for(let y=Math.max(0,mid-2);y<=Math.min(MH-1,mid+2);y++){
+      const core=Math.abs(y-mid)<=1;
+      if(core) setT(x,y,levelCrossing(x)?DI:RA);
+      else if(tAt(x,y)===TR || tAt(x,y)===BU) setT(x,y,GR);
+    }
+  }
+}
+function drawLesserRail(g) {
+  for(let x=Math.max(0,GW.x0);x<=Math.min(WEST-1,GW.x1);x++){
+    const cy=railAxis(x),slope=railAxis(x+1)-cy;
+    if(cy<GW.y0-3 || cy>GW.y1+3) continue;
+    g.save();g.translate(x*T,cy*T);g.transform(1,slope,0,1,0,0);
+    if(C1 && ART) drawRailStrip(g,x,-1.5*T-9,3*T+18);
+    else {
+      g.fillStyle='#59534b';g.fillRect(0,-T,T,2*T);
+      g.fillStyle='#43392e';for(let i=0;i<T;i+=8) g.fillRect(i,-15,5,30);
+      g.fillStyle='#8c877c';for(const dy of [-11,11])g.fillRect(0,dy,T,2);
+    }
+    if(levelCrossing(x)){
+      g.fillStyle='#635849';g.fillRect(0,-7,T,14);
+      g.strokeStyle='#403932';g.lineWidth=1;g.beginPath();g.moveTo(0,0);g.lineTo(T,0);g.stroke();
+    }
+    g.restore();
+  }
 }
 const lesserSprites = {};
 async function loadLesserSprites() {
@@ -7031,24 +7106,25 @@ const trailSigns = [
   {x:WEST+8.45,y:121.35,label:'← МАЛАЯ ЗОНА',angle:-.12},
   {x:58.6,y:LESSER_TOP+45.75,label:'← МЕЛЬНИЦА',angle:-.12},
   {x:112.5,y:LESSER_TOP+50.45,label:'СФЕРА →',angle:.14},
-  {x:75.5,y:LESSER_TOP+43.45,village:true,angle:-.22},
-  {x:104.35,y:LESSER_TOP+51.35,village:true,angle:.18}
+  {x:74.65,y:LESSER_TOP+43.8,village:true,angle:-.22},
+  {x:107.35,y:LESSER_TOP+50.75,village:true,angle:.18}
 ];
 function drawTrailSigns(g) {
   if (!BIG) return;
   for (const sign of trailSigns) {
-    const x=sign.x*T, y=sign.y*T, width=sign.village?75:66;
+    const x=sign.x*T, y=sign.y*T, width=sign.village?36:32;
     if (x+width<GWP.x0 || x-width>GWP.x1 || y+width<GWP.y0 || y-width>GWP.y1) continue;
     const sprite=lesserSprites[sign.village?'village-sign':'fingerpost'];
     if (!sprite) continue;
     const height=width*sprite.height/sprite.width;
     g.save(); g.translate(x,y); g.rotate(sign.angle);
-    g.save(); spriteShadow(g,5,2);
+    g.save(); spriteShadow(g,2,1);
+    g.globalAlpha=.87;
     g.drawImage(sprite,-width/2,-height,width,height);
     g.restore();
     if (sign.label) {
-      g.fillStyle='#d2c6a7'; g.textAlign='center'; g.textBaseline='middle';
-      g.font='bold 8px sans-serif';
+      g.fillStyle='#baaf93'; g.textAlign='center'; g.textBaseline='middle';
+      g.font='600 4px sans-serif';
       g.fillText(sign.label,0,-height*.78,width*.84);
     }
     g.restore();
@@ -7058,6 +7134,7 @@ function drawTrailSigns(g) {
 // куски земли, что и местные декорации. На мини-карте используется тот же план.
 function drawLesserDetails(g) {
   if (!BIG || GW.x0>=WEST) return;
+  drawLesserRail(g);
   const top=LESSER_TOP;
   for(let y=Math.max(-22,GW.y0-top);y<=Math.min(35,GW.y1-top);y++)
     for(let x=Math.max(18,GW.x0);x<=Math.min(71,GW.x1);x++) {
@@ -7651,8 +7728,6 @@ function g7Human(e, extra, target) {
       const rise = e.campRise || 0, frame = Math.round(rise * 16);
       const sw = sheet.naturalWidth / 17, sh = 168;
       target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
-      const seatScale=.74+.26*rise;
-      target.scale(seatScale,seatScale);
       const alpha = target.globalAlpha * opacity;
       const w = rise > 0.75 ? weaponLocal(e) : null;
       const images = jacketFor(e)?.images || G3.images;
@@ -8655,6 +8730,10 @@ function talk(e) {
   if (e.sid === 'wolf') return talkWolf(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
+    if(e.guard!=='bridge' && e.guard!=='south'){
+      const line=e.guard==='sphere'?SPHERE_WARNING:'Военный патруль. Проходи мимо.';
+      return dialog(cardOf(e),[line],()=>[{t:'Уйти',close:1}],'dialog',e);
+    }
     const south = e.guard === 'south';
     return dialog(cardOf(e), [south ? 'Назад. Здесь граница Зоны, проход закрыт.' : S.flags.bridgePaid ? 'А, это ты. Проходи.' : 'Стоять. Пятьсот за проход в обе стороны. Пересечёшь шлагбаум без оплаты — откроем огонь.'], () => [
       south ? { t: 'А если договоримся?', fn: () => say('Не договоримся. Свободен.') }

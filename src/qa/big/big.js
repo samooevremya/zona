@@ -779,7 +779,7 @@ Tt('M2_lesser_zone_exploration', () => {
 Tt('M3_walk_the_western_road', () => {
   reset();
   const p=P(), s=S();p.x=249.5*T;p.y=120.5*T;
-  const checkpoints=[[240,118],[232,116],[229,107],[222,100],[204,99],[199,114],[190,126],[172,118],[155,116],[140,115],[120,110],[106,115],[91,114]];
+  const checkpoints=[[240,118],[232,116],[229,107],[222,100],[204,99],[199,114],[190,126],[181,130],[169,132],[152,130],[146,124],[140,115],[120,110],[106,115],[91,114]];
   let walked=0, maxStep=0;
   for(const [x,y] of checkpoints){
     const path=z.findPath(p.x,p.y,(x+.5)*T,(y+.5)*T);
@@ -796,7 +796,7 @@ Tt('M3_walk_the_western_road', () => {
     }
   }
   z.resetInput();
-  return {ok:p===P() && s===S() && maxStep<7 && p.x<100*T && walked>120*T,
+  return {ok:p===P() && s===S() && maxStep<7 && p.x<100*T && walked>120*T && !s.flags.sphereAlarm,
     walkedTiles:Math.round(walked/T),maxStepPx:+maxStep.toFixed(2)};
 });
 Tt('M4_roadside_signs_and_barge_loot', () => {
@@ -834,6 +834,36 @@ Tt('M6_village_bar_and_perimeter',()=>{
   const serve=[...document.querySelectorAll('.dlg-opts button')].find(b=>b.textContent.includes('Покажи припасы'));
   if(serve)serve.click();const trade=z.panel?.kind==='trade' && e.inv.energy>0;z.closePanel();
   return {ok:!!(gates&&walls.length===6&&trade),gates,trade};
+});
+Tt('M7_rail_crossing_and_dry_trail',()=>{
+  reset();const tiles=window.__bigTiles(),at=(x,y)=>tiles[y*M.MW+x];
+  const seam=[238,239,240,241].every(x=>[56,57,58].every(y=>at(x,y)===9));
+  const path=z.findPath(145.5*T,59.5*T,145.5*T,48.5*T);
+  const crossing=path?.some(pt=>pt.x>=143*T&&pt.x<148*T&&pt.y<56*T&&pt.y>51*T);
+  const dry=[[250,120],[240,118],[232,116],[229,107],[222,100],[204,99]].every(([x,y])=>
+    at(x,y)===1&&[-1,0,1].every(a=>[-1,0,1].every(b=>at(x+a,y+b)!==3)));
+  const saved=z.freshS();saved.x=225.5*T;saved.y=57.5*T;saved.money=421;
+  z.applyState(saved);
+  const restored=!!M.nav[Math.floor(P().y/T)*M.MW+Math.floor(P().x/T)] &&
+    Math.hypot(P().x/T-225.5,P().y/T-57.5)<5 && S().money===421;
+  return {ok:!!(seam&&crossing&&dry&&restored),seam,crossing,dry,restored};
+});
+Tt('M8_sphere_guard',()=>{
+  reset();const p=P(),s=S(),guards=z.ents.filter(e=>e.guard==='sphere');
+  const move=(x,y)=>{p.x=x*T;p.y=y*T;};const safe=()=>!s.flags.sphereAlarm && guards.every(e=>e.tgt!==p);
+  const guard=guards[0];move(guard.x/T+.65,guard.y/T);step(1);z.interact();
+  const dialogue=document.getElementById('pbody').innerText;
+  const noToll=z.panel?.kind==='dialog' && dialogue.includes('Территория под охраной') && !/шлагбаум|500 RU|пятьсот/i.test(dialogue);
+  z.closePanel();move(140,116);step(2);z.clearMsgs();
+  move(148,116);step(90);
+  const warned=B.msgs().some(t=>t.includes('Территория под охраной'))&&safe();
+  move(141,116);step(2);const withdrew=s.flags.sphereWarnAt==null&&safe();
+  s.flags.bridgePaid=1;move(149,116);step(60);move(155,116);step(1);
+  const alarm=!!s.flags.sphereAlarm && guards.every(e=>e.tgt===p) && !s.flags.armyAngry;
+  const mags=guards.map(e=>e.mag);step(90);
+  const fired=guards.some((e,i)=>e.mag<mags[i]);
+  move(141,116);step(20);const cleared=safe();
+  return {ok:guards.length===2&&noToll&&warned&&withdrew&&alarm&&fired&&cleared,noToll,warned,withdrew,alarm,fired,cleared};
 });
 return JSON.stringify(R);
 })()
