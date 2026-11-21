@@ -1,7 +1,7 @@
 // Perspective only affects world-space drawing. Save data, collision and PDA coordinates stay on the ground
 // plane.
 const perspective = BIG && C1 && !/perspective-off/.test(location.hash);
-const houseHeight = .16;
+const houseHeight = .115;
 const walls = new Map(), canopyLayers = new WeakMap();
 function roofPoint(x, y, k) {
   return [x + (x - cam.x) * k, y + (y - cam.y) * k];
@@ -58,6 +58,7 @@ function wallTexture(h, side, len, wood, kind) {
     artFill(g, 'wall_brick', 0, 0, len, 88);
     g.restore();
   }
+  weatherFacade(g,len,wood,rand);
   const sideDir = [[0, -1], [1, 0], [0, 1], [-1, 0]][side];
   const ds = (h.entrances || [])
                  .filter(e => e.nx === sideDir[0] && e.ny === sideDir[1])
@@ -74,7 +75,7 @@ function wallTexture(h, side, len, wood, kind) {
     g.fillRect(l + w * .19, 57, 2, 3);
   }
   for (let i = 0, n = Math.max(1, Math.floor(len / 65)); i < n; i++) {
-    const u = (i + .5) * len / n;
+    const u = (i + .43 + .14*rand()) * len / n;
     if (ds.some(d => Math.abs(d.u - u) < d.w / 2 + 18)) continue;
     let l = u - 13;
     g.fillStyle = '#252623';
@@ -90,6 +91,12 @@ function wallTexture(h, side, len, wood, kind) {
     g.fillStyle = '#736c5b';
     g.fillRect(u - 1, 22, 2, 29);
     g.fillRect(l, 32, 26, 2);
+    if(rand()<.68) {
+      g.fillStyle='#161915'; g.beginPath();g.moveTo(l+1,24);g.lineTo(l+11,24);
+      g.lineTo(l+8,30);g.lineTo(l+5,28);g.lineTo(l+1,39);g.fill();
+      if(rand()<.64){g.save();g.translate(u,39);g.rotate((rand()-.5)*.64);
+        artFill(g,'floor_wood',-16,-3,32,6);g.fillStyle='#41372b';g.fillRect(-12,-1,1,2);g.fillRect(10,-1,1,2);g.restore();}
+    }
     g.fillStyle = '#a1987f';
     g.fillRect(l - 4, 52, 34, 2);
     g.fillStyle = 'rgba(26,23,19,.5)';
@@ -124,7 +131,7 @@ function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
   const k = houseHeight *
       (h.ruin                ? .72 :
-           h.mat === 'depot' ? 1.23 :
+           h.mat === 'depot' ? 1.55 :
            w < 110           ? .68 :
            w > 300           ? 1.12 :
                                1),
@@ -411,6 +418,7 @@ function drawWorldRelief(inView) {
     const x = o.x + o.w / 2, y = o.y + o.h / 2, k = objectHeight[o.k];
     if (!(k || o.k === 'fence') || !visible(x, y, Math.max(o.w, o.h) / 2 + 64)) continue;
     if (o.k === 'fence') {
+      if(o.material==='railMesh'){drawHighWire(o);continue;}
       const vertical = o.h > o.w, len = vertical ? o.h : o.w, n = Math.ceil(len / 52),
             height = o.material === 'stockade' ? .043 : .024;
       for (let i = 0; i <= n; i++)
@@ -532,73 +540,6 @@ function paintHills(g) {
 
 // The rail goes over the Cordon highway. Abutments sit on the existing railway banks.
 // Fade the deck locally underfoot as with house roofs, so the gate and actors remain readable.
-let checkpointDeck;
-function drawCheckpointSpan(inView) {
-  const y = (NORTH_ROWS + 57.5) * T, cx = (roadX[NORTH_ROWS + 57] + .5) * T;
-  if (!inView(cx, y, 6 * T)) return;
-  let left = Math.floor(cx / T) - 1, right = left + 2;
-  while (left > WEST && tAt(left, NORTH_ROWS + 57) !== RA && left > cx / T - 8) left--;
-  while (right < PW && tAt(right, NORTH_ROWS + 57) !== RA && right < cx / T + 8) right++;
-  const x = (left + .38) * T, w = (right + .62) * T - x, h = 49, k = .068;
-  if (!checkpointDeck) {
-    const c = document.createElement('canvas');
-    c.width = Math.ceil(w * 2);
-    c.height = h * 2;
-    const g = c.getContext('2d');
-    g.scale(2, 2);
-    artFill(g, 'wall_concrete', 0, 0, w, h);
-    const rail = ART.m.sprites.rail, img = ART.images[rail.atlas], r = rail.rect;
-    // Use the same sleeper spacing and steel gauge as the embankment.
-    const full = 3 * T + 18, period = r[2] * full / r[3], sy = r[1] + (full - h) * .5 * r[3] / full;
-    for (let i = -(x % period); i < w; i += period)
-      g.drawImage(img, r[0], sy, r[2], h * r[3] / full, i, 0, period, h);
-    for (const edge of [0, h - 4]) {
-      g.fillStyle = '#504a40';
-      g.fillRect(0, edge, w, 4);
-      g.fillStyle = '#97917b';
-      g.fillRect(0, edge, w, 1);
-      for (let i = 5; i < w; i += 13) {
-        g.fillStyle = '#aaa28c';
-        g.fillRect(i, edge + 1, 2, 1);
-      }
-    }
-    c1Grade(c, 0, 0, c.width, c.height);
-    checkpointDeck = c;
-  }
-  const depth = y - h / 2, bottom = y + h / 2;
-  for (const foot of [x, x + w - 7]) {
-    ctx.fillStyle = '#544f43';
-    ctx.fillRect(foot, depth, 7, h + 4);
-    ctx.fillStyle = '#96917e';
-    ctx.fillRect(foot, depth, 2, h);
-  }
-  const a = roofPoint(x, depth, k), b = roofPoint(x + w, bottom, k);
-  const dist = Math.max(Math.abs(P.y - y) - h * .5, Math.abs(P.x - cx) - w * .5);
-  ctx.save();
-  ctx.globalAlpha = .29 + .71 * clamp(dist / 32, 0, 1);
-  const near = cam.y >= y ? bottom : depth;
-  const edge = roofPoint(x, near, k);
-  ctx.drawImage(checkpointDeck, ...a, b[0] - a[0], b[1] - a[1]);
-  const dir = cam.y >= y ? 1 : -1, face = Math.min(11, 3 + Math.abs(cam.y - y) * .024);
-  ctx.save();
-  ctx.translate(a[0], edge[1]);
-  ctx.scale(1, dir);
-  const length = b[0] - a[0], faceShade = ctx.createLinearGradient(0, 0, 0, face);
-  faceShade.addColorStop(0, '#aaa18a');
-  faceShade.addColorStop(.24, '#62594d');
-  faceShade.addColorStop(.75, '#454139');
-  faceShade.addColorStop(1, '#7a715f');
-  ctx.fillStyle = faceShade;
-  ctx.fillRect(0, 0, length, face);
-  for (let t = 5; t < length; t += 14) {
-    ctx.fillStyle = '#433e35';
-    ctx.fillRect(t, 1, 1.4, face - 1);
-    ctx.fillStyle = '#a2967f';
-    ctx.fillRect(t + 2, 2, 1, 1);
-  }
-  ctx.restore();
-  ctx.restore();
-}
 function liftContainer(o, paint) {
   const height = o.k === 'safe' ? .026 : .014, x = o.x + o.w / 2, y = o.y + o.h / 2;
   const [u, v] = roofPoint(x, y, height);

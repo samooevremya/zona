@@ -238,7 +238,7 @@ function* paintGroundWin(g, R) {
     }
   }
   if (ART) yield* artGround(g, R);
-  if (perspective && ART) paintHills(g);
+  if (perspective && ART) {paintHills(g); paintRailSlopes(g);}
   yield;
   // мягкие пятна цвета поверх клеток, чтобы не было шахматки
   if (!ART) {
@@ -294,6 +294,7 @@ function* paintGroundWin(g, R) {
     else { g.fillStyle = 'rgba(255,255,240,0.06)'; g.fillRect(px, py, T, 3); if (R() < 0.3) { g.fillStyle = 'rgba(60,45,30,0.4)'; g.fillRect(px + R() * 20, py + R() * 20, 8, 10); } }
     if (below !== CO && below !== BR) { g.fillStyle = face; g.fillRect(px, py + T - 7, T, 7); }
   }
+  for(const h of HOUSES)if(h.interior && h.x<=GW.x1 && h.x+h.w>=GW.x0 && h.y<=GW.y1 && h.y+h.h>=GW.y0)drawRoomMarks(g,h);
   drawThresholds(g);
   yield;
   drawLesserDetails(g);
@@ -315,6 +316,10 @@ function* paintGroundWin(g, R) {
   yield;
   objs.forEach(o => { if (o.x + o.w >= (GW.x0 - 2) * T && o.x <= (GW.x1 + 3) * T && o.y + o.h >= (GW.y0 - 2) * T && o.y <= (GW.y1 + 3) * T) drawStaticObj(g, o); });
   if (ART) artDecor(g);
+  // Upper floors have a separate camera. Hide their working tiles beyond the outdoor boundary.
+  if(BIG && GWP.x1>PW*T) for(const r of lofts){
+    g.fillStyle='#080a07';g.fillRect(r.x*T-3,r.y*T-3,r.w*T+14,r.h*T+16);
+  }
 }
 function gensetProc(g, o) {   // прежняя процедурная отрисовка — запасной путь при ошибке растра
   g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(o.x + 4, o.y + 5, o.w, o.h);
@@ -383,6 +388,9 @@ async function prepareShopGate() {
   }
 }
 function drawStaticObj(g, o) {
+  if(o.k==='roomFitting'){drawRoomFitting(g,o);return;}
+  if(o.k==='partition'){paintPartition(g,o);return;}
+  if(o.k==='stairRun')return;
   if (perspective && ART && objectHeight[o.k]) {
     groundShadow(g,o.x+o.w*.5,o.y+o.h*.5,o.w*.49,o.h*.44,0,2);
     return;
@@ -774,6 +782,8 @@ function render() {
     cam.x = shopCamera(cam.x, STAIRS.x-SHOP_ROOM.width*T/2, SHOP_ROOM.width*T, VW/Z);
     cam.y = shopCamera(cam.y, SHOP_ROOM.top*T, SHOP_ROOM.height*T, VH/Z);
   }
+  const loft=P && loftAt(P);
+  if(loft){cam.x=shopCamera(cam.x,loft.x*T,loft.w*T,VW/Z);cam.y=shopCamera(cam.y,loft.y*T,loft.h*T,VH/Z);}
   const vw = VW / Z, vh = VH / Z, vx = cam.x - vw / 2, vy = cam.y - vh / 2;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#121410'; ctx.fillRect(0, 0, VW, VH);
@@ -787,9 +797,11 @@ function render() {
     ctx.beginPath(); ctx.rect(x,y,width,height); ctx.clip();
     ctx.drawImage(shopImage,x,y,width,height);
   }
+  else if(loft){ctx.save();ctx.beginPath();ctx.rect(loft.x*T,loft.y*T,loft.w*T,loft.h*T);ctx.clip();drawLoft(loft);}
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
-  if (perspective && ART && !shopVisible) drawWorldRelief(inView);
+  if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
+  for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
     if (d.burn) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.28); ctx.fill(); continue; }
@@ -802,6 +814,7 @@ function render() {
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
   for (const o of objs) {
+    if (BIG && o.x>=PW*T && loftAt(o)!==loft) continue;
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
       if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
       else containerDraw(o);
@@ -829,15 +842,18 @@ function render() {
     ctx.fillStyle = '#c9c7bd'; ctx.fillRect(x - 2, y - h - 1.5, 4, 3);
   }
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
-  const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30)).sort((a, b) => a.y - b.y);
+  const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
-    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else drawLitHuman(e);
+    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if(e.sid==='shust' && e.captive && loft) drawRestingCaptive(e);
+    else drawLitHuman(e);
+    if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
     }
   }
+  if(BIG && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }
   ctx.lineWidth = 1;
   for (const f of flashes) {
@@ -880,7 +896,7 @@ function render() {
   }
   for (let i = 0; i + 1 < py0.length; i++) { const a = py0[i], b = py0[i + 1]; if (!inView(a.x, a.y, 600) && !inView(b.x, b.y, 600)) continue; [-6, 0, 6].forEach(o => { ctx.beginPath(); ctx.moveTo(a.x + 10 + o, a.y + 10 - o); ctx.quadraticCurveTo((a.x + b.x) / 2 + 10 + o, (a.y + b.y) / 2 + 30, b.x + 10 + o, b.y + 10 - o); ctx.stroke(); }); }
   ctx.restore();
-  if (perspective && ART && !shopVisible) drawCheckpointSpan(inView);
+  if (perspective && ART && !shopVisible && !loft) drawCheckpointSpan(inView);
   drawCloudShadows();
   // кроны
   const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
@@ -950,13 +966,13 @@ function render() {
     ctx.lineWidth = 1;
   }
   // свет, цвет, ночь
-  if (shopVisible) ctx.restore();
+  if (shopVisible || loft) ctx.restore();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalCompositeOperation = 'multiply';
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
-  const bunk = P && inBunker(P.x, P.y);
-  const dk = bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
+  const bunk = P && (loftAt(P) || inBunker(P.x, P.y));
+  const dk = loft ? .18+.15*darkness() : bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);

@@ -75,7 +75,7 @@ function drawPda2() {
   w.appendChild(cv2); mapc.appendChild(w);
   const focusPt = () => {
     const p = panel.focus === 'target' && selT[0] ? selT[0] : P;
-    return inBunker(p.x, p.y) ? HATCH : p;
+    return worldMapPoint(p);
   };
   requestAnimationFrame(() => {
     if (!cv2.isConnected) return;

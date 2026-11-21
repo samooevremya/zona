@@ -177,10 +177,10 @@ function followTick(e, dt) {
   if (!e.follow) return false;
   if (S.min > e.hireEnd) { endHire(e); msg(e.name + ': срок вышел, я в деревню.', 'say'); news('Контракт с напарником ' + e.name + ' закончился.'); return true; }
   if (e.wait && e.waitAt) { if (dE(e, e.waitAt) > 10) goTo(e, e.waitAt.x, e.waitAt.y, 70, dt); return true; }
-  const tgt = inBunker(P.x, P.y) ? { x: HATCH.x + 30, y: HATCH.y + 20 } : P;
+  const tgt = inBunker(P.x, P.y) ? { x: HATCH.x + 30, y: HATCH.y + 20 } : (loftAt(P)?.stair || P);
   const d = dst(e.x, e.y, tgt.x, tgt.y);
   // догоняющий телепорт: только вне камеры, вне боя и в проверенную безопасную точку позади игрока
-  if (d > 900 && !inBunker(P.x, P.y) && !(P.combatT > 0) && offCam(e)) {
+  if (d > 900 && !loftAt(P) && !inBunker(P.x, P.y) && !(P.combatT > 0) && offCam(e)) {
     const back = VW / 2 / Z / T + 3, p = freeTile(P.x / T - Math.cos(P.ang) * back, P.y / T - Math.sin(P.ang) * back);
     if (offCam({ x: p.x * T, y: p.y * T }) && !nearAnom(p.x * T, p.y * T, 20) && findPath(p.x * T, p.y * T, P.x, P.y)) { e.x = p.x * T; e.y = p.y * T; e.path = null; }
     return true;

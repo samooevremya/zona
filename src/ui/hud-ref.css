@@ -177,7 +177,7 @@ body.is-touch .touch.zt #b-run.on{border-color:#d2b77e!important;background:rgba
  body.is-touch .touch.zt #b-run{right:calc(175px + var(--sar));bottom:calc(132px + var(--sab))}
 }
 
-#poppy-veil{position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(#191016 1%,rgba(34,18,25,.84) 27%,rgba(45,26,28,.32) 48%,rgba(34,18,25,.84) 73%,#191016 99%)}
+#poppy-veil{position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(to bottom,#110e10 0%,#160f12 var(--lid,0%),transparent calc(var(--lid,0%) + 12%)),linear-gradient(to top,#110e10 0%,#160f12 var(--lid,0%),transparent calc(var(--lid,0%) + 12%))}
 .zh-map #mini-distance,.zh-map #mini-people{position:absolute;z-index:1;padding:1px 4px;background:#24211cd9;color:#e7d7b6;font:700 11px/1.2 Arial;pointer-events:none}
 #mini-distance{top:1px;left:50%;transform:translateX(-50%)}#mini-distance:empty{display:none}
 #mini-people{bottom:1px;right:1px}#mini-people::before{content:'';display:inline-block;width:9px;height:10px;margin-right:3px;background:radial-gradient(circle at 50% 23%,#c0ac85 0 2px,transparent 2.5px),radial-gradient(ellipse at 50% 100%,#c0ac85 0 4px,transparent 4.5px)}
