@@ -157,6 +157,7 @@ function mkHuman(d) {
     money: (d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120, inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null, score: [ri(2, 14), ri(15, 44), ri(45, 80)][Math.min(rank, 2)] };
+  if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
   if (d.sid==='lz_barman') {e.inv={energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
   e.maxhp = e.hp;
   if (e.sit) e.ang = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);

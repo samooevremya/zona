@@ -295,8 +295,9 @@ function* paintGroundWin(g, R) {
   }
   drawThresholds(g);
   yield;
-  drawCordonDetails(g);
   drawLesserDetails(g);
+  drawDumpDetails(g,GWP);
+  drawCordonDetails(g);
   drawTrailSigns(g);
   // кусты и пни деревьев
   for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {

@@ -865,5 +865,36 @@ Tt('M8_sphere_guard',()=>{
   move(141,116);step(20);const cleared=safe();
   return {ok:guards.length===2&&noToll&&warned&&withdrew&&alarm&&fired&&cleared,noToll,warned,withdrew,alarm,fired,cleared};
 });
+Tt('G1_garbage_approaches_and_return',()=>{
+  reset();
+  const p=P(),state=S(), routes=[
+    [[367.5,10.5],[367,5],[355,4],[332,9],[310,11],[286,11],[271,14],[251,14],[237,19],[225,25],[211,22],[183,15],[168,20],[143,22],[118,21]],
+    [[145.5,59.5],[145.5,48],[151,34],[149,25],[143,22],[118,21]]
+  ];
+  for(const points of routes){
+    p.x=points[0][0]*T;p.y=points[0][1]*T;
+    for(const [x,y] of [...points.slice(1),...points.slice(0,-1).reverse()]){
+      const path=z.findPath(p.x,p.y,x*T,y*T);
+      if(!path?.length) return {ok:false,noPath:[x,y]};
+      for(const goal of path){
+        let count=0;
+        while(Math.hypot(goal.x-p.x,goal.y-p.y)>6 && count++<80){
+          const dx=goal.x-p.x,dy=goal.y-p.y,d=Math.hypot(dx,dy);
+          z.IN.moveX=dx/d;z.IN.moveY=dy/d;
+          const oldX=p.x,oldY=p.y;step(1);
+          if(Math.hypot(p.x-oldX,p.y-oldY)>T) return {ok:false,jump:[oldX/T,oldY/T,p.x/T,p.y/T]};
+        }
+        if(count>=80){z.resetInput();return {ok:false,blocked:[goal.x/T,goal.y/T],player:[p.x/T,p.y/T]};}
+      }
+    }
+    z.resetInput();
+  }
+  const places=M.LOCATIONS.filter(l=>l.id.startsWith('dump_'));
+  const linked=places.every(l=>{const [x,y]=l.anchors.approach;return z.findPath(168*T,20*T,x*T,y*T)?.length;});
+  const seamless=p===P() && state===S() && !z.panel;
+  p.x=168.5*T;p.y=20.5*T;z.save(true);z.applyState(z.loadSave());
+  return {ok:seamless && state.flags.visitedDump===1 && linked && places.length===9 &&
+    Math.abs(P().x-168.5*T)<1 && Math.abs(P().y-20.5*T)<1,places:places.length,linked};
+});
 return JSON.stringify(R);
 })()

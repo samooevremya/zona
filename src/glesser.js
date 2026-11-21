@@ -1,5 +1,5 @@
 const LESSER_FIRE = { x: 90.5*T, y: (LESSER_TOP+49.5)*T };
-const campOf = e => BIG && e.x < WEST*T ? LESSER_FIRE : FIRE;
+const campOf = e => inGarbage(e.x/T,e.y/T) ? dumpFire : BIG && e.x < WEST*T ? LESSER_FIRE : FIRE;
 const WORLD_FIRES = BIG ? [FIRE, FIRE2, LESSER_FIRE] : [FIRE, FIRE2];
 const lesserPlaces = [
   // id, название, границы, общедоступная точка подхода
@@ -21,6 +21,9 @@ const lesserPlaces = [
   ['north_lz','Лесной кордон',[18,2,32,13],[25,10]]
 ];
 const lesserLore = {
+  dump_scale:'Костёр держим под стеной старой конторы. Отсюда к депо иди вдоль разгрузочной дороги на запад.',
+  dump_sorter:'Сухая канава огибает южный отвал. На гребне дозиметр трещит, а внизу можно пройти.',
+  dump_driver:'Смотри по колее. Кузова слева — идёшь к Кордону, справа — назад к Барахолке.',
   lz_spool: 'Ящик с зелёным замком стоит в доме у костра. Сюда доходят вещи из твоего ящика на Кордоне.',
   lz_sieve: 'Видишь старую водонапорку за крышами? От неё одна колея идёт к коровникам, другая возвращается в деревню.',
   lz_meter: 'В старице маятник детектора тянет к воде. В самом центре завихрения лучше не задерживаться.',
@@ -171,6 +174,8 @@ function makeLesserZone() {
     addObj({k:'table',barService:x===80.3,x:x*T,y:(Y+y)*T,w:32,h:15,solid:1});
   }
   for (const sign of trailSigns) {
+    const tx=Math.floor(sign.x),ty=Math.floor(sign.y);
+    if(tAt(tx,ty)===TR || tAt(tx,ty)===BU) setT(tx,ty,GR);
     const span=sign.village?16:4;
     addObj({k:'signpost',village:!!sign.village,x:sign.x*T-span/2,y:sign.y*T-3,w:span,h:6,solid:1});
   }
@@ -254,6 +259,8 @@ async function loadLesserSprites() {
 }
 // Foot positions, in world tiles. Lettering stays on the face as the board turns.
 const trailSigns = [
+  {x:360.3,y:5.85,label:'← СВАЛКА',angle:.08},
+  {x:147.2,y:33.4,label:'ДЕПО ↖',angle:-.14},
   {x:WEST+8.45,y:121.35,label:'← МАЛАЯ ЗОНА',angle:-.12},
   {x:58.6,y:LESSER_TOP+45.75,label:'← МЕЛЬНИЦА',angle:-.12},
   {x:112.5,y:LESSER_TOP+50.45,label:'СФЕРА →',angle:.14},

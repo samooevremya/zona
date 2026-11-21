@@ -164,15 +164,17 @@ function update(dt) {
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
   if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
-  if (!cordonStage() && P.alive && (!BIG || Math.abs(P.x/T-BIG_EXITS.north.x)<5) && P.y < 5 * T && !inBunker(P.x, P.y) && warnT <= 0) { warnT = 6; msg('Дальше Свалка. Эта часть Зоны появится в следующей версии.', 'say'); }
   if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < CORDON_ROWS*T && warnT <= 0 && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
-  if(BIG && P.alive && Math.abs(P.x/T-150)<4 && P.y<5*T && warnT<=0){
-    warnT=6;msg('Северная тропа ведёт на Свалку. Дальше путь пока закрыт.','say');
-  }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
-  if(BIG) checkSpherePerimeter();
+  if(BIG) {
+    checkSpherePerimeter();
+    if(P.alive && !S.flags.visitedDump && inGarbage(P.x/T,P.y/T)){
+      S.flags.visitedDump=1;
+      bulletin('Свалка. На западной дороге работает перегрузочное депо.');
+    }
+  }
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
@@ -460,6 +462,12 @@ function applyState(d) {
   if(BIG && P.x<WEST*T && tAt(Math.floor(P.x/T),Math.floor(P.y/T))===RA){
     const verge=freeTile(P.x/T,P.y/T);
     P.x=S.x=verge.x*T;P.y=S.y=verge.y*T;
+  }
+  if(inGarbage(P.x/T,P.y/T) && !nav[Math.floor(P.y/T)*MW+Math.floor(P.x/T)]){
+    const probe={x:P.x,y:P.y,r:P.r}; collide(probe);
+    if(Math.hypot(probe.x-P.x,probe.y-P.y)>.1){
+      const free=freeTile(P.x/T,P.y/T); P.x=S.x=free.x*T; P.y=S.y=free.y*T;
+    }
   }
   // A saved position can be under an enlarged landmark after the world update.
   if (BIG && objs.some(o=>(o.k==='installation'||o.k==='bargeHull') &&

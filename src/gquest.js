@@ -96,8 +96,8 @@ function cluesTick() {
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
   if (cordonExit()) return;
-  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до перехода на Свалку. Дальше — в следующей части.'); save(true); }
-  msg('Дорога на Свалку. Эта локация появится в следующей версии.', 'say');
+  if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до северного перехода на Свалку.'); save(true); }
+  msg(BIG ? 'За поворотом начинается дорога к кладбищу техники.' : 'Северный переход.', 'say');
 }
 function interactRC1(cand) {
   if (MAP_ID !== 'rc1') return;
@@ -106,5 +106,5 @@ function interactRC1(cand) {
   const g = locPt('village', 'generator'), dg = dst(P.x, P.y, g.x, g.y);
   if (dg < 56) cand(dg - 5, { k: 'genset', label: q5().st === 'completed' ? 'Верстак у генератора' : 'Генератор' });
   const ex = locPt('exit', 'gate'), de = dst(P.x, P.y, ex.x, ex.y);
-  if (de < 90) cand(de, { k: 'exit', label: cordonStage()==='north'?'Вызвать Серого':'Переход на Свалку' });
+  if (de < 90) cand(de, { k: 'exit', label: cordonStage()==='north'?'Вызвать Серого':BIG?'Сверить маршрут':'Переход на Свалку' });
 }

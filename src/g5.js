@@ -252,6 +252,9 @@ function talk(e) {
   const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
   dialog(cardOf(e), lines, () => {
     const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
+    if (e.sid==='dump_dispatch') o.push({t:'Про северный переход', fn:()=>say(cordonStage()==='done' ?
+      'Узнал голос. Держи журнал при себе. На Барахолке есть костёр, а за мазутными баками фонит даже пустая тара.' :
+      'До Кордона иди вдоль кузовов на восток. Если нужен западный переезд, за путями держись тропы к коровникам.')});
     if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
     if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
@@ -408,7 +411,7 @@ function drawLoot() {
 const PDA_TABS = [['map', 'Карта'], ['tasks', 'Задания'], ['log', 'Журнал'], ['stat', 'Данные']];
 function drawPda() {
   if (panel.tab === 'map') {
-    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Кордон и Малая Зона.'));
+    const bar = el('div', 'mapbar'); bar.appendChild(el('span', 'note', panel.zoom ? 'Листай карту пальцем.' : 'Кордон, Малая Зона и Свалка.'));
     bar.appendChild(btn('chip', panel.zoom ? 'Отдалить' : 'Приблизить', () => { panel.zoom = !panel.zoom; refresh(); }));
     pbody.appendChild(bar);
     const w = el('div', 'mapwrap' + (panel.zoom ? ' zoom' : '')), c = el('canvas'); c.id = 'bigmap'; c.width = PW * 6; c.height = MH * 6;
@@ -580,7 +583,7 @@ function buildBigMini() {
     if (ROOFS[i]) drawHouseRoof(g, h, i, 1/T);
   });
   if (BIG) {
-    g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); g.restore();
+    g.save(); g.scale(1/T,1/T); drawLesserInstallations(g); drawDumpDetails(g); g.restore();
     g.fillStyle='rgba(134,61,44,.65)';
     for(let y=-22;y<35;y+=.5) for(let x=18;x<71;x+=.5)
       if (poppyBed(x,y)<.9 && tAt(Math.floor(x),LESSER_TOP+Math.floor(y))===GR)
@@ -1124,7 +1127,7 @@ function frame(now) {
 /* загрузка по шагам: если на телефоне что-то падает, на экране видно где и почему (а не тёмный экран) */
 function bootStep(t) { window.__bootStep = t; const b = document.getElementById('bootlog'); if (b) b.firstChild.textContent = 'Загрузка: ' + t + '…'; }
 async function boot() {
-  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); buildGrids();
+  bootStep('мир'); gen(); bigWorld(); makeLesserZone(); makeGarbage(); buildGrids();
   HOUSES.forEach(buildEntrances);
   resize();
   bootStep('графика'); await loadArt(); await Promise.all([prepareShopGate(), loadLesserSprites()]); bigFences(); buildFieldProps(); buildGrids(); placeSearchContainers(); buildGrids(); buildFieldCrateSites();
