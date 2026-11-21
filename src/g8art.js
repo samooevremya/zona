@@ -282,7 +282,7 @@ function* artGround(g, R) {
       if (id === 'water' && y >= FORD[0] - 4 && y < FORD[1] + 5 && Math.abs(x - STREAM_X(y)) <= 1) id = 'grass';
     }
     if (id) artFill(g, id, px, py, T, T);
-    if (t===RA && BIG && x<WEST) artFill(g,'grass',px,py,T,T);
+    if (t===RA && BIG && (x<WEST || y<NORTH_ROWS)) artFill(g,'grass',px,py,T,T);
     else if (C1 && t === RA) c1Rail(g,x,y);
     if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
     if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }

@@ -120,10 +120,10 @@ function makeLesserZone() {
   for(let y=-22;y<=35;y++) for(let x=18;x<=71;x++)
     if(poppyBed(x+.5,y+.5)<1.15 && tAt(x,Y+y)!==SW) setT(x,Y+y,GR);
   lane([[204,31],[222,32],[229,39],[232,48],[240,50],[250,52]],1.05);
-  // From the cowsheds the northern track crosses the embankment to the future boundary.
-  lane([[123,26],[133,15],[142,2],[145,-8],[145,-21],[151,-34],[148,-50],[150,-68]],1.15);
+  // The cowshed trail crosses the main line on its original timber deck.
+  lane([[123,26],[133,15],[142,2],[145,-8],[145,-19]],1.15);
   bigLoc('lesser_dump',{name:'Северная тропа на Свалку',gen:'северной тропы',type:'story',
-    bounds:[147,NORTH_ROWS,153,NORTH_ROWS+5],entrances:[[150,NORTH_ROWS+3]],anchors:{approach:[150,NORTH_ROWS+3]}});
+    bounds:[191,NORTH_ROWS,199,NORTH_ROWS+5],entrances:[[194,135]],anchors:{approach:[194,135]}});
   lane([[90,35],[90,46]],1.4);
   lane([[29,10],[30,-8],[44,-17],[62,-11],[69,5],[65,22],[59,32]],1.1);
   lane([[25,10],[36,13],[48,27],[59,32],[60,44],[76,46],[90,46],[102,48],[120,42],[140,47],[146,56],[152,62],[169,64],[181,62],[190,58],[191,69]],2);

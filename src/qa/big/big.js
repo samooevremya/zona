@@ -871,9 +871,11 @@ Tt('G1_garbage_approaches_and_return',()=>{
   const p=P(),state=S(), routes=[
     [[367.5,north+10.5],[367,130],[366,119],[367,103],[366,95],[365,81],[363,66],[363,51],
      [356,51],[345,48],[332,49],[322,51],[311,51],[299,51],[294,50]],
-    [[145.5,north+59.5],[145,north+48],[151,north+34],[148,north+18],[150,north+3],[150,128],
-     [158,119],[167,117],[175,107],[187,102],[194,91],[207,87],[216,76],[228,75],
-     [239,67],[250,65],[259,57],[268,56],[278,52],[290,52],[294,50]]
+    [[145.5,north+59.5],[145,181],[151,178],[165,178],[177,173],[183,162],[188,148],
+     [194,135],[200,123],[208,110],[216,99],[225,85],[233,74],[241,61],[247,66.52],
+     [252,71],[260,64],[270,58],[279,55],[285,52],[294,50]],
+    [[294,50],[285,52],[279,55],[270,58],[260,64],[252,71],[247,66.52],[241,61],
+     [233,62],[224,63],[207,68],[195,65],[180,60],[161,61],[147,64],[132,64],[122,61]]
   ];
   const lengths=[];
   for(const points of routes){
@@ -900,8 +902,20 @@ Tt('G1_garbage_approaches_and_return',()=>{
   const linked=places.every(l=>{const [x,y]=l.anchors.approach;return z.findPath(391*T,32*T,x*T,y*T)?.length;});
   const seamless=p===P() && state===S() && !z.panel;
   p.x=389.5*T;p.y=33.5*T;z.save(true);z.applyState(z.loadSave());
-  return {ok:seamless && state.flags.visitedDump===1 && linked && places.length===9 && lengths[0]>145 && lengths[1]>195 &&
+  return {ok:seamless && state.flags.visitedDump===1 && linked && places.length===10 && lengths[0]>145 && lengths[1]>195 && lengths[2]>150 &&
     Math.abs(P().x-389.5*T)<1 && Math.abs(P().y-33.5*T)<1,places:places.length,linked,oneWayTiles:lengths};
+});
+Tt('G4_station_crossing_and_western_cut',()=>{
+  reset();
+  const path=(a,b)=>z.findPath(a[0]*T,a[1]*T,b[0]*T,b[1]*T);
+  const tiles=window.__bigTiles(),at=(x,y)=>tiles[y*M.MW+x];
+  const deck=path([241,61],[252,71]);
+  const crossesOnDeck=deck?.length<24 && deck.some(p=>Math.hypot(p.x/T-247,p.y/T-66.52)<2);
+  const closedBank=at(200,135)===9 && at(230,87)===9;
+  const closedWest=!path([145.5,191.5],[50,44]) && !path([180,60],[50,44]);
+  const saved=z.freshS();saved.x=50*T;saved.y=44*T;z.applyState(saved);
+  const restored=!!path([P().x/T,P().y/T],[180,60]);
+  return {ok:!!(crossesOnDeck && closedBank && closedWest && restored),crossesOnDeck,closedBank,closedWest,restored};
 });
 Tt('G3_saved_world_origin',()=>{
   reset();
@@ -936,7 +950,7 @@ Tt('G2_wagon_footprints',()=>{
   const car=cars[2],x=car.x+car.w/2,ty=car.y+car.h+28;
   npc.x=x;npc.y=car.y-30;npc.jumpT=0;
   for(let i=0;i<900 && Math.hypot(npc.x-x,npc.y-ty)>14;i++)M.goTo(npc,x,ty,90,1/30);
-  return {ok:cars.length===6 && Math.hypot(npc.x-x,npc.y-ty)<=14,wagons:cars.length,npcArrived:Math.hypot(npc.x-x,npc.y-ty)<=14};
+  return {ok:cars.length===8 && Math.hypot(npc.x-x,npc.y-ty)<=14,wagons:cars.length,npcArrived:Math.hypot(npc.x-x,npc.y-ty)<=14};
 });
 return JSON.stringify(R);
 })()

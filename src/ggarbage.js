@@ -17,27 +17,73 @@ const dumpPlaces = [
   ['dump_pumps','Мазутная эстакада',[371,25,381,33],[376,33]],
   ['dump_ditch','Водоотводный коллектор',[316,82,328,90],[322,84]],
   ['dump_checkpoint','Северная застава',[357,9,366,17],[360,14]],
-  ['dump_watch','Сторожка весовой',[405,23,416,31],[410,28]]
+  ['dump_watch','Сторожка весовой',[405,23,416,31],[410,28]],
+  ['dump_sorting','Сортировочная станция',[161,47,204,68],[180,60]]
 ];
 // The post, the cemetery entrance and the depot junction lie on the same northbound road.
-const dumpHighway=[[367,NORTH_ROWS+10],[367,NORTH_ROWS-2],[366,119],[367,103],
+const dumpHighway=[[367,NORTH_ROWS+10],[367,119],[367,103],
   [366,95],[365,81],[363,66],[363,51],[365,42],[365,30],[362,22],[360,14]];
-// From the Lesser Zone, follow the old service track into the forest, then approach the yard from its southwest.
-const dumpTrail=[[150,NORTH_ROWS+3],[150,128],[158,119],[167,117],[175,107],
-  [187,102],[194,91],[207,87],[216,76],[228,75],[239,67],[250,65],
-  [259,57],[268,56],[278,52],[290,52],[294,50]];
+// The trail stays on the north-west toe of the freight embankment up to the depot deck.
+const dumpTrail=[[145,181],[151,178],[165,178],[177,173],[183,162],[188,148],
+  [194,135],[200,123],[208,110],[216,99],[225,85],[233,74],[241,61],
+  [247,66.52],[252,71],[260,64],[270,58],[279,55],[285,52],[294,50]];
+const sortingRoad=[[241,61],[224,63],[207,68],[195,65],[180,60],[161,61],[147,64],[132,64],[122,61]];
+function easeRailBends(points) {
+  const result=[points[0]];
+  for(let i=1;i<points.length-1;i++){
+    const [x,y]=points[i], [ax,ay]=points[i-1], [bx,by]=points[i+1];
+    const enter=Math.hypot(x-ax,y-ay), leave=Math.hypot(bx-x,by-y);
+    const trim=Math.min(4,enter*.44,leave*.44);
+    for(let j=0;j<=4;j++){
+      const before=(1-j/4)**2*trim/enter, after=(j/4)**2*trim/leave;
+      result.push([x+(ax-x)*before+(bx-x)*after,y+(ay-y)*before+(by-y)*after]);
+    }
+  }
+  return [...result,points[points.length-1]];
+}
 const sidings=[
   [[258,55],[261,49],[266,48],[305,48]],
   [[258,55],[260,46],[263,42],[316,42]],
   [[245,42],[263,42]],
   // Single-track branch from the Lesser Zone embankment into the freight yard.
-  [[106,railAxis(106)],[121,166],[146,143],[172,126],[196,115],[219,88],[237,77],[258,55]]
+  easeRailBends([[154,railAxis(154)],[160,188.55],[166,188.7],[172,187.4],[178,183.5],
+   [183,177.5],[187,170],[191,160],[195,149],[200,137],[206,125],
+   [213,113],[221,102],[230,88],[237,77],[258,55]]),
+  // Outbound line and two double-ended sorting roads. Points are ordered west to east.
+  [[81,48],[127,48],[143,48],[155,47],[174,45],[197,45],[207,44.6],[222,42.4],[229,42],[245,42]],
+  [[135,48],[141,48.4],[149,50],[156,50.6],[198,50.6],[205,50.2],[216,46.5],[224,43.5],[230,42]],
+  [[149,50],[155,51.8],[163,54.3],[170,54.7],[194,54.7],[201,54.1],[209,51.4],[217,47.6],[223,43.875]]
 ];
+const freightLine=sidings[3];
+const depotDeck={x:247,y:77-10*22/21,angle:Math.atan2(-22,21)};
+// Keep the future works beyond a wooded cutting. Its south rim ends north of the old main line.
+function cuttingDepth(x,y) {
+  return Math.min(80+2*Math.sin(y*.12)-x,72+3*Math.sin(x*.10)-y);
+}
+function stampFreightBank() {
+  // Only the raised approach is a barrier. The flat sorting yard is walkable.
+  for(let i=1;i<freightLine.length;i++){
+    const [ax,ay]=freightLine[i-1],[bx,by]=freightLine[i];
+    const slope=(by-ay)/(bx-ax),normal=Math.hypot(1,slope);
+    for(let x=Math.ceil(ax-.5);x+.5<bx;x++){
+      const cy=ay+(x+.5-ax)*slope;
+      for(let y=Math.floor(cy-normal);y<=Math.ceil(cy+normal);y++){
+        if(Math.abs(y+.5-cy)>.86*normal) continue;
+        const along=(x+.5-depotDeck.x)*Math.cos(depotDeck.angle)+(y+.5-depotDeck.y)*Math.sin(depotDeck.angle);
+        setT(x,y,Math.abs(along)<1.75?DI:RA);
+      }
+    }
+  }
+}
 const wagonWidth=5.75, wagonDepth=1.43;
 // Store a wagon on a named horizontal siding. Rail axis, body, collision and PDA
 // are derived from this placement. The wheelsets sit underneath the body centre.
 function addRailVehicle(siding,x,sprite='wagon',width=wagonWidth,depth=wagonDepth) {
-  const line=sidings[siding],y=line[line.length-1][1];
+  const line=sidings[siding];
+  const segment=line.findIndex(([bx,by],i)=>i>0 && line[i-1][1]===by &&
+    line[i-1][0]<=x-width/2 && bx>=x+width/2);
+  if(segment<0) throw new Error('No straight track for vehicle at '+x);
+  const y=line[segment][1];
   addObj({k:'freightWagon',sprite,x:(x-width/2)*T,y:(y-depth/2)*T,
     w:width*T,h:depth*T,solid:1,opaque:1});
 }
@@ -47,7 +93,8 @@ function makeGarbage() {
   // Continuous northern terrain, with open clearings separated by wooded ridges.
   for(let y=0;y<NORTH_ROWS;y++)for(let x=0;x<PW;x++){
     const woodland=.72*vnoise(x+98,y+34,16)+.28*vnoise(x+63,y+70,6);
-    const roll=random(), edge=y<2 || x<2 || x>=PW-2;
+    const depth=cuttingDepth(x,y);
+    const roll=random(), edge=y<2 || x<2 || x>=PW-2 || (depth>=0 && depth<4);
     setT(x,y,edge || roll<Math.max(.018,(woodland-.34)*.97)?TR:roll>.93?BU:GR);
   }
   // Soften the old forest border where the southern maps used to end.
@@ -78,6 +125,7 @@ function makeGarbage() {
     for(let row=by;row<ay && row<NORTH_ROWS;row++) roadX[row]=Math.round(lerp(bx,ax,(row-by)/(ay-by)));
   }
   bigPath(dumpTrail,1.25);
+  bigPath(sortingRoad,1.35);
   const lanes=[
     [[367,105],[360,106],[358,102],[354,102],[348,102],[345,104]],
     [[365,96],[358,93],[353,95],[350,100]],
@@ -98,7 +146,9 @@ function makeGarbage() {
     [383,23,8,5,[[4,4]],'slate'],[393,26,6,4,[[2,3]],'plank'],
     [391,34,8,5,[[4,0]],'ruin'],[342,104,5,5,[[4,2]],'conc'],
     [405,23,8,4,[[5,3]],'conc'],[369,34,6,3,[[2,2]],'slate'],
-    [357,10,5,3,[[2,2]],'conc']
+    [357,10,5,3,[[2,2]],'conc'],
+    [230,55,6,4,[[3,3]],'conc'],[174,63,15,6,[[4,0],[11,0]],'slate'],
+    [197,57,5,4,[[2,3]],'plank'],[123,55,5,4,[[2,3]],'conc']
   ]) {
     for(let row=y-2;row<=y+h+1;row++)for(let col=x-2;col<=x+w+1;col++){
       if(tAt(col,row)===TR || tAt(col,row)===BU) setT(col,row,GR);
@@ -109,8 +159,12 @@ function makeGarbage() {
   // The two sidings diverge from the existing embankment and end at wheel stops.
   rcClear(245,40,262,48);
   for(const line of sidings) bigPath(line,1.1);
+  stampFreightBank();
+  for(const spur of [[[233,59],[233,62]],[[178,63],[178,60]],[[199,61],[199,66]],[[125,59],[125,62]]])
+    bigPath(spur,1.1);
   for(const [track,x] of [[0,280.5],[0,287.1],[1,297.3],[1,304.3],[1,311.3]]) addRailVehicle(track,x);
   addRailVehicle(2,252,'shunter',5.2,1.45);
+  for(const x of [181.5,188.3]) addRailVehicle(6,x);
   addObj({k:'scrapCrane',x:250.4*T,y:45.6*T,w:1.65*T,h:1.2*T,solid:1,opaque:1});
   for(const [x,y] of dumpTanks)
     addObj({k:'installation',x:(x-.87)*T,y:(y-.87)*T,w:1.74*T,h:1.74*T,solid:1});
@@ -120,13 +174,18 @@ function makeGarbage() {
     ['mesh',262,30,301,30],['mesh',262,30,262,39],['mesh',262,46,262,53],
     ['mesh',262,53,277,53],['mesh',300,53,305,53],
     ['concreteWire',356,9.5,361,9.5],['concreteWire',364,9.5,366,9.5],
-    ['mesh',372,25,380,25],['mesh',380,25,380,29]
+    ['mesh',372,25,380,25],['mesh',380,25,380,29],
+    ['mesh',170,69.8,194,69.8],['mesh',170,64,170,69.8],['mesh',194,67,194,69.8]
   ]) CORDON_FENCES.push(fence);
   for(const [x,y,w,h] of [[344,97,3.9,1.5],[353,98,3.9,1.5],[372.6,40.7,3.9,1.5]])
     addObj({k:'bus',x:x*T,y:y*T,w:w*T,h:h*T,solid:1,opaque:1});
   CORDON_DETAILS.push(
-    ['c1_trace_sleepers',164,120.6,56,-.25],['c1_trace_reel',194,94.4,31,-.15],
-    ['c1_trace_pipes',215.4,79.8,60,-.3],['c1_yard_car',245,64,63,-.27],
+    ['c1_trace_sleepers',191,146.5,56,-.25],['c1_trace_reel',211,109,31,-.15],
+    ['c1_trace_pipes',227.5,84.8,60,-.3],['c1_yard_car',241,57,63,-.27],
+    ['c1_trace_sleepers',162,57.4,52,.09],['c1_trace_reel',172.4,65.6,33,-.15],
+    ['c1_crate_army',188.9,61.5,29,-.04],['c1_trace_pipes',192,64,57,.08],
+    ['c1_bricks',130,58.5,28,-.12],['c1_rock0',80,47.6,106,-.3],
+    ['c1_rock1',79.5,49.3,86,.22],['c1_trace_sleepers',82.6,50.4,46,.35],
     ['c1_trace_pipes',319,85.4,66,.29],['c1_trace_pipes',325.5,87.5,56,-.18],
     ['c1_bricks',324.7,85.4,30,.24],['c1_sandbags',363.3,12,42,-.17],
     ['c1_yard_car',370,109.8,72,-.18],['c1_trace_wheel',369.1,108.7,24,.13],
@@ -164,22 +223,71 @@ function makeGarbage() {
     {id:'dump_coil',k:'e',x:379*T,y:29*T,r:29});
   ARTS0.push({key:'dump_coil',id:'art_bengal',x:379.5*T,y:29.6*T});
 }
+function freightBallast(g) {
+  if(!PATS.freightBallast){
+    const h=3*T+18,s=ART.m.sprites.rail;
+    const strip=document.createElement('canvas');
+    strip.height=h;strip.width=Math.round(h*s.rect[2]/s.rect[3]);
+    const ctx=strip.getContext('2d');
+    ctx.drawImage(ART.images[s.atlas],...s.rect,0,0,strip.width,h);
+    const edge=ctx.createLinearGradient(0,0,0,h);
+    for(const [at,alpha] of [[0,0],[.18,1],[.82,1],[1,0]])edge.addColorStop(at,'rgba(0,0,0,'+alpha+')');
+    ctx.globalCompositeOperation='destination-in';ctx.fillStyle=edge;ctx.fillRect(0,0,strip.width,h);
+    PATS.freightBallast=g.createPattern(strip,'repeat-x');
+  }
+  return PATS.freightBallast;
+}
+// Clip each straight to its join planes, keeping a constant gauge on steep grades.
+function drawFreightTrack(g,line,win,steelOnly=false) {
+  const pattern=freightBallast(g);
+  let phase=line[0][0]*T;
+  for(let i=1;i<line.length;i++){
+    const [ax,ay]=line[i-1],[bx,by]=line[i],dx=bx-ax,dy=by-ay;
+    const len=Math.hypot(dx,dy),slope=dy/dx,pad=2*Math.abs(slope)+1;
+    if(!win || (bx*T>=win.x0 && ax*T<=win.x1 && (Math.max(ay,by)+pad+2)*T>=win.y0 && (Math.min(ay,by)-pad-2)*T<=win.y1)){
+      g.save();g.beginPath();
+      g.rect(ax*T,(Math.min(ay,by)-pad-2)*T,dx*T,(Math.abs(dy)+2*pad+4)*T);g.clip();
+      g.translate(ax*T,ay*T);g.rotate(Math.atan2(dy,dx));
+      if(steelOnly){
+        g.beginPath();for(const y of [-17,7])g.rect(-pad*T,y,(len+2*pad)*T,5);
+        g.clip();
+      }
+      g.translate(-phase,-1.5*T-9);g.fillStyle=pattern;
+      g.fillRect(phase-pad*T,0,(len+2*pad)*T,3*T+18);
+      g.restore();
+    }
+    phase+=len*T;
+  }
+}
+function drawDepotDeck(g) {
+  g.save();g.translate(depotDeck.x*T,depotDeck.y*T);g.rotate(depotDeck.angle);
+  for(const [y,h] of [[-48,29],[-11,17],[13,35]]){
+    artFill(g,'floor_wood',-52,y,104,h);
+    g.fillStyle='rgba(45,38,31,.35)';g.fillRect(-52,y,104,h);
+    for(let x=-51;x<52;x+=12)g.fillRect(x,y,1,h);
+  }
+  g.restore();
+}
 function drawDumpDetails(g,win) {
-  if(!BIG || (win && (win.y0>(NORTH_ROWS+60)*T || win.x0>425*T || win.x1<100*T))) return;
+  if(!BIG || (win && (win.y0>(NORTH_ROWS+60)*T || win.x0>425*T || win.x1<77*T))) return;
   const visible=(x,y,r)=>!win || x+r>=win.x0 && x-r<=win.x1 && y+r>=win.y0 && y-r<=win.y1;
   for(const [x,y,w,h,a] of dumpHills){
     if(!visible(x*T,y*T,w*T) || !lesserSprites.slag) continue;
     g.save();g.globalAlpha=.66;g.translate(x*T,y*T);g.rotate(a);
     g.drawImage(lesserSprites.slag,-w*T/2,-h*T/2,w*T,h*T);g.restore();
   }
-  if(ART) for(const line of sidings) for(let i=1;i<line.length;i++){
-    const [ax,ay]=line[i-1],[bx,by]=line[i],slope=(by-ay)/(bx-ax);
-    for(let x=ax;x<bx;x++){
-      const y=ay+(x-ax)*slope;
-      if(!visible(x*T,y*T,3*T)) continue;
-      g.save();g.translate(x*T,y*T);g.transform(1,slope,0,1,0,0);
-      drawRailStrip(g,x,-1.5*T-9,3*T+18);g.restore();
+  if(ART){
+    for(const line of sidings) drawFreightTrack(g,line,win);
+    // Keep both pairs of steel rails visible through the shared ballast at a turnout.
+    for(const line of sidings) drawFreightTrack(g,line,win,true);
+    if(visible(165*T,188*T,14*T)){
+      for(let x=154;x<177;x++){
+        g.save();g.translate(x*T,railAxis(x)*T);g.transform(1,railAxis(x+1)-railAxis(x),0,1,0,0);
+        g.beginPath();for(const y of [-17,7])g.rect(0,y,T,5);g.clip();
+        drawRailStrip(g,x,-1.5*T-9,3*T+18);g.restore();
+      }
     }
+    if(visible(depotDeck.x*T,depotDeck.y*T,4*T)) drawDepotDeck(g);
   }
   for(const [kind,centres,width] of [['tank',dumpTanks,2.25]]){
     const sprite=lesserSprites[kind]; if(!sprite) continue;

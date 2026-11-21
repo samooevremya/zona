@@ -459,6 +459,11 @@ function applyState(d) {
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  // Older northern-map saves could stand inside the now closed western cutting.
+  if(BIG && cuttingDepth(Math.floor(P.x/T),Math.floor(P.y/T))>=0){
+    const verge=freeTile(122,61);
+    P.x=S.x=verge.x*T;P.y=S.y=verge.y*T;
+  }
   if(BIG && P.x<WEST*T && tAt(Math.floor(P.x/T),Math.floor(P.y/T))===RA){
     const verge=freeTile(P.x/T,P.y/T);
     P.x=S.x=verge.x*T;P.y=S.y=verge.y*T;
