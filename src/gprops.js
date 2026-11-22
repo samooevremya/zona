@@ -488,7 +488,7 @@ function chooseFieldSite(stock, previous) {
 }
 
 function fieldCrateLoot() {
-  const ammo = ['a9','a12','a545'][ri(0,2)];
+  const ammo = ['a9','a12','a545','a762'][ri(0,3)];
   const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
   const loot = { [ammo]: supplyCount(ammo === 'a12' ? ri(2,5) : ri(4,12)) };
   const supplyChance=(FOOD[supplies] ? .55 : 1)*rules().loot;

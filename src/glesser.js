@@ -226,7 +226,7 @@ function makeLesserZone() {
     ['lz_guest2','Уголёк',81,56,'w_obrez','loner'],
     ['lz_tech','Клемма',86.5,52.8,'w_pm','loner'],['lz_spool','Катушка',89,49,'w_pm','loner'],['lz_sieve','Сито',92,50,'w_obrez','loner'],
     ['lz_millhand','Мельник',54,70,'w_pm','loner'],['lz_meter','Шкала',75,80,'w_pm','loner'],
-    ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
+    ['lz_watch','Кряж',23,9,'w_toz34','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
     ['lz_rivet','Радист',170,48,'w_obrez','army']
   ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:81.2*T,y:(Y+55.55)*T}:LESSER_FIRE});
   DOGDEF.push({sid:'lz_yard_dog',pack:'lz_yard',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz_fuel',x:186,y:Y+69});

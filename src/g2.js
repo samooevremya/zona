@@ -882,7 +882,7 @@ function dropBody(e) {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
     const W = WP[e.wpn];
-    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + supplyCount(W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
+    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + supplyCount((W.ammo === 'a545' || W.ammo === 'a762') ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
     if (e.fac === 'army' && chance(0.3)) loot.grenade = 1;
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }

@@ -48,9 +48,13 @@ const ITEMS = {
   sausage: { n: 'Колбаса', price: 60, heal: 8, w: 0.4, d: '+8 здоровья' },
   cans: { n: 'Консервы', price: 90, heal: 12, w: 0.5, d: '+12 здоровья' },
   grenade: { n: 'Граната Ф-1', price: 350, w: 0.6, d: 'Кнопка G или «Граната». Взрыв через полторы секунды' },
-  a9: { n: 'Патроны 9×18', price: 8, ammo: 1, w: 0.01, d: 'Для ПМ' },
-  a12: { n: 'Дробь 12 калибра', price: 20, ammo: 1, w: 0.04, d: 'Для обреза' },
+  a9: { n: 'Патроны 9×18', price: 8, ammo: 1, w: 0.01, d: 'Для ПМ и АПС' },
+  a12: { n: 'Дробь 12 калибра', price: 20, ammo: 1, w: 0.04, d: 'Для обреза и ТОЗ-34' },
   a545: { n: 'Патроны 5,45×39', price: 15, ammo: 1, w: 0.012, d: 'Для АКС-74У' },
+  a762: { n: 'Патроны 7,62×39', price: 18, ammo: 1, w: 0.016, d: 'Для АКМС' },
+  w_aps: { n: 'АПС', price: 2100, weapon: 1, w: 1.05, d: 'Автоматический пистолет. При удержании спуска стреляет очередью.' },
+  w_toz34: { n: 'ТОЗ-34', price: 2700, weapon: 1, w: 3.1, d: 'Длинная охотничья двустволка. Дробь ложится плотнее, чем у обреза.' },
+  w_akms: { n: 'АКМС', price: 6200, weapon: 1, w: 3.3, d: 'Автомат со складным прикладом. Пуля мощнее, чем у АКС-74У, но патроны тяжелее.' },
   w_pm: { n: 'ПМ', price: 600, weapon: 1, w: 0.8 },
   w_obrez: { n: 'Обрез', price: 1200, weapon: 1, w: 1.9 },
   w_aksu: { n: 'АКС-74У', price: 4500, weapon: 1, w: 2.7 },
@@ -74,18 +78,22 @@ const ITEMS = {
 const ARTFX = { art_medusa: 'На поясе: радиация копится вдвое медленнее и уходит сама', art_bengal: 'На поясе: защита +5%, электра бьёт вдвое слабее', art_blood: 'На поясе: понемногу лечит, но слегка фонит' };
 const WP = {
   knife: { n: 'Нож', melee: 1, dmg: 34, rate: 0.5, range: 26, pref: 0 },
+  w_aps: { n: 'АПС', ammo: 'a9', mag: 20, dmg: 19, rate: 0.13, spread: 0.065, range: 465, reload: 1.75, snd: 'p', pref: 175, auto: 1 },
+  w_toz34: { n: 'ТОЗ-34', ammo: 'a12', mag: 2, dmg: 22, pellets: 7, rate: 0.19, spread: 0.095, range: 395, reload: 2.15, snd: 's', pref: 150 },
+  w_akms: { n: 'АКМС', ammo: 'a762', mag: 30, dmg: 22, rate: 0.115, spread: 0.073, range: 660, reload: 2.6, snd: 'r', pref: 285, auto: 1 },
   w_pm: { n: 'ПМ', ammo: 'a9', mag: 8, dmg: 22, rate: 0.24, spread: 0.04, range: 520, reload: 1.4, snd: 'p', pref: 200 },
   w_obrez: { n: 'Обрез', ammo: 'a12', mag: 2, dmg: 23, pellets: 7, rate: 0.16, spread: 0.16, range: 300, reload: 1.9, snd: 's', pref: 110 },
   w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
   grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS)];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS), 'w_aps', 'w_toz34', 'w_akms'];
 const STOCK = [
   ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 }, { id: 'energy', q: 1, p: 150 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
   { id: 'a9', q: 20, p: 160 }, { id: 'a12', q: 10, p: 200 }, { id: 'a545', q: 30, p: 450 },
-  { id: 'w_pm', q: 1, p: 600 }, { id: 'w_obrez', q: 1, p: 1200 }, { id: 'w_aksu', q: 1, p: 4500 }, { id: 'ar_zarya', q: 1, p: 6000 }
+  { id: 'w_pm', q: 1, p: 600 }, { id: 'w_obrez', q: 1, p: 1200 }, { id: 'w_aksu', q: 1, p: 4500 }, { id: 'ar_zarya', q: 1, p: 6000 },
+  { id: 'a762', q: 30, p: 540 }, ...['w_aps', 'w_toz34', 'w_akms'].map(id => ({id, q: 1, p: ITEMS[id].price}))
 ];
 const RANKS = ['новичок', 'опытный', 'ветеран', 'мастер'];
 const LONER_NAMES = ['Костя Шнурок', 'Лёха Компас', 'Витя Ржавый', 'Саня Глухарь', 'Миха Полтора', 'Дима Чайник', 'Гена Сова', 'Тоха Барсук',

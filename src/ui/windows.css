@@ -246,7 +246,7 @@ img.b1ic.tall{width:62%;height:86%}
 
 #pbody .pack-grid [data-item^="w_"]{overflow:hidden}
 #pbody .pack-grid [data-item^="w_"] img{inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(89%,118px);height:auto;max-height:none;pointer-events:none}
-#pbody .pack-grid [data-item="w_pm"] img{width:min(85%,48px)}
+#pbody .pack-grid :is([data-item="w_pm"],[data-item="w_aps"]) img{width:min(85%,48px)}
 
 #wpnbox{touch-action:none;text-align:inherit;color:inherit}
 #pbody .gear-rack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;width:100%}

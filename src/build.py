@@ -41,6 +41,20 @@ for color in ('white', 'beige', 'brown'):
 for weapon in ('w_pm', 'w_obrez', 'grenade'):
     with open('art/g8/held/' + weapon + '.webp', 'rb') as sprite:
         equipped_art['assets/g8/hand_' + weapon + '.webp'] = 'data:image/webp;base64,' + _b64.b64encode(sprite.read()).decode()
+# Original side icons share the item manifest used by the HUD, backpack and ground.
+field_items = {}
+field_images = {}
+for file in sorted(_os.listdir('art/field')):
+    if file.endswith('.svg'):
+        key = 'assets/field/' + file
+        with open('art/field/' + file, 'rb') as sprite:
+            field_images[key] = 'data:image/svg+xml;base64,' + _b64.b64encode(sprite.read()).decode()
+        if file.startswith('item_'):
+            from xml.etree import ElementTree
+            svg = ElementTree.parse('art/field/' + file).getroot()
+            field_items[file[5:-4]] = dict(file=key, width=int(svg.get('width')), height=int(svg.get('height')))
+art += '\nObject.assign(CORDON_G31.images,' + __import__('json').dumps(field_images) + ');'
+art += '\nObject.assign(CORDON_G31.manifest.items,' + __import__('json').dumps(field_items) + ');'
 art += '\nif(window.CORDON_G8_ON) Object.assign(CORDON_G31.images,' + __import__('json').dumps(equipped_art) + ');'
 art+='\nwindow.CORDON_B1_ATLAS='+repr('data:image/png;base64,'+_b64.b64encode(open('art/b1/atlas.png','rb').read()).decode())+';\nwindow.CORDON_B1_PNG='+__import__('json').dumps(_b1png)+';'
 if BIGF:

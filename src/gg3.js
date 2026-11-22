@@ -18,7 +18,9 @@ function g3Skin(e) {
 /* фаза шага — от пройденного пути; путь и таймер обновляются в update (g7Tick), отрисовка только читает */
 function g3Gait(e) { return gaitOf(e); }
 /* временный слой оружия (до атласа стволов): рисуется в южной системе координат тела, +y — вперёд */
-const G3W = { w_pm: { len: 11, w: 3.2 }, w_obrez: { len: 17, w: 3.6 }, w_aksu: { len: 21, w: 3.6, mag: 1 }, knife: { len: 9, w: 2, blade: 1 }, grenade: {len: 0, w: 3.8, toss: 1} };
+const G3W = {
+  w_aps: { len: 12, w: 3.3 }, w_toz34: { len: 23, w: 3.4 }, w_akms: { len: 22, w: 3.7, mag: 1 },
+  w_pm: { len: 11, w: 3.2 }, w_obrez: { len: 17, w: 3.6 }, w_aksu: { len: 21, w: 3.6, mag: 1 }, knife: { len: 9, w: 2, blade: 1 }, grenade: {len: 0, w: 3.8, toss: 1} };
 const G3_GRIP = [1.5, 8];   // точка хвата в кадре (уточнена по рукам idle/walk/crouch; см. отчёт)
 /* дуло для выстрела/вспышки — та же геометрия, что и у слоя оружия (gg7.js: weaponLocal → localToWorld) */
 function g3Muzzle(e, ang) { return g7Muzzle(e, ang); }

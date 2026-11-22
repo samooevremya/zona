@@ -80,7 +80,7 @@ function g7PoseFrame(skin, pose) {
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
   const id = e === P ? S.weapon : e.wpn, W = G3W[id] || (DETECTORS[id] && { len: 5 }); if (!W) return null;
-  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
+  const grip = kitSlot(id) === 'sidearm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
   const r = rigActive(e);
   if (r) {
     const s = CordonRig.sockets(r.rig.pose, grip);
