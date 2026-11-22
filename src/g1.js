@@ -299,7 +299,9 @@ function gen() {
   } else {
     addObj({ k: 'blocks', x: (roadX[104] - 4) * T, y: 104 * T, w: 9 * T, h: T, solid: 1 });
   }
-  addObj({ k: 'blocks', x: (roadX[3] - 4) * T, y: 3 * T, w: 9 * T, h: T, solid: 1 });
+  if(BIG) {
+    for(const dx of [-4,2]) addObj({k:'blocks',roadblock:true,x:(roadX[3]+dx)*T,y:3*T,w:2*T,h:T*.52,solid:1});
+  } else addObj({ k: 'blocks', x: (roadX[3] - 4) * T, y: 3 * T, w: 9 * T, h: T, solid: 1 });
   addObj({ k: 'hatch', x: 12 * T, y: 98 * T, w: T, h: T });
   addObj({ k: 'fire', x: FIRE.x - 10, y: FIRE.y - 10, w: 20, h: 20, solid: 1 });
   addObj({ k: 'fire', x: FIRE2.x - 10, y: FIRE2.y - 10, w: 20, h: 20, solid: 1 });

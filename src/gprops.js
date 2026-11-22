@@ -476,6 +476,10 @@ function loadFieldCrates() {
     stock.slots.push({tile, loot:fieldCrateLoot(), due:0});
   }
   for (const slot of stock.slots) {
+    if (!slot.due && (map[slot.tile]===DI || map[slot.tile]===AS)) {
+      const tile = chooseFieldSite(stock, null);
+      if (tile != null) slot.tile = tile;
+    }
     if (!slot.due) objs.push(fieldBox(slot.tile,slot.loot,false));
     else nextFieldCrateAt = Math.min(nextFieldCrateAt,slot.due);
   }
