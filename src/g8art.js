@@ -592,7 +592,7 @@ function artWall(g, x, y) {
 // зависит от координат двери и сохраняется при перестроении соседних кусков.
 function wornEntrance(width, seed) {
   const c = document.createElement('canvas');
-  c.width = Math.ceil(width + 24); c.height = 63;
+  c.width = Math.ceil(width + 24); c.height = 77 + seed % 13;
   const g = c.getContext('2d');
   g.fillStyle = '#a18461'; g.fillRect(0, 0, c.width, c.height);
   if (ART) {
@@ -602,9 +602,9 @@ function wornEntrance(width, seed) {
   const image = g.getImageData(0, 0, c.width, c.height), data = image.data;
   for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
     const depth = y / c.height;
-    const center = c.width / 2 + Math.sin(depth * 3 + seed) * 3;
+    const center = c.width / 2 + Math.sin(depth * 3 + seed) * (3 + depth * 6);
     const lateral = (x - center) / (width * (.53 - .16 * depth));
-    const rim = Math.hypot(lateral, (y - 9) / 53);
+    const rim = Math.hypot(lateral, (y - 9) / (c.height - 12));
     const tuft = vnoise(x + seed, y, 5) - .5;
     const grit = hash2(x + seed, y) - .5, i = (y * c.width + x) * 4;
     data[i + 3] = 235 * clamp((1 - rim + tuft * .32 + grit * .10) * 3.8, 0, 1);
@@ -655,7 +655,14 @@ function drawThresholds(g) {
         g.fillStyle = '#9d876c'; g.fillRect(left+1, 19, w-2, 1);
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
-      g.fillStyle = concrete ? '#69695f' : '#68503a';
+      if (door.approach === 'earth' && seed % 3 !== 0) {
+        const stone = concrete || h.ruin;
+        g.fillStyle = stone ? '#635e50' : '#534638';
+        g.fillRect(left+2,-3,w-4,5);
+        g.fillStyle = stone ? '#918777' : '#8a775e';
+        g.fillRect(left+3,0,w-7,1.4);
+      }
+      g.fillStyle = concrete ? '#807d70' : '#785e46';
       g.fillRect(left - 2, -T / 2 - 5, 3, 10); g.fillRect(-left - 1, -T / 2 - 5, 3, 10);
       g.restore();
     }

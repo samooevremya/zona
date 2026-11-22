@@ -114,18 +114,19 @@ function wallTexture(h, side, len, wood, kind) {
   return c;
 }
 function texturedFace(a, b, k, tex) {
-  // Horizontal strips follow the four projected corners; doors meet their original sill.
-  const u = roofPoint(...a, k), v = roofPoint(...b, k);
-  const N = 8;
-  for (let j = 0; j < N; j++) {
-    let t = j / N, s = (j + 1) / N, ax = lerp(u[0], a[0], t), ay = lerp(u[1], a[1], t),
-        bx = lerp(v[0], b[0], t), by = lerp(v[1], b[1], t), dx = lerp(u[0], a[0], s),
-        dy = lerp(u[1], a[1], s);
-    ctx.save();
-    ctx.transform((bx - ax) / tex.width, (by - ay) / tex.width, dx - ax, dy - ay, ax, ay);
-    ctx.drawImage(tex, 0, t * tex.height, tex.width, tex.height / N, 0, 0, tex.width, 1.1);
-    ctx.restore();
-  }
+  // Sample the whole facade once. Narrow independently resampled bands flicker
+  // as the camera makes the projected wall a fraction of a pixel taller.
+  const u = roofPoint(...a,k), v = roofPoint(...b,k);
+  const dx=(a[0]+b[0]-u[0]-v[0])/2, dy=(a[1]+b[1]-u[1]-v[1])/2;
+  ctx.save();
+  ctx.beginPath();ctx.moveTo(...u);ctx.lineTo(...v);ctx.lineTo(...b);ctx.lineTo(...a);ctx.closePath();ctx.clip();
+  ctx.imageSmoothingEnabled=true;
+  ctx.transform((b[0]-a[0])/tex.width,(b[1]-a[1])/tex.width,dx/tex.height,dy/tex.height,a[0]-dx,a[1]-dy);
+  const overhang=Math.ceil(k*tex.width/2)+1;
+  ctx.drawImage(tex,0,0,1,tex.height,-overhang,0,overhang,tex.height);
+  ctx.drawImage(tex,tex.width-1,0,1,tex.height,tex.width,0,overhang,tex.height);
+  ctx.drawImage(tex,0,0);
+  ctx.restore();
 }
 function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;

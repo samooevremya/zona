@@ -33,7 +33,8 @@ function startReload() {
 function finishReload() {
   const W = WP[S.weapon]; if (!W || W.melee) return;
   const m = S.mag[S.weapon] || 0, n = Math.min(W.mag - m, cnt(W.ammo));
-  take(W.ammo, n); S.mag[S.weapon] = m + n;
+  if(n<=0)return;
+  take(W.ammo, n); S.mag[S.weapon] = m + n; hudT=quickHudT=0;
 }
 let noAmmoT = 0;
 function playerFire() {
@@ -55,7 +56,10 @@ function playerFire() {
   const locked = P.lock && Math.abs(angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x))) < 0.12;
   fire(P, P.ang, W, (W.spread + P.bloom + (moving ? 0.035 : 0) + (100 - cond(S.weapon)) * 0.0008 - (P.crouch ? 0.015 : 0)) * (locked && IN.touch ? 0.6 : 1));
   P.bloom = Math.min(0.14, P.bloom + (W.auto ? 0.016 : 0.03));
-  if (m - 1 <= 0 && cnt(W.ammo)) setTimeout(startReload, 150);
+  if (m===1 && cnt(W.ammo)) {
+    const gun=S.weapon, shooter=P;
+    setTimeout(()=>{if(P===shooter && P.alive && S.weapon===gun && !S.mag[gun]) startReload();},150);
+  }
 }
 function cycleWeapon(dir) {
   const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean)];
@@ -63,7 +67,7 @@ function cycleWeapon(dir) {
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
 function setWeapon(w) {
-  if (w !== 'knife' && !has(w)) return;
+  if (w !== 'hands' && w !== 'knife' && !has(w)) return;
   const slot = kitSlot(w);
   if (slot) S.flags.kit[slot] = w;
   S.weapon = w;
@@ -130,11 +134,15 @@ function startJump() {
   P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play('step');
 }
 const JUMP_T = 0.42, JUMP_V = 250;
-/* тихое убийство: сзади, пока враг не заметил. Лёгкая броня — сразу; армейская держит удар */
+/* тихое убийство: сзади, пока враг не заметил. Тяжёлая броня защищает от мгновенного поражения */
+function canTakeDown(e){
+  return S.weapon==='knife' && e.kind==='human' && (hostile(e,P) || e.fac==='army') && !e.captive && e.tgt!==P && (e.aw||0)<1 &&
+    dE(e,P)<42 && Math.abs(angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x)))>1.9 && clearNPCShot(P,e);
+}
 function takedown(e) {
-  if (!e.alive || e.tgt === P || (e.aw || 0) >= 1) return;
+  if (!canTakeDown(e)) return;
   const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knife', P.x, P.y);
-  const heavy = e.fac === 'army' || e.sid === 'boss';
+  const heavy = e.sid === 'boss' || e.heavyArmor;
   if (!heavy) { e.quiet = 1; hurt(e, e.hp + 5, P, a); msg('Тихо снял: ' + e.name + '.', 'good'); }
   else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
   ents.forEach(o => { if (o !== e && o.alive && hostile(o, P) && o.tgt !== P && dE(o, e) < 150 && los(o.x, o.y, e.x, e.y)) o.aw = Math.max(o.aw || 0, 0.75); });   // кто рядом и видел — насторожился
@@ -180,11 +188,21 @@ function resolveActorContacts(dt){
       const dx = b.x - a.x, dy = b.y - a.y;
       const other = a === P ? b : b === P ? a : null;
       const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
-      const rr = atSeat ? 40 : a.r + b.r;
+      const friendly=other?.kind==='human' && other.fac==='loner' && !hostile(other,P);
+      const rr=(a.r+b.r)*(friendly ? .72 : 1);
       if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy);
+      if (friendly && !other.sit && !other.captive && !other.wounded && d<rr &&
+          (IN.moveX || IN.moveY) && !other.tgt) {
+        // Give the moving player right of way, including narrow thresholds.
+        const sign=IN.moveX*(other.y-P.y)-IN.moveY*(other.x-P.x)>=0?1:-1;
+        const step=Math.min(65*dt,rr-d+1);
+        const sx=-IN.moveY*sign*step,sy=IN.moveX*sign*step;
+        if(clearWalk(other.x,other.y,other.x+sx,other.y+sy,other.r))moveE(other,sx,sy);
+        continue;
+      }
       if (atSeat && d < rr) {
-        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
+        // Сидящий остаётся на месте, вокруг него можно пройти.
         const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
         moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
       } else if (d < rr && d > 0.01) {
@@ -216,6 +234,10 @@ function update(dt) {
     }
   }
   worldFx(dt);
+  const tolik=byS('tolik');
+  if(tolik?.wounded && dE(P,tolik)<175 && S.min>=(tolik.nextGroan||0)){
+    play('groan',tolik.x,tolik.y,.6*(1-dE(P,tolik)/190));tolik.nextGroan=S.min+9+Math.random()*3;
+  }
   for (const e of ents) {
     if (!e.alive || e === P) continue;
     if (e.qaHold || blowoutHumanAI(e, dt)) continue;
@@ -366,8 +388,7 @@ function findInteract() {
   let best = null, bd = 1e9;
   const cand = (d, o) => { if (d < bd) { bd = d; best = o; } };
   for (const e of ents) {
-    if (e.alive && e.kind === 'human' && hostile(e, P) && !e.captive && e.tgt !== P && (e.aw || 0) < 1 && dE(e, P) < 42 &&
-      (Math.abs(angD(e.ang, Math.atan2(P.y - e.y, P.x - e.x))) > 1.9 || e.sit)) { cand(dE(e, P) - 200, { k: 'kill', e: e, label: 'Убить ножом: ' + e.name }); continue; }   // сзади и незаметно
+    if (e.alive && hostile(e,P) && canTakeDown(e)) { cand(dE(e, P) - 200, { k: 'kill', e: e, label: 'Убить ножом: ' + e.name }); continue; }   // сзади и незаметно
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
@@ -458,7 +479,7 @@ function healWounded(e) {
   if (!has('medkit')) { msg('Нужна аптечка. Купи у Сидоровича.', 'bad'); return false; }
   take('medkit', 1); e.captive = 0; e.wounded = 0; e.hp = e.maxhp * 0.7;
   if (e.sid === 'tolik') {
-    S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);
+    S.flags.tolikBlood={x:e.x,y:e.y,t:S.min};S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
     news('Толик получил помощь и вернулся в деревню.');
   }
@@ -500,9 +521,9 @@ function applyState(d) {
         P.y=S.y=P.y<y+T/2?y-P.r-1:y+T+P.r+1;
     }
     // A trader snapshot from the old bar also stores its old home and seat.
-    for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust']){
+    for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust','wolf']){
       const e=byS(sid), d=NPCDEF.find(n=>n.sid===sid);
-      if(!e?.alive || !d || e.evacuating || e.follow || (sid==='shust' && !e.captive))continue;
+      if(!e?.alive || !d || e.evacuating || e.follow || e.wounded || (sid==='shust' && S.flags.shustFree))continue;
       if(e.home && (e.home.x!==d.x*T || e.home.y!==d.y*T)){
         e.home={x:d.x*T,y:d.y*T};e.x=e.home.x;e.y=e.home.y;e.path=null;
       }

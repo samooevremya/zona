@@ -26,7 +26,7 @@ function restoreKit() {
       if (slot && has(id) && !S.flags.kit[slot]) S.flags.kit[slot] = id;
     }
   }
-  if (S.weapon !== 'knife' && !has(S.weapon)) S.weapon = 'knife';
+  if (S.weapon !== 'hands' && S.weapon !== 'knife' && !has(S.weapon)) S.weapon = 'knife';
   const active = kitSlot(S.weapon);
   if (active) S.flags.kit[active] = S.weapon;
   for (const [slot,id] of Object.entries(S.flags.kit)) {

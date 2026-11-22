@@ -41,7 +41,7 @@ function activeDetectorRange() {
 function survival(dt) {
   survDefaults();
   // голод
-  S.food = Math.max(0, S.food - dt * 0.065);
+  S.food = Math.max(0, S.food - dt * 0.048);
   if (S.food < 20 && !S.flags.hungryMsg) { S.flags.hungryMsg = 1; msg('Ты голоден. Съешь что-нибудь из рюкзака.', 'bad'); }
   if (S.food >= 30) S.flags.hungryMsg = 0;
   if (S.food <= 0) P.hp -= 0.12 * dt;

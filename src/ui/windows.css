@@ -289,3 +289,8 @@ img.b1ic.tall{width:62%;height:86%}
 #ov:is([data-kind=dialog],[data-kind=trader]) .dlg{height:auto}
 #pbody .dlg-main,#pbody .dlg-opts{max-height:none;min-height:0;overflow:visible}
 #pbody .dlg-opts .opt{flex:none;touch-action:pan-y}
+
+.kpk-wrap.kpk-wrap:not(.zoom){overflow:hidden;touch-action:none;user-select:none;cursor:grab}
+.kpk-wrap.kpk-wrap:not(.zoom):active{cursor:grabbing}
+.kpk-wrap.kpk-wrap:not(.zoom) #bigmap{position:absolute;inset:0 auto auto 0;margin:0;pointer-events:none}
+.chambers{font-size:.65em;line-height:1;color:#cbb489}

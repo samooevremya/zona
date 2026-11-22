@@ -54,6 +54,8 @@ function campaignList(){
   const [n,loc]=STORY[chapter()];
   const list=CHAPTERS.slice(0,n+1).map((name,i)=>({id:'chapter'+i,n:name,loc:i===n?loc:chapterReports[i][0],st:i===n?'a':'d',d:i===n?campaignLabel():chapterReports[i][1]}));
   if(S.sos?.act)list.push({id:'sos',loc:S.sos.act.loc,n:'Сигнал SOS',st:'a',d:'Сталкерам нужна помощь у '+S.sos.act.where+'.'});
+  const job=S.jobs?.act;
+  if(job)list.push({id:'job',loc:job.loc||'sid',n:job.n_,d:job.d+' '+(jobReady(job)?'Готово. Вернись к Сидоровичу.':jobProgress(job)),st:'a'});
   return list;
 }
 function worldPoint(x,y){return {x:(WEST+x)*T,y:(NORTH_ROWS+y)*T};}
@@ -86,6 +88,20 @@ function campaignTargets(){
   }
   const sos=S.sos?.act;
   if(sos)targets.push({qid:'sos',x:sos.x*T,y:sos.y*T,n:'Сигнал SOS: '+sos.where});
+  const job=S.jobs?.act;
+  if(job){
+    let point, label=job.n_;
+    if(jobReady(job)){point=locPt('sid',inBunker(P.x,P.y)?'trader':'hatch');label='Сдать заказ';}
+    else if(job.k==='clear')point={x:job.x*T,y:job.y*T};
+    else if(job.k==='hunt'||job.k==='trophy'){
+      const kind=job.kind || (job.item==='hoof'?'boar':'dog');
+      const closest=ents.filter(e=>e.alive && e.den && e.kind===kind).sort((a,b)=>dE(P,a.home)-dE(P,b.home))[0];
+      point=closest?.home;
+    }else if(job.k==='art'){
+      point=locPt('field','medusa');label='Обследовать поле аномалий';
+    }
+    if(point)targets.push({qid:'job',x:point.x,y:point.y,n:label});
+  }
   return targets;
 }
 let campaignSites;
@@ -127,19 +143,40 @@ function campaignCast(){
     const p=locPt('farm','fox');
     for(let i=0;i<4;i++)addCast('traildog'+i,walkPoint(p,5+i%2,4+i),{pack:'foxdogs'},'trailDog');
   }
+  if(c.atpReliefSent)spawnAtpRelief();
   if(c.raid){
-    RAIDERS.forEach((name,i)=>addCast('northAlly'+i,walkPoint(c.northHeld?northCamp():FIRE,i-2,3),{name,fac:'loner',wpn:i%2?'w_aksu':'w_obrez'},'squadMate'));
+    RAIDERS.forEach((name,i)=>addCast('northAlly'+i,walkPoint(c.northHeld?northCamp():FIRE,(i-2)*1.8,5),{name,fac:'loner',wpn:i%2?'w_aksu':'w_obrez'},'squadMate'));
     if(chapter()==='battle')for(let i=0;i<6;i++)addCast('northMerc'+i,walkPoint(northCamp(),(i%3-1)*2,-Math.floor(i/3)*2),{name:'Наёмник',fac:'bandit',wpn:i%2?'w_aksu':'w_pm'},'assailant');
   }
 }
+function atpCompany(){
+  return ['petr','petr2','atpRelief0','atpRelief1'].map(byS).filter(Boolean);
+}
+function spawnAtpRelief(){
+  const gate=locPt('atp','petr');
+  ['Чибис','Тихон'].forEach((name,i)=>{
+    const id='atpRelief'+i;
+    if(byS(id)||S.dead[id])return;
+    const from=walkPoint(gate,-11-i,5+i),dest=walkPoint(gate,i?2:0,i?3:1);
+    addCast(id,from,{name,fac:'loner',wpn:i?'w_pm':'w_obrez'},'relief');
+    const e=byS(id);e.home=dest;e.trip={stage:2,returnTo:dest};
+  });
+}
 function occupyATP(){
+  const first=!S.campaign.liberated;
   S.campaign.liberated=true;S.flags.atpClear=S.flags.shustFree=1;
   ['petr','petr2','shust'].forEach((id,i)=>{
     const e=byS(id);if(!e)return;
     const p=walkPoint(locPt('atp',i===1?'petr2':'petr'),i===2?3:0,i===2?2:0);
-    if(e.captive && id==='shust'){const room=loftAt(e);if(room){e.x=p.x;e.y=p.y;}}
-    e.captive=e.wounded?1:0;e.follow=0;e.trip=null;e.sit=0;e.home=p;e.stay=1;e.resident=1;e.path=null;
+    e.captive=e.wounded?1:0;e.home=p;e.stay=1;e.resident=1;
+    if(first){e.follow=e.sit=0;e.path=null;e.trip={stage:2,returnTo:p};}
   });
+  if(!atpCompany().length && !S.campaign.atpReliefSent)S.campaign.atpCallAt??=S.min+30;
+}
+function shustCampLine(){
+  if(atpCompany().some(e=>!e.relief || dE(e,e.home)<95))return 'Мы остаёмся на АТП. Обживём гараж.';
+  if(S.campaign.atpReliefSent)return 'Ребята ответили по КПК. Жду их здесь.';
+  return 'Я пока один. Свяжусь с ребятами по КПК, попрошу прийти на АТП.';
 }
 function storyRead(name,lines){dialog({n:name,record:true,grp:'Кордон'},lines,()=>[{t:'Понятно',close:1}]);}
 function storyTalk(e){
@@ -168,7 +205,7 @@ function storyTalk(e){
   ],()=>nextChapter('bargain'));
   if(id==='wolf' && stage==='muster')return conclude(['Наёмники к северу от деревни. Пятеро наших собрались у костра. А я останусь с новичками, организую оборону.'],'Встретиться с отрядом','ready',()=>{S.campaign.raid=true;});
   if(e.squadMate && stage==='ready')return conclude(['Там человек шесть. Проверь снаряжение. Как дашь знак — выступаем.'],'Я готов. Выходим','battle');
-  storyRead(e.name,[id==='shust'?'Мы остаёмся на АТП. Обживёмся.':e.squadMate?'Держим этот участок.':id==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.']);
+  storyRead(e.name,[id==='shust'?shustCampLine():e.squadMate?'Держим этот участок.':id==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.']);
 }
 function storyExchange(e,pairs,end){
   let i=0;const stage=chapter();
@@ -207,6 +244,13 @@ function alarmPost(){
 function campaignTick(){
   if(!BIG || !P.alive)return;
   const c=S.campaign;
+  if(c.liberated && !c.atpReliefSent && !atpCompany().length){
+    c.atpCallAt??=S.min+30;
+    if(S.min>=c.atpCallAt && !byS('shust')?.wounded){
+      c.atpReliefSent=true;spawnAtpRelief();
+      bulletin('Шустрый вызывает одиночек на АТП. Чибис и Тихон откликнулись и идут к гаражам.');save(true);
+    }
+  }
   if(chapter()==='ready' && !raidAllies().length)nextChapter('battle');
   if(chapter()==='dogs' && !ents.some(e=>e.alive && e.trailDog))nextChapter('favour');
   if(['case','escape'].includes(chapter())){
@@ -221,7 +265,7 @@ function campaignTick(){
     for(const e of alive){e.home={x:e.x,y:e.y};e.trip=e.path=null;e.stay=1;}
     const line=alive.length===5?'Все наши целы. Мы тут останемся.':alive.length?'Не все вышли из боя. Мы останемся здесь.':'Волк по КПК: «Меченый, возвращайся. Есть раненые».';
     bulletin(line);if(alive.length)sayLine(alive[0],line);
-    const wolf=byS('wolf'), village=walkPoint(FIRE,-2,2);
+    const wolf=byS('wolf'), village=locPt('village','wolf');
     wolf.x=village.x;wolf.y=village.y;wolf.home=village;woundKey(wolf);
     c.raidAftermath=S.min;villageAftermath();nextChapter('aid');
   }

@@ -112,6 +112,14 @@ function jobTurnIn(artId) {
   return true;
 }
 const artPay = id => Math.round(sellPrice(id) * 1.5 / 10) * 10;
+function previewOffer(title,description,reward,accept) {
+  const previous=panel.opts;
+  say(description);sys('Награда · '+reward);
+  panel.opts=()=>[
+    {t:'Принять · '+title,k:'key',fn:()=>{panel.opts=previous;accept();}},
+    {t:'Пока откажусь',fn:()=>{panel.opts=previous;say('Хорошо. Если передумаешь, заходи.');}}
+  ];
+}
 function jobOpts() {
   const o = [];
   const j = S.jobs.act;
@@ -131,7 +139,7 @@ function jobOpts() {
   } else {
     const L = jobOffers();
     if (!L.length) o.push({ t: 'Есть заказы?', fn: () => say('На сегодня всё разобрали. Завтра приходи.') });
-    L.forEach(x => o.push({ t: 'Заказ: ' + x.n_ + (x.pay ? ' · ' + x.pay + ' RU' : ' · ×1,5 от цены'), fn: () => { say(x.d); jobTake(x); } }));
+    L.forEach(x => o.push({ t: 'Заказ: ' + x.n_ + (x.pay ? ' · ' + x.pay + ' RU' : ' · ×1,5 от цены'), fn: () => previewOffer(x.n_,x.d,x.pay ? x.pay+" RU" : "полторы цены артефакта",()=>{ if(!S.jobs.act && jobOffers().includes(x)) jobTake(x); }) }));
   }
   return o;
 }

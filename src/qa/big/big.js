@@ -904,6 +904,31 @@ Tt('G4_station_crossing_and_western_cut',()=>{
   const restored=!!path([P().x/T,P().y/T],[180,60]);
   return {ok:!!(crossesOnDeck && walkableBank && closedWest && restored),crossesOnDeck,walkableBank,closedWest,restored};
 });
+Tt('F1_job_preview_and_holster',()=>{
+  reset();z.talkTrader();
+  const opt=t=>[...document.querySelectorAll('.dlg-opts button')].find(b=>b.textContent.includes(t));
+  opt('Заказ:').click();const preview=!S().jobs.act && !!opt('Принять ·');
+  opt('Пока откажусь').click();const declined=!S().jobs.act && !!opt('Заказ:');
+  opt('Заказ:').click();opt('Принять ·').click();
+  const accepted=!!S().jobs.act && z.plus.qList().some(q=>q.id==='job');
+  z.closePanel();z.openPanel('inv','Рюкзак');z.refresh();
+  [...document.querySelectorAll('#pbody button')].find(b=>b.textContent==='Освободить руки').click();
+  z.closePanel();const selected=S().weapon;z.save(true);z.applyState(z.loadSave());
+  const empty=S().weapon==='hands' && !z.rc.g7.weaponLocal(P());
+  return {ok:preview&&declined&&accepted&&empty,preview,declined,accepted,empty,selected,loaded:S().weapon};
+});
+Tt('F2_atp_reinforcements',()=>{
+  reset();const s=z.freshS();s.dead={petr:1,petr2:1};s.flags.shustFree=1;
+  z.applyState(s);S().campaign.liberated=true;S().campaign.atpCallAt=S().min+3;
+  const relief=()=>z.ents.filter(e=>e.alive && e.relief);
+  step(45);const waiting=relief().length===0;
+  step(90);const arrive=relief().map(e=>({e,start:{x:e.x,y:e.y}}));
+  const walking=arrive.length===2 && arrive.every(({e})=>e.trip && Math.hypot(e.x-e.home.x,e.y-e.home.y)>150);
+  z.save(true);z.applyState(z.loadSave());
+  for(let i=0;i<1800 && relief().some(e=>e.trip);i++)step(1);
+  const settled=relief().length===2 && relief().every(e=>Math.hypot(e.x-e.home.x,e.y-e.home.y)<55);
+  return {ok:waiting&&walking&&settled,waiting,walking,settled,remaining:relief().map(e=>Math.round(Math.hypot(e.x-e.home.x,e.y-e.home.y)))};
+});
 Tt('L1_upstairs_rescue_and_depot_gallery',()=>{
   reset();S().campaign.stage='rescue';for(const e of z.ents)if(['b1','b2','b3','b4','b5','b6','boss'].includes(e.sid)){e.alive=0;S().dead[e.sid]=1;}const p=P();
   const stand=(x,y)=>{Object.assign(p,{x:x*T,y:y*T});step(1);};
@@ -913,13 +938,18 @@ Tt('L1_upstairs_rescue_and_depot_gallery',()=>{
   const linked=p.x>480*T && prisoner.captive && z.findPath(p.x,p.y,prisoner.x,prisoner.y)?.length;
   z.save(true);z.applyState(z.loadSave());const saved=P().x>480*T;
   prisoner=z.ents.find(e=>e.sid==='shust');P().x=prisoner.x-18;P().y=prisoner.y;step(1);use('free');
-  const freed=S().flags.shustFree && prisoner.x<480*T && S().q.flash===3;
+  const freedUpstairs=S().flags.shustFree && prisoner.x>480*T && S().q.flash===3;
+  z.closePanel();z.save(true);z.applyState(z.loadSave());prisoner=z.ents.find(e=>e.sid==='shust');
+  const resumedUpstairs=prisoner.x>480*T;
+  Object.assign(P(),{x:438*T,y:265*T});
+  for(let i=0;i<1500 && prisoner.x>480*T;i++)step(1);
+  const freed=freedUpstairs && resumedUpstairs && prisoner.x<480*T;
   P().x=483.5*T;P().y=72.25*T;step(1);use('floor');
   const back=Math.hypot(P().x/T-438.5,P().y/T-266.73)<1;
   Object.assign(P(),{x:290.26*T,y:40.25*T});step(1);use('floor');
   const gallery=M.nav[103*M.MW+486]===0 && z.findPath(P().x,P().y,488.5*T,101.5*T)?.length;
   use('floor');const depotDown=P().x<480*T;
-  return {ok:!!(linked&&saved&&freed&&back&&gallery&&depotDown),linked,saved,freed,back,gallery,depotDown};
+  return {ok:!!(linked&&saved&&freed&&back&&gallery&&depotDown),linked,saved,freed,freedUpstairs,resumedUpstairs,back,gallery,depotDown};
 });
 Tt('L4_interior_clearance',()=>{
   reset();

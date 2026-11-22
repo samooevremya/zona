@@ -593,6 +593,7 @@ function drawHuman(e, g) {
   // оружие и руки
   if (!e.sit) {
     if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
+    else if (e===P && S.weapon==='hands') { /* bare hands below */ }
     else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
@@ -806,6 +807,15 @@ function render() {
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
+  const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
+  if(blood && inView(blood.x,blood.y,30)){
+    const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
+    if(alpha){ctx.save();ctx.globalAlpha=alpha*.64;ctx.fillStyle='#552c22';
+      for(const [x,y,rx,ry] of [[-5,1,9,6],[-11,6,8,4],[-16,10,4,2],[-20,12,2,1],[7,-6,2,1]]){
+        ctx.beginPath();ctx.ellipse(blood.x+x,blood.y+y,rx,ry,-.3,0,Math.PI*2);ctx.fill();
+      }
+      ctx.restore();}
+  }
   for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
@@ -850,7 +860,7 @@ function render() {
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
-    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if(e.sid==='shust' && e.captive && loft) drawRestingCaptive(e);
+    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {

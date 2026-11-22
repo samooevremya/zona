@@ -63,6 +63,36 @@ async def run(vw, vh):
         await touch('touchEnd',[]);await pg.wait_for_timeout(80)
         once=await pg.evaluate("__z.S.weapon==='w_pm' && !__z.IN.left")
         res['move+switch']={'ok':moving['gun']=='w_pm' and moving['stick'] and moving['x']>.2 and once}
+        torchbox=await pg.locator('#det').bounding_box()
+        torch=(torchbox['x']+torchbox['width']/2,torchbox['y']+torchbox['height']/2)
+        before=await pg.evaluate("__z.S.torch!==false")
+        await touch('touchStart',[(0,mv)])
+        await touch('touchMove',[(0,drag)])
+        await touch('touchStart',[(0,drag),(1,torch)])
+        lit=await pg.evaluate("({on:__z.S.torch!==false,walking:__z.IN.moveX>.2})")
+        await touch('touchEnd',[])
+        res['move+torch']={'ok':lit['on']!=before and lit['walking'] and await pg.evaluate("__z.S.torch!==false")==lit['on']}
+        await pg.evaluate("__z.openPanel('pda','КПК',__z.PDA_TABS2);__z.refresh()")
+        await pg.wait_for_timeout(100)
+        box=await pg.locator('.kpk-wrap').bounding_box()
+        x,y=box['x']+box['width']/2,box['y']+box['height']/2
+        await touch('touchStart',[(1,(x-12,y)),(2,(x+12,y))])
+        await touch('touchMove',[(1,(x-45,y)),(2,(x+45,y))])
+        await touch('touchEnd',[])
+        v=await pg.evaluate("({...__z.panel.mapView})")
+        await touch('touchStart',[(1,(x,y))])
+        await touch('touchMove',[(1,(x,y+28))])
+        await touch('touchEnd',[])
+        v2=await pg.evaluate("({...__z.panel.mapView})")
+        res['map-pinch-pan']={'ok':v['zoom']>3 and abs(v2['y']-v['y'])>2}
+        # Give a second quest a marker under the centre of the current viewport.
+        await pg.evaluate("()=>{const z=__z,v=z.panel.mapView;z.S.sos.act={id:'touchSOS',x:v.x,y:v.y,where:'деревни'};z.refresh()}")
+        await pg.wait_for_timeout(100)
+        await touch('touchStart',[(1,(x,y))])
+        await touch('touchEnd',[])
+        res['map-marker']={'ok':await pg.evaluate("__z.panel.qsel==='sos' && document.querySelector('.kpk-detail').textContent.includes('Сигнал SOS')")}
+        await pg.evaluate("__z.S.sos.act=null")
+        await pg.evaluate("__z.closePanel()")
         # свернули окно с зажатыми касаниями
         await touch('touchStart',[(0,mv),(1,fire)]); await touch('touchMove',[(0,(mv[0]+40,mv[1])),(1,fire)]); await pg.wait_for_timeout(100)
         await pg.evaluate("window.dispatchEvent(new Event('blur'))"); await pg.wait_for_timeout(80)
