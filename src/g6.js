@@ -239,7 +239,15 @@ function blowoutHumanAI(e, dt) {
     if(e.sit)e.seat=1;
   }
   e.tgt=e.lastSeen=null;e.mem=e.aw=0;
-  if(!e.shelterSpot && sheltered(e.x,e.y))return true;
+  if(sheltered(e.x,e.y)){
+    const spot=e.shelterSpot,h=spot && HOUSES.find(h=>h.ok===spot.house);
+    if(h && e.x>(h.x+.6)*T && e.x<(h.x+h.w-.6)*T && e.y>(h.y+.6)*T && e.y<(h.y+h.h-.6)*T &&
+        dE(e,spot)>7 && clearWalk(e.x,e.y,spot.x,spot.y,e.r)){
+      goTo(e,spot.x,spot.y,76,dt);return true;
+    }
+    e.path=null;e.yielding=false;
+    return true;
+  }
   const probe=e.shelterProbe;
   if(probe)probe.time-=dt;
   const stalled=probe && probe.time<=0 && dE(e,probe)<12 && !sheltered(e.x,e.y);
@@ -275,6 +283,7 @@ function blowout(dt) {
     if (chance(dt * 1.5)) WX.flash = 0.8;
     if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
     if (B.t <= 0) {
+      S.flags.blowClearUntil=S.min+12;
       B.stage = 0; B.next = S.min + rnd(1440, 2400);
       ents.forEach(e => { if (e.trip && e.trip.shelter) e.trip.stage = 2; });
       let born = 0;

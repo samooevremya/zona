@@ -77,7 +77,7 @@ const ARTFX = { art_medusa: 'На поясе: радиация копится в
 const WP = {
   knife: { n: 'Нож', melee: 1, dmg: 34, rate: 0.5, range: 26, pref: 0 },
   w_pm: { n: 'ПМ', ammo: 'a9', mag: 8, dmg: 22, rate: 0.24, spread: 0.04, range: 520, reload: 1.4, snd: 'p', pref: 200 },
-  w_obrez: { n: 'Обрез', ammo: 'a12', mag: 2, dmg: 13, pellets: 7, rate: 0.55, spread: 0.2, range: 300, reload: 1.9, snd: 's', pref: 110 },
+  w_obrez: { n: 'Обрез', ammo: 'a12', mag: 2, dmg: 23, pellets: 7, rate: 0.16, spread: 0.16, range: 300, reload: 1.9, snd: 's', pref: 110 },
   w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
   grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
@@ -458,7 +458,7 @@ const MAP_ID = (typeof window !== 'undefined' && window.ZONA_MAP) || 'k07';
 const MAP_VERSION = (typeof window !== 'undefined' && window.ZONA_BIG === 1) ? 'kordon-north' : MAP_ID === 'rc1' ? 'kordon-rc1' : 'kordon-0.7';
 const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
-    anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [27.5, 79], safe: [30, 88] } },
+    anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [20.5, 79], safe: [30, 88] } },
   { id: 'sid', name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
     anchors: { hatch: [12.5, 98.5], trader: [SID_DESK_X, SID_DESK_Y], stairs: [SID_STAIR_X, SID_STAIR_Y], spawn: [SID_SHOP ? SID_STAIR_X : 126.5, SID_SPAWN_Y] } },
   { id: 'atp', name: 'АТП', gen: 'АТП', type: 'danger', bounds: [84, 58, 112, 84], entrances: [[86, 70], [104, 84]],
@@ -538,7 +538,7 @@ function restoreKit() {
       if (slot && has(id) && !S.flags.kit[slot]) S.flags.kit[slot] = id;
     }
   }
-  if (S.weapon !== 'knife' && !has(S.weapon)) S.weapon = 'knife';
+  if (S.weapon !== 'hands' && S.weapon !== 'knife' && !has(S.weapon)) S.weapon = 'knife';
   const active = kitSlot(S.weapon);
   if (active) S.flags.kit[active] = S.weapon;
   for (const [slot,id] of Object.entries(S.flags.kit)) {
@@ -778,7 +778,7 @@ const YARD_SEATS = [
 ].map(s => ({ ...s, x: s.x + CAMP_TILE[0] - 30.5, y: s.y + CAMP_TILE[1] - 84.5 }));
 const NPCDEF = [
   { sid: 'sid', fac: 'trader', name: 'Сидорович', x: SID_DESK_X, y: SID_DESK_Y, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
-  { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
+  { sid: 'wolf', fac: 'loner', name: 'Волк', x: 20.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
   { sid: 'petr', fac: 'loner', name: 'Петруха', x: 74, y: 63.5, wpn: 'w_pm', hp: 150, rank: 1, stay: 1, named: 1 },
   { sid: 'petr2', fac: 'loner', name: 'Хомяк', x: 74, y: 79, wpn: 'w_obrez', hp: 130, rank: 0, stay: 1, named: 1 },
   { sid: 'shust', fac: 'loner', name: 'Шустрый', x: 94.5, y: 64.6, wpn: 'knife', hp: 60, rank: 0, captive: 1, named: 1 },
@@ -924,7 +924,7 @@ const FAC_N = { loner: 'Одиночки', bandit: 'Бандиты', army: 'Во
 const nameI = { loner: 0, bandit: 3 };
 function rollInv(fac) {
   const inv = {};
-  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance(0.3)) inv[i] = 1; });
+  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance(FOOD[i] ? .16 : .3)) inv[i] = 1; });
   if (chance(fac === 'army' ? 0.5 : 0.25)) inv.medkit = 1;
   if (chance(0.15)) inv.antirad = 1;
   return inv;
@@ -1493,6 +1493,7 @@ function melee(sh, W) {
     const box=containerOnRay(sh,ca,sa,shotBarrier(sh,ca,sa,reach));
     if(box.o){breakCrate(box.o);return;}
   }
+  if(hit && sh===P && canTakeDown(hit)){takedown(hit);return;}
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
@@ -1638,7 +1639,7 @@ function aiHuman(e, dt) {
     if (e.guard === 'south' && BIG && ['case','escape'].includes(chapter()) && storyArea() && e.aw>=1)alarmPost();
     if (e.guard === 'south' && !(BIG && ['case','escape'].includes(chapter())) && P.alive && dE(e, P) < 300 && seesActor(e, P)) {
       const d = dE(e, P);
-      if (d < 150 && !e.angry && !armyAngry) { e.angry = 1; msg('Часовой: — Огонь по нарушителю!', 'bad'); }
+      if (d < 150 && !e.angry && !armyAngry) { e.angry=1;e.aw=1;e.tgt=P;e.react=.3;e.mem=8;e.lastSeen={x:P.x,y:P.y}; msg('Часовой: — Огонь по нарушителю!', 'bad'); }
       else if (d < 300 && warnT <= 0 && !e.angry) { warnT = 8; msg('Часовой: — Стой! Назад, стреляю без предупреждения!', 'bad'); }
     }
   }
@@ -1677,7 +1678,7 @@ function aiHuman(e, dt) {
 function pickRole(e, t) {
   const mates = ents.filter(o => o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && o.tgt === t);
   const has = r => mates.some(o => o.role === r);
-  if (e.guard) return 'hold';
+  if (e.guard && e.guard!=='south') return 'hold';
   if (WP[e.wpn].pellets && !has('push')) return 'push';
   if (mates.length >= 1 && !has('flank')) return 'flank';
   if (!has('push') && mates.length >= 2) return 'push';
@@ -1776,7 +1777,7 @@ function combatHuman(e, t, W, dt) {
   // цель не видна
   if (!see) {
     e.crouch = 0; e.inCover = 0;
-    if(e.lastSeen && !e.guard && e.mem>0){
+    if(e.lastSeen && (!e.guard || e.guard==='south') && e.mem>0){
       e.peekTime=(e.peekTime||0)-dt;
       if(e.peekTime<=0){
         e.peekTime=1.5;e.firingSpot=battlePosition(e,e.lastSeen,28,W.range||300,false);
@@ -1791,7 +1792,7 @@ function combatHuman(e, t, W, dt) {
   const pref = W.pref || 20;
   // движение по роли
   if (W.melee) { e.crouch = 0; goTo(e, t.x, t.y, 110, dt); }
-  else if (e.guard) { e.crouch = d > 160 ? 1 : 0; }
+  else if (e.guard && e.guard!=='south') { e.crouch = d > 160 ? 1 : 0; }
   else if (e.role === 'hold') {
     if (e.tacT <= 0) { e.tacT = rnd(4, 8); e.cover = findCover(e, t, Math.max(120, pref - 60), pref + 160); }
     if (e.cover && dst(e.x, e.y, e.cover.x, e.cover.y) > 10) { e.crouch = 0; e.inCover = 0; goTo(e, e.cover.x, e.cover.y, 105, dt); }
@@ -1812,7 +1813,7 @@ function combatHuman(e, t, W, dt) {
   if (W.melee) { if (d < e.r + t.r + W.range && e.cool <= 0) { e.cool = W.rate * 1.6; melee(e, W); } return; }
   if (e.react <= 0 && e.cool <= 0 && e.reload <= 0 && d < W.range * 0.92 && Math.abs(angD(e.ang, want)) < 0.25) {
     if (!lineClear(e,t)) {
-      if(!e.guard){
+      if(!e.guard || e.guard==='south'){
         e.peekTime=(e.peekTime||0)-dt;
         if(e.peekTime<=0){e.peekTime=1;e.firingSpot=battlePosition(e,t,28,W.range,false);}
         if(e.firingSpot)goTo(e,e.firingSpot.x,e.firingSpot.y,86,dt);
@@ -1865,6 +1866,16 @@ function helpCompanion(e,dt){
 function idleHuman(e, dt) {
   if(e.squadMate && chapter()==='battle'){ const p=northCamp(); if(dE(e,p)>90)goTo(e,p.x,p.y,90,dt); return; }
   if (followTick(e, dt)) return;
+  if(e.sid==='shust' && S.campaign?.liberated){
+    const room=loftAt(e);
+    if(room){
+      if(goTo(e,room.landing.x,room.landing.y,62,dt)<11){
+        e.x=room.stair.x;e.y=room.stair.y;e.path=null;e.routeRetry=0;
+        e.trip={stage:2,returnTo:{...e.home}};
+      }
+      return;
+    }
+  }
   if(e.trip?.returnTo){
     const dest=e.trip.returnTo;
     if(goTo(e,dest.x,dest.y,82,dt)<7){
@@ -1872,6 +1883,7 @@ function idleHuman(e, dt) {
     }
     return;
   }
+  if(e.sid==='wolf'){if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);return;}
   if(helpCompanion(e,dt))return;
   if (e.guard) {
     if (dE(e, e.home) > 8) goTo(e, e.home.x, e.home.y, 70, dt);
@@ -1917,7 +1929,8 @@ function startTrip(e) {
   const resting=night()||WX.rain>.45||e.hp<e.maxhp*.65;
   const spots=LOCATIONS.filter(l=>!['danger','anomaly'].includes(l.type) &&
     l.id!=='sid' && (l.anchors.fire||l.entrances?.length)).map(l=>{
-    const [x,y]=l.anchors.fire||l.entrances[0],p=freeTile(x,y);
+    const [x,y]=l.anchors.fire||l.entrances[0],angle=e.id*2.4;
+    const p=l.anchors.fire?freeTile(x+3*Math.cos(angle),y+3*Math.sin(angle)):freeTile(x,y);
     const dest={x:p.x*T,y:p.y*T},distance=dE(e,dest);
     const busy=ents.filter(m=>m!==e&&m.alive&&m.trip?.stage===0&&dE(m.trip,dest)<60).length;
     const score=distance*(.8+Math.random()*.4)+busy*180+(resting&&!l.anchors.fire?750:0);
@@ -1970,11 +1983,15 @@ function spawnTick() {
   const far = (x, y) => dst(x, y, P.x, P.y) > 520;
   const villageLoners = ents.filter(e => e.alive && e.fac === 'loner' && !e.named && dst(e.home.x, e.home.y, FIRE.x, FIRE.y) < 260).length;
   if (villageLoners < 4 && far(...RMp(21 * T, 82.5 * T))) {
-    const seat = RMt(...[[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]][ri(0, 3)]);
-    const e = mkHuman({ fac: 'loner', x: RMt(21, 82.5)[0], y: RMt(21, 82.5)[1], wpn: chance(0.7) ? 'w_pm' : 'w_obrez' });
-    e.home = { x: seat[0] * T, y: seat[1] * T }; e.seat = 1;
-    e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-    ents.push(e);
+    const seat = YARD_SEATS.map(s=>RMt(s.x,s.y)).find(([x,y])=>
+      !ents.some(o=>o.alive && o.home && dst(x*T,y*T,o.home.x,o.home.y)<24));
+    if(seat){
+      const [x,y]=RMt(21,82.5);
+      const e=mkHuman({fac:'loner',x,y,wpn:chance(.7)?'w_pm':'w_obrez'});
+      e.home={x:seat[0]*T,y:seat[1]*T};e.seat=1;e.fireRef=FIRE;
+      e.trip={...e.home,stage:2};
+      ents.push(e);
+    }
   }
   const patrol = ents.filter(e => e.alive && e.patrol).length;
   if (S.min - (S.flags.patrolT || 420) > 480 && patrol < 2 && far(...RMp(113 * T, 92 * T))) {
@@ -2150,7 +2167,8 @@ function startReload() {
 function finishReload() {
   const W = WP[S.weapon]; if (!W || W.melee) return;
   const m = S.mag[S.weapon] || 0, n = Math.min(W.mag - m, cnt(W.ammo));
-  take(W.ammo, n); S.mag[S.weapon] = m + n;
+  if(n<=0)return;
+  take(W.ammo, n); S.mag[S.weapon] = m + n; hudT=quickHudT=0;
 }
 let noAmmoT = 0;
 function playerFire() {
@@ -2172,7 +2190,10 @@ function playerFire() {
   const locked = P.lock && Math.abs(angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x))) < 0.12;
   fire(P, P.ang, W, (W.spread + P.bloom + (moving ? 0.035 : 0) + (100 - cond(S.weapon)) * 0.0008 - (P.crouch ? 0.015 : 0)) * (locked && IN.touch ? 0.6 : 1));
   P.bloom = Math.min(0.14, P.bloom + (W.auto ? 0.016 : 0.03));
-  if (m - 1 <= 0 && cnt(W.ammo)) setTimeout(startReload, 150);
+  if (m===1 && cnt(W.ammo)) {
+    const gun=S.weapon, shooter=P;
+    setTimeout(()=>{if(P===shooter && P.alive && S.weapon===gun && !S.mag[gun]) startReload();},150);
+  }
 }
 function cycleWeapon(dir) {
   const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean)];
@@ -2180,7 +2201,7 @@ function cycleWeapon(dir) {
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
 function setWeapon(w) {
-  if (w !== 'knife' && !has(w)) return;
+  if (w !== 'hands' && w !== 'knife' && !has(w)) return;
   const slot = kitSlot(w);
   if (slot) S.flags.kit[slot] = w;
   S.weapon = w;
@@ -2247,11 +2268,15 @@ function startJump() {
   P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play('step');
 }
 const JUMP_T = 0.42, JUMP_V = 250;
-/* тихое убийство: сзади, пока враг не заметил. Лёгкая броня — сразу; армейская держит удар */
+/* тихое убийство: сзади, пока враг не заметил. Тяжёлая броня защищает от мгновенного поражения */
+function canTakeDown(e){
+  return S.weapon==='knife' && e.kind==='human' && (hostile(e,P) || e.fac==='army') && !e.captive && e.tgt!==P && (e.aw||0)<1 &&
+    dE(e,P)<42 && Math.abs(angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x)))>1.9 && clearNPCShot(P,e);
+}
 function takedown(e) {
-  if (!e.alive || e.tgt === P || (e.aw || 0) >= 1) return;
+  if (!canTakeDown(e)) return;
   const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knife', P.x, P.y);
-  const heavy = e.fac === 'army' || e.sid === 'boss';
+  const heavy = e.sid === 'boss' || e.heavyArmor;
   if (!heavy) { e.quiet = 1; hurt(e, e.hp + 5, P, a); msg('Тихо снял: ' + e.name + '.', 'good'); }
   else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
   ents.forEach(o => { if (o !== e && o.alive && hostile(o, P) && o.tgt !== P && dE(o, e) < 150 && los(o.x, o.y, e.x, e.y)) o.aw = Math.max(o.aw || 0, 0.75); });   // кто рядом и видел — насторожился
@@ -2297,11 +2322,21 @@ function resolveActorContacts(dt){
       const dx = b.x - a.x, dy = b.y - a.y;
       const other = a === P ? b : b === P ? a : null;
       const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
-      const rr = atSeat ? 40 : a.r + b.r;
+      const friendly=other?.kind==='human' && other.fac==='loner' && !hostile(other,P);
+      const rr=(a.r+b.r)*(friendly ? .72 : 1);
       if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy);
+      if (friendly && !other.sit && !other.captive && !other.wounded && d<rr &&
+          (IN.moveX || IN.moveY) && !other.tgt) {
+        // Give the moving player right of way, including narrow thresholds.
+        const sign=IN.moveX*(other.y-P.y)-IN.moveY*(other.x-P.x)>=0?1:-1;
+        const step=Math.min(65*dt,rr-d+1);
+        const sx=-IN.moveY*sign*step,sy=IN.moveX*sign*step;
+        if(clearWalk(other.x,other.y,other.x+sx,other.y+sy,other.r))moveE(other,sx,sy);
+        continue;
+      }
       if (atSeat && d < rr) {
-        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
+        // Сидящий остаётся на месте, вокруг него можно пройти.
         const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
         moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
       } else if (d < rr && d > 0.01) {
@@ -2333,6 +2368,10 @@ function update(dt) {
     }
   }
   worldFx(dt);
+  const tolik=byS('tolik');
+  if(tolik?.wounded && dE(P,tolik)<175 && S.min>=(tolik.nextGroan||0)){
+    play('groan',tolik.x,tolik.y,.6*(1-dE(P,tolik)/190));tolik.nextGroan=S.min+9+Math.random()*3;
+  }
   for (const e of ents) {
     if (!e.alive || e === P) continue;
     if (e.qaHold || blowoutHumanAI(e, dt)) continue;
@@ -2483,8 +2522,7 @@ function findInteract() {
   let best = null, bd = 1e9;
   const cand = (d, o) => { if (d < bd) { bd = d; best = o; } };
   for (const e of ents) {
-    if (e.alive && e.kind === 'human' && hostile(e, P) && !e.captive && e.tgt !== P && (e.aw || 0) < 1 && dE(e, P) < 42 &&
-      (Math.abs(angD(e.ang, Math.atan2(P.y - e.y, P.x - e.x))) > 1.9 || e.sit)) { cand(dE(e, P) - 200, { k: 'kill', e: e, label: 'Убить ножом: ' + e.name }); continue; }   // сзади и незаметно
+    if (e.alive && hostile(e,P) && canTakeDown(e)) { cand(dE(e, P) - 200, { k: 'kill', e: e, label: 'Убить ножом: ' + e.name }); continue; }   // сзади и незаметно
     if (!e.alive || e === P) continue;
     const d = dE(e, P);
     if (d > 60) continue;
@@ -2575,7 +2613,7 @@ function healWounded(e) {
   if (!has('medkit')) { msg('Нужна аптечка. Купи у Сидоровича.', 'bad'); return false; }
   take('medkit', 1); e.captive = 0; e.wounded = 0; e.hp = e.maxhp * 0.7;
   if (e.sid === 'tolik') {
-    S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);
+    S.flags.tolikBlood={x:e.x,y:e.y,t:S.min};S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
     news('Толик получил помощь и вернулся в деревню.');
   }
@@ -2617,9 +2655,9 @@ function applyState(d) {
         P.y=S.y=P.y<y+T/2?y-P.r-1:y+T+P.r+1;
     }
     // A trader snapshot from the old bar also stores its old home and seat.
-    for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust']){
+    for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust','wolf']){
       const e=byS(sid), d=NPCDEF.find(n=>n.sid===sid);
-      if(!e?.alive || !d || e.evacuating || e.follow || (sid==='shust' && !e.captive))continue;
+      if(!e?.alive || !d || e.evacuating || e.follow || e.wounded || (sid==='shust' && S.flags.shustFree))continue;
       if(e.home && (e.home.x!==d.x*T || e.home.y!==d.y*T)){
         e.home={x:d.x*T,y:d.y*T};e.x=e.home.x;e.y=e.home.y;e.path=null;
       }
@@ -3270,6 +3308,7 @@ function drawHuman(e, g) {
   // оружие и руки
   if (!e.sit) {
     if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
+    else if (e===P && S.weapon==='hands') { /* bare hands below */ }
     else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
@@ -3483,6 +3522,15 @@ function render() {
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
+  const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
+  if(blood && inView(blood.x,blood.y,30)){
+    const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
+    if(alpha){ctx.save();ctx.globalAlpha=alpha*.64;ctx.fillStyle='#552c22';
+      for(const [x,y,rx,ry] of [[-5,1,9,6],[-11,6,8,4],[-16,10,4,2],[-20,12,2,1],[7,-6,2,1]]){
+        ctx.beginPath();ctx.ellipse(blood.x+x,blood.y+y,rx,ry,-.3,0,Math.PI*2);ctx.fill();
+      }
+      ctx.restore();}
+  }
   for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
   for (const d of decals) if (inView(d.x, d.y, 30)) {
     ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
@@ -3527,7 +3575,7 @@ function render() {
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   for (const e of vis) {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
-    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if(e.sid==='shust' && e.captive && loft) drawRestingCaptive(e);
+    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
@@ -3956,7 +4004,15 @@ function blowoutHumanAI(e, dt) {
     if(e.sit)e.seat=1;
   }
   e.tgt=e.lastSeen=null;e.mem=e.aw=0;
-  if(!e.shelterSpot && sheltered(e.x,e.y))return true;
+  if(sheltered(e.x,e.y)){
+    const spot=e.shelterSpot,h=spot && HOUSES.find(h=>h.ok===spot.house);
+    if(h && e.x>(h.x+.6)*T && e.x<(h.x+h.w-.6)*T && e.y>(h.y+.6)*T && e.y<(h.y+h.h-.6)*T &&
+        dE(e,spot)>7 && clearWalk(e.x,e.y,spot.x,spot.y,e.r)){
+      goTo(e,spot.x,spot.y,76,dt);return true;
+    }
+    e.path=null;e.yielding=false;
+    return true;
+  }
   const probe=e.shelterProbe;
   if(probe)probe.time-=dt;
   const stalled=probe && probe.time<=0 && dE(e,probe)<12 && !sheltered(e.x,e.y);
@@ -3992,6 +4048,7 @@ function blowout(dt) {
     if (chance(dt * 1.5)) WX.flash = 0.8;
     if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
     if (B.t <= 0) {
+      S.flags.blowClearUntil=S.min+12;
       B.stage = 0; B.next = S.min + rnd(1440, 2400);
       ents.forEach(e => { if (e.trip && e.trip.shelter) e.trip.stage = 2; });
       let born = 0;
@@ -4107,7 +4164,7 @@ function activeDetectorRange() {
 function survival(dt) {
   survDefaults();
   // голод
-  S.food = Math.max(0, S.food - dt * 0.065);
+  S.food = Math.max(0, S.food - dt * 0.048);
   if (S.food < 20 && !S.flags.hungryMsg) { S.flags.hungryMsg = 1; msg('Ты голоден. Съешь что-нибудь из рюкзака.', 'bad'); }
   if (S.food >= 30) S.flags.hungryMsg = 0;
   if (S.food <= 0) P.hp -= 0.12 * dt;
@@ -4745,7 +4802,7 @@ function artWall(g, x, y) {
 // зависит от координат двери и сохраняется при перестроении соседних кусков.
 function wornEntrance(width, seed) {
   const c = document.createElement('canvas');
-  c.width = Math.ceil(width + 24); c.height = 63;
+  c.width = Math.ceil(width + 24); c.height = 77 + seed % 13;
   const g = c.getContext('2d');
   g.fillStyle = '#a18461'; g.fillRect(0, 0, c.width, c.height);
   if (ART) {
@@ -4755,9 +4812,9 @@ function wornEntrance(width, seed) {
   const image = g.getImageData(0, 0, c.width, c.height), data = image.data;
   for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
     const depth = y / c.height;
-    const center = c.width / 2 + Math.sin(depth * 3 + seed) * 3;
+    const center = c.width / 2 + Math.sin(depth * 3 + seed) * (3 + depth * 6);
     const lateral = (x - center) / (width * (.53 - .16 * depth));
-    const rim = Math.hypot(lateral, (y - 9) / 53);
+    const rim = Math.hypot(lateral, (y - 9) / (c.height - 12));
     const tuft = vnoise(x + seed, y, 5) - .5;
     const grit = hash2(x + seed, y) - .5, i = (y * c.width + x) * 4;
     data[i + 3] = 235 * clamp((1 - rim + tuft * .32 + grit * .10) * 3.8, 0, 1);
@@ -4808,7 +4865,14 @@ function drawThresholds(g) {
         g.fillStyle = '#9d876c'; g.fillRect(left+1, 19, w-2, 1);
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
-      g.fillStyle = concrete ? '#69695f' : '#68503a';
+      if (door.approach === 'earth' && seed % 3 !== 0) {
+        const stone = concrete || h.ruin;
+        g.fillStyle = stone ? '#635e50' : '#534638';
+        g.fillRect(left+2,-3,w-4,5);
+        g.fillStyle = stone ? '#918777' : '#8a775e';
+        g.fillRect(left+3,0,w-7,1.4);
+      }
+      g.fillStyle = concrete ? '#807d70' : '#785e46';
       g.fillRect(left - 2, -T / 2 - 5, 3, 10); g.fillRect(-left - 1, -T / 2 - 5, 3, 10);
       g.restore();
     }
@@ -5471,6 +5535,14 @@ function jobTurnIn(artId) {
   return true;
 }
 const artPay = id => Math.round(sellPrice(id) * 1.5 / 10) * 10;
+function previewOffer(title,description,reward,accept) {
+  const previous=panel.opts;
+  say(description);sys('Награда · '+reward);
+  panel.opts=()=>[
+    {t:'Принять · '+title,k:'key',fn:()=>{panel.opts=previous;accept();}},
+    {t:'Пока откажусь',fn:()=>{panel.opts=previous;say('Хорошо. Если передумаешь, заходи.');}}
+  ];
+}
 function jobOpts() {
   const o = [];
   const j = S.jobs.act;
@@ -5490,7 +5562,7 @@ function jobOpts() {
   } else {
     const L = jobOffers();
     if (!L.length) o.push({ t: 'Есть заказы?', fn: () => say('На сегодня всё разобрали. Завтра приходи.') });
-    L.forEach(x => o.push({ t: 'Заказ: ' + x.n_ + (x.pay ? ' · ' + x.pay + ' RU' : ' · ×1,5 от цены'), fn: () => { say(x.d); jobTake(x); } }));
+    L.forEach(x => o.push({ t: 'Заказ: ' + x.n_ + (x.pay ? ' · ' + x.pay + ' RU' : ' · ×1,5 от цены'), fn: () => previewOffer(x.n_,x.d,x.pay ? x.pay+" RU" : "полторы цены артефакта",()=>{ if(!S.jobs.act && jobOffers().includes(x)) jobTake(x); }) }));
   }
   return o;
 }
@@ -6081,51 +6153,106 @@ function drawDialog2() {
 
 /* ---------- КПК: карта ~65% + выбранное задание ~35%, вкладки снизу ---------- */
 const PDA_TABS2 = [['map', 'Карта и задания'], ['log', 'Журнал'], ['stat', 'Данные']];
+// The viewport stores its centre in map tiles. Resizing the panel or opening a
+// quest card therefore keeps the same place under the player's finger.
+function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
+  const view=state.mapView, touches=new Map();
+  let fit,k,width,height,left,top,paintFrame=0,press=null;
+  function layout(){
+    const W=w.clientWidth,H=w.clientHeight;
+    fit=Math.min(W/PW,H/MH); k=fit*view.zoom;
+    width=PW*k;height=MH*k;
+    const place=(size,screen,center)=>size<=screen?(screen-size)/2:clamp(screen/2-center*k,screen-size,0);
+    left=place(width,W,view.x);top=place(height,H,view.y);
+    view.x=(W/2-left)/k;view.y=(H/2-top)/k;
+    Object.assign(cv.style,{width:width+'px',height:height+'px',transform:'translate('+left+'px,'+top+'px)'});
+    scaleLabel.textContent='×'+Number(view.zoom.toFixed(1));
+  }
+  function paint(){
+    paintFrame=0;if(!cv.isConnected || !w.clientWidth || !w.clientHeight)return;
+    layout();
+    const px=Math.min(devicePixelRatio||1,2,3000/Math.max(width,height));
+    cv.width=Math.round(width*px);cv.height=Math.round(height*px);
+    const out={};drawMapTo(cv.getContext('2d'),cv.width/PW,state.f.loc,{...state.f,sel:targets,u:px,out});
+    state.mapLabels=out.labels;
+  }
+  function schedule(){if(!paintFrame)paintFrame=requestAnimationFrame(paint);}
+  function point(e){const b=w.getBoundingClientRect();return {x:e.clientX-b.left-w.clientLeft,y:e.clientY-b.top-w.clientTop};}
+  function change(from,to,zoom){
+    const x=(from.x-left)/k,y=(from.y-top)/k;
+    view.zoom=clamp(zoom,1,12);
+    view.x=x+(w.clientWidth/2-to.x)/(fit*view.zoom);
+    view.y=y+(w.clientHeight/2-to.y)/(fit*view.zoom);
+    layout();
+  }
+  function gesture(){
+    const [a,b]=touches.values();
+    return b?{x:(a.x+b.x)/2,y:(a.y+b.y)/2,d:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))}:{...a,d:1};
+  }
+  w.addEventListener('pointerdown',e=>{
+    if(e.button!==0||!k)return;
+    const p=point(e);touches.set(e.pointerId,p);w.setPointerCapture(e.pointerId);
+    press=touches.size===1?p:null;
+  });
+  w.addEventListener('pointermove',e=>{
+    if(!touches.has(e.pointerId))return;
+    const a=gesture(),p=point(e);touches.set(e.pointerId,p);const b=gesture();
+    if(press && Math.hypot(p.x-press.x,p.y-press.y)>5)press=null;
+    change(a,b,view.zoom*b.d/a.d);
+  });
+  function end(e){
+    if(!touches.delete(e.pointerId))return;
+    const p=point(e);
+    if(e.type==='pointerup' && press && Math.hypot(p.x-press.x,p.y-press.y)<=5){
+      const near=qTargets().map(t=>{const m=worldMapPoint(t);return {id:t.qid,d:Math.hypot(m.x/T*k+left-p.x,m.y/T*k+top-p.y)};})
+        .filter(m=>m.d<=18).sort((a,b)=>a.d-b.d);
+      if(near.length)pick([...new Set(near.map(m=>m.id))]);
+    }
+    press=null;if(!touches.size)schedule();
+  }
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])w.addEventListener(type,end);
+  w.addEventListener('wheel',e=>{e.preventDefault();if(k){const p=point(e);change(p,p,view.zoom*Math.exp(-clamp(e.deltaY,-200,200)*.003));schedule();}},{passive:false});
+  const observer=new ResizeObserver(()=>{if(w.isConnected)schedule();});
+  requestAnimationFrame(()=>{if(w.isConnected){observer.observe(w);schedule();}});
+  state.unmountMap=()=>{observer.disconnect();cancelAnimationFrame(paintFrame);};
+}
+
 function drawPda2() {
   if (panel.tab !== 'map') { drawPda(); return; }
   if (!panel.f) panel.f = { ppl: 1, cache: 1, loc: 1 };
   const all = qList(), act = all.filter(q => q.st === 'a'), done = all.filter(q => q.st !== 'a');
   if (!panel.qsel || !all.some(q => q.id === panel.qsel)) panel.qsel = S.trackedQuestId || (act[0] && act[0].id) || null;
   const box = el('div', 'kpk');
-  // карта: масштаб ×1…×4 от «вся карта влезает», по умолчанию ×2 вокруг игрока
+  // Начинаем с общего вида, центр хранится в координатах мира.
   const mapc = el('div', 'kpk-map');
-  if (panel.zl == null) { panel.zl = 2; panel.focus = 'me'; }
-  const selT = qTargets().filter(t => t.qid === panel.qsel);
-  const bar = el('div', 'kpk-bar');
-  bar.appendChild(btn('chip zb', '−', () => { panel.zl = Math.max(1, panel.zl - 1); refresh(); }, panel.zl <= 1));
-  bar.appendChild(el('span', 'zl', '×' + panel.zl));
-  bar.appendChild(btn('chip zb', '+', () => { panel.zl = Math.min(4, panel.zl + 1); refresh(); }, panel.zl >= 4));
-  bar.appendChild(btn('chip', 'К игроку', () => { panel.focus = 'me'; if (panel.zl < 2) panel.zl = 2; refresh(); }));
-  bar.appendChild(btn('chip', 'К цели', () => { panel.focus = 'target'; if (panel.zl < 2) panel.zl = 2; refresh(); }, !selT.length));
+  const view=panel.mapView ||= {zoom:1,x:PW/2,y:MH/2};
+  const selT=qTargets().filter(t=>t.qid===panel.qsel);
+  const bar=el('div','kpk-bar'), scaleLabel=el('span','zl','×'+view.zoom);
+  const zoom=n=>{view.zoom=clamp(n,1,12);refresh();};
+  const focus=p=>{if(!p)return;const m=worldMapPoint(p);view.x=m.x/T;view.y=m.y/T;zoom(Math.max(3,view.zoom));};
+  bar.appendChild(btn('chip zb','−',()=>zoom(view.zoom/1.6)));
+  bar.appendChild(scaleLabel);bar.appendChild(btn('chip zb','+',()=>zoom(view.zoom*1.6)));
+
+  bar.appendChild(btn('chip','К игроку',()=>focus(P)));
+  bar.appendChild(btn('chip','К цели',()=>focus(selT[0]),!selT.length));
   [['ppl', 'Люди'], ['cache', 'Тайники'], ['loc', 'Подписи']].forEach(f => bar.appendChild(btn('chip' + (panel.f[f[0]] ? ' on' : ''), f[1], () => { panel.f[f[0]] = !panel.f[f[0]]; refresh(); })));
   if (BIG) bar.prepend(el('span','zl', inGarbage(P.x/T,P.y/T) ? 'Свалка' : P.x < WEST*T ? 'Малая Зона' : 'Кордон'));
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);
-  const focusPt = () => {
-    const p = panel.focus === 'target' && selT[0] ? selT[0] : P;
-    return worldMapPoint(p);
-  };
-  requestAnimationFrame(() => {
-    if (!cv2.isConnected) return;
-    const fit = Math.min(w.clientWidth / PW, w.clientHeight / MH);      // ×1: вся карта влезает
-    const cover = Math.max(w.clientWidth / PW, w.clientHeight / MH);    // заполняет панель целиком
-    const k = panel.zl === 1 ? fit : Math.max(fit * panel.zl, cover * (1 + 0.45 * (panel.zl - 2)));
-    const cssW = Math.round(PW * k), cssH = Math.round(MH * k);
-    const dpr = Math.min(2, window.devicePixelRatio || 1), px = Math.min(2600 / cssW, dpr);
-    cv2.width = Math.round(cssW * px); cv2.height = Math.round(cssH * px);
-    cv2.style.width = cssW + 'px'; cv2.style.height = cssH + 'px';
-    const out = {};
-    drawMapTo(cv2.getContext('2d'), cv2.width / PW, panel.f.loc, { ppl: panel.f.ppl, cache: panel.f.cache, sel: selT, u: px, out: out });
-    panel.mapLabels = out.labels;
-    const f = focusPt();
-    w.scrollLeft = f.x / (PW * T) * cssW - w.clientWidth / 2; w.scrollTop = f.y / (MH * T) * cssH - w.clientHeight / 2;
-  });
+  mountPdaMap(w,cv2,panel,selT,ids=>{
+    panel.qsel=ids[0];panel.markerChoices=ids.length>1?ids:null;refresh();
+  },scaleLabel);
   mapc.appendChild(mapLegend());
   box.appendChild(mapc);
   // задания
   const qc = el('div', 'kpk-q');
   if (!all.length) qc.appendChild(el('p', 'note', 'Заданий нет. Поговори с Сидоровичем в бункере.'));
+  if(panel.markerChoices) {
+    const choices=el('div','kpk-list');
+    for(const id of panel.markerChoices){const q=act.find(q=>q.id===id);if(q)choices.appendChild(btn('qrow',q.n,()=>{panel.qsel=id;panel.markerChoices=null;refresh();}));}
+    qc.appendChild(choices);
+  }
   const list = el('div', 'kpk-list');
   act.forEach(q => {
     const b = btn('qrow' + (q.id === panel.qsel ? ' sel' : '') + (q.id === S.trackedQuestId ? ' trk' : '') + (q.id === 'sos' ? ' sos' : ''), '', () => { panel.qsel = q.id; refresh(); });
@@ -6174,6 +6301,7 @@ function drawInv2() {
   rack.appendChild(slot('Костюм',S.armor)); rack.appendChild(slot('Нож','knife'));
   for (const [key,label] of Object.entries(KIT_LABELS)) rack.appendChild(slot(label,kitItem(key)));
   eq.appendChild(rack);
+  eq.appendChild(btn('wide',S.weapon==='hands'?'Руки свободны':'Освободить руки',()=>{setWeapon('hands');refresh();},S.weapon==='hands'));
   const belt = el('div', 'slot beltslot'); belt.appendChild(el('span', 'sl', 'Пояс'));
   const br = el('div', 'beltrow');
   for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); }
@@ -6759,6 +6887,8 @@ function campaignList(){
   const [n,loc]=STORY[chapter()];
   const list=CHAPTERS.slice(0,n+1).map((name,i)=>({id:'chapter'+i,n:name,loc:i===n?loc:chapterReports[i][0],st:i===n?'a':'d',d:i===n?campaignLabel():chapterReports[i][1]}));
   if(S.sos?.act)list.push({id:'sos',loc:S.sos.act.loc,n:'Сигнал SOS',st:'a',d:'Сталкерам нужна помощь у '+S.sos.act.where+'.'});
+  const job=S.jobs?.act;
+  if(job)list.push({id:'job',loc:job.loc||'sid',n:job.n_,d:job.d+' '+(jobReady(job)?'Готово. Вернись к Сидоровичу.':jobProgress(job)),st:'a'});
   return list;
 }
 function worldPoint(x,y){return {x:(WEST+x)*T,y:(NORTH_ROWS+y)*T};}
@@ -6791,6 +6921,20 @@ function campaignTargets(){
   }
   const sos=S.sos?.act;
   if(sos)targets.push({qid:'sos',x:sos.x*T,y:sos.y*T,n:'Сигнал SOS: '+sos.where});
+  const job=S.jobs?.act;
+  if(job){
+    let point, label=job.n_;
+    if(jobReady(job)){point=locPt('sid',inBunker(P.x,P.y)?'trader':'hatch');label='Сдать заказ';}
+    else if(job.k==='clear')point={x:job.x*T,y:job.y*T};
+    else if(job.k==='hunt'||job.k==='trophy'){
+      const kind=job.kind || (job.item==='hoof'?'boar':'dog');
+      const closest=ents.filter(e=>e.alive && e.den && e.kind===kind).sort((a,b)=>dE(P,a.home)-dE(P,b.home))[0];
+      point=closest?.home;
+    }else if(job.k==='art'){
+      point=locPt('field','medusa');label='Обследовать поле аномалий';
+    }
+    if(point)targets.push({qid:'job',x:point.x,y:point.y,n:label});
+  }
   return targets;
 }
 let campaignSites;
@@ -6832,19 +6976,40 @@ function campaignCast(){
     const p=locPt('farm','fox');
     for(let i=0;i<4;i++)addCast('traildog'+i,walkPoint(p,5+i%2,4+i),{pack:'foxdogs'},'trailDog');
   }
+  if(c.atpReliefSent)spawnAtpRelief();
   if(c.raid){
-    RAIDERS.forEach((name,i)=>addCast('northAlly'+i,walkPoint(c.northHeld?northCamp():FIRE,i-2,3),{name,fac:'loner',wpn:i%2?'w_aksu':'w_obrez'},'squadMate'));
+    RAIDERS.forEach((name,i)=>addCast('northAlly'+i,walkPoint(c.northHeld?northCamp():FIRE,(i-2)*1.8,5),{name,fac:'loner',wpn:i%2?'w_aksu':'w_obrez'},'squadMate'));
     if(chapter()==='battle')for(let i=0;i<6;i++)addCast('northMerc'+i,walkPoint(northCamp(),(i%3-1)*2,-Math.floor(i/3)*2),{name:'Наёмник',fac:'bandit',wpn:i%2?'w_aksu':'w_pm'},'assailant');
   }
 }
+function atpCompany(){
+  return ['petr','petr2','atpRelief0','atpRelief1'].map(byS).filter(Boolean);
+}
+function spawnAtpRelief(){
+  const gate=locPt('atp','petr');
+  ['Чибис','Тихон'].forEach((name,i)=>{
+    const id='atpRelief'+i;
+    if(byS(id)||S.dead[id])return;
+    const from=walkPoint(gate,-11-i,5+i),dest=walkPoint(gate,i?2:0,i?3:1);
+    addCast(id,from,{name,fac:'loner',wpn:i?'w_pm':'w_obrez'},'relief');
+    const e=byS(id);e.home=dest;e.trip={stage:2,returnTo:dest};
+  });
+}
 function occupyATP(){
+  const first=!S.campaign.liberated;
   S.campaign.liberated=true;S.flags.atpClear=S.flags.shustFree=1;
   ['petr','petr2','shust'].forEach((id,i)=>{
     const e=byS(id);if(!e)return;
     const p=walkPoint(locPt('atp',i===1?'petr2':'petr'),i===2?3:0,i===2?2:0);
-    if(e.captive && id==='shust'){const room=loftAt(e);if(room){e.x=p.x;e.y=p.y;}}
-    e.captive=e.wounded?1:0;e.follow=0;e.trip=null;e.sit=0;e.home=p;e.stay=1;e.resident=1;e.path=null;
+    e.captive=e.wounded?1:0;e.home=p;e.stay=1;e.resident=1;
+    if(first){e.follow=e.sit=0;e.path=null;e.trip={stage:2,returnTo:p};}
   });
+  if(!atpCompany().length && !S.campaign.atpReliefSent)S.campaign.atpCallAt??=S.min+30;
+}
+function shustCampLine(){
+  if(atpCompany().some(e=>!e.relief || dE(e,e.home)<95))return 'Мы остаёмся на АТП. Обживём гараж.';
+  if(S.campaign.atpReliefSent)return 'Ребята ответили по КПК. Жду их здесь.';
+  return 'Я пока один. Свяжусь с ребятами по КПК, попрошу прийти на АТП.';
 }
 function storyRead(name,lines){dialog({n:name,record:true,grp:'Кордон'},lines,()=>[{t:'Понятно',close:1}]);}
 function storyTalk(e){
@@ -6873,7 +7038,7 @@ function storyTalk(e){
   ],()=>nextChapter('bargain'));
   if(id==='wolf' && stage==='muster')return conclude(['Наёмники к северу от деревни. Пятеро наших собрались у костра. А я останусь с новичками, организую оборону.'],'Встретиться с отрядом','ready',()=>{S.campaign.raid=true;});
   if(e.squadMate && stage==='ready')return conclude(['Там человек шесть. Проверь снаряжение. Как дашь знак — выступаем.'],'Я готов. Выходим','battle');
-  storyRead(e.name,[id==='shust'?'Мы остаёмся на АТП. Обживёмся.':e.squadMate?'Держим этот участок.':id==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.']);
+  storyRead(e.name,[id==='shust'?shustCampLine():e.squadMate?'Держим этот участок.':id==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.']);
 }
 function storyExchange(e,pairs,end){
   let i=0;const stage=chapter();
@@ -6912,6 +7077,13 @@ function alarmPost(){
 function campaignTick(){
   if(!BIG || !P.alive)return;
   const c=S.campaign;
+  if(c.liberated && !c.atpReliefSent && !atpCompany().length){
+    c.atpCallAt??=S.min+30;
+    if(S.min>=c.atpCallAt && !byS('shust')?.wounded){
+      c.atpReliefSent=true;spawnAtpRelief();
+      bulletin('Шустрый вызывает одиночек на АТП. Чибис и Тихон откликнулись и идут к гаражам.');save(true);
+    }
+  }
   if(chapter()==='ready' && !raidAllies().length)nextChapter('battle');
   if(chapter()==='dogs' && !ents.some(e=>e.alive && e.trailDog))nextChapter('favour');
   if(['case','escape'].includes(chapter())){
@@ -6926,7 +7098,7 @@ function campaignTick(){
     for(const e of alive){e.home={x:e.x,y:e.y};e.trip=e.path=null;e.stay=1;}
     const line=alive.length===5?'Все наши целы. Мы тут останемся.':alive.length?'Не все вышли из боя. Мы останемся здесь.':'Волк по КПК: «Меченый, возвращайся. Есть раненые».';
     bulletin(line);if(alive.length)sayLine(alive[0],line);
-    const wolf=byS('wolf'), village=walkPoint(FIRE,-2,2);
+    const wolf=byS('wolf'), village=locPt('village','wolf');
     wolf.x=village.x;wolf.y=village.y;wolf.home=village;woundKey(wolf);
     c.raidAftermath=S.min;villageAftermath();nextChapter('aid');
   }
@@ -7083,7 +7255,7 @@ function intro(){
 const RC1 = {
   locations: {
     village: { name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [14, 70, 46, 98], entrances: [[33, 70], [46, 83], [24, 98]],
-      anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [27.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
+      anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], wolf: [20.5, 79], safe: [30, 88], generator: [34.5, 86.5], bench: [36.5, 84.5],
         lamps: [[27, 81], [34, 81], [27.5, 88], [34, 88.5], [30.5, 78.5]] } },
     sid: { name: 'Бункер Сидоровича', gen: 'бункера', type: 'safe', bounds: [8, 94, 17, 102], entrances: [[12.5, 98.5]],
       anchors: { hatch: [12.5, 98.5], trader: [SID_DESK_X, SID_DESK_Y], stairs: [SID_STAIR_X, SID_STAIR_Y], spawn: [SID_SHOP ? SID_STAIR_X : 126.5, SID_SPAWN_Y], safe: [14.5, 95.5] } },
@@ -9531,6 +9703,7 @@ function buildFieldCrateSites() {
   for (let y = 4; y < MH-4; y += 6) for (let x = 4; x < PW-4; x += 6) {
     const tile = y*MW+x, cx = (x+.5)*T, cy = (y+.5)*T;
     if (map[tile] !== GR || !reachable[tile] || DIRS.some(([dx,dy]) => !nav[tile+dx+dy*MW])) continue;
+    if (DIRS.some(([dx,dy])=>[DI,AS,RA].includes(map[tile+dx+dy*MW]))) continue;
     const clearance = {x:cx, y:cy, r:20};
     if ([[0,0],...DIRS].some(([dx,dy]) =>
       propCells.get(tile+dx+dy*MW)?.some(prop => touchesProp(prop,clearance)))) continue;
@@ -9569,7 +9742,8 @@ function chooseFieldSite(stock, previous) {
 function fieldCrateLoot() {
   const ammo = ['a9','a12','a545'][ri(0,2)];
   const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
-  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12), [supplies]: 1 };
+  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12) };
+  if (!FOOD[supplies] || chance(.55)) loot[supplies]=1;
   if (ri(1,4) === 1) loot.money = ri(15,65);
   return loot;
 }
@@ -9590,7 +9764,7 @@ function loadFieldCrates() {
     stock.slots.push({tile, loot:fieldCrateLoot(), due:0});
   }
   for (const slot of stock.slots) {
-    if (!slot.due && (map[slot.tile]===DI || map[slot.tile]===AS)) {
+    if (!slot.due && !fieldCrateSites.includes(slot.tile)) {
       const tile = chooseFieldSite(stock, null);
       if (tile != null) slot.tile = tile;
     }
@@ -9887,18 +10061,19 @@ function wallTexture(h, side, len, wood, kind) {
   return c;
 }
 function texturedFace(a, b, k, tex) {
-  // Horizontal strips follow the four projected corners; doors meet their original sill.
-  const u = roofPoint(...a, k), v = roofPoint(...b, k);
-  const N = 8;
-  for (let j = 0; j < N; j++) {
-    let t = j / N, s = (j + 1) / N, ax = lerp(u[0], a[0], t), ay = lerp(u[1], a[1], t),
-        bx = lerp(v[0], b[0], t), by = lerp(v[1], b[1], t), dx = lerp(u[0], a[0], s),
-        dy = lerp(u[1], a[1], s);
-    ctx.save();
-    ctx.transform((bx - ax) / tex.width, (by - ay) / tex.width, dx - ax, dy - ay, ax, ay);
-    ctx.drawImage(tex, 0, t * tex.height, tex.width, tex.height / N, 0, 0, tex.width, 1.1);
-    ctx.restore();
-  }
+  // Sample the whole facade once. Narrow independently resampled bands flicker
+  // as the camera makes the projected wall a fraction of a pixel taller.
+  const u = roofPoint(...a,k), v = roofPoint(...b,k);
+  const dx=(a[0]+b[0]-u[0]-v[0])/2, dy=(a[1]+b[1]-u[1]-v[1])/2;
+  ctx.save();
+  ctx.beginPath();ctx.moveTo(...u);ctx.lineTo(...v);ctx.lineTo(...b);ctx.lineTo(...a);ctx.closePath();ctx.clip();
+  ctx.imageSmoothingEnabled=true;
+  ctx.transform((b[0]-a[0])/tex.width,(b[1]-a[1])/tex.width,dx/tex.height,dy/tex.height,a[0]-dx,a[1]-dy);
+  const overhang=Math.ceil(k*tex.width/2)+1;
+  ctx.drawImage(tex,0,0,1,tex.height,-overhang,0,overhang,tex.height);
+  ctx.drawImage(tex,tex.width-1,0,1,tex.height,tex.width,0,overhang,tex.height);
+  ctx.drawImage(tex,0,0);
+  ctx.restore();
 }
 function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
@@ -10974,6 +11149,7 @@ const SND = {
   eat: () => { nz(0.08, 900, 2, 0.15, 'bandpass'); nz(0.08, 700, 2, 0.12, 'bandpass', 0.18); },
   reload: () => { nz(0.05, 2500, 3, 0.3, 'bandpass'); nz(0.06, 1700, 3, 0.3, 'bandpass', 0.35); },
   geiger: () => nz(0.01, 3200, 1, 0.4, 'highpass'),
+  groan: v => { tn(106,81,.55,.14*v,'triangle'); nz(.36,440,.8,.06*v,'lowpass'); },
   hurt: () => tn(150, 60, 0.18, 0.35, 'triangle'),
   dog: v => { tn(560, 280, 0.11, 0.22 * v, 'sawtooth'); tn(520, 260, 0.1, 0.18 * v, 'sawtooth', 0.15); },
   boom: v => { nz(1.3, 380, 0.5, 1.3 * v); tn(80, 28, 0.9, 0.7 * v); },
@@ -11101,6 +11277,7 @@ const meCard = () => ({ isPlayer: 1, n: 'Меченый', rank: RANKS[rankOf(sco
 let panel = null;
 const ov = $('ov'), pbody = $('pbody'), ptitle = $('ptitle'), ptabs = $('ptabs');
 function openPanel(kind, title, tabs) {
+  panel?.unmountMap?.();
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
   ptitle.textContent = title;
@@ -11119,11 +11296,12 @@ function drawTabs() {
     ptabs.appendChild(b);
   });
 }
-function closePanel() { if (!panel) return; const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
+function closePanel() { if (!panel) return; panel.unmountMap?.(); const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
 $('pclose').addEventListener('click', closePanel);
 ov.addEventListener('click', e => { if (e.target === ov && panel?.kind!=='menu') closePanel(); });
 function refresh() {
   if (!panel) return;
+  panel.unmountMap?.();panel.unmountMap=null;
   const top = pbody.scrollTop;
   const selectors = panel.kind === 'trade' ? ['.tr-col.mine','.tr-col.their','.clines','.cside:first-child','.cside:last-child'] : [];
   const positions = panel.scrollPositions ||= {};
@@ -11244,6 +11422,7 @@ function traderOpts(){
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
+  o.push(...jobOpts());
   const repair=repairOffer(); if(repair) o.push(repair);
   { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
     o.push({ t: restLabel('Отоспаться до утра:', till, 'sleep'), d: blk, fn: () => {
@@ -11754,7 +11933,7 @@ function hud(dt) {
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > carryLimit() ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
-  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
+  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? (S.blow.stage===1?'Предупреждение · оставайся в укрытии':'Идёт выброс · оставайся в укрытии') : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : S.min<(S.flags.blowClearUntil||0)?'Отбой · можно выходить':'';
   const stt = [shelterStatus, S.flags.poppySleep>8 ? (S.flags.poppySleep>26?"Засыпаешь":"Слипаются глаза") : "", energyActive() ? 'энергетик · ' + Math.ceil(S.flags.energyUntil-S.min) + ' с' : '', fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
@@ -11765,8 +11944,8 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const detector = DETECTORS[S.weapon], W = detector || WP[S.weapon];
-  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
+  const empty=S.weapon==='hands', detector = DETECTORS[S.weapon], W = detector || WP[S.weapon] || {n:'Руки свободны',melee:true};
+  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else if (!empty) H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
@@ -11774,8 +11953,8 @@ function hud(dt) {
   H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
   if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
   else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
-  else if (W.melee) H.am.textContent = '∞';
-  else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
+  else if (W.melee) H.am.textContent = empty?'':'∞';
+  else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); else if (W.pellets) H.am.appendChild(el('div','chambers',(S.mag[S.weapon]||0)===2?'● ●':S.mag[S.weapon]?'● ○':'○ ○')); }
   briefTask();
   const sleep=S.flags.poppySleep||0;
   const veil=$('poppy-veil'), fatigue=clamp(sleep/42,0,1);
@@ -11834,7 +12013,7 @@ function interact() {
     if(n.e.sid!=='shust' || chapter()!=='rescue'){msg('Пока рано.','say');return;}
     if(ATP_BANDITS.some(id=>byS(id))){msg('Сначала обезопась АТП.','say');return;}
     occupyATP();S.inv.flash=1;S.q.flash=3;nextChapter('flash');
-    storyRead('Шустрый',['Флешка у меня в подкладке. Отнеси Сидоровичу. А я здесь останусь — обживём гараж.']);
+    storyRead('Шустрый',['Флешка у меня в подкладке. Отнеси Сидоровичу. '+shustCampLine()]);
   }
 }
 const KEYS = {};
@@ -11849,9 +12028,10 @@ addEventListener('keydown', e => {
   KEYS[k] = true;
   if (!P.alive) return;
   if (k === 'KeyE' || k === 'Space') interact();
+  if (k === 'Digit0') setWeapon('hands');
   if (k === 'KeyR') startReload();
   if (k === 'KeyF') throwBolt();
-  if (k === 'KeyG') throwNade();
+  if (k === 'KeyG' && S.weapon!=='hands') throwNade();
   if (k === 'KeyQ') healWith('medkit');
   if (k === 'KeyB') healWith('bandage');
   if (k === 'KeyH') quickHeal();
@@ -11924,9 +12104,11 @@ cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
 const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'b-wpn': () => cycleWeapon(1) };
-$('det').addEventListener('click', () => {
-  if (P.alive && !panel && !title.open) { audioInit(); toggleTorch(); }
-});
+function pressTorch() {
+  if (P?.alive && !panel && !title.open) { audioInit(); toggleTorch(); }
+}
+$('det').addEventListener('pointerdown',e=>{if(e.button===0){e.preventDefault();e.stopPropagation();pressTorch();}});
+$('det').addEventListener('click',e=>{if(e.detail===0)pressTorch();});
 const runB = $('b-run');
 runB.addEventListener('pointerdown', e => {
   if (!P.alive || panel || title.open || IN.runPointer !== null) return;
@@ -11980,12 +12162,18 @@ $('rot-skip').addEventListener('click', () => document.body.classList.add('portr
 Object.keys(TB).forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); if (P.alive && !panel) TB[id](); }));
 ['mp-bandage', 'mp-medkit'].forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (P.alive && !panel) healWith(id === 'mp-medkit' ? 'medkit' : 'bandage'); }));
 const weaponButton = $('wpnbox');
+let holsterTimer;
+for(const type of ['pointerup','pointercancel','lostpointercapture'])weaponButton.addEventListener(type,()=>clearTimeout(holsterTimer));
+window.addEventListener('blur',()=>clearTimeout(holsterTimer));
 function cycleFromHud() {
   if (P.alive && !panel && !title.open) cycleWeapon(1);
 }
 weaponButton.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   e.preventDefault(); e.stopPropagation(); cycleFromHud();
+  weaponButton.setPointerCapture(e.pointerId);
+  clearTimeout(holsterTimer);
+  holsterTimer=setTimeout(()=>{if(P.alive && !panel && !title.open)setWeapon('hands');},500);
 });
 // Keyboard, assistive activation and programmatic clicks have no pointer press.
 weaponButton.addEventListener('click', e => { if (e.detail === 0) cycleFromHud(); });

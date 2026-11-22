@@ -445,6 +445,7 @@ function buildFieldCrateSites() {
   for (let y = 4; y < MH-4; y += 6) for (let x = 4; x < PW-4; x += 6) {
     const tile = y*MW+x, cx = (x+.5)*T, cy = (y+.5)*T;
     if (map[tile] !== GR || !reachable[tile] || DIRS.some(([dx,dy]) => !nav[tile+dx+dy*MW])) continue;
+    if (DIRS.some(([dx,dy])=>[DI,AS,RA].includes(map[tile+dx+dy*MW]))) continue;
     const clearance = {x:cx, y:cy, r:20};
     if ([[0,0],...DIRS].some(([dx,dy]) =>
       propCells.get(tile+dx+dy*MW)?.some(prop => touchesProp(prop,clearance)))) continue;
@@ -483,7 +484,8 @@ function chooseFieldSite(stock, previous) {
 function fieldCrateLoot() {
   const ammo = ['a9','a12','a545'][ri(0,2)];
   const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
-  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12), [supplies]: 1 };
+  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12) };
+  if (!FOOD[supplies] || chance(.55)) loot[supplies]=1;
   if (ri(1,4) === 1) loot.money = ri(15,65);
   return loot;
 }
@@ -504,7 +506,7 @@ function loadFieldCrates() {
     stock.slots.push({tile, loot:fieldCrateLoot(), due:0});
   }
   for (const slot of stock.slots) {
-    if (!slot.due && (map[slot.tile]===DI || map[slot.tile]===AS)) {
+    if (!slot.due && !fieldCrateSites.includes(slot.tile)) {
       const tile = chooseFieldSite(stock, null);
       if (tile != null) slot.tile = tile;
     }

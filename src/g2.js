@@ -79,7 +79,7 @@ const YARD_SEATS = [
 ].map(s => ({ ...s, x: s.x + CAMP_TILE[0] - 30.5, y: s.y + CAMP_TILE[1] - 84.5 }));
 const NPCDEF = [
   { sid: 'sid', fac: 'trader', name: 'Сидорович', x: SID_DESK_X, y: SID_DESK_Y, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
-  { sid: 'wolf', fac: 'loner', name: 'Волк', x: 27.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
+  { sid: 'wolf', fac: 'loner', name: 'Волк', x: 20.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
   { sid: 'petr', fac: 'loner', name: 'Петруха', x: 74, y: 63.5, wpn: 'w_pm', hp: 150, rank: 1, stay: 1, named: 1 },
   { sid: 'petr2', fac: 'loner', name: 'Хомяк', x: 74, y: 79, wpn: 'w_obrez', hp: 130, rank: 0, stay: 1, named: 1 },
   { sid: 'shust', fac: 'loner', name: 'Шустрый', x: 94.5, y: 64.6, wpn: 'knife', hp: 60, rank: 0, captive: 1, named: 1 },
@@ -225,7 +225,7 @@ const FAC_N = { loner: 'Одиночки', bandit: 'Бандиты', army: 'Во
 const nameI = { loner: 0, bandit: 3 };
 function rollInv(fac) {
   const inv = {};
-  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance(0.3)) inv[i] = 1; });
+  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance(FOOD[i] ? .16 : .3)) inv[i] = 1; });
   if (chance(fac === 'army' ? 0.5 : 0.25)) inv.medkit = 1;
   if (chance(0.15)) inv.antirad = 1;
   return inv;
@@ -794,6 +794,7 @@ function melee(sh, W) {
     const box=containerOnRay(sh,ca,sa,shotBarrier(sh,ca,sa,reach));
     if(box.o){breakCrate(box.o);return;}
   }
+  if(hit && sh===P && canTakeDown(hit)){takedown(hit);return;}
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
@@ -939,7 +940,7 @@ function aiHuman(e, dt) {
     if (e.guard === 'south' && BIG && ['case','escape'].includes(chapter()) && storyArea() && e.aw>=1)alarmPost();
     if (e.guard === 'south' && !(BIG && ['case','escape'].includes(chapter())) && P.alive && dE(e, P) < 300 && seesActor(e, P)) {
       const d = dE(e, P);
-      if (d < 150 && !e.angry && !armyAngry) { e.angry = 1; msg('Часовой: — Огонь по нарушителю!', 'bad'); }
+      if (d < 150 && !e.angry && !armyAngry) { e.angry=1;e.aw=1;e.tgt=P;e.react=.3;e.mem=8;e.lastSeen={x:P.x,y:P.y}; msg('Часовой: — Огонь по нарушителю!', 'bad'); }
       else if (d < 300 && warnT <= 0 && !e.angry) { warnT = 8; msg('Часовой: — Стой! Назад, стреляю без предупреждения!', 'bad'); }
     }
   }
@@ -978,7 +979,7 @@ function aiHuman(e, dt) {
 function pickRole(e, t) {
   const mates = ents.filter(o => o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && o.tgt === t);
   const has = r => mates.some(o => o.role === r);
-  if (e.guard) return 'hold';
+  if (e.guard && e.guard!=='south') return 'hold';
   if (WP[e.wpn].pellets && !has('push')) return 'push';
   if (mates.length >= 1 && !has('flank')) return 'flank';
   if (!has('push') && mates.length >= 2) return 'push';
@@ -1077,7 +1078,7 @@ function combatHuman(e, t, W, dt) {
   // цель не видна
   if (!see) {
     e.crouch = 0; e.inCover = 0;
-    if(e.lastSeen && !e.guard && e.mem>0){
+    if(e.lastSeen && (!e.guard || e.guard==='south') && e.mem>0){
       e.peekTime=(e.peekTime||0)-dt;
       if(e.peekTime<=0){
         e.peekTime=1.5;e.firingSpot=battlePosition(e,e.lastSeen,28,W.range||300,false);
@@ -1092,7 +1093,7 @@ function combatHuman(e, t, W, dt) {
   const pref = W.pref || 20;
   // движение по роли
   if (W.melee) { e.crouch = 0; goTo(e, t.x, t.y, 110, dt); }
-  else if (e.guard) { e.crouch = d > 160 ? 1 : 0; }
+  else if (e.guard && e.guard!=='south') { e.crouch = d > 160 ? 1 : 0; }
   else if (e.role === 'hold') {
     if (e.tacT <= 0) { e.tacT = rnd(4, 8); e.cover = findCover(e, t, Math.max(120, pref - 60), pref + 160); }
     if (e.cover && dst(e.x, e.y, e.cover.x, e.cover.y) > 10) { e.crouch = 0; e.inCover = 0; goTo(e, e.cover.x, e.cover.y, 105, dt); }
@@ -1113,7 +1114,7 @@ function combatHuman(e, t, W, dt) {
   if (W.melee) { if (d < e.r + t.r + W.range && e.cool <= 0) { e.cool = W.rate * 1.6; melee(e, W); } return; }
   if (e.react <= 0 && e.cool <= 0 && e.reload <= 0 && d < W.range * 0.92 && Math.abs(angD(e.ang, want)) < 0.25) {
     if (!lineClear(e,t)) {
-      if(!e.guard){
+      if(!e.guard || e.guard==='south'){
         e.peekTime=(e.peekTime||0)-dt;
         if(e.peekTime<=0){e.peekTime=1;e.firingSpot=battlePosition(e,t,28,W.range,false);}
         if(e.firingSpot)goTo(e,e.firingSpot.x,e.firingSpot.y,86,dt);
@@ -1166,6 +1167,16 @@ function helpCompanion(e,dt){
 function idleHuman(e, dt) {
   if(e.squadMate && chapter()==='battle'){ const p=northCamp(); if(dE(e,p)>90)goTo(e,p.x,p.y,90,dt); return; }
   if (followTick(e, dt)) return;
+  if(e.sid==='shust' && S.campaign?.liberated){
+    const room=loftAt(e);
+    if(room){
+      if(goTo(e,room.landing.x,room.landing.y,62,dt)<11){
+        e.x=room.stair.x;e.y=room.stair.y;e.path=null;e.routeRetry=0;
+        e.trip={stage:2,returnTo:{...e.home}};
+      }
+      return;
+    }
+  }
   if(e.trip?.returnTo){
     const dest=e.trip.returnTo;
     if(goTo(e,dest.x,dest.y,82,dt)<7){
@@ -1173,6 +1184,7 @@ function idleHuman(e, dt) {
     }
     return;
   }
+  if(e.sid==='wolf'){if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);return;}
   if(helpCompanion(e,dt))return;
   if (e.guard) {
     if (dE(e, e.home) > 8) goTo(e, e.home.x, e.home.y, 70, dt);
@@ -1218,7 +1230,8 @@ function startTrip(e) {
   const resting=night()||WX.rain>.45||e.hp<e.maxhp*.65;
   const spots=LOCATIONS.filter(l=>!['danger','anomaly'].includes(l.type) &&
     l.id!=='sid' && (l.anchors.fire||l.entrances?.length)).map(l=>{
-    const [x,y]=l.anchors.fire||l.entrances[0],p=freeTile(x,y);
+    const [x,y]=l.anchors.fire||l.entrances[0],angle=e.id*2.4;
+    const p=l.anchors.fire?freeTile(x+3*Math.cos(angle),y+3*Math.sin(angle)):freeTile(x,y);
     const dest={x:p.x*T,y:p.y*T},distance=dE(e,dest);
     const busy=ents.filter(m=>m!==e&&m.alive&&m.trip?.stage===0&&dE(m.trip,dest)<60).length;
     const score=distance*(.8+Math.random()*.4)+busy*180+(resting&&!l.anchors.fire?750:0);
@@ -1271,11 +1284,15 @@ function spawnTick() {
   const far = (x, y) => dst(x, y, P.x, P.y) > 520;
   const villageLoners = ents.filter(e => e.alive && e.fac === 'loner' && !e.named && dst(e.home.x, e.home.y, FIRE.x, FIRE.y) < 260).length;
   if (villageLoners < 4 && far(...RMp(21 * T, 82.5 * T))) {
-    const seat = RMt(...[[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]][ri(0, 3)]);
-    const e = mkHuman({ fac: 'loner', x: RMt(21, 82.5)[0], y: RMt(21, 82.5)[1], wpn: chance(0.7) ? 'w_pm' : 'w_obrez' });
-    e.home = { x: seat[0] * T, y: seat[1] * T }; e.seat = 1;
-    e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-    ents.push(e);
+    const seat = YARD_SEATS.map(s=>RMt(s.x,s.y)).find(([x,y])=>
+      !ents.some(o=>o.alive && o.home && dst(x*T,y*T,o.home.x,o.home.y)<24));
+    if(seat){
+      const [x,y]=RMt(21,82.5);
+      const e=mkHuman({fac:'loner',x,y,wpn:chance(.7)?'w_pm':'w_obrez'});
+      e.home={x:seat[0]*T,y:seat[1]*T};e.seat=1;e.fireRef=FIRE;
+      e.trip={...e.home,stage:2};
+      ents.push(e);
+    }
   }
   const patrol = ents.filter(e => e.alive && e.patrol).length;
   if (S.min - (S.flags.patrolT || 420) > 480 && patrol < 2 && far(...RMp(113 * T, 92 * T))) {

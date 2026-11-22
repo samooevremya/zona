@@ -36,6 +36,7 @@ const SND = {
   eat: () => { nz(0.08, 900, 2, 0.15, 'bandpass'); nz(0.08, 700, 2, 0.12, 'bandpass', 0.18); },
   reload: () => { nz(0.05, 2500, 3, 0.3, 'bandpass'); nz(0.06, 1700, 3, 0.3, 'bandpass', 0.35); },
   geiger: () => nz(0.01, 3200, 1, 0.4, 'highpass'),
+  groan: v => { tn(106,81,.55,.14*v,'triangle'); nz(.36,440,.8,.06*v,'lowpass'); },
   hurt: () => tn(150, 60, 0.18, 0.35, 'triangle'),
   dog: v => { tn(560, 280, 0.11, 0.22 * v, 'sawtooth'); tn(520, 260, 0.1, 0.18 * v, 'sawtooth', 0.15); },
   boom: v => { nz(1.3, 380, 0.5, 1.3 * v); tn(80, 28, 0.9, 0.7 * v); },
@@ -138,6 +139,7 @@ const meCard = () => ({ isPlayer: 1, n: 'Меченый', rank: RANKS[rankOf(sco
 let panel = null;
 const ov = $('ov'), pbody = $('pbody'), ptitle = $('ptitle'), ptabs = $('ptabs');
 function openPanel(kind, title, tabs) {
+  panel?.unmountMap?.();
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
   ptitle.textContent = title;
@@ -156,11 +158,12 @@ function drawTabs() {
     ptabs.appendChild(b);
   });
 }
-function closePanel() { if (!panel) return; const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
+function closePanel() { if (!panel) return; panel.unmountMap?.(); const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
 $('pclose').addEventListener('click', closePanel);
 ov.addEventListener('click', e => { if (e.target === ov && panel?.kind!=='menu') closePanel(); });
 function refresh() {
   if (!panel) return;
+  panel.unmountMap?.();panel.unmountMap=null;
   const top = pbody.scrollTop;
   const selectors = panel.kind === 'trade' ? ['.tr-col.mine','.tr-col.their','.clines','.cside:first-child','.cside:last-child'] : [];
   const positions = panel.scrollPositions ||= {};
@@ -281,6 +284,7 @@ function traderOpts(){
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
+  o.push(...jobOpts());
   const repair=repairOffer(); if(repair) o.push(repair);
   { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
     o.push({ t: restLabel('Отоспаться до утра:', till, 'sleep'), d: blk, fn: () => {
@@ -791,7 +795,7 @@ function hud(dt) {
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > carryLimit() ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
-  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? 'В укрытии' : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : '';
+  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? (S.blow.stage===1?'Предупреждение · оставайся в укрытии':'Идёт выброс · оставайся в укрытии') : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : S.min<(S.flags.blowClearUntil||0)?'Отбой · можно выходить':'';
   const stt = [shelterStatus, S.flags.poppySleep>8 ? (S.flags.poppySleep>26?"Засыпаешь":"Слипаются глаза") : "", energyActive() ? 'энергетик · ' + Math.ceil(S.flags.energyUntil-S.min) + ' с' : '', fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
@@ -802,8 +806,8 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const detector = DETECTORS[S.weapon], W = detector || WP[S.weapon];
-  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
+  const empty=S.weapon==='hands', detector = DETECTORS[S.weapon], W = detector || WP[S.weapon] || {n:'Руки свободны',melee:true};
+  if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else if (!empty) H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
   const cd = W.melee ? 100 : Math.round(S.cond[S.weapon] == null ? 100 : S.cond[S.weapon]);
@@ -811,8 +815,8 @@ function hud(dt) {
   H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
   if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
   else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
-  else if (W.melee) H.am.textContent = '∞';
-  else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); }
+  else if (W.melee) H.am.textContent = empty?'':'∞';
+  else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); else if (W.pellets) H.am.appendChild(el('div','chambers',(S.mag[S.weapon]||0)===2?'● ●':S.mag[S.weapon]?'● ○':'○ ○')); }
   briefTask();
   const sleep=S.flags.poppySleep||0;
   const veil=$('poppy-veil'), fatigue=clamp(sleep/42,0,1);
@@ -871,7 +875,7 @@ function interact() {
     if(n.e.sid!=='shust' || chapter()!=='rescue'){msg('Пока рано.','say');return;}
     if(ATP_BANDITS.some(id=>byS(id))){msg('Сначала обезопась АТП.','say');return;}
     occupyATP();S.inv.flash=1;S.q.flash=3;nextChapter('flash');
-    storyRead('Шустрый',['Флешка у меня в подкладке. Отнеси Сидоровичу. А я здесь останусь — обживём гараж.']);
+    storyRead('Шустрый',['Флешка у меня в подкладке. Отнеси Сидоровичу. '+shustCampLine()]);
   }
 }
 const KEYS = {};
@@ -886,9 +890,10 @@ addEventListener('keydown', e => {
   KEYS[k] = true;
   if (!P.alive) return;
   if (k === 'KeyE' || k === 'Space') interact();
+  if (k === 'Digit0') setWeapon('hands');
   if (k === 'KeyR') startReload();
   if (k === 'KeyF') throwBolt();
-  if (k === 'KeyG') throwNade();
+  if (k === 'KeyG' && S.weapon!=='hands') throwNade();
   if (k === 'KeyQ') healWith('medkit');
   if (k === 'KeyB') healWith('bandage');
   if (k === 'KeyH') quickHeal();
@@ -961,9 +966,11 @@ cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
 const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'b-wpn': () => cycleWeapon(1) };
-$('det').addEventListener('click', () => {
-  if (P.alive && !panel && !title.open) { audioInit(); toggleTorch(); }
-});
+function pressTorch() {
+  if (P?.alive && !panel && !title.open) { audioInit(); toggleTorch(); }
+}
+$('det').addEventListener('pointerdown',e=>{if(e.button===0){e.preventDefault();e.stopPropagation();pressTorch();}});
+$('det').addEventListener('click',e=>{if(e.detail===0)pressTorch();});
 const runB = $('b-run');
 runB.addEventListener('pointerdown', e => {
   if (!P.alive || panel || title.open || IN.runPointer !== null) return;
@@ -1017,12 +1024,18 @@ $('rot-skip').addEventListener('click', () => document.body.classList.add('portr
 Object.keys(TB).forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); if (P.alive && !panel) TB[id](); }));
 ['mp-bandage', 'mp-medkit'].forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (P.alive && !panel) healWith(id === 'mp-medkit' ? 'medkit' : 'bandage'); }));
 const weaponButton = $('wpnbox');
+let holsterTimer;
+for(const type of ['pointerup','pointercancel','lostpointercapture'])weaponButton.addEventListener(type,()=>clearTimeout(holsterTimer));
+window.addEventListener('blur',()=>clearTimeout(holsterTimer));
 function cycleFromHud() {
   if (P.alive && !panel && !title.open) cycleWeapon(1);
 }
 weaponButton.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   e.preventDefault(); e.stopPropagation(); cycleFromHud();
+  weaponButton.setPointerCapture(e.pointerId);
+  clearTimeout(holsterTimer);
+  holsterTimer=setTimeout(()=>{if(P.alive && !panel && !title.open)setWeapon('hands');},500);
 });
 // Keyboard, assistive activation and programmatic clicks have no pointer press.
 weaponButton.addEventListener('click', e => { if (e.detail === 0) cycleFromHud(); });

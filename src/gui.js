@@ -52,51 +52,106 @@ function drawDialog2() {
 
 /* ---------- КПК: карта ~65% + выбранное задание ~35%, вкладки снизу ---------- */
 const PDA_TABS2 = [['map', 'Карта и задания'], ['log', 'Журнал'], ['stat', 'Данные']];
+// The viewport stores its centre in map tiles. Resizing the panel or opening a
+// quest card therefore keeps the same place under the player's finger.
+function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
+  const view=state.mapView, touches=new Map();
+  let fit,k,width,height,left,top,paintFrame=0,press=null;
+  function layout(){
+    const W=w.clientWidth,H=w.clientHeight;
+    fit=Math.min(W/PW,H/MH); k=fit*view.zoom;
+    width=PW*k;height=MH*k;
+    const place=(size,screen,center)=>size<=screen?(screen-size)/2:clamp(screen/2-center*k,screen-size,0);
+    left=place(width,W,view.x);top=place(height,H,view.y);
+    view.x=(W/2-left)/k;view.y=(H/2-top)/k;
+    Object.assign(cv.style,{width:width+'px',height:height+'px',transform:'translate('+left+'px,'+top+'px)'});
+    scaleLabel.textContent='×'+Number(view.zoom.toFixed(1));
+  }
+  function paint(){
+    paintFrame=0;if(!cv.isConnected || !w.clientWidth || !w.clientHeight)return;
+    layout();
+    const px=Math.min(devicePixelRatio||1,2,3000/Math.max(width,height));
+    cv.width=Math.round(width*px);cv.height=Math.round(height*px);
+    const out={};drawMapTo(cv.getContext('2d'),cv.width/PW,state.f.loc,{...state.f,sel:targets,u:px,out});
+    state.mapLabels=out.labels;
+  }
+  function schedule(){if(!paintFrame)paintFrame=requestAnimationFrame(paint);}
+  function point(e){const b=w.getBoundingClientRect();return {x:e.clientX-b.left-w.clientLeft,y:e.clientY-b.top-w.clientTop};}
+  function change(from,to,zoom){
+    const x=(from.x-left)/k,y=(from.y-top)/k;
+    view.zoom=clamp(zoom,1,12);
+    view.x=x+(w.clientWidth/2-to.x)/(fit*view.zoom);
+    view.y=y+(w.clientHeight/2-to.y)/(fit*view.zoom);
+    layout();
+  }
+  function gesture(){
+    const [a,b]=touches.values();
+    return b?{x:(a.x+b.x)/2,y:(a.y+b.y)/2,d:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))}:{...a,d:1};
+  }
+  w.addEventListener('pointerdown',e=>{
+    if(e.button!==0||!k)return;
+    const p=point(e);touches.set(e.pointerId,p);w.setPointerCapture(e.pointerId);
+    press=touches.size===1?p:null;
+  });
+  w.addEventListener('pointermove',e=>{
+    if(!touches.has(e.pointerId))return;
+    const a=gesture(),p=point(e);touches.set(e.pointerId,p);const b=gesture();
+    if(press && Math.hypot(p.x-press.x,p.y-press.y)>5)press=null;
+    change(a,b,view.zoom*b.d/a.d);
+  });
+  function end(e){
+    if(!touches.delete(e.pointerId))return;
+    const p=point(e);
+    if(e.type==='pointerup' && press && Math.hypot(p.x-press.x,p.y-press.y)<=5){
+      const near=qTargets().map(t=>{const m=worldMapPoint(t);return {id:t.qid,d:Math.hypot(m.x/T*k+left-p.x,m.y/T*k+top-p.y)};})
+        .filter(m=>m.d<=18).sort((a,b)=>a.d-b.d);
+      if(near.length)pick([...new Set(near.map(m=>m.id))]);
+    }
+    press=null;if(!touches.size)schedule();
+  }
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])w.addEventListener(type,end);
+  w.addEventListener('wheel',e=>{e.preventDefault();if(k){const p=point(e);change(p,p,view.zoom*Math.exp(-clamp(e.deltaY,-200,200)*.003));schedule();}},{passive:false});
+  const observer=new ResizeObserver(()=>{if(w.isConnected)schedule();});
+  requestAnimationFrame(()=>{if(w.isConnected){observer.observe(w);schedule();}});
+  state.unmountMap=()=>{observer.disconnect();cancelAnimationFrame(paintFrame);};
+}
+
 function drawPda2() {
   if (panel.tab !== 'map') { drawPda(); return; }
   if (!panel.f) panel.f = { ppl: 1, cache: 1, loc: 1 };
   const all = qList(), act = all.filter(q => q.st === 'a'), done = all.filter(q => q.st !== 'a');
   if (!panel.qsel || !all.some(q => q.id === panel.qsel)) panel.qsel = S.trackedQuestId || (act[0] && act[0].id) || null;
   const box = el('div', 'kpk');
-  // карта: масштаб ×1…×4 от «вся карта влезает», по умолчанию ×2 вокруг игрока
+  // Начинаем с общего вида, центр хранится в координатах мира.
   const mapc = el('div', 'kpk-map');
-  if (panel.zl == null) { panel.zl = 2; panel.focus = 'me'; }
-  const selT = qTargets().filter(t => t.qid === panel.qsel);
-  const bar = el('div', 'kpk-bar');
-  bar.appendChild(btn('chip zb', '−', () => { panel.zl = Math.max(1, panel.zl - 1); refresh(); }, panel.zl <= 1));
-  bar.appendChild(el('span', 'zl', '×' + panel.zl));
-  bar.appendChild(btn('chip zb', '+', () => { panel.zl = Math.min(4, panel.zl + 1); refresh(); }, panel.zl >= 4));
-  bar.appendChild(btn('chip', 'К игроку', () => { panel.focus = 'me'; if (panel.zl < 2) panel.zl = 2; refresh(); }));
-  bar.appendChild(btn('chip', 'К цели', () => { panel.focus = 'target'; if (panel.zl < 2) panel.zl = 2; refresh(); }, !selT.length));
+  const view=panel.mapView ||= {zoom:1,x:PW/2,y:MH/2};
+  const selT=qTargets().filter(t=>t.qid===panel.qsel);
+  const bar=el('div','kpk-bar'), scaleLabel=el('span','zl','×'+view.zoom);
+  const zoom=n=>{view.zoom=clamp(n,1,12);refresh();};
+  const focus=p=>{if(!p)return;const m=worldMapPoint(p);view.x=m.x/T;view.y=m.y/T;zoom(Math.max(3,view.zoom));};
+  bar.appendChild(btn('chip zb','−',()=>zoom(view.zoom/1.6)));
+  bar.appendChild(scaleLabel);bar.appendChild(btn('chip zb','+',()=>zoom(view.zoom*1.6)));
+
+  bar.appendChild(btn('chip','К игроку',()=>focus(P)));
+  bar.appendChild(btn('chip','К цели',()=>focus(selT[0]),!selT.length));
   [['ppl', 'Люди'], ['cache', 'Тайники'], ['loc', 'Подписи']].forEach(f => bar.appendChild(btn('chip' + (panel.f[f[0]] ? ' on' : ''), f[1], () => { panel.f[f[0]] = !panel.f[f[0]]; refresh(); })));
   if (BIG) bar.prepend(el('span','zl', inGarbage(P.x/T,P.y/T) ? 'Свалка' : P.x < WEST*T ? 'Малая Зона' : 'Кордон'));
   mapc.appendChild(bar); markScrollX(bar);
   const w = el('div', 'mapwrap kpk-wrap'), cv2 = el('canvas'); cv2.id = 'bigmap';
   w.appendChild(cv2); mapc.appendChild(w);
-  const focusPt = () => {
-    const p = panel.focus === 'target' && selT[0] ? selT[0] : P;
-    return worldMapPoint(p);
-  };
-  requestAnimationFrame(() => {
-    if (!cv2.isConnected) return;
-    const fit = Math.min(w.clientWidth / PW, w.clientHeight / MH);      // ×1: вся карта влезает
-    const cover = Math.max(w.clientWidth / PW, w.clientHeight / MH);    // заполняет панель целиком
-    const k = panel.zl === 1 ? fit : Math.max(fit * panel.zl, cover * (1 + 0.45 * (panel.zl - 2)));
-    const cssW = Math.round(PW * k), cssH = Math.round(MH * k);
-    const dpr = Math.min(2, window.devicePixelRatio || 1), px = Math.min(2600 / cssW, dpr);
-    cv2.width = Math.round(cssW * px); cv2.height = Math.round(cssH * px);
-    cv2.style.width = cssW + 'px'; cv2.style.height = cssH + 'px';
-    const out = {};
-    drawMapTo(cv2.getContext('2d'), cv2.width / PW, panel.f.loc, { ppl: panel.f.ppl, cache: panel.f.cache, sel: selT, u: px, out: out });
-    panel.mapLabels = out.labels;
-    const f = focusPt();
-    w.scrollLeft = f.x / (PW * T) * cssW - w.clientWidth / 2; w.scrollTop = f.y / (MH * T) * cssH - w.clientHeight / 2;
-  });
+  mountPdaMap(w,cv2,panel,selT,ids=>{
+    panel.qsel=ids[0];panel.markerChoices=ids.length>1?ids:null;refresh();
+  },scaleLabel);
   mapc.appendChild(mapLegend());
   box.appendChild(mapc);
   // задания
   const qc = el('div', 'kpk-q');
   if (!all.length) qc.appendChild(el('p', 'note', 'Заданий нет. Поговори с Сидоровичем в бункере.'));
+  if(panel.markerChoices) {
+    const choices=el('div','kpk-list');
+    for(const id of panel.markerChoices){const q=act.find(q=>q.id===id);if(q)choices.appendChild(btn('qrow',q.n,()=>{panel.qsel=id;panel.markerChoices=null;refresh();}));}
+    qc.appendChild(choices);
+  }
   const list = el('div', 'kpk-list');
   act.forEach(q => {
     const b = btn('qrow' + (q.id === panel.qsel ? ' sel' : '') + (q.id === S.trackedQuestId ? ' trk' : '') + (q.id === 'sos' ? ' sos' : ''), '', () => { panel.qsel = q.id; refresh(); });
@@ -145,6 +200,7 @@ function drawInv2() {
   rack.appendChild(slot('Костюм',S.armor)); rack.appendChild(slot('Нож','knife'));
   for (const [key,label] of Object.entries(KIT_LABELS)) rack.appendChild(slot(label,kitItem(key)));
   eq.appendChild(rack);
+  eq.appendChild(btn('wide',S.weapon==='hands'?'Руки свободны':'Освободить руки',()=>{setWeapon('hands');refresh();},S.weapon==='hands'));
   const belt = el('div', 'slot beltslot'); belt.appendChild(el('span', 'sl', 'Пояс'));
   const br = el('div', 'beltrow');
   for (let i = 0; i < 3; i++) { const id = S.belt[i]; br.appendChild(id ? itemCell(id, { on: 1, sel: panel.sel === id, fn: () => { panel.sel = id; panel.copy=0; refresh(); } }) : el('div', 'icell empty')); }
