@@ -445,14 +445,13 @@ function shotBarrier(sh, ca, sa, reach) {
   return sh.crouch ? Math.min(wall, rayFence(sh.x, sh.y, ca, sa, 0, Math.min(wall, FENCE_REACH))) : wall;
 }
 const ballOff = sh => (sh.r || 11) + 8;
-function shotTrace(sh, a, W, passFriends = sh === P && combatNear()) {   // чистая функция исхода одного луча: {t, best, wall}
+function shotTrace(sh, a, W) {   // чистая функция исхода одного луча: {t, best, wall}
   const ca = Math.cos(a), sa = Math.sin(a), reach = W.range + ballOff(sh);
   const wallT = shotBarrier(sh, ca, sa, reach);
   let best = null, bt = wallT;
 
   for (const e of ents) {
     if (!e.alive || e === sh) continue;
-    if (passFriends && !hostile(P, e)) continue;
     const t = rayCircle(sh.x, sh.y, ca, sa, e.x, e.y, e.r + (e.captive ? -4 : 0));
     if (t !== null && t <= bt) { best = e; bt = t; }
   }
@@ -465,16 +464,26 @@ function shotTrace(sh, a, W, passFriends = sh === P && combatNear()) {   // чи
   if(box.o) return {t:box.d,best:null,box:box.o,wall:true,ca,sa};
   return { t: bt, best: best, wall: !best && bt < reach, ca: ca, sa: sa };
 }
-function fire(sh, ang, W, spread) {
+// Только реальные выстрелы между противниками продлевают локальную перестрелку.
+function noteGunfight(sh, target) {
+  if (!target || !hostile(sh,target)) return;
+  const x=(sh.x+target.x)/2, y=(sh.y+target.y)/2;
+  if (dst(P.x,P.y,x,y)>480) return;
+  P.combatT=3;
+  let fight=P.gunfight;
+  if (!fight || fight.until<S.min || dst(x,y,fight.x,fight.y)>480) fight=P.gunfight={};
+  Object.assign(fight,{x,y,until:S.min+8});
+}
+function fire(sh, ang, W, spread, target = sh.tgt) {
   const mz = muzzlePoint(sh, ang), n = W.pellets || 1;
   const ca0 = Math.cos(ang), sa0 = Math.sin(ang), mzT = Math.max(0, (mz.x - sh.x) * ca0 + (mz.y - sh.y) * sa0);
   const w0 = shotBarrier(sh, ca0, sa0, mzT + 1), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
   const fx = blocked ? sh.x + ca0 * Math.max(0, w0 - 1) : mz.x, fy = blocked ? sh.y + sa0 * Math.max(0, w0 - 1) : mz.y;
-  const passFriends = sh === P && combatNear();
+  if (sh!==P) noteGunfight(sh,target);
   // Дробины одного выстрела считаются одним попаданием по своим.
-  const shot = sh === P ? {} : null;
+  const shot = sh === P ? { fight:P.gunfight, id:(P.shotId=(P.shotId || 0)+1) } : null;
   for (let k = 0; k < n; k++) {
-    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W, passFriends), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
+    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
     if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
@@ -483,6 +492,7 @@ function fire(sh, ang, W, spread) {
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
       for (let i = 0; i < 4; i++) parts.push({ x: cx, y: cy, vx: rnd(-90, 90), vy: rnd(-90, 90), life: rnd(0.15, 0.3), c: '#d8c9a0', s: 1.6 });
     } else if (best && best.sid !== 'sid') {
+      if (sh===P && hostile(sh,best)) noteGunfight(sh,best);
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
       if (sh === P) { P.hitT = 0.18; if (best.hp - W.dmg * fall <= 0) P.killT = 0.4; }
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
@@ -555,10 +565,11 @@ function hurt(e, dmg, src, ang, shot) {
   for (let i = 0; i < n; i++) parts.push({ x: e.x, y: e.y, vx: Math.cos((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), vy: Math.sin((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), life: rnd(0.2, 0.4), c: '#7a1d14', s: 2, blood: 1 });
   if (e !== P && src && src.alive !== undefined) {
     if (src === P && e.fac === 'loner' && e.hp > 0 && !hostile(e, P)) {
-      if (shot && (e.lastStrayShot === shot || !(e.strayUntil > S.min))) {
-        if (e.lastStrayShot !== shot) sayLine(e, 'Свои! Следи за огнём!');
-        e.lastStrayShot = shot;
-        e.strayUntil = S.min + 6;
+      const fight=shot?.fight;
+      if (fight && fight.until>=S.min && dE(P,fight)<=480 && dE(e,fight)<=480 &&
+          (!fight.warningShot || fight.warningShot===shot.id)) {
+        if (!fight.warningShot) sayLine(e,'Свои!');
+        fight.warningShot=shot.id;
       } else witnessLonerAttack(e, false);
     }
     if (src === P && e.fac === 'army' && !hostile(e, P)) anger(e);

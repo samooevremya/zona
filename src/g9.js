@@ -410,7 +410,7 @@ function sosFoeAI(e, dt) {
       e.crouch = 1; e.supT -= dt;
       const tg = ents.find(o => o.alive && o.sos === a.id && dE(o, e) < 520 && los(e.x, e.y, o.x, o.y));
       if (tg) { const ta = Math.atan2(tg.y - e.y, tg.x - e.x); e.ang += angD(e.ang, ta) * Math.min(1, dt * 4);
-        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3); /* подавление: в основном мимо и не насмерть до штурма */ play(W.snd || 'p', e.x, e.y, 0.7); } }
+        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3, tg); /* подавление: в основном мимо и не насмерть до штурма */ play(W.snd || 'p', e.x, e.y, 0.7); } }
       else e.ang += angD(e.ang, ang) * Math.min(1, dt * 2);
     }
     return true;

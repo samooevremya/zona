@@ -697,13 +697,17 @@ Tt('K_trader_seat_and_old_save', () => {
   return {ok:sid.alive && sid.hp===d.hp && hp===d.hp && !sid.flash && !sid.kx && !sid.ky &&
     sid.money===123 && sid.x===d.x*T && sid.y===d.y*T && !S().dead.sid};
 });
-Tt('K_stray_round_or_repeated_attack', () => {
+Tt('K_warning_shared_only_in_same_firefight', () => {
   const {victim,add}=witnessScene(), witness=add('Дозорный',-52,0);
-  const shot={};
+  const fight={x:P().x,y:P().y,until:S().min+8};
+  const shot={fight,id:1};
   for(let i=0;i<3;i++) z.rc.hurt(victim,1,P(),0,shot);
-  const warned=!victim.angry && !witness.angry && victim.hp===victim.maxhp-3;
-  z.rc.hurt(victim,1,P(),0,{});
-  return {ok:!!(warned && victim.angry && witness.angry),warned};
+  const warned=!victim.angry && !witness.angry && victim.bub.t==='Свои!';
+  z.rc.hurt(witness,1,P(),0,{fight,id:2});
+  const repeat=!!witness.angry;
+  const quiet=add('Прохожий',-64,0); fight.until=S().min-1;
+  z.rc.hurt(quiet,1,P(),0,{fight,id:3});
+  return {ok:warned && repeat && !!quiet.angry,warned,repeat};
 });
 Tt('K_witness_private_attack', () => {
   const {victim, add} = witnessScene();

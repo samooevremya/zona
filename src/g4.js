@@ -776,22 +776,6 @@ function drawDeskTrader(e) {
   ctx.restore();
 }
 const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
-// Only nearby stems move. The world-aligned undergrowth and its shadows stay in the terrain cache.
-function drawNearGrass() {
-  const x0=Math.floor(P.x/T), y0=Math.floor(P.y/T), time=performance.now()*.001;
-  for (let y=y0-3;y<=y0+3;y++) for (let x=x0-3;x<=x0+3;x++) {
-    if (tAt(x,y)!==GR) continue;
-    const seed=hash2(x+17,y+83);
-    if (seed>.32) continue;
-    const px=(x+.18+seed*2)*T, py=(y+.2+.6*hash2(y+7,x))*T;
-    const distance=Math.hypot(px-P.x,py-P.y);
-    if (distance>=90) continue;
-    const size=14+seed*24, fade=Math.min(1,(90-distance)/30);
-    const bend=reducedCameraMotion.matches?0: .09*Math.sin(time*2+x*.6+y*.2)
-      +clamp((25-distance)/25,0,1)*Math.sign(px-P.x)*.48;
-    ART.draw(ctx,'c1_tuft'+Math.floor(seed*18),px+Math.sin(bend)*3,py-2,size,size*.86,seed*5+bend,fade*.86);
-  }
-}
 function render() {
   let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
   if (S && P && S.blow?.stage === 2 && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
@@ -825,10 +809,7 @@ function render() {
     ctx.drawImage(shopImage,x,y,width,height);
   }
   else if(loft){ctx.save();ctx.beginPath();ctx.rect(loft.x*T,loft.y*T,loft.w*T,loft.h*T);ctx.clip();drawLoft(loft);}
-  else {
-    drawGround(vx, vy, vw, vh);
-    if (BIG && C1 && ART && P) drawNearGrass();
-  }
+  else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
   for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
@@ -1061,16 +1042,4 @@ function render() {
   ctx.globalAlpha = 1;
   ctx.fillStyle = ctx.createPattern(grainC, 'repeat');
   ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128); ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
-  drawSticks();
-}
-function drawSticks() {
-  if (!IN.touch) return;
-  [IN.left, IN.aimStick].forEach((s, i) => {
-    if (!s) return;
-    ctx.strokeStyle = 'rgba(216,210,188,0.35)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(s.ox, s.oy, 56, 0, 6.28); ctx.stroke();
-    ctx.fillStyle = i ? 'rgba(220,147,48,0.45)' : 'rgba(216,210,188,0.35)';
-    ctx.beginPath(); ctx.arc(s.ox + s.dx * 56, s.oy + s.dy * 56, 22, 0, 6.28); ctx.fill();
-  });
-  ctx.lineWidth = 1;
 }

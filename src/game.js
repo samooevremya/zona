@@ -1097,14 +1097,13 @@ function shotBarrier(sh, ca, sa, reach) {
   return sh.crouch ? Math.min(wall, rayFence(sh.x, sh.y, ca, sa, 0, Math.min(wall, FENCE_REACH))) : wall;
 }
 const ballOff = sh => (sh.r || 11) + 8;
-function shotTrace(sh, a, W, passFriends = sh === P && combatNear()) {   // чистая функция исхода одного луча: {t, best, wall}
+function shotTrace(sh, a, W) {   // чистая функция исхода одного луча: {t, best, wall}
   const ca = Math.cos(a), sa = Math.sin(a), reach = W.range + ballOff(sh);
   const wallT = shotBarrier(sh, ca, sa, reach);
   let best = null, bt = wallT;
 
   for (const e of ents) {
     if (!e.alive || e === sh) continue;
-    if (passFriends && !hostile(P, e)) continue;
     const t = rayCircle(sh.x, sh.y, ca, sa, e.x, e.y, e.r + (e.captive ? -4 : 0));
     if (t !== null && t <= bt) { best = e; bt = t; }
   }
@@ -1117,16 +1116,26 @@ function shotTrace(sh, a, W, passFriends = sh === P && combatNear()) {   // чи
   if(box.o) return {t:box.d,best:null,box:box.o,wall:true,ca,sa};
   return { t: bt, best: best, wall: !best && bt < reach, ca: ca, sa: sa };
 }
-function fire(sh, ang, W, spread) {
+// Только реальные выстрелы между противниками продлевают локальную перестрелку.
+function noteGunfight(sh, target) {
+  if (!target || !hostile(sh,target)) return;
+  const x=(sh.x+target.x)/2, y=(sh.y+target.y)/2;
+  if (dst(P.x,P.y,x,y)>480) return;
+  P.combatT=3;
+  let fight=P.gunfight;
+  if (!fight || fight.until<S.min || dst(x,y,fight.x,fight.y)>480) fight=P.gunfight={};
+  Object.assign(fight,{x,y,until:S.min+8});
+}
+function fire(sh, ang, W, spread, target = sh.tgt) {
   const mz = muzzlePoint(sh, ang), n = W.pellets || 1;
   const ca0 = Math.cos(ang), sa0 = Math.sin(ang), mzT = Math.max(0, (mz.x - sh.x) * ca0 + (mz.y - sh.y) * sa0);
   const w0 = shotBarrier(sh, ca0, sa0, mzT + 1), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
   const fx = blocked ? sh.x + ca0 * Math.max(0, w0 - 1) : mz.x, fy = blocked ? sh.y + sa0 * Math.max(0, w0 - 1) : mz.y;
-  const passFriends = sh === P && combatNear();
+  if (sh!==P) noteGunfight(sh,target);
   // Дробины одного выстрела считаются одним попаданием по своим.
-  const shot = sh === P ? {} : null;
+  const shot = sh === P ? { fight:P.gunfight, id:(P.shotId=(P.shotId || 0)+1) } : null;
   for (let k = 0; k < n; k++) {
-    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W, passFriends), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
+    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
     if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
@@ -1135,6 +1144,7 @@ function fire(sh, ang, W, spread) {
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
       for (let i = 0; i < 4; i++) parts.push({ x: cx, y: cy, vx: rnd(-90, 90), vy: rnd(-90, 90), life: rnd(0.15, 0.3), c: '#d8c9a0', s: 1.6 });
     } else if (best && best.sid !== 'sid') {
+      if (sh===P && hostile(sh,best)) noteGunfight(sh,best);
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
       if (sh === P) { P.hitT = 0.18; if (best.hp - W.dmg * fall <= 0) P.killT = 0.4; }
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
@@ -1207,10 +1217,11 @@ function hurt(e, dmg, src, ang, shot) {
   for (let i = 0; i < n; i++) parts.push({ x: e.x, y: e.y, vx: Math.cos((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), vy: Math.sin((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), life: rnd(0.2, 0.4), c: '#7a1d14', s: 2, blood: 1 });
   if (e !== P && src && src.alive !== undefined) {
     if (src === P && e.fac === 'loner' && e.hp > 0 && !hostile(e, P)) {
-      if (shot && (e.lastStrayShot === shot || !(e.strayUntil > S.min))) {
-        if (e.lastStrayShot !== shot) sayLine(e, 'Свои! Следи за огнём!');
-        e.lastStrayShot = shot;
-        e.strayUntil = S.min + 6;
+      const fight=shot?.fight;
+      if (fight && fight.until>=S.min && dE(P,fight)<=480 && dE(e,fight)<=480 &&
+          (!fight.warningShot || fight.warningShot===shot.id)) {
+        if (!fight.warningShot) sayLine(e,'Свои!');
+        fight.warningShot=shot.id;
       } else witnessLonerAttack(e, false);
     }
     if (src === P && e.fac === 'army' && !hostile(e, P)) anger(e);
@@ -2099,8 +2110,8 @@ function updatePlayer(dt) {
   if (P.lock && (!P.lock.alive || !hostile(P, P.lock))) P.lock = null;
   if (IN.touch) {
     const firing = IN.btnFire;
-    if (P.lock && (firing || IN.aimStick)) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
-    else if (IN.aimStick) P.ang += angD(P.ang, IN.aimStick.a) * Math.min(1, dt * 18);
+    if (P.lock && firing && Math.abs(angD(aimDir, Math.atan2(P.lock.y-P.y,P.lock.x-P.x)))<.14) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
+    else if (IN.aimStick) P.ang = IN.aimStick.a;
     else if (ml > 0.1) P.ang += angD(P.ang, Math.atan2(my, mx)) * Math.min(1, dt * 10);
   } else {
     const w = screenToWorld(IN.mx, IN.my);
@@ -2109,7 +2120,10 @@ function updatePlayer(dt) {
   }
   P.hitT = Math.max(0, (P.hitT || 0) - dt); P.killT = Math.max(0, (P.killT || 0) - dt);
   for (let i = HURTDIR.length - 1; i >= 0; i--) { HURTDIR[i].life -= dt; if (HURTDIR[i].life <= 0) HURTDIR.splice(i, 1); }
-  if (IN.fire || IN.btnFire) playerFire();
+  if (IN.fire || IN.btnFire) {
+    if (IN.aimStick) IN.aimStick.sampled=true;
+    playerFire();
+  }
   // радиация и артефакты
   radRate = 0;
   rads.forEach(z => { const d = dst(P.x, P.y, z.x, z.y); if (d < z.r) radRate += z.p * (1 - d / z.r); });
@@ -3089,22 +3103,6 @@ function drawDeskTrader(e) {
   ctx.restore();
 }
 const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
-// Only nearby stems move. The world-aligned undergrowth and its shadows stay in the terrain cache.
-function drawNearGrass() {
-  const x0=Math.floor(P.x/T), y0=Math.floor(P.y/T), time=performance.now()*.001;
-  for (let y=y0-3;y<=y0+3;y++) for (let x=x0-3;x<=x0+3;x++) {
-    if (tAt(x,y)!==GR) continue;
-    const seed=hash2(x+17,y+83);
-    if (seed>.32) continue;
-    const px=(x+.18+seed*2)*T, py=(y+.2+.6*hash2(y+7,x))*T;
-    const distance=Math.hypot(px-P.x,py-P.y);
-    if (distance>=90) continue;
-    const size=14+seed*24, fade=Math.min(1,(90-distance)/30);
-    const bend=reducedCameraMotion.matches?0: .09*Math.sin(time*2+x*.6+y*.2)
-      +clamp((25-distance)/25,0,1)*Math.sign(px-P.x)*.48;
-    ART.draw(ctx,'c1_tuft'+Math.floor(seed*18),px+Math.sin(bend)*3,py-2,size,size*.86,seed*5+bend,fade*.86);
-  }
-}
 function render() {
   let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
   if (S && P && S.blow?.stage === 2 && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
@@ -3138,10 +3136,7 @@ function render() {
     ctx.drawImage(shopImage,x,y,width,height);
   }
   else if(loft){ctx.save();ctx.beginPath();ctx.rect(loft.x*T,loft.y*T,loft.w*T,loft.h*T);ctx.clip();drawLoft(loft);}
-  else {
-    drawGround(vx, vy, vw, vh);
-    if (BIG && C1 && ART && P) drawNearGrass();
-  }
+  else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
   for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
@@ -3374,18 +3369,6 @@ function render() {
   ctx.globalAlpha = 1;
   ctx.fillStyle = ctx.createPattern(grainC, 'repeat');
   ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128); ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
-  drawSticks();
-}
-function drawSticks() {
-  if (!IN.touch) return;
-  [IN.left, IN.aimStick].forEach((s, i) => {
-    if (!s) return;
-    ctx.strokeStyle = 'rgba(216,210,188,0.35)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(s.ox, s.oy, 56, 0, 6.28); ctx.stroke();
-    ctx.fillStyle = i ? 'rgba(220,147,48,0.45)' : 'rgba(216,210,188,0.35)';
-    ctx.beginPath(); ctx.arc(s.ox + s.dx * 56, s.oy + s.dy * 56, 22, 0, 6.28); ctx.fill();
-  });
-  ctx.lineWidth = 1;
 }
 
 /* ===================== погода, выброс, шаги, голоса, гитара ===================== */
@@ -4237,6 +4220,12 @@ function c1ForestFloor(g) {
 // Пучки группируются по мировым координатам. Берег узнаётся по камышу,
 // обочина — по низкой траве, открытое поле — по более редким куртинам.
 function scatterAutumnPlants(g, x, y, terrain) {
+  // Тот же пучок попадает в оба соседних куска по своим мировым координатам.
+  const seed=hash2(x+17,y+83);
+  if(seed<=.32) {
+    const px=(x+.18+seed*2)*T, py=(y+.2+.6*hash2(y+7,x))*T, size=14+seed*24;
+    ART.draw(g,'c1_tuft'+Math.floor(seed*18),px,py-2,size,size*.86,seed*5,.86);
+  }
   const i = y * MW + x, bank = terrain.water[i] <= 2, verge = terrain.verge[i];
   const patch = vnoise(x + 31, y - 19, 5);
   const density = bank ? .23 : verge <= 2 ? .25 : .19;
@@ -5348,7 +5337,7 @@ function sosFoeAI(e, dt) {
       e.crouch = 1; e.supT -= dt;
       const tg = ents.find(o => o.alive && o.sos === a.id && dE(o, e) < 520 && los(e.x, e.y, o.x, o.y));
       if (tg) { const ta = Math.atan2(tg.y - e.y, tg.x - e.x); e.ang += angD(e.ang, ta) * Math.min(1, dt * 4);
-        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3); /* подавление: в основном мимо и не насмерть до штурма */ play(W.snd || 'p', e.x, e.y, 0.7); } }
+        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3, tg); /* подавление: в основном мимо и не насмерть до штурма */ play(W.snd || 'p', e.x, e.y, 0.7); } }
       else e.ang += angD(e.ang, ang) * Math.min(1, dt * 2);
     }
     return true;
@@ -10721,7 +10710,7 @@ function drawMenu() {
   if (panel.pausePage==='help') {
     heading.textContent='Управление и сохранения';
     nav.appendChild(el('p','pause-note',IN.touch
-      ? 'Джойстик отвечает за движение. Удерживай кнопку бега, а для смены оружия коснись его панели.'
+      ? 'Левый джойстик — ходьба. Удерживай кнопку с прицелом для огня и тяни её в сторону цели. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
     if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
     nav.appendChild(el('p','pause-note','Игра сохраняется автоматически у костра и у Сидоровича. Вручную можно сохраниться, когда рядом нет врагов.'));
@@ -11239,8 +11228,7 @@ addEventListener('keyup', e => { KEYS[e.code] = false; });
 function resetInput() {
   IN.sprint = false; IN.runPointer = null; $('b-run').classList.remove('on');
   for (const k in KEYS) KEYS[k] = false;
-  IN.fire = false; IN.btnFire = false; IN.firePointer = null; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
-  const fb = document.getElementById('b-fire'); if (fb) fb.classList.remove('on');
+  IN.fire = false; releaseFireStick(); IN.left = null; IN.moveX = IN.moveY = 0;
   if (typeof joyReset === 'function') joyReset();
 }
 addEventListener('blur', resetInput);
@@ -11265,32 +11253,30 @@ cv.addEventListener('pointerdown', e => {
   if (panel || title.open) return;
   if (e.pointerType === 'mouse') { setTouch(false); IN.mx = e.clientX; IN.my = e.clientY; if (e.button === 0) IN.fire = true; return; }
   setTouch(true);
-  cv.setPointerCapture(e.pointerId);
   const s = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, a: P.ang };
   const jr = JOY.getBoundingClientRect();
   const custom = !!JOY.dataset.layout;
   const onStick = custom ? Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2) <= jr.width/2+6 : e.clientX<VW*.5;
   if (onStick && !IN.left) {
+    cv.setPointerCapture(e.pointerId);
     IN.left = s;
     if (custom) { s.ox=jr.x+jr.width/2; s.oy=jr.y+jr.height/2; JOY.classList.add('on'); }
     else joyAt(e.clientX,e.clientY,s);
     s.radius = custom ? jr.width/2 : 56;
-  } else if (!onStick && !IN.aimStick) IN.aimStick=s;
+  }
 });
 cv.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { IN.mx = e.clientX; IN.my = e.clientY; if (IN.touch) setTouch(false); return; }
-  const s = IN.left && IN.left.id === e.pointerId ? IN.left : IN.aimStick && IN.aimStick.id === e.pointerId ? IN.aimStick : null;
-  if (!s) return;
+  const s=IN.left;
+  if (!s || s.id!==e.pointerId) return;
   let dx = (e.clientX - s.ox) / (s.radius || 56), dy = (e.clientY - s.oy) / (s.radius || 56);
   const m = Math.hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
   s.dx = dx; s.dy = dy;
-  if (s === IN.left) { IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * Math.min(34,(s.radius || 56)*.6)) + 'px,' + (dy * Math.min(34,(s.radius || 56)*.6)) + 'px)'; }
-  else if (m > 0.2) s.a = Math.atan2(dy, dx);
+  IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * Math.min(34,(s.radius || 56)*.6)) + 'px,' + (dy * Math.min(34,(s.radius || 56)*.6)) + 'px)';
 });
 function endPtr(e) {
   if (e.pointerType === 'mouse') { IN.fire = false; return; }
   if (IN.left && IN.left.id === e.pointerId) { IN.left = null; IN.moveX = IN.moveY = 0; joyReset(); }
-  if (IN.aimStick && IN.aimStick.id === e.pointerId) { IN.aimStick = null; }
 }
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -11315,16 +11301,36 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 const fireB = $('b-fire');
+function releaseFireStick() {
+  IN.aimStick=null; IN.btnFire=false;
+  fireB.classList.remove('on');
+  fireB.style.removeProperty('--aim-x'); fireB.style.removeProperty('--aim-y');
+}
+function steerFireStick(e) {
+  const s=IN.aimStick;
+  if (!s || e.pointerId!==s.id) return;
+  const dx=e.clientX-s.cx, dy=e.clientY-s.cy, length=Math.hypot(dx,dy);
+  if (length>s.radius*.16) { s.a=Math.atan2(dy,dx); P.lockT=0; }
+  const k=Math.min(.34,.34*s.radius/Math.max(length,1));
+  fireB.style.setProperty('--aim-x',dx*k+'px'); fireB.style.setProperty('--aim-y',dy*k+'px');
+}
 fireB.addEventListener('pointerdown', e => {
-  if (IN.firePointer != null || panel || title.open || !P?.alive) return;
-  e.preventDefault(); e.stopPropagation(); audioInit();
+  if (IN.aimStick || panel || title.open || !P?.alive) return;
+  e.preventDefault(); e.stopPropagation(); audioInit(); setTouch(true);
+  const r=fireB.getBoundingClientRect();
+  IN.aimStick={id:e.pointerId,cx:r.left+r.width/2,cy:r.top+r.height/2,radius:r.width/2,a:P.ang};
   fireB.setPointerCapture(e.pointerId);
-  IN.firePointer = e.pointerId; IN.btnFire = true; fireB.classList.add('on');
+  steerFireStick(e); IN.btnFire=true; fireB.classList.add('on');
 });
-for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-  fireB.addEventListener(event, e => {
-    if (IN.firePointer !== e.pointerId) return;
-    IN.firePointer = null; IN.btnFire = false; fireB.classList.remove('on');
+fireB.addEventListener('pointermove',steerFireStick);
+for (const event of ['pointerup','pointercancel','lostpointercapture']) {
+  fireB.addEventListener(event,e=>{
+    const stick=IN.aimStick;
+    if (stick?.id!==e.pointerId) return;
+    if (event==='pointerup' && !stick.sampled && P?.alive && !panel && !title.open) {
+      P.ang=stick.a; playerFire();
+    }
+    releaseFireStick();
   });
 }
 $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); if (!panel) interact(); });

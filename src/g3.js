@@ -324,8 +324,8 @@ function updatePlayer(dt) {
   if (P.lock && (!P.lock.alive || !hostile(P, P.lock))) P.lock = null;
   if (IN.touch) {
     const firing = IN.btnFire;
-    if (P.lock && (firing || IN.aimStick)) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
-    else if (IN.aimStick) P.ang += angD(P.ang, IN.aimStick.a) * Math.min(1, dt * 18);
+    if (P.lock && firing && Math.abs(angD(aimDir, Math.atan2(P.lock.y-P.y,P.lock.x-P.x)))<.14) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
+    else if (IN.aimStick) P.ang = IN.aimStick.a;
     else if (ml > 0.1) P.ang += angD(P.ang, Math.atan2(my, mx)) * Math.min(1, dt * 10);
   } else {
     const w = screenToWorld(IN.mx, IN.my);
@@ -334,7 +334,10 @@ function updatePlayer(dt) {
   }
   P.hitT = Math.max(0, (P.hitT || 0) - dt); P.killT = Math.max(0, (P.killT || 0) - dt);
   for (let i = HURTDIR.length - 1; i >= 0; i--) { HURTDIR[i].life -= dt; if (HURTDIR[i].life <= 0) HURTDIR.splice(i, 1); }
-  if (IN.fire || IN.btnFire) playerFire();
+  if (IN.fire || IN.btnFire) {
+    if (IN.aimStick) IN.aimStick.sampled=true;
+    playerFire();
+  }
   // радиация и артефакты
   radRate = 0;
   rads.forEach(z => { const d = dst(P.x, P.y, z.x, z.y); if (d < z.r) radRate += z.p * (1 - d / z.r); });
