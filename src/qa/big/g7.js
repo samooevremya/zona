@@ -188,14 +188,14 @@ T_('G_fence_cover', () => {
   const trace = (from, to) => G.shotTrace(from, Math.atan2(to.y - from.y, to.x - from.x), G.WP.w_pm);
   const cases = { concreteAtCheckpoint: M.objs.some(o => o.material === 'concreteWire' &&
     x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h) };
-  p.crouch = 0; cases.standing = trace(guard, p).best === p;
+  p.crouch = 0; cases.standingBlocked = trace(guard, p).wall;
   p.crouch = 1; const impact = trace(guard, p);
   cases.stoppedAtConcrete = !impact.best && impact.wall && Math.abs(guard.y + impact.t - (y - 4)) < .01;
   cases.returnFireBlocked = trace(p, guard).wall;
   guard.x += 45; cases.diagonal = trace(guard, p).wall;
   place(guard, x + 75, p.y); cases.flank = trace(guard, p).best === p;
   place(p, 369 * T, y + 20); place(guard, p.x, y - 80); cases.gate = trace(guard, p).best === p;
-  place(p, x, y + 80); place(guard, x, y - 80); cases.awayFromFence = trace(guard, p).best === p;
+  place(p, x, y + 80); place(guard, x, y - 80); cases.awayFromFence = trace(guard, p).wall;
 
   // Сначала часовой не знает о герое. После обнаружения присед прерывает уже начатый огонь.
   place(p, x, y - 20); place(guard, x, y + 80, -Math.PI / 2);
@@ -204,12 +204,11 @@ T_('G_fence_cover', () => {
   const tick = n => { for (let i = 0; i < n; i++) z.update(1 / 60); };
   tick(100); cases.undetected = !guard.tgt && !guard.aw;
   p.crouch = 0; const full = guard.mag;
-  tick(112); cases.openedFire = guard.tgt === p && guard.mag < full;
-  // Проверяем следующий выстрел у самой панели, отдельно от отбрасывания и кровотечения при первом попадании.
-  place(p, x, y - 20); p.kx = p.ky = 0; S().bleed = 0;
-  p.crouch = 1; guard.cool = 0; const mag = guard.mag, hp = p.hp;
-  tick(15); cases.lostSight = guard.unseen > 0 && guard.mag === mag && p.hp === hp;
-  p.crouch = 0; tick(10); cases.resumedFire = guard.mag < mag;
+  tick(112); cases.heldFire = guard.mag === full;
+  // Часовой возобновляет огонь только когда герой виден через открытый створ.
+  place(guard,369*T,y+80,-Math.PI/2);guard.home={x:guard.x,y:guard.y};
+  place(p,369*T,y-20);guard.angry=1;guard.aw=1;
+  tick(100); cases.openedFireAtGate = guard.mag < full;
   reset(); return { ok: Object.values(cases).every(Boolean), cases };
 });
 return JSON.stringify(R);

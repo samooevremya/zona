@@ -163,7 +163,7 @@ function explode(n) {
   ents.forEach(e => {
     if (!e.alive) return;
     const d = dE(e, n);
-    if (d < 130 && los(n.x, n.y, e.x, e.y)) hurt(e, 100 * (1 - d / 130) + 10, n.owner, Math.atan2(e.y - n.y, e.x - n.x));
+    if (d < 130 && los(n.x, n.y, e.x, e.y) && (n.owner===P || clearNPCShot(n,e))) hurt(e, 100 * (1 - d / 130) + 10, n.owner, Math.atan2(e.y - n.y, e.x - n.x));
   });
   ents.forEach(e => { if (e !== P && e.alive && dE(e, n) < 600 && hostile(e, P)) { e.lastSeen = { x: P.x, y: P.y }; e.mem = 6; } });
 }
