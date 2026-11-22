@@ -408,7 +408,7 @@ const CORDON_DETAILS = [
   // АТП
   ['c1_trace_wheel', 193, 141, 25, -0.12],
   ['c1_tires', 194.4, 141.4, 36, 0.1],
-  ['c1_trace_pipes', 200, 148, 49, 0.2],
+  ['c1_trace_pipes', 201.25, 150.1, 49, 1.53],
   // Автобус
   ...(TOLIK_AT_JUNCTION ? [
     ['c1_trace_wheel', 81, 160, 22, 0.18],

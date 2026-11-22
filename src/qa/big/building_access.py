@@ -1,0 +1,44 @@
+"""Check both directions between a real outdoor road and every exterior door in the built game."""
+import argparse
+import json
+import os
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+
+from road_network import REGISTER
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("html", type=Path)
+    parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--stock-crates", action="store_true", help="Occupy every eligible field-crate site near a building")
+    args = parser.parse_args()
+    marker = "function bigPath(pts, rad, tile) {"
+    html = args.html.read_text()
+    assert html.count(marker) == 1, "Cannot register the built world’s road centrelines"
+    html = html.replace(marker, marker + REGISTER)
+    head, tail = html.rsplit("boot();", 1)
+    check = Path(__file__).with_suffix(".js").read_text()
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(executable_path=os.environ.get("BROWSER_EXECUTABLE"),
+                                     args=["--single-process", "--disable-gpu"])
+        page = browser.new_page(viewport={"width": 960, "height": 500}, has_touch=True)
+        errors = []
+        page.on("pageerror", lambda err: errors.append(str(err)))
+        page.route("https://fonts.**/*", lambda route: route.abort())
+        page.route("**/access.html", lambda route: route.fulfill(content_type="text/html", body=head+check+"boot();"+tail))
+        page.goto(f"https://zona.test/access.html#qa-seed={args.seed}")
+        page.get_by_role("button", name="Новая игра").tap()
+        page.get_by_role("button", name="Пропустить").tap()
+        result = page.evaluate("flag => checkBuildingAccess(flag)", args.stock_crates)
+        if args.report:
+            args.report.write_text(json.dumps(result), encoding="utf-8")
+        result.pop("results")
+        print(json.dumps(result, ensure_ascii=False))
+        assert result["houses"] and result["openings"] and not result["failures"] and not errors, errors
+
+
+if __name__ == "__main__":
+    main()
