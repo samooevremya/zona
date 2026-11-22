@@ -179,7 +179,14 @@ function chunkStep(p, all) {
   } while (all && !done);
   p.ms += performance.now() - t0;
   if (!all) gStat.stepMax = Math.max(gStat.stepMax || 0, Math.round(performance.now() - t0));
-  if (done) { p.g.setTransform(1, 0, 0, 1, 0, 0); GCACHE.set(p.key, p.c); gStat.painted++; gStat.ms = Math.round(p.ms); gStat.step = Math.max(gStat.step || 0, Math.round(performance.now() - t0)); }
+  if (done) {
+    p.g.setTransform(1, 0, 0, 1, 0, 0);
+    // A visible chunk can fill the last slot while a background chunk is pending.
+    if (GCACHE.size >= GMAX && !GCACHE.has(p.key)) GCACHE.delete(GCACHE.keys().next().value);
+    GCACHE.set(p.key, p.c);
+    gStat.painted++; gStat.ms = Math.round(p.ms);
+    gStat.step = Math.max(gStat.step || 0, Math.round(performance.now() - t0));
+  }
   return done;
 }
 function groundChunk(cx, cy) {
@@ -210,22 +217,7 @@ function* paintGroundWin(g, R) {
       if (R() < 0.35) { g.strokeStyle = 'rgba(160,150,95,0.25)'; g.lineWidth = 1; g.beginPath(); const sx = px + R() * T, sy = py + R() * T; g.moveTo(sx, sy); g.lineTo(sx + R() * 4 - 2, sy - 5); g.stroke(); }
     };
     switch (t) {
-      case GR: case TR: case BU: grass(); break;
-      case DI:
-        g.fillStyle = shade('#5a4b34', k); g.fillRect(px, py, T, T);
-        for (let i = 0; i < 7; i++) { g.fillStyle = R() < 0.5 ? 'rgba(30,22,12,0.4)' : 'rgba(170,150,110,0.25)'; g.fillRect(px + R() * T, py + R() * T, 2, 2); }
-        break;
-      case AS:
-        g.fillStyle = shade('#3c3c37', 0.92 + n * 0.16); g.fillRect(px, py, T, T);
-        for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(90,90,80,0.35)'; g.fillRect(px + R() * T, py + R() * T, 1.5, 1.5); }
-        if (R() < 0.25) { g.strokeStyle = 'rgba(15,15,12,0.6)'; g.lineWidth = 1; g.beginPath(); let cx = px + R() * T, cy = py + R() * T; g.moveTo(cx, cy); for (let s = 0; s < 3; s++) { cx += R() * 14 - 7; cy += R() * 14 - 7; g.lineTo(cx, cy); } g.stroke(); }
-        if (x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.22)'; g.fillRect(px + 14, py + 4, 4, 18); }
-        break;
-      case SW:
-        g.fillStyle = shade('#26332c', 0.9 + n * 0.2); g.fillRect(px, py, T, T);
-        g.strokeStyle = 'rgba(140,160,140,0.12)'; g.beginPath(); g.ellipse(px + R() * T, py + R() * T, 6, 2, 0, 0, 6.28); g.stroke();
-        for (let i = 0; i < 3; i++) { if (R() < 0.6) { g.strokeStyle = 'rgba(120,120,70,0.5)'; g.beginPath(); const rx = px + R() * T, ry = py + R() * T; g.moveTo(rx, ry); g.lineTo(rx + R() * 4 - 2, ry - 8); g.stroke(); } }
-        break;
+      case GR: case TR: case BU: case DI: case AS: case SW: grass(); break;
       case CF:
         g.fillStyle = shade('#55554d', 0.9 + n * 0.18); g.fillRect(px, py, T, T);
         g.strokeStyle = 'rgba(25,25,20,0.35)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1);
@@ -248,7 +240,8 @@ function* paintGroundWin(g, R) {
       case CO: case BR: break;
     }
   }
-  if (ART) yield* artGround(g, R);
+  if (ART) yield* artGround(g);
+  else yield* paintSurfaceLayers(g,surfaceTiles(),BIG && C1);
   if (perspective && ART) {paintHills(g); paintRailSlopes(g);}
   yield;
   // мягкие пятна цвета поверх клеток, чтобы не было шахматки

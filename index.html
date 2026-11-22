@@ -3755,7 +3755,14 @@ function chunkStep(p, all) {
   } while (all && !done);
   p.ms += performance.now() - t0;
   if (!all) gStat.stepMax = Math.max(gStat.stepMax || 0, Math.round(performance.now() - t0));
-  if (done) { p.g.setTransform(1, 0, 0, 1, 0, 0); GCACHE.set(p.key, p.c); gStat.painted++; gStat.ms = Math.round(p.ms); gStat.step = Math.max(gStat.step || 0, Math.round(performance.now() - t0)); }
+  if (done) {
+    p.g.setTransform(1, 0, 0, 1, 0, 0);
+    // A visible chunk can fill the last slot while a background chunk is pending.
+    if (GCACHE.size >= GMAX && !GCACHE.has(p.key)) GCACHE.delete(GCACHE.keys().next().value);
+    GCACHE.set(p.key, p.c);
+    gStat.painted++; gStat.ms = Math.round(p.ms);
+    gStat.step = Math.max(gStat.step || 0, Math.round(performance.now() - t0));
+  }
   return done;
 }
 function groundChunk(cx, cy) {
@@ -3786,22 +3793,7 @@ function* paintGroundWin(g, R) {
       if (R() < 0.35) { g.strokeStyle = 'rgba(160,150,95,0.25)'; g.lineWidth = 1; g.beginPath(); const sx = px + R() * T, sy = py + R() * T; g.moveTo(sx, sy); g.lineTo(sx + R() * 4 - 2, sy - 5); g.stroke(); }
     };
     switch (t) {
-      case GR: case TR: case BU: grass(); break;
-      case DI:
-        g.fillStyle = shade('#5a4b34', k); g.fillRect(px, py, T, T);
-        for (let i = 0; i < 7; i++) { g.fillStyle = R() < 0.5 ? 'rgba(30,22,12,0.4)' : 'rgba(170,150,110,0.25)'; g.fillRect(px + R() * T, py + R() * T, 2, 2); }
-        break;
-      case AS:
-        g.fillStyle = shade('#3c3c37', 0.92 + n * 0.16); g.fillRect(px, py, T, T);
-        for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(90,90,80,0.35)'; g.fillRect(px + R() * T, py + R() * T, 1.5, 1.5); }
-        if (R() < 0.25) { g.strokeStyle = 'rgba(15,15,12,0.6)'; g.lineWidth = 1; g.beginPath(); let cx = px + R() * T, cy = py + R() * T; g.moveTo(cx, cy); for (let s = 0; s < 3; s++) { cx += R() * 14 - 7; cy += R() * 14 - 7; g.lineTo(cx, cy); } g.stroke(); }
-        if (x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.22)'; g.fillRect(px + 14, py + 4, 4, 18); }
-        break;
-      case SW:
-        g.fillStyle = shade('#26332c', 0.9 + n * 0.2); g.fillRect(px, py, T, T);
-        g.strokeStyle = 'rgba(140,160,140,0.12)'; g.beginPath(); g.ellipse(px + R() * T, py + R() * T, 6, 2, 0, 0, 6.28); g.stroke();
-        for (let i = 0; i < 3; i++) { if (R() < 0.6) { g.strokeStyle = 'rgba(120,120,70,0.5)'; g.beginPath(); const rx = px + R() * T, ry = py + R() * T; g.moveTo(rx, ry); g.lineTo(rx + R() * 4 - 2, ry - 8); g.stroke(); } }
-        break;
+      case GR: case TR: case BU: case DI: case AS: case SW: grass(); break;
       case CF:
         g.fillStyle = shade('#55554d', 0.9 + n * 0.18); g.fillRect(px, py, T, T);
         g.strokeStyle = 'rgba(25,25,20,0.35)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1);
@@ -3824,7 +3816,8 @@ function* paintGroundWin(g, R) {
       case CO: case BR: break;
     }
   }
-  if (ART) yield* artGround(g, R);
+  if (ART) yield* artGround(g);
+  else yield* paintSurfaceLayers(g,surfaceTiles(),BIG && C1);
   if (perspective && ART) {paintHills(g); paintRailSlopes(g);}
   yield;
   // мягкие пятна цвета поверх клеток, чтобы не было шахматки
@@ -5260,8 +5253,7 @@ function drawSurfaceEdges(g, tiles) {
   }
 }
 
-// Two radius-two box filters need four neighbouring mask pixels. One extra pixel
-// lets Canvas interpolate across a chunk boundary identically on both sides.
+// Sample centres are fixed in the world, including the halo outside each cached chunk.
 function surfaceMask(tiles,kind,shoulders,coverage,x,y,width,height) {
   const left=Math.max(0,Math.floor(x)-5), top=Math.max(0,Math.floor(y)-5);
   const w=Math.min(PW*4,Math.ceil(x+width)+5)-left, h=Math.min(MH*4,Math.ceil(y+height)+5)-top;
@@ -5280,10 +5272,7 @@ function surfaceMask(tiles,kind,shoulders,coverage,x,y,width,height) {
       values[j*w+i]=sum/(b-a+1);
     }
   }
-  const canvas=ARTM.surfaceMask || (ARTM.surfaceMask=document.createElement('canvas'));
-  if(canvas.width<w)canvas.width=w;
-  if(canvas.height<h)canvas.height=h;
-  const g=canvas.getContext('2d'), mask=g.createImageData(w,h);
+  const alpha=new Uint8ClampedArray(w*h);
   for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
     const wx=left+i, wy=top+j, tile=tiles[(wy>>2)*MW+(wx>>2)], base=values[j*w+i];
     if (!base) continue;
@@ -5300,75 +5289,76 @@ function surfaceMask(tiles,kind,shoulders,coverage,x,y,width,height) {
     else if (shoulders && kind===AS) v=clamp((v-.26)*2.15,0,1);
     else v=clamp((v-.045)*1.5,0,1);
     const a = v*v*(3-2*v)*(kind===DI ? 235 : 255);
-    mask.data[(j*w+i)*4+3]=Math.round(a);
+    alpha[j*w+i]=a;
   }
-  g.putImageData(mask,0,0);
-  return {canvas,x:left,y:top};
+  return {alpha,width:w,height:h,left,top,spacing:T/4};
 }
-function* artGround(g, R) {
-  const shoulders = BIG && C1, tiles = surfaceTiles();
-  // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
-  for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
-    const t = tiles[y * MW + x], px = x * T, py = y * T;
-    let id = GROUNDISH(t) || t === DI ? 'grass' : t === AS ? (shoulders ? 'grass' : 'asphalt') : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
-    if (C1 && t === SW) id = shoulders ? 'grass' : 'swamp';
-    if (id) artFill(g, id, px, py, T, T);
-    if (t===RA && BIG && (x<WEST || y<NORTH_ROWS)) artFill(g,'grass',px,py,T,T);
-    else if (C1 && t === RA) c1Rail(g,x,y);
-    if (!shoulders && t === AS && x === roadX[y] && y % 3 === 0 && y > 8) { g.fillStyle = 'rgba(200,190,150,0.16)'; g.fillRect(px + 14, py + 4, 4, 18); }
-    if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
+// Bake opacity into the actual material pixels. A transparent roadside pixel must
+// remain transparent even when a mobile canvas batches, crops or reuses a surface.
+function stampGroundLayer(g, mask, x, y, w, h, paint) {
+  if(w<=0 || h<=0)return;
+  const {alpha,width,height,spacing,left,top}=mask;
+  // Crop to the actual support of the interpolated coverage. In particular a
+  // dry patch at the opposite side of a road chunk is never stamped at all.
+  const sampleX=world=>clamp(Math.floor(world/spacing-.5)-left,0,width-1);
+  const sampleY=world=>clamp(Math.floor(world/spacing-.5)-top,0,height-1);
+  const sx=sampleX(x), sy=sampleY(y);
+  const ex=Math.min(width-1,sampleX(x+w)+1),ey=Math.min(height-1,sampleY(y+h)+1);
+  let minX=width,maxX=-1,minY=height,maxY=-1;
+  for(let j=sy;j<=ey;j++)for(let i=sx;i<=ex;i++){
+    if(!alpha[j*width+i])continue;
+    minX=Math.min(minX,i);maxX=Math.max(maxX,i);
+    minY=Math.min(minY,j);maxY=Math.max(maxY,j);
   }
-  yield;
-  // 2. Сухая трава крупными мягкими пятнами: маска низкого разрешения, накладывается кусками 512 px
-  if (!ARTM.dry) {
-    const mask = document.createElement('canvas'); mask.width = MW * 2; mask.height = MH * 2;
-    const terrain = shoulders && autumnTerrain();
-    const mg = mask.getContext('2d'), md = mg.createImageData(mask.width, mask.height);
-    for (let y = 0; y < mask.height; y++) for (let x = 0; x < mask.width; x++) {
-      const tx = x >> 1, ty = y >> 1, t = tiles[ty * MW + tx];
-      const v = vnoise(x, y, 11) * 0.7 + vnoise(x + 31, y + 17, 4) * 0.3;
-      let a = GROUNDISH(t) ? clamp((v - 0.5) * 4, 0, 1) : 0;
-      if (terrain && (GROUNDISH(t) || t===DI || t===AS || t===SW) && tx < PW) {
-        const i = ty * MW + tx;
-        const exposure = clamp((terrain.water[i] - 1) / 5, 0, 1);
-        const shoulder = Math.max(0, 1 - terrain.verge[i] / 4);
-        a = exposure * clamp((v - .20) * 1.9 + shoulder * .25, 0, 1);
-      }
-      md.data[(y * mask.width + x) * 4 + 3] = Math.round(a * 235);
+  if(maxX<0)return;
+  const x1=Math.min(x+w,(left+maxX+1.5)*spacing), y1=Math.min(y+h,(top+maxY+1.5)*spacing);
+  x=Math.max(x,(left+minX-.5)*spacing);y=Math.max(y,(top+minY-.5)*spacing);
+  w=x1-x;h=y1-y;if(w<=0 || h<=0)return;
+  const tile=ARTM.materialTile || (ARTM.materialTile=document.createElement('canvas'));
+  if(tile.width!==GCH || tile.height!==GCH)tile.width=tile.height=GCH;
+  const cg=tile.getContext('2d',{willReadFrequently:true});
+  cg.save();
+  cg.translate(-x,-y);cg.clearRect(x,y,w,h);paint(cg,x,y,w,h);
+  cg.restore();
+  const rgba=cg.getImageData(0,0,w,h), pixels=rgba.data;
+  // Grid spacing is 8 or 16 world pixels. Interpolate runs between sample
+  // centres, avoiding a texture lookup and floor operation for every pixel.
+  for(let j=0;j<h;j++){
+    const sy=clamp((y+j+.5)/spacing-.5-top,0,height-1);
+    const row=Math.floor(sy)*width, next=Math.min(row+width,(height-1)*width);
+    const fy=sy-Math.floor(sy);
+    for(let i=0;i<w;){
+      const world=x+i+.5, gx=Math.floor(world/spacing-.5);
+      const ix=clamp(gx-left,0,width-1), jx=clamp(gx+1-left,0,width-1);
+      const a=alpha[row+ix]+fy*(alpha[next+ix]-alpha[row+ix]);
+      const b=alpha[row+jx]+fy*(alpha[next+jx]-alpha[row+jx]);
+      const delta=(b-a)/spacing, end=Math.min(w,(gx+1.5)*spacing-x);
+      let opacity=a+(world-(gx+.5)*spacing)*delta;
+      for(;i<end;i++,opacity+=delta)pixels[(j*w+i)*4+3]=opacity;
     }
-    mg.putImageData(md, 0, 0); ARTM.dry = mask;
   }
-  const mask = ARTM.dry;
-  const CH = 512, cc = ARTM.cc || (ARTM.cc = document.createElement('canvas'));
-  if (cc.width !== CH * GS || cc.height !== CH * GS) cc.width = cc.height = CH * GS;
-  const cg = cc.getContext('2d');
-  cg.setTransform(1, 0, 0, 1, 0, 0);
-  // кусок земли (GWP, пиксели) обрабатывается полосами по 256 px, между полосами шаг отдаётся кадру
-  const wx0 = GWP.x0, wy0 = GWP.y0, wx1 = Math.min(PW * T, GWP.x1), wy1 = Math.min(WH, GWP.y1), SH = BIG ? 256 / GS : CH;
-  for (let cy = wy0; cy < wy1; cy += SH) { for (let cx = wx0; cx < wx1; cx += CH) {
-    const w = Math.min(CH, wx1 - cx), h = Math.min(SH, wy1 - cy);
-    cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
-    cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS);
-    if (shoulders) { cg.fillStyle = autumnGrassPattern(cg); cg.fillRect(cx, cy, w, h); }
-    else artFill(cg, 'grass_dry', cx, cy, w, h);
-    cg.setTransform(1, 0, 0, 1, 0, 0);
-    cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
-    const s = mask.width / WW;
-    cg.drawImage(mask, cx * s, cy * s, w * s, h * s, 0, 0, w * GS, h * GS);
-    g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
-  } if (BIG) yield; }
-  yield;
+  cg.putImageData(rgba,0,0);
+  // One material sample per world pixel, even in the 2× cache. Filtering here
+  // would sample a stale texel outside this subrectangle at every cache seam.
+  g.save();
+  g.imageSmoothingEnabled=false;
+  g.drawImage(tile,0,0,w,h,x,y,w,h);
+  g.restore();
+}
+function* paintSurfaceLayers(g,tiles,shoulders){
+  const CH=GCH;
   // 3. Мягкие края грунта и асфальта: маска 4 точки на клетку, размытая и с шумом, только поверх травы
   const surfaces = [[DI, shoulders ? 'bare_soil' : 'dirt'], [AS, 'asphalt']];
-  if (shoulders) {
+  if (BIG) {
     if (GW.x0<WEST+2 || GW.x1>=WEST+222 || GW.y0<NORTH_ROWS+2) surfaces.push([SW,'water']);
     if (GW.x1>=WEST-2 && GW.x0<WEST+226 && GW.y1>=NORTH_ROWS-2) surfaces.push([SW,'swamp']);
   }
+  else surfaces.push([SW,'water']);
   for (const [tt, id] of surfaces) {
     // Гравий заходит под полотно и выступает за его края.
     const coverage = (t,x,y) => {
       if (tt!==SW) return t===tt || (shoulders && tt===DI && t===AS);
-      const marsh=x>=WEST && x<WEST+224 && y>=NORTH_ROWS;
+      const marsh=BIG && x>=WEST && x<WEST+224 && y>=NORTH_ROWS;
       return t===SW && marsh===(id==='swamp');
     };
     const sc = 4 / T;
@@ -5380,30 +5370,79 @@ function* artGround(g, R) {
       const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(PW*T,GWP.x1, (bx1 + 4) * T), ry1 = Math.min(MH*T,GWP.y1, (by1 + 4) * T);
       for (let cy = ry0; cy < ry1; cy += CH) for (let cx = rx0; cx < rx1; cx += CH) {
         const w = Math.min(CH, rx1 - cx), h = Math.min(CH, ry1 - cy);
-        cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
-        cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS); artFill(cg, id, cx, cy, w, h);
-        if (shoulders && tt === DI) {
-          cg.fillStyle = 'rgba(178,145,101,.16)';
-          cg.fillRect(cx, cy, w, h);
-          drawWheelTracks(cg, cx, cy, w, h);
-        }
-        if (shoulders && tt === AS) {
-          cg.fillStyle = 'rgba(200,190,150,0.16)';
-          for (let row = Math.max(9, Math.floor(cy / (3 * T)) * 3); row * T < cy + h; row += 3)
-            cg.fillRect(roadX[row] * T + 14, row * T + 4, 4, 18);
-        }
-        cg.setTransform(1, 0, 0, 1, 0, 0);
-        cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
-        const mask = surfaceMask(tiles,tt,shoulders,coverage,cx*sc,cy*sc,w*sc,h*sc);
-        cg.drawImage(mask.canvas,cx*sc-mask.x,cy*sc-mask.y,w*sc,h*sc,0,0,w*GS,h*GS);
-        g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
+        const mask=surfaceMask(tiles,tt,shoulders,coverage,cx*sc,cy*sc,w*sc,h*sc);
+        stampGroundLayer(g,mask,cx,cy,w,h,(cg,cx,cy,w,h)=>{
+          if(ART?.m.sprites[id])artFill(cg,id,cx,cy,w,h);
+          else{
+            cg.fillStyle=tt===DI?'#625441':tt===AS?'#44443e':id==='swamp'?'#404634':'#323e37';
+            cg.fillRect(cx,cy,w,h);
+          }
+          if (shoulders && tt === DI) {
+            cg.fillStyle = 'rgba(178,145,101,.16)';
+            cg.fillRect(cx, cy, w, h);
+            if(ART)drawWheelTracks(cg, cx, cy, w, h);
+          }
+          if (tt === AS) {
+            cg.fillStyle = 'rgba(200,190,150,0.16)';
+            for (let row = Math.max(9, Math.floor(cy / (3 * T)) * 3); row * T < cy + h; row += 3)
+              cg.fillRect(roadX[row] * T + 14, row * T + 4, 4, 18);
+          }
+        });
       }
     }
     yield;
   }
+}
+function* paintGroundMaterials(g) {
+  const shoulders = BIG && C1, tiles = surfaceTiles();
+  // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
+  for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
+    const t = tiles[y * MW + x], px = x * T, py = y * T;
+    const id = GROUNDISH(t) || t === DI || t === AS || t === SW ? 'grass' : t === FL ? 'floor_wood' : t === CF ? 'floor_concrete' : null;
+    if (id) artFill(g, id, px, py, T, T);
+    if (t===RA && BIG && (x<WEST || y<NORTH_ROWS)) artFill(g,'grass',px,py,T,T);
+    else if (C1 && t === RA) c1Rail(g,x,y);
+    if (t === CF) { g.strokeStyle = 'rgba(25,25,20,0.18)'; g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
+  }
+  yield;
+  // 2. Сухая трава крупными мягкими пятнами: маска низкого разрешения, накладывается кусками 512 px
+  if (!ARTM.dry) {
+    const width=MW*2,height=MH*2,alpha=new Uint8ClampedArray(width*height);
+    const terrain = shoulders && autumnTerrain();
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const tx = x >> 1, ty = y >> 1, t = tiles[ty * MW + tx];
+      const v = vnoise(x, y, 11) * 0.7 + vnoise(x + 31, y + 17, 4) * 0.3;
+      let a = GROUNDISH(t) ? clamp((v - 0.5) * 4, 0, 1) : 0;
+      if (terrain && (GROUNDISH(t) || t===DI || t===AS || t===SW) && tx < PW) {
+        const i = ty * MW + tx;
+        const exposure = clamp((terrain.water[i] - 1) / 5, 0, 1);
+        const shoulder = Math.max(0, 1 - terrain.verge[i] / 4);
+        a = exposure * clamp((v - .20) * 1.9 + shoulder * .25, 0, 1);
+      }
+      alpha[y*width+x]=a*235;
+    }
+    ARTM.dry={alpha,width,height,left:0,top:0,spacing:T/2};
+  }
+  const CH=GCH, sh=BIG?256/GS:CH;
+  const wx0=GWP.x0, wy0=GWP.y0, wx1=Math.min(PW*T,GWP.x1), wy1=Math.min(WH,GWP.y1);
+  for(let cy=wy0;cy<wy1;cy+=sh){
+    for(let cx=wx0;cx<wx1;cx+=CH){
+      stampGroundLayer(g,ARTM.dry,cx,cy,Math.min(CH,wx1-cx),Math.min(sh,wy1-cy),(cg,x,y,w,h)=>{
+        if(shoulders){cg.fillStyle=autumnGrassPattern(cg);cg.fillRect(x,y,w,h);}
+        else artFill(cg,'grass_dry',x,y,w,h);
+      });
+    }
+    if(BIG)yield;
+  }
+  yield;
+  yield* paintSurfaceLayers(g,tiles,shoulders);
+  if(C1)c1ForestFloor(g);
+}
+function* artGround(g) {
+  yield* paintGroundMaterials(g);
+  const tiles=surfaceTiles();
   yield;
   if (C1) {
-    c1ForestFloor(g);
     if (BIG) {
       drawSurfaceEdges(g, tiles);
     }
@@ -5453,17 +5492,14 @@ function c1ForestFloor(g) {
     for (let i = 0; i < PW * MH; i++) { const t = map[(i / PW | 0) * MW + i % PW]; id.data[i * 4 + 3] = (t === GR || t === TR || t === BU) ? Math.round(clamp((a[i] - 4) / 9, 0, 1) * 235) : 0; }
     mg.putImageData(id, 0, 0);
     const big = document.createElement('canvas'); big.width = w; big.height = h; const bg = big.getContext('2d'); bg.imageSmoothingEnabled = true; bg.filter = 'blur(1.5px)'; bg.drawImage(m, 0, 0, w, h);
-    ARTM.forest = big;
+    const pixels=bg.getImageData(0,0,w,h).data,alpha=new Uint8ClampedArray(w*h);
+    for(let i=0;i<alpha.length;i++)alpha[i]=pixels[4*i+3];
+    ARTM.forest={alpha,width:w,height:h,left:0,top:0,spacing:T/K};
   }
-  const mk = ARTM.forest, sc = mk.width / (PW * T), cc = ARTM.cc, cg = cc.getContext('2d');
-  const x0 = GWP.x0, y0 = GWP.y0, x1 = Math.min(PW * T, GWP.x1), y1 = Math.min(WH, GWP.y1);
-  for (let cy = y0; cy < y1; cy += 512) for (let cx = x0; cx < x1; cx += 512) {
-    const w = Math.min(512, x1 - cx), h = Math.min(512, y1 - cy); if (w <= 0 || h <= 0) continue;
-    cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
-    cg.setTransform(GS, 0, 0, GS, -cx * GS, -cy * GS); artFill(cg, 'forest', cx, cy, w, h); cg.setTransform(1, 0, 0, 1, 0, 0);
-    cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
-    cg.drawImage(mk, cx * sc, cy * sc, w * sc, h * sc, 0, 0, w * GS, h * GS);
-    g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
+  const {x0,y0}=GWP,x1=Math.min(PW*T,GWP.x1),y1=Math.min(WH,GWP.y1);
+  for(let cy=y0;cy<y1;cy+=GCH)for(let cx=x0;cx<x1;cx+=GCH){
+    stampGroundLayer(g,ARTM.forest,cx,cy,Math.min(GCH,x1-cx),Math.min(GCH,y1-cy),
+      (cg,x,y,w,h)=>artFill(cg,'forest',x,y,w,h));
   }
 }
 // Пучки группируются по мировым координатам. Берег узнаётся по камышу,
