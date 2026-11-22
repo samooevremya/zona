@@ -682,6 +682,33 @@ function witnessScene() {
   };
   return { victim:add('Потерпевший', 28, Math.PI), add };
 }
+Tt('K_trader_seat_and_old_save', () => {
+  reset();
+  const d=z.gfxSnap().NPCDEF.find(e=>e.sid==='sid');
+  const old=structuredClone(S());
+  old.dead.sid=1;
+  old.dyn.npcs.push({uid:'oldSid',sid:'sid',kind:'human',fac:'trader',name:d.name,
+    x:d.x*T+65,y:d.y*T-40,home:{x:0,y:0},hp:1,maxhp:1,traded:1,money:123});
+  z.applyState(old);
+  const sid=z.ents.find(e=>e.sid==='sid'), hp=sid.hp;
+  z.rc.hurt(sid,1000000,P(),Math.PI/2);
+  Object.assign(P(),{x:d.x*T+1,y:d.y*T+2});
+  sid.kx=300;sid.ky=120;step(6);
+  return {ok:sid.alive && sid.hp===d.hp && hp===d.hp && !sid.flash && !sid.kx && !sid.ky &&
+    sid.money===123 && sid.x===d.x*T && sid.y===d.y*T && !S().dead.sid};
+});
+Tt('K_warning_shared_only_in_same_firefight', () => {
+  const {victim,add}=witnessScene(), witness=add('Дозорный',-52,0);
+  const fight={x:P().x,y:P().y,until:S().min+8};
+  const shot={fight,id:1};
+  for(let i=0;i<3;i++) z.rc.hurt(victim,1,P(),0,shot);
+  const warned=!victim.angry && !witness.angry && victim.bub.t==='Свои!';
+  z.rc.hurt(witness,1,P(),0,{fight,id:2});
+  const repeat=!!witness.angry;
+  const quiet=add('Прохожий',-64,0); fight.until=S().min-1;
+  z.rc.hurt(quiet,1,P(),0,{fight,id:3});
+  return {ok:warned && repeat && !!quiet.angry,warned,repeat};
+});
 Tt('K_witness_private_attack', () => {
   const {victim, add} = witnessScene();
   const turned = add('Спиной к игроку', -38, Math.PI);

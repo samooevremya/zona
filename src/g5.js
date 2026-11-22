@@ -480,7 +480,7 @@ function drawMenu() {
   if (panel.pausePage==='help') {
     heading.textContent='Управление и сохранения';
     nav.appendChild(el('p','pause-note',IN.touch
-      ? 'Джойстик отвечает за движение. Удерживай кнопку бега, а для смены оружия коснись его панели.'
+      ? 'Левый джойстик — ходьба. Удерживай кнопку с прицелом для огня и тяни её в сторону цели. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
     if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
     nav.appendChild(el('p','pause-note','Игра сохраняется автоматически у костра и у Сидоровича. Вручную можно сохраниться, когда рядом нет врагов.'));
@@ -998,8 +998,7 @@ addEventListener('keyup', e => { KEYS[e.code] = false; });
 function resetInput() {
   IN.sprint = false; IN.runPointer = null; $('b-run').classList.remove('on');
   for (const k in KEYS) KEYS[k] = false;
-  IN.fire = false; IN.touchFire = false; IN.btnFire = false; IN.fireStick = null; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
-  const fb = document.getElementById('b-fire'); if (fb) { fb.classList.remove('on'); fb.style.setProperty('--fx', '0px'); fb.style.setProperty('--fy', '0px'); }
+  IN.fire = false; releaseFireStick(); IN.left = null; IN.moveX = IN.moveY = 0;
   if (typeof joyReset === 'function') joyReset();
 }
 addEventListener('blur', resetInput);
@@ -1024,32 +1023,30 @@ cv.addEventListener('pointerdown', e => {
   if (panel || title.open) return;
   if (e.pointerType === 'mouse') { setTouch(false); IN.mx = e.clientX; IN.my = e.clientY; if (e.button === 0) IN.fire = true; return; }
   setTouch(true);
-  cv.setPointerCapture(e.pointerId);
   const s = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, a: P.ang };
   const jr = JOY.getBoundingClientRect();
   const custom = !!JOY.dataset.layout;
   const onStick = custom ? Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2) <= jr.width/2+6 : e.clientX<VW*.5;
   if (onStick && !IN.left) {
+    cv.setPointerCapture(e.pointerId);
     IN.left = s;
     if (custom) { s.ox=jr.x+jr.width/2; s.oy=jr.y+jr.height/2; JOY.classList.add('on'); }
     else joyAt(e.clientX,e.clientY,s);
     s.radius = custom ? jr.width/2 : 56;
-  } else if (!onStick && !IN.aimStick) IN.aimStick=s;
+  }
 });
 cv.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { IN.mx = e.clientX; IN.my = e.clientY; if (IN.touch) setTouch(false); return; }
-  const s = IN.left && IN.left.id === e.pointerId ? IN.left : IN.aimStick && IN.aimStick.id === e.pointerId ? IN.aimStick : null;
-  if (!s) return;
+  const s=IN.left;
+  if (!s || s.id!==e.pointerId) return;
   let dx = (e.clientX - s.ox) / (s.radius || 56), dy = (e.clientY - s.oy) / (s.radius || 56);
   const m = Math.hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
   s.dx = dx; s.dy = dy;
-  if (s === IN.left) { IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * Math.min(34,(s.radius || 56)*.6)) + 'px,' + (dy * Math.min(34,(s.radius || 56)*.6)) + 'px)'; }
-  else { if (m > 0.2) s.a = Math.atan2(dy, dx); IN.touchFire = m > 0.92; }
+  IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * Math.min(34,(s.radius || 56)*.6)) + 'px,' + (dy * Math.min(34,(s.radius || 56)*.6)) + 'px)';
 });
 function endPtr(e) {
   if (e.pointerType === 'mouse') { IN.fire = false; return; }
   if (IN.left && IN.left.id === e.pointerId) { IN.left = null; IN.moveX = IN.moveY = 0; joyReset(); }
-  if (IN.aimStick && IN.aimStick.id === e.pointerId) { IN.aimStick = null; IN.touchFire = false; }
 }
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1074,9 +1071,38 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 const fireB = $('b-fire');
-fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
-fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => fireB.addEventListener(t, () => { IN.btnFire = false; IN.fireStick = null; fireB.classList.remove('on'); fireB.style.setProperty('--fx', '0px'); fireB.style.setProperty('--fy', '0px'); }));
+function releaseFireStick() {
+  IN.aimStick=null; IN.btnFire=false;
+  fireB.classList.remove('on');
+  fireB.style.removeProperty('--aim-x'); fireB.style.removeProperty('--aim-y');
+}
+function steerFireStick(e) {
+  const s=IN.aimStick;
+  if (!s || e.pointerId!==s.id) return;
+  const dx=e.clientX-s.cx, dy=e.clientY-s.cy, length=Math.hypot(dx,dy);
+  if (length>s.radius*.16) { s.a=Math.atan2(dy,dx); P.lockT=0; }
+  const k=Math.min(.34,.34*s.radius/Math.max(length,1));
+  fireB.style.setProperty('--aim-x',dx*k+'px'); fireB.style.setProperty('--aim-y',dy*k+'px');
+}
+fireB.addEventListener('pointerdown', e => {
+  if (IN.aimStick || panel || title.open || !P?.alive) return;
+  e.preventDefault(); e.stopPropagation(); audioInit(); setTouch(true);
+  const r=fireB.getBoundingClientRect();
+  IN.aimStick={id:e.pointerId,cx:r.left+r.width/2,cy:r.top+r.height/2,radius:r.width/2,a:P.ang};
+  fireB.setPointerCapture(e.pointerId);
+  steerFireStick(e); IN.btnFire=true; fireB.classList.add('on');
+});
+fireB.addEventListener('pointermove',steerFireStick);
+for (const event of ['pointerup','pointercancel','lostpointercapture']) {
+  fireB.addEventListener(event,e=>{
+    const stick=IN.aimStick;
+    if (stick?.id!==e.pointerId) return;
+    if (event==='pointerup' && !stick.sampled && P?.alive && !panel && !title.open) {
+      P.ang=stick.a; playerFire();
+    }
+    releaseFireStick();
+  });
+}
 $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); if (!panel) interact(); });
 $('rot-skip').addEventListener('click', () => document.body.classList.add('portrait-ok'));
 Object.keys(TB).forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); if (P.alive && !panel) TB[id](); }));

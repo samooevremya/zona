@@ -366,15 +366,26 @@ function containerDraw(o){
 
 // Оставляем персонажа как можно ближе к его исходному месту у костра или поста.
 function clearPropSpawn(e) {
-  const tx=Math.floor(e.x/T), ty=Math.floor(e.y/T);
-  if(!propCells.has(ty*MW+tx)) return;
-  for(let distance=0;distance<=2*T;distance+=3){
+  const atHome = Math.hypot(e.x-e.home.x, e.y-e.home.y) < 1;
+  function open(x,y) {
+    const tx=Math.floor(x/T), ty=Math.floor(y/T);
+    if (!inb(tx,ty) || !nav[ty*MW+tx]) return false;
+    if (e.kind === 'human') {
+      // Leave enough space for the shoulders at a stationary NPC's post.
+      for (let j=ty-1;j<=ty+1;j++) for (let i=tx-1;i<=tx+1;i++)
+        if (tAt(i,j)===BU && Math.hypot((i+.5)*T-x,(j+.5)*T-y)<24) return false;
+    }
+    const probe={x,y,r:e.r}; collide(probe);
+    return Math.hypot(probe.x-x,probe.y-y)<.01;
+  }
+  if (open(e.x,e.y)) return;
+  for(let distance=3;distance<=4*T;distance+=3){
     for(let i=0;i<16;i++){
       const a=i*Math.PI/8, x=e.x+Math.cos(a)*distance, y=e.y+Math.sin(a)*distance;
-      if(!nav[Math.floor(y/T)*MW+Math.floor(x/T)]) continue;
-      const probe={x,y,r:e.r}; collide(probe);
-      if(Math.hypot(probe.x-x,probe.y-y)>.01) continue;
-      e.x=e.home.x=x; e.y=e.home.y=y;
+      if(!open(x,y)) continue;
+      e.x=x; e.y=y;
+      if(atHome || !open(e.home.x,e.home.y)) e.home={x,y};
+      e.path=null;
       return;
     }
   }

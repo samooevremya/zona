@@ -28,18 +28,22 @@ canopyWindow.width = canopyWindow.height = 64;
   fade.addColorStop(1, 'transparent');
   g.fillStyle = fade; g.fillRect(0, 0, 64, 64);
 }
+let canopyCompanion = null;
 const nearCrown = document.createElement('canvas'), nearCtx = nearCrown.getContext('2d');
 function drawAutumnCrown(sprite, x, y, w, h) {
   if (w <= 0 || h <= 0) return;
   const left = x - w / 2, top = y - h / 2, radius = 30;
-  if (!P || Math.abs(x - P.x) > w / 2 + radius || Math.abs(y - P.y) > h / 2 + radius) {
+  const nearPlayer = P && Math.abs(x-P.x)<=w/2+radius && Math.abs(y-P.y)<=h/2+radius;
+  const e=canopyCompanion, nearNpc=e && Math.abs(x-e.x)<=w/2+radius && Math.abs(y-e.y)<=h/2+radius;
+  if (!nearPlayer && !nearNpc) {
     ctx.drawImage(sprite, left, top, w, h); return;
   }
   if (nearCrown.width !== sprite.width) nearCrown.width = nearCrown.height = sprite.width;
   nearCtx.globalCompositeOperation = 'copy'; nearCtx.drawImage(sprite, 0, 0);
   nearCtx.globalCompositeOperation = 'destination-out';
   const kx = sprite.width / w, ky = sprite.height / h;
-  nearCtx.drawImage(canopyWindow, (P.x - radius - left) * kx, (P.y - radius - top) * ky, radius * 2 * kx, radius * 2 * ky);
+  if (nearNpc) nearCtx.drawImage(canopyWindow,(e.x-radius-left)*kx,(e.y-radius-top)*ky,radius*2*kx,radius*2*ky);
+  if (nearPlayer) nearCtx.drawImage(canopyWindow, (P.x - radius - left) * kx, (P.y - radius - top) * ky, radius * 2 * kx, radius * 2 * ky);
   ctx.drawImage(nearCrown, left, top, w, h);
 }
 
@@ -905,6 +909,10 @@ function render() {
   ctx.restore();
   if (perspective && ART && !shopVisible && !loft) drawCheckpointSpan(inView);
   drawCloudShadows();
+  // Open the leaves over the person within speaking or helping distance.
+  const near=G.near;
+  canopyCompanion=near?.e?.alive && ['talk','heal','free'].includes(near.k) && dE(near.e,P)<=60 &&
+    los(P.x,P.y,near.e.x,near.e.y) ? near.e : null;
   // кроны
   const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
   const tx0 = Math.max(0, Math.floor(vx / T) - margin), tx1 = Math.min(MW - 1, Math.ceil((vx + vw) / T) + margin);
@@ -967,7 +975,7 @@ function render() {
   // захват цели: уголки вокруг врага
   if (P && P.alive && P.lock && P.lock.alive) {
     const L = P.lock, r = L.r + 7, k = 6, on = Math.abs(angD(P.ang, Math.atan2(L.y - P.y, L.x - P.x))) < 0.12;
-    ctx.strokeStyle = on ? 'rgba(235,80,60,0.95)' : 'rgba(235,190,90,0.8)'; ctx.lineWidth = 1.6;
+    ctx.strokeStyle = on ? 'rgba(235,80,60,0.95)' : 'rgba(230,101,73,0.86)'; ctx.lineWidth = 1.6;
     [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(c => { ctx.beginPath(); ctx.moveTo(L.x + c[0] * r, L.y + c[1] * (r - k)); ctx.lineTo(L.x + c[0] * r, L.y + c[1] * r); ctx.lineTo(L.x + c[0] * (r - k), L.y + c[1] * r); ctx.stroke(); });
     if (P.hitT > 0) { const m = 5 + (P.killT > 0 ? 3 : 0); ctx.strokeStyle = P.killT > 0 ? 'rgba(255,70,50,0.95)' : 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L.x - m, L.y - m); ctx.lineTo(L.x - 2, L.y - 2); ctx.moveTo(L.x + m, L.y - m); ctx.lineTo(L.x + 2, L.y - 2); ctx.moveTo(L.x - m, L.y + m); ctx.lineTo(L.x - 2, L.y + 2); ctx.moveTo(L.x + m, L.y + m); ctx.lineTo(L.x + 2, L.y + 2); ctx.stroke(); }
     ctx.lineWidth = 1;
@@ -1034,16 +1042,4 @@ function render() {
   ctx.globalAlpha = 1;
   ctx.fillStyle = ctx.createPattern(grainC, 'repeat');
   ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128); ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
-  drawSticks();
-}
-function drawSticks() {
-  if (!IN.touch) return;
-  [IN.left, IN.aimStick].forEach((s, i) => {
-    if (!s) return;
-    ctx.strokeStyle = 'rgba(216,210,188,0.35)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(s.ox, s.oy, 56, 0, 6.28); ctx.stroke();
-    ctx.fillStyle = i ? (IN.touchFire ? 'rgba(214,69,65,0.55)' : 'rgba(220,147,48,0.45)') : 'rgba(216,210,188,0.35)';
-    ctx.beginPath(); ctx.arc(s.ox + s.dx * 56, s.oy + s.dy * 56, 22, 0, 6.28); ctx.fill();
-  });
-  ctx.lineWidth = 1;
 }

@@ -74,8 +74,8 @@ body.is-touch .touch.zt .c4{top:calc(126px + var(--sat) + var(--st) * 3)}
 body.is-touch .touch.zt .c5{top:calc(126px + var(--sat) + var(--st) * 4)}
 body.is-touch .touch.zt .fire{position:absolute;pointer-events:auto;width:108px;height:108px;border-radius:50%;padding:0;right:calc(66px + var(--sar));bottom:calc(14px + var(--sab));display:grid;place-items:center;color:#ece4d0;
  background:radial-gradient(circle,rgba(30,27,23,.55) 55%,rgba(16,14,12,.75) 70%);border:2px solid rgba(190,172,140,.55);box-shadow:inset 0 0 0 5px rgba(0,0,0,.35),inset 0 0 0 6px rgba(160,140,110,.25),0 2px 8px rgba(0,0,0,.6)}
-body.is-touch .touch.zt .fire svg{width:58px;height:58px;transform:translate(var(--fx,0),var(--fy,0));transition:transform .05s}
-body.is-touch .touch.zt .fire.on{border-color:#e05a3a;color:#ffb39a;background:radial-gradient(circle,rgba(90,30,20,.55) 55%,rgba(40,14,10,.8) 70%)}
+body.is-touch .touch.zt .fire svg{width:58px;height:58px;transform:translate(var(--aim-x,0px),var(--aim-y,0px))}
+body.is-touch .touch.zt .fire.on{border-color:#b9ad92;color:#fff3d7;background:rgba(43,39,32,.65)}
 .joy{display:none}
 body.is-touch .joy{display:block;position:absolute;pointer-events:none;left:calc(26px + var(--sal));bottom:calc(16px + var(--sab));width:124px;height:124px;border-radius:50%;
  background:radial-gradient(circle,rgba(30,27,23,.35) 50%,rgba(14,12,10,.6) 70%);border:2px solid rgba(190,172,140,.45);box-shadow:inset 0 0 0 5px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.5);opacity:.75}

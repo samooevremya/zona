@@ -1,7 +1,7 @@
 /* ===================== игрок и мир за кадр ===================== */
 const HURTDIR = [];
 let hurtFlash = 0, deathT = 0, shakeA = 0, geigerAcc = 0, radRate = 0, ambT = 0;
-const IN = { mx: 0, my: 0, fire: false, moveX: 0, moveY: 0, sprint: false, runPointer: null, aimStick: null, touchFire: false };
+const IN = { mx: 0, my: 0, fire: false, moveX: 0, moveY: 0, sprint: false, runPointer: null, aimStick: null };
 function shake(a) { shakeA = Math.max(shakeA, a); }
 const fog = new Uint8Array(MW * MH);
 function reveal() {
@@ -196,6 +196,7 @@ function update(dt) {
   // толкотня и отдача
   for (let i = 0; i < ents.length; i++) {
     const a = ents[i]; if (!a.alive) continue;
+    if (a.sid === 'sid') { a.x = a.home.x; a.y = a.home.y; a.kx = a.ky = 0; }
     if (a.kx || a.ky) { moveE(a, a.kx * dt, a.ky * dt); a.kx *= Math.pow(0.02, dt); a.ky *= Math.pow(0.02, dt); if (Math.abs(a.kx) + Math.abs(a.ky) < 2) a.kx = a.ky = 0; }
     a.flash = Math.max(0, a.flash - dt);
     for (let j = i + 1; j < ents.length; j++) {
@@ -212,8 +213,8 @@ function update(dt) {
         moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
       } else if (d < rr && d > 0.01) {
         const push = (rr - d) / 2, ux = dx / d, uy = dy / d;
-        if (!a.captive) { a.x -= ux * push; a.y -= uy * push; }
-        if (!b.captive) { b.x += ux * push; b.y += uy * push; }
+        if (!a.captive && a.sid !== 'sid') moveE(a, -ux * push, -uy * push);
+        if (!b.captive && b.sid !== 'sid') moveE(b, ux * push, uy * push);
       }
     }
   }
@@ -305,10 +306,10 @@ function updatePlayer(dt) {
   // прицел
   // захват цели: видимый враг ближе всего к направлению прицела, с удержанием
   P.lockT = (P.lockT || 0) - dt; P.combatT = Math.max(0, (P.combatT || 0) - dt);
-  const aimDir = IN.touch ? (IN.aimStick ? IN.aimStick.a : IN.fireStick && IN.fireStick.m > 0.25 ? IN.fireStick.a : P.ang) : Math.atan2(screenToWorld(IN.mx, IN.my).y - P.y, screenToWorld(IN.mx, IN.my).x - P.x);
+  const aimDir = IN.touch ? (IN.aimStick ? IN.aimStick.a : P.ang) : Math.atan2(screenToWorld(IN.mx, IN.my).y - P.y, screenToWorld(IN.mx, IN.my).x - P.x);
   if (P.lockT <= 0) {
     P.lockT = 0.12;
-    const cone = IN.touch ? (IN.aimStick || (IN.fireStick && IN.fireStick.m > 0.25) ? 0.6 : 3.2) : 0.14;
+    const cone = IN.touch ? (IN.aimStick ? 0.44 : 0.85) : 0.14;
     let best = null, bs = 1e9;
     for (const e of ents) {
       if (!e.alive || e === P || !hostile(P, e) || e.captive || e.cloak > 0.7) continue;
@@ -322,10 +323,9 @@ function updatePlayer(dt) {
   }
   if (P.lock && (!P.lock.alive || !hostile(P, P.lock))) P.lock = null;
   if (IN.touch) {
-    const firing = IN.btnFire || IN.touchFire;
-    if (P.lock && (firing || IN.aimStick)) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
-    else if (IN.aimStick) P.ang += angD(P.ang, IN.aimStick.a) * Math.min(1, dt * 18);
-    else if (IN.fireStick && IN.fireStick.m > 0.25) P.ang += angD(P.ang, IN.fireStick.a) * Math.min(1, dt * 18);
+    const firing = IN.btnFire;
+    if (P.lock && firing && Math.abs(angD(aimDir, Math.atan2(P.lock.y-P.y,P.lock.x-P.x)))<.14) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
+    else if (IN.aimStick) P.ang = IN.aimStick.a;
     else if (ml > 0.1) P.ang += angD(P.ang, Math.atan2(my, mx)) * Math.min(1, dt * 10);
   } else {
     const w = screenToWorld(IN.mx, IN.my);
@@ -334,7 +334,10 @@ function updatePlayer(dt) {
   }
   P.hitT = Math.max(0, (P.hitT || 0) - dt); P.killT = Math.max(0, (P.killT || 0) - dt);
   for (let i = HURTDIR.length - 1; i >= 0; i--) { HURTDIR[i].life -= dt; if (HURTDIR[i].life <= 0) HURTDIR.splice(i, 1); }
-  if (IN.fire || IN.touchFire || IN.btnFire) playerFire();
+  if (IN.fire || IN.btnFire) {
+    if (IN.aimStick) IN.aimStick.sampled=true;
+    playerFire();
+  }
   // радиация и артефакты
   radRate = 0;
   rads.forEach(z => { const d = dst(P.x, P.y, z.x, z.y); if (d < z.r) radRate += z.p * (1 - d / z.r); });
@@ -487,6 +490,7 @@ function applyState(d) {
     }
   }
   loadFieldCrates(); restoreCrateCleanup(); renewFieldCrates();
+  for (const e of ents) if (e !== P && e.home && e.sid !== 'sid') clearPropSpawn(e);
   // Older northern-map saves could stand inside the now closed western cutting.
   if(BIG && cuttingDepth(Math.floor(P.x/T),Math.floor(P.y/T))>=0){
     const verge=freeTile(122,61);

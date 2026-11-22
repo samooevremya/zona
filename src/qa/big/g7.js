@@ -86,14 +86,22 @@ T_('G4_corner_and_open', () => {
   return { ok: !out.cornerHit && open === all, cornerHit: out.cornerHit, openHits: open + '/' + all };
 });
 
-/* G5: дружеский огонь по прежним правилам: в бою свой пропускается, вне боя — получает попадание */
+/* Проверяем попадание первым же лучом и реакцию через обычный выстрел. */
 T_('G5_friendly_fire_rules', () => {
-  reset(); const rest = isolate(); const [cx, cy] = C0(); place(P(), cx, cy, 0);
-  const f = tgt(cx + 40, cy, 'loner'), foe = tgt(cx + 90, cy, 'bandit');
-  P().combatT = 3; const inCombat = shoot(P(), 0, 'w_pm');
-  P().combatT = 0; z.ents.splice(z.ents.indexOf(foe), 1); const calm = shoot(P(), 0, 'w_pm');
-  z.ents.splice(z.ents.indexOf(f), 1); restore(rest);
-  return { ok: inCombat.includes(foe) && !inCombat.includes(f) && calm.includes(f), inCombat: inCombat.map(e => e.fac), calm: calm.map(e => e.fac) };
+  reset(); const rest = isolate(), [x,y]=C0(); place(P(),x,y,0);
+  const ally=tgt(x+40,y,'loner'), foe=tgt(x+90,y,'bandit');
+  foe.tgt=P(); shoot(foe,Math.PI,'w_pm');
+  const first=shoot(P(),0,'w_obrez');
+  const stopped=first.length===1 && first[0]===ally, warned=!ally.angry && ally.bub?.t==='Свои!';
+  shoot(P(),0,'w_pm');
+  const repeated=!!ally.angry && ally.tgt===P();
+  z.ents.splice(z.ents.indexOf(ally),1);
+  const stranger=tgt(x+45,y,'loner'); delete P().gunfight;
+  // Nearby enemy is present but has not fired in this encounter.
+  shoot(P(),0,'w_pm');
+  const calm=!!stranger.angry && stranger.tgt===P();
+  z.ents.splice(z.ents.indexOf(stranger),1); z.ents.splice(z.ents.indexOf(foe),1); restore(rest);
+  return {ok:!!(stopped && warned && repeated && calm),stopped,warned,repeated,calm};
 });
 
 /* G6: дальность от расчётного дула одинакова: r+8+range (не зависит от графики) */
