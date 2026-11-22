@@ -54,7 +54,7 @@ function playerFire() {
   S.mag[S.weapon] = m - 1; P.cool = W.rate;
   const moving = Math.abs(IN.moveX) + Math.abs(IN.moveY) > 0.1;
   const spread = W.spread + P.bloom + (moving ? .035 : 0) + (100-cond(S.weapon))*.0008 - (P.crouch ? .015 : 0);
-  fire(P, P.ang, W, Math.max(0, spread));
+  fire(P, P.ang, W, Math.max(0, spread)*rules().spread);
   P.bloom = Math.min(.14, P.bloom + (W.auto ? .018 : .03));
   P.bloomDelay = .24;
   P.shotFlash = .12;
@@ -546,7 +546,7 @@ function loadSave(slot=0) {
   try { const raw = localStorage.getItem(slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
 }
 function applyState(d) {
-  S = d; prepareCampaign(); lastShiftState=null;
+  S = d; S.difficulty=difficultyKey(d.difficulty); prepareCampaign(); lastShiftState=null;
   if (BIG && (S.mapVersion==='kordon-big' || S.mapVersion==='kordon-west')) migrateNorthernWorld(S);
   restoreKit();
   fog.fill(0);

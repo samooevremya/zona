@@ -1061,5 +1061,26 @@ Tt('G2_wagon_footprints',()=>{
   for(let i=0;i<900 && Math.hypot(npc.x-x,npc.y-ty)>14;i++)M.goTo(npc,x,ty,90,1/30);
   return {ok:cars.length===8 && Math.hypot(npc.x-x,npc.y-ty)<=14,wagons:cars.length,npcArrived:Math.hypot(npc.x-x,npc.y-ty)<=14};
 });
+Tt('D1_campaign_difficulty',()=>{
+  const rows=[];
+  for (const [level,price,hit] of [['rookie',240,11.7],['normal',300,18],['hard',375,22.5],['master',465,27.9]]) {
+    z.closePanel(); z.applyState(z.freshS(level));
+    const p=P(),s=S();
+    z.rc.hurt(p,20,z.ents.find(e=>e.fac==='bandit'));
+    const actualHit=100-p.hp;
+    s.money=2000; z.openTrade(null);
+    const kit=document.querySelector('.their button[aria-label^="Аптечка,"]');
+    const quoted=Number(kit.querySelector('.pr').textContent);
+    kit.click(); document.querySelector('.tr-acts .deal').click(); z.closePanel();
+    const box=M.objs.find(o=>o.stash==='st9');
+    const cash=box.loot.money, stock=JSON.stringify(s.flags.fieldCrates.slots);
+    z.save(true,1); z.applyState(z.loadSave(1));
+    rows.push({level,quoted,cash,actualHit,ok:quoted===price && S().money===2000-price && S().inv.medkit===2 &&
+      Math.abs(actualHit-hit)<.001 && S().difficulty===level && box.loot.money===cash &&
+      JSON.stringify(S().flags.fieldCrates.slots)===stock});
+  }
+  const legacy=z.freshS(); delete legacy.difficulty; z.applyState(legacy);
+  return {ok:S().difficulty==='normal' && rows.every((r,i)=>r.ok && (!i || r.cash<rows[i-1].cash)),rows};
+});
 return JSON.stringify(R);
 })()
