@@ -411,7 +411,7 @@ function sosFoeAI(e, dt) {
       e.crouch = 1; e.supT -= dt;
       const tg = ents.find(o => o.alive && o.sos === a.id && dE(o, e) < 520 && los(e.x, e.y, o.x, o.y));
       if (tg) { const ta = Math.atan2(tg.y - e.y, tg.x - e.x); e.ang += angD(e.ang, ta) * Math.min(1, dt * 4);
-        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3, tg); /* подавление: в основном мимо и не насмерть до штурма */ play(W.snd || 'p', e.x, e.y, 0.7); } }
+        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3, tg); /* подавление до штурма */ } }
       else e.ang += angD(e.ang, ang) * Math.min(1, dt * 2);
     }
     return true;
@@ -455,11 +455,11 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
     ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip, shelterOrigin:e.shelterOrigin, shelterSpot:e.shelterSpot } } : {}),
-    ...(e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
+    ...((e.inBattle && e.trip) || e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
     sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, assisted: e.assisted || undefined, inv: e.traded || e.assisted ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt

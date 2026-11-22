@@ -1158,20 +1158,96 @@ function rayFence(x, y, dx, dy, near, far) {
   }
   return hit;
 }
-function seesActor(observer, target) {
+// Ground elevations in world units, sampled from the same landforms as the renderer.
+// Both ends of a shot stand on the ground; two people on one crest can see each other.
+let combatRelief;
+function terrainLevel(x,y) {
+  if(!BIG || x<0 || y<0 || x>=(MW-1)*T || y>=(MH-1)*T)return 0;
+  if(!combatRelief){
+    combatRelief=new Float32Array(MW*MH);
+    function mound(cx,cy,rx,ry,a,height){
+      const sn=Math.sin(a),cs=Math.cos(a),r=Math.ceil(Math.max(rx,ry));
+      for(let j=Math.max(0,Math.floor(cy-r));j<=Math.min(MH-1,cy+r);j++)
+        for(let i=Math.max(0,Math.floor(cx-r));i<=Math.min(MW-1,cx+r);i++){
+          const u=((i-cx)*cs+(j-cy)*sn)/rx,v=((j-cy)*cs-(i-cx)*sn)/ry;
+          const k=j*MW+i;
+          combatRelief[k]=Math.max(combatRelief[k],height*Math.max(0,1-u*u-v*v)**2);
+        }
+    }
+    for(const [cx,cy,rx,ry,a] of knolls)mound(cx,cy,rx,ry,a,48);
+    for(const [cx,cy,w,h,a] of dumpHills)mound(cx,cy,w/2,h/2,a,84);
+  }
+  const u=x/T,v=y/T,i=Math.floor(u),j=Math.floor(v),k=j*MW+i;
+  return lerp(lerp(combatRelief[k],combatRelief[k+1],u-i),
+              lerp(combatRelief[k+MW],combatRelief[k+MW+1],u-i),v-j);
+}
+// Clip a ray against the same convex footprint that stops a walking actor.
+function propRay(p,x,y,dx,dy,near,far){
+  let enter=near,exit=far;
+  for(let i=0;i<p.vertices.length;i++){
+    const a=p.vertices[i],b=p.vertices[(i+1)%p.vertices.length];
+    const ex=b[0]-a[0],ey=b[1]-a[1],offset=ex*(y-a[1])-ey*(x-a[0]),rate=ex*dy-ey*dx;
+    if(Math.abs(rate)<1e-8){if(offset<0)return Infinity;continue;}
+    if(rate>0)enter=Math.max(enter,-offset/rate);
+    else exit=Math.min(exit,-offset/rate);
+    if(enter>exit)return Infinity;
+  }
+  return enter;
+}
+function npcBarrier(from,dx,dy,limit,target,vision=false){
+  if(limit<=0)return 0;
+  const {x,y}=from,base=terrainLevel(x,y)+18,range=target?dE(from,target):0;
+  const slope=range>1?(terrainLevel(target.x,target.y)+18-base)/range:0;
+  let i=Math.floor(x/T),j=Math.floor(y/T),near=0;
+  const sx=dx>0?1:-1,sy=dy>0?1:-1;
+  const stepX=dx?T/Math.abs(dx):Infinity,stepY=dy?T/Math.abs(dy):Infinity;
+  let nextX=dx?((i+(dx>0))*T-x)/dx:Infinity,nextY=dy?((j+(dy>0))*T-y)/dy:Infinity;
+  function tileBlocks(i,j){
+    if(!inb(i,j))return true;
+    const tile=map[j*MW+i];
+    return OPAQ[tile] || tile===RA;
+  }
+  while(near<limit){
+    if(tileBlocks(i,j))return near;
+    const cell=j*MW+i,far=Math.min(nextX,nextY,limit);
+    let hit=Infinity;
+    const solids=walkSolids.get(cell),props=propCells.get(cell);
+    if(solids)for(const o of solids)if(o.solid && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
+      hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
+    if(props)for(const p of props)hit=Math.min(hit,propRay(p,x,y,dx,dy,near,far));
+    const mid=(near+far)/2;
+    if(terrainLevel(x+dx*mid,y+dy*mid)>base+slope*mid)hit=Math.min(hit,mid);
+    else if(terrainLevel(x+dx*far,y+dy*far)>base+slope*far)hit=Math.min(hit,far);
+    if(hit<=far)return hit;
+    if(far===limit)break;
+    const crossX=nextX<=nextY+1e-8,crossY=nextY<=nextX+1e-8;
+    if(crossX&&crossY&&(tileBlocks(i+sx,j)||tileBlocks(i,j+sy)))return far;
+    if(crossX){i+=sx;nextX+=stepX;}
+    if(crossY){j+=sy;nextY+=stepY;}
+    near=far;
+  }
+  return limit;
+}
+function clearNPCShot(from,to,vision=false){
+  const d=dE(from,to);
+  return d<.01 || npcBarrier(from,(to.x-from.x)/d,(to.y-from.y)/d,d,to,vision)>=d;
+}
+function seesActor(observer, target, openRay=false) {
   if (!los(observer.x, observer.y, target.x, target.y)) return false;
+  if(!openRay && observer.kind==='human' && !clearNPCShot(observer,target,true))return false;
   if (!target.crouch) return true;
   const dx = observer.x - target.x, dy = observer.y - target.y, d = Math.hypot(dx, dy);
   return !d || rayFence(target.x, target.y, dx / d, dy / d, 0, Math.min(d, FENCE_REACH)) === Infinity;
 }
-function shotBarrier(sh, ca, sa, reach) {
+function shotBarrier(sh, ca, sa, reach, target=sh.tgt) {
+  if(sh!==P && sh.kind==='human')return npcBarrier(sh,ca,sa,reach,target);
   const wall = rayWall(sh.x, sh.y, ca, sa, reach);
   return sh.crouch ? Math.min(wall, rayFence(sh.x, sh.y, ca, sa, 0, Math.min(wall, FENCE_REACH))) : wall;
 }
 const ballOff = sh => (sh.r || 11) + 8;
-function shotTrace(sh, a, W) {   // чистая функция исхода одного луча: {t, best, wall}
+function shotTrace(sh, a, W, target=sh.tgt) {   // чистая функция исхода одного луча: {t, best, wall}
   const ca = Math.cos(a), sa = Math.sin(a), reach = W.range + ballOff(sh);
-  const wallT = shotBarrier(sh, ca, sa, reach);
+  const wallT = shotBarrier(sh,ca,sa,reach,target);
   let best = null, bt = wallT;
 
   for (const e of ents) {
@@ -1179,13 +1255,15 @@ function shotTrace(sh, a, W) {   // чистая функция исхода о�
     const t = rayCircle(sh.x, sh.y, ca, sa, e.x, e.y, e.r + (e.captive ? -4 : 0));
     if (t !== null && t <= bt) { best = e; bt = t; }
   }
-  if (best && best.crouch) {
+  if (sh===P && best && best.crouch) {
     const centerT = (best.x - sh.x) * ca + (best.y - sh.y) * sa;
     const fence = rayFence(sh.x, sh.y, ca, sa, Math.max(0, centerT - FENCE_REACH), bt);
     if (fence <= bt) { bt = fence; best = null; }
   }
-  const box=containerOnRay(sh,ca,sa,bt);
-  if(box.o) return {t:box.d,best:null,box:box.o,wall:true,ca,sa};
+  if(sh===P){
+    const box=containerOnRay(sh,ca,sa,bt);
+    if(box.o)return {t:box.d,best:null,box:box.o,wall:true,ca,sa};
+  }
   return { t: bt, best: best, wall: !best && bt < reach, ca: ca, sa: sa };
 }
 // Только реальные выстрелы между противниками продлевают локальную перестрелку.
@@ -1200,14 +1278,24 @@ function noteGunfight(sh, target) {
 }
 function fire(sh, ang, W, spread, target = sh.tgt) {
   const mz = muzzlePoint(sh, ang), n = W.pellets || 1;
+  let shots;
+  if(sh!==P){
+    if(!target || !hostile(sh,target) || !clearNPCShot(sh,target) || !lineClear(sh,target))return false;
+    shots=[];
+    for(let k=0;k<n;k++){
+      const a=ang+rnd(-spread,spread),r=shotTrace(sh,a,W,target);
+      if(r.best && !hostile(sh,r.best))return false;
+      shots.push({a,r});
+    }
+  }
   const ca0 = Math.cos(ang), sa0 = Math.sin(ang), mzT = Math.max(0, (mz.x - sh.x) * ca0 + (mz.y - sh.y) * sa0);
-  const w0 = shotBarrier(sh, ca0, sa0, mzT + 1), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
+  const w0 = shotBarrier(sh, ca0, sa0, mzT + 1, target), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
   const fx = blocked ? sh.x + ca0 * Math.max(0, w0 - 1) : mz.x, fy = blocked ? sh.y + sa0 * Math.max(0, w0 - 1) : mz.y;
   if (sh!==P) noteGunfight(sh,target);
   // Дробины одного выстрела считаются одним попаданием по своим.
   const shot = sh === P ? { fight:P.gunfight, id:(P.shotId=(P.shotId || 0)+1) } : null;
   for (let k = 0; k < n; k++) {
-    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
+    const a = shots ? shots[k].a : ang + (Math.random() - 0.5) * 2 * spread, r = shots ? shots[k].r : shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
     if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
@@ -1231,6 +1319,7 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
     const d = dE(e, sh);
     if (d < 620 && hostile(e, sh)) { e.lastSeen = { x: sh.x, y: sh.y }; e.mem = Math.max(e.mem || 0, 5); if (sh === P) e.aw = Math.max(e.aw || 0, d < 320 ? 1 : 0.75); }
   });
+  return true;
 }
 /* бой рядом: есть враг игрока ближе 650 px, который его видит или видим им */
 function combatNear() { for (const e of ents) if (e.alive && e !== P && hostile(P, e) && dE(e, P) < 650) { P.combatT = 3; return true; } return (P.combatT || 0) > 0; }
@@ -1242,11 +1331,11 @@ function coverBlocks(t, sx, sy) {
   return false;
 }
 /* линия огня свободна от своих (для НПС) */
-function lineClear(sh, t) {
-  const a = Math.atan2(t.y - sh.y, t.x - sh.x), ca = Math.cos(a), sa = Math.sin(a), L = dE(sh, t);
+function lineClear(sh, t, from=sh) {
+  const a = Math.atan2(t.y - from.y, t.x - from.x), ca = Math.cos(a), sa = Math.sin(a), L = dE(from, t);
   for (const e of ents) {
     if (!e.alive || e === sh || e === t || hostile(sh, e)) continue;
-    const vx = e.x - sh.x, vy = e.y - sh.y, k = vx * ca + vy * sa;
+    const vx = e.x - from.x, vy = e.y - from.y, k = vx * ca + vy * sa;
     if (k < 0 || k > L) continue;
     const px = vx - ca * k, py = vy - sa * k;
     if (px * px + py * py < (e.r + 6) ** 2) return false;
@@ -1257,6 +1346,7 @@ function melee(sh, W) {
   const passFriends = sh === P && combatNear();
   let hit = null, bd = 1e9;
   ents.forEach(e => {
+    if(sh!==P && (!hostile(sh,e)||!clearNPCShot(sh,e)))return;
     if (!e.alive || e === sh || (passFriends && !hostile(sh, e))) return;
     const d = dE(e, sh);
     if (d < W.range + e.r + sh.r && Math.abs(angD(sh.ang, Math.atan2(e.y - sh.y, e.x - sh.x))) < 0.9 && d < bd) { hit = e; bd = d; }
@@ -1418,6 +1508,10 @@ function aiHuman(e, dt) {
   }
   const t = e.tgt;
   if (t && t.alive && hostile(e, t)) { combatHuman(e, t, W, dt); return; }
+  if(e.inBattle){
+    e.inBattle=false;e.healing=0;e.healT=0;e.firingSpot=null;e.peekTime=0;
+    e.path=null;e.routeRetry=0;e.mem=0;e.lastSeen=null;
+  }
   e.inCover = 0; e.crouch = 0; e.role = null; e.cover = null;
   e.tgt = null;
   e.react = 0.5;
@@ -1454,23 +1548,35 @@ function pickRole(e, t) {
   return 'hold';
 }
 /* укрытие: проходимая клетка рядом с препятствием, которое стоит между ней и целью */
-function findCover(e, t, minD, maxD) {
-  const ex = Math.floor(e.x / T), ey = Math.floor(e.y / T);
-  let best = null, bs = 1e9;
-  for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
-    const x = ex + dx, y = ey + dy;
-    if (!inb(x, y) || !nav[y * MW + x]) continue;
-    const cx = x * T + 16, cy = y * T + 16;
-    const dt2 = dst(cx, cy, t.x, t.y); if (dt2 < minD || dt2 > maxD) continue;
-    const a = Math.atan2(t.y - cy, t.x - cx);
-    let shield = false;
-    for (const d of [20, 30]) if (solidPx(cx + Math.cos(a) * d, cy + Math.sin(a) * d)) { shield = true; break; }
-    if (!shield) continue;
-    if (ents.some(o => o !== e && o.alive && o.cover && Math.abs(o.cover.x - cx) < 20 && Math.abs(o.cover.y - cy) < 20)) continue;
-    const sc = dst(cx, cy, e.x, e.y) + Math.abs(dt2 - (minD + maxD) / 2) * 0.4;
-    if (sc < bs) { bs = sc; best = { x: cx, y: cy }; }
+// Search only locally connected cells. The travel cost follows doors and fence openings.
+function battlePosition(e,t,minD,maxD,seekCover){
+  const start=walkAnchor(e.x,e.y);
+  if(start<0)return null;
+  const queue=[start],steps=[0],visited=new Set(queue);
+  let best=null,bestCost=Infinity;
+  for(let i=0;i<queue.length;i++){
+    const cell=queue[i],x=cell%MW,y=Math.floor(cell/MW),cost=steps[i]*T;
+    if(cost>bestCost || steps[i]>9)break;
+    const p={x:(x+.5)*T,y:(y+.5)*T},d=dE(p,t);
+    if(d>=minD && d<=maxD && !ents.some(o=>o!==e&&o.alive&&o.cover&&dE(o.cover,p)<22)){
+      const dx=(t.x-p.x)/d,dy=(t.y-p.y)/d;
+      const usable=seekCover ? npcBarrier(p,dx,dy,54,t)<54 :
+        dE(e,p)>20 && clearNPCShot(p,t) && lineClear(e,t,p);
+      if(usable){
+        const score=cost+Math.abs(d-(minD+maxD)/2)*.22;
+        if(score<bestCost){bestCost=score;best=p;}
+      }
+    }
+    for(let k=0;k<8;k++){
+      const n=navNeighbor(x,y,k);
+      if(n>=0&&!visited.has(n)){visited.add(n);queue.push(n);steps.push(steps[i]+1);}
+    }
   }
   return best;
+}
+function findCover(e,t,minD,maxD){
+  const near=Math.max(25,Math.min(minD,dE(e,t)-64));
+  return battlePosition(e,t,near,maxD,true);
 }
 function npcHeal(e,patient=e) {
   const id = e.inv.medkit ? 'medkit' : e.inv.bandage ? 'bandage' : null;
@@ -1480,6 +1586,8 @@ function npcHeal(e,patient=e) {
   return true;
 }
 function npcGrenade(e, x, y) {
+  const dest={x,y};
+  if(!clearNPCShot(e,dest) || ents.some(o=>o!==e&&o.alive&&!hostile(e,o)&&dE(o,dest)<145))return;
   e.nade = 0;
   const a = Math.atan2(y - e.y, x - e.x), d = Math.min(260, dst(e.x, e.y, x, y));
   nades.push({ x: e.x, y: e.y, vx: Math.cos(a) * d * 1.25, vy: Math.sin(a) * d * 1.25, t: 1.6, z: 0, vz: 160, owner: e });
@@ -1487,18 +1595,30 @@ function npcGrenade(e, x, y) {
   if (dst(x, y, P.x, P.y) < 300) msg('Граната! Уходи с места!', 'bad');
 }
 function combatHuman(e, t, W, dt) {
-  e.sit = 0; e.campRise = null; e.trip = null; e.aidTarget=null;
-  const d = dE(e, t), see = seesActor(e, t);
-  if (see) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
+  if(!e.inBattle){
+    e.inBattle=true;
+    if(e.sit)e.seat=1;
+    if(!e.trip&&!e.follow)e.trip={stage:2,returnTo:e.guard?{...e.home}:{x:e.x,y:e.y}};
+    e.coverWait=0;
+    if(e.trip?.stage===1)e.trip.stage=0;
+  }
+  e.sit=0;e.campRise=null;e.aidTarget=null;
+  const d=dE(e,t), inRange=d<sight(e)*1.45;
+  const openRay=inRange && clearNPCShot(e,t);
+  const visible=inRange && seesActor(e,t,openRay), see=visible && openRay;
+  if (visible) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
   const want = Math.atan2(t.y - e.y, t.x - e.x);
-  if (!e.role) { e.role = pickRole(e, t); e.morale = e.morale === undefined ? 1 : e.morale; if (e.nade === undefined) e.nade = (e.fac === 'army' ? 0.6 : e.fac === 'bandit' ? 0.35 : 0.2) > Math.random() ? 1 : 0; }
+  if (!e.role) { e.tacT=0; e.role = pickRole(e, t); e.morale = e.morale === undefined ? 1 : e.morale; if (e.nade === undefined) e.nade = (e.fac === 'army' ? 0.6 : e.fac === 'bandit' ? 0.35 : 0.2) > Math.random() ? 1 : 0; }
   e.tacT = (e.tacT || 0) - dt;
   // бегство при потере духа
   if (e.morale < 0.35 && e.hp < e.maxhp * 0.5 && !e.guard) {
-    if (!e.routT) { e.routT = rnd(5, 8); callout(e, 'hurt', true); }
+    if (!e.routT) {
+      e.routT=rnd(5,8);e.cover=findCover(e,t,Math.max(30,d-30),d+230);callout(e,'hurt',true);
+    }
     e.routT -= dt; e.crouch = 0;
-    steer(e, e.x - Math.cos(want) * 60, e.y - Math.sin(want) * 60, 128, dt);
+    if(e.cover)goTo(e,e.cover.x,e.cover.y,128,dt);
+    else steer(e,e.x-Math.cos(want)*60,e.y-Math.sin(want)*60,128,dt);
     if (e.routT <= 0) { e.morale = 0.6; e.routT = 0; }
     return;
   }
@@ -1509,43 +1629,64 @@ function combatHuman(e, t, W, dt) {
     else { e.crouch = 1; e.inCover = 1; e.healT = (e.healT || 1.6) - dt; if (e.healT <= 0) { npcHeal(e); e.healing = 0; e.healT = 0; e.cover = null; } }
     return;
   }
+  // Finish the move into cover, then seek a shooting angle on the last known position.
+  if(e.cover && !see && e.role==='hold' && e.mem>0){
+    if(dE(e,e.cover)>9){goTo(e,e.cover.x,e.cover.y,105,dt);return;}
+    e.inCover=1;e.crouch=1;
+    e.coverWait=(e.coverWait||0)+dt;
+    if(e.coverWait<.85)return;
+    e.coverWait=0;e.cover=null;
+  }
   // цель не видна
   if (!see) {
     e.crouch = 0; e.inCover = 0;
-    if (e.nade && e.unseen > 2.5 && e.lastSeen && dst(e.x, e.y, e.lastSeen.x, e.lastSeen.y) < 280 && dst(e.x, e.y, e.lastSeen.x, e.lastSeen.y) > 90 && chance(dt * 0.8)) { npcGrenade(e, e.lastSeen.x, e.lastSeen.y); return; }
-    if (e.lastSeen && !e.guard) goTo(e, e.lastSeen.x, e.lastSeen.y, e.role === 'push' ? 100 : 72, dt);
+    if(e.lastSeen && !e.guard && e.mem>0){
+      e.peekTime=(e.peekTime||0)-dt;
+      if(e.peekTime<=0){
+        e.peekTime=1.5;e.firingSpot=battlePosition(e,e.lastSeen,28,W.range||300,false);
+      }
+      const dest=e.firingSpot||e.lastSeen;
+      e.cover=null;goTo(e,dest.x,dest.y,90,dt);
+    }
     if (e.mem <= 0) { e.tgt = null; e.role = null; }
     return;
   }
   e.ang += angD(e.ang, want) * Math.min(1, dt * 7);
   const pref = W.pref || 20;
   // движение по роли
-  if (W.melee) { e.crouch = 0; steer(e, t.x, t.y, 110, dt); }
+  if (W.melee) { e.crouch = 0; goTo(e, t.x, t.y, 110, dt); }
   else if (e.guard) { e.crouch = d > 160 ? 1 : 0; }
   else if (e.role === 'hold') {
-    if (!e.cover || e.tacT <= 0) { e.tacT = rnd(4, 8); e.cover = findCover(e, t, Math.max(120, pref - 60), pref + 160); }
+    if (e.tacT <= 0) { e.tacT = rnd(4, 8); e.cover = findCover(e, t, Math.max(120, pref - 60), pref + 160); }
     if (e.cover && dst(e.x, e.y, e.cover.x, e.cover.y) > 10) { e.crouch = 0; e.inCover = 0; goTo(e, e.cover.x, e.cover.y, 105, dt); }
-    else { e.inCover = !!e.cover; e.crouch = e.cover ? (e.cool > W.rate * 1.2 ? 1 : 0) : 0; if (!e.cover && d < pref - 60) steer(e, e.x - Math.cos(want) * 60, e.y - Math.sin(want) * 60, 70, dt); }
+    else { e.inCover = !!e.cover; e.crouch = e.cover ? (e.cool > W.rate * 1.2 ? 1 : 0) : 0; if (!e.cover && d < pref - 60) goTo(e, e.x - Math.cos(want) * 60, e.y - Math.sin(want) * 60, 70, dt); }
   } else if (e.role === 'flank') {
     if (!e.side) e.side = chance(0.5) ? 1 : -1;
     const fa = want + Math.PI + e.side * 1.25, fx = t.x + Math.cos(fa) * pref, fy = t.y + Math.sin(fa) * pref;
     e.crouch = 0; e.inCover = 0;
-    if (goTo(e, fx, fy, 112, dt) < 30 || e.stuck > 1) { e.role = 'hold'; e.cover = null; }
+    if (!clearFooting(fx,fy,e.r) || goTo(e, fx, fy, 112, dt) < 30 || e.routeRetry>0 || e.stuck > 1) { e.role = 'hold'; e.cover = null; }
   } else {
     e.crouch = 0; e.inCover = 0;
-    if (d > pref) steer(e, t.x, t.y, 92, dt);
-    else { e.strT = (e.strT || 0) - dt; if (e.strT <= 0) { e.strT = rnd(0.8, 1.8); e.side = chance(0.5) ? 1 : -1; } steer(e, e.x + Math.cos(want + e.side * 1.57) * 60, e.y + Math.sin(want + e.side * 1.57) * 60, 64, dt); }
+    if (d > pref) goTo(e, t.x, t.y, 92, dt);
+    else { e.strT = (e.strT || 0) - dt; if (e.strT <= 0) { e.strT = rnd(0.8, 1.8); e.side = chance(0.5) ? 1 : -1; } goTo(e, e.x + Math.cos(want + e.side * 1.57) * 60, e.y + Math.sin(want + e.side * 1.57) * 60, 64, dt); }
   }
   // гранату в укрывшегося
   if (e.nade && t.crouch && d > 120 && d < 260 && chance(dt * 0.25)) { npcGrenade(e, t.x, t.y); return; }
   // огонь
   if (W.melee) { if (d < e.r + t.r + W.range && e.cool <= 0) { e.cool = W.rate * 1.6; melee(e, W); } return; }
   if (e.react <= 0 && e.cool <= 0 && e.reload <= 0 && d < W.range * 0.92 && Math.abs(angD(e.ang, want)) < 0.25) {
-    if (!lineClear(e, t)) { e.side = -(e.side || 1); e.strT = 0; steer(e, e.x + Math.cos(want + 1.57 * e.side) * 60, e.y + Math.sin(want + 1.57 * e.side) * 60, 80, dt); return; }
+    if (!lineClear(e,t)) {
+      if(!e.guard){
+        e.peekTime=(e.peekTime||0)-dt;
+        if(e.peekTime<=0){e.peekTime=1;e.firingSpot=battlePosition(e,t,28,W.range,false);}
+        if(e.firingSpot)goTo(e,e.firingSpot.x,e.firingSpot.y,86,dt);
+      }
+      return;
+    }
     const moving = !e.inCover && e.role !== 'hold';
     const acc = { bandit: 0.12, loner: 0.1, army: 0.07 }[e.fac] - (e.rank || 0) * 0.015 + (night() && d > 200 ? 0.05 : 0) + (moving ? 0.04 : 0) + (t === P && P.crouch ? 0.03 : 0);
     e.crouch = 0;
-    fire(e, e.ang, W, W.spread + acc);
+    if(!fire(e,e.ang,W,W.spread+acc))return;
     e.mag--;
     e.cool = W.auto ? (e.burst = (e.burst || 0) + 1) % 4 === 0 ? rnd(0.7, 1.3) : W.rate * 1.3 : W.rate * rnd(2.2, 3.4);
     if (e.mag <= 0) { e.reload = W.reload * 1.2; e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
@@ -2028,7 +2169,7 @@ function explode(n) {
   ents.forEach(e => {
     if (!e.alive) return;
     const d = dE(e, n);
-    if (d < 130 && los(n.x, n.y, e.x, e.y)) hurt(e, 100 * (1 - d / 130) + 10, n.owner, Math.atan2(e.y - n.y, e.x - n.x));
+    if (d < 130 && los(n.x, n.y, e.x, e.y) && (n.owner===P || clearNPCShot(n,e))) hurt(e, 100 * (1 - d / 130) + 10, n.owner, Math.atan2(e.y - n.y, e.x - n.x));
   });
   ents.forEach(e => { if (e !== P && e.alive && dE(e, n) < 600 && hostile(e, P)) { e.lastSeen = { x: P.x, y: P.y }; e.mem = 6; } });
 }
@@ -5502,7 +5643,7 @@ function sosFoeAI(e, dt) {
       e.crouch = 1; e.supT -= dt;
       const tg = ents.find(o => o.alive && o.sos === a.id && dE(o, e) < 520 && los(e.x, e.y, o.x, o.y));
       if (tg) { const ta = Math.atan2(tg.y - e.y, tg.x - e.x); e.ang += angD(e.ang, ta) * Math.min(1, dt * 4);
-        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3, tg); /* подавление: в основном мимо и не насмерть до штурма */ play(W.snd || 'p', e.x, e.y, 0.7); } }
+        if (e.supT <= 0 && Math.abs(angD(e.ang, ta)) < 0.2) { e.supT = rnd(2.8, 4.5); const W0 = WP[e.wpn] || WP.w_pm, W = Object.assign({}, W0, { dmg: W0.dmg * 0.3 }); fire(e, e.ang, W, 0.3, tg); /* подавление до штурма */ } }
       else e.ang += angD(e.ang, ang) * Math.min(1, dt * 2);
     }
     return true;
@@ -5546,11 +5687,11 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
     ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip, shelterOrigin:e.shelterOrigin, shelterSpot:e.shelterSpot } } : {}),
-    ...(e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
+    ...((e.inBattle && e.trip) || e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
     sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, assisted: e.assisted || undefined, inv: e.traded || e.assisted ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
