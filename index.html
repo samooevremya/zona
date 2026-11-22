@@ -1638,23 +1638,59 @@ function openBarrier() { const b = objs.find(o => o.key === 'bar'); if (b && b.s
 /* сетки проходимости и видимости */
 const nav = new Uint8Array(MW * MH), opq = new Uint8Array(MW * MH);
 const fences = [];
+// Spatial buckets for short walking probes. Transparent furniture and mesh fences
+// still stop a body, so a visibility ray cannot answer this question.
+const walkSolids=new Map(), propEdgeBlocks=new Uint8Array(MW*MH), propBlockedCenters=new Set();
+function clearFooting(x,y,r){
+  const body={x,y,r};
+  for(let j=Math.floor((y-r)/T);j<=Math.floor((y+r)/T);j++)
+    for(let i=Math.floor((x-r)/T);i<=Math.floor((x+r)/T);i++){
+      if(!inb(i,j))return false;
+      const cell=j*MW+i;
+      if(SOLID[map[cell]] && Math.hypot(x-clamp(x,i*T,(i+1)*T),y-clamp(y,j*T,(j+1)*T))<r)return false;
+      const solids=walkSolids.get(cell);
+      if(solids)for(const o of solids)if(o.solid &&
+        Math.hypot(x-clamp(x,o.x,o.x+o.w),y-clamp(y,o.y,o.y+o.h))<r)return false;
+      const props=propCells.get(cell);
+      if(props && props.some(p=>touchesProp(p,body)))return false;
+    }
+  return true;
+}
+function clearWalk(x,y,tx,ty,r=11){
+  const n=Math.max(1,Math.ceil(Math.hypot(tx-x,ty-y)/7));
+  for(let i=1;i<=n;i++)if(!clearFooting(x+(tx-x)*i/n,y+(ty-y)*i/n,r))return false;
+  return true;
+}
+function walkAnchor(px,py){
+  const tx=Math.floor(px/T),ty=Math.floor(py/T);
+  for(let ring=0;ring<=4;ring++){
+    let best=-1,dist=Infinity;
+    for(let y=ty-ring;y<=ty+ring;y++)for(let x=tx-ring;x<=tx+ring;x++){
+      if(!inb(x,y)||Math.max(Math.abs(x-tx),Math.abs(y-ty))!==ring||!nav[y*MW+x])continue;
+      const wx=(x+.5)*T,wy=(y+.5)*T,d=Math.hypot(wx-px,wy-py);
+      if(d<dist&&clearWalk(px,py,wx,wy)){best=y*MW+x;dist=d;}
+    }
+    if(best>=0)return best;
+  }
+  return -1;
+}
 let navRevision = 0;
 function buildGrids() {
   navRevision++;
-  fences.length = 0;
+  fences.length = 0;walkSolids.clear();
   for (let i = 0; i < MW * MH; i++) { nav[i] = SOLID[map[i]] ? 0 : 1; opq[i] = OPAQ[map[i]]; }
   objs.forEach(o => {
     if (!o.solid) return;
     if (o.k === 'fence') fences.push(o);
     for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++)
       for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) if (inb(x, y)) {
+        const cell=y*MW+x;
+        if(!walkSolids.has(cell))walkSolids.set(cell,[]);
+        walkSolids.get(cell).push(o);
         nav[y * MW + x] = 0; if (o.opaque) opq[y * MW + x] = 1;
       }
   });
-  for (const [key,props] of propCells) {
-    const center={x:(key%MW+.5)*T, y:(Math.floor(key/MW)+.5)*T, r:10};
-    if(props.some(p=>touchesProp(p,center))) nav[key]=0;
-  }
+  for(const cell of propBlockedCenters)nav[cell]=0;
   ANOM0.forEach(a => {
     for (let y = Math.floor((a.y - a.r - 14) / T); y <= Math.floor((a.y + a.r + 14) / T); y++)
       for (let x = Math.floor((a.x - a.r - 14) / T); x <= Math.floor((a.x + a.r + 14) / T); x++)
@@ -1672,6 +1708,7 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -
 function navNeighbor(x, y, k) {
   const nx = x + DIRS[k][0], ny = y + DIRS[k][1];
   if (!inb(nx, ny) || !nav[ny * MW + nx]) return -1;
+  if (propEdgeBlocks[y*MW+x] & (1<<k)) return -1;
   if (k >= 4 && (!nav[y * MW + nx] || !nav[ny * MW + x])) return -1;
   return ny * MW + nx;
 }
@@ -1681,8 +1718,9 @@ function nearestNav(tx, ty) {
   }
   return -1;
 }
-function findPath(sx, sy, tx, ty) {
-  const s = nearestNav(Math.floor(sx / T), Math.floor(sy / T)), g = nearestNav(Math.floor(tx / T), Math.floor(ty / T));
+function findPath(sx, sy, tx, ty, walking=false) {
+  const s=walking?walkAnchor(sx,sy):nearestNav(Math.floor(sx/T),Math.floor(sy/T));
+  const g=walking?walkAnchor(tx,ty):nearestNav(Math.floor(tx/T),Math.floor(ty/T));
   if (s < 0 || g < 0) return null;
   bfsPrev.fill(-1); bfsPrev[s] = s;
   let h = 0, t = 0; bfsQ[t++] = s;
@@ -1698,6 +1736,7 @@ function findPath(sx, sy, tx, ty) {
   if (bfsPrev[g] < 0) return null;
   const pts = []; let c = g;
   while (c !== s) { pts.push({ x: (c % MW) * T + 16, y: ((c / MW) | 0) * T + 16 }); c = bfsPrev[c]; }
+  if(walking)pts.push({x:(s%MW+.5)*T,y:(Math.floor(s/MW)+.5)*T});
   pts.reverse();
   return pts;
 }
@@ -2315,23 +2354,48 @@ function steer(e, tx, ty, speed, dt) {
   return moved;
 }
 function goTo(e, tx, ty, speed, dt) {
-  if (e.path && e.goal && dst(e.goal.x, e.goal.y, tx, ty) > 48) e.path = null;
-  if (!e.path) {
-    if (los(e.x, e.y, tx, ty) && dst(e.x, e.y, tx, ty) < 260 && !(e.stuck > 0.6)) {
-      steer(e, tx, ty, speed, dt); e.ang += angD(e.ang, Math.atan2(ty - e.y, tx - e.x)) * Math.min(1, dt * 6);
-      if (e.stuck > 0.6) { e.path = findPath(e.x, e.y, tx, ty); e.pi = 0; e.goal = { x: tx, y: ty }; e.stuck = 0; }
-      return dst(e.x, e.y, tx, ty);
-    }
-    e.path = findPath(e.x, e.y, tx, ty); e.pi = 0; e.goal = { x: tx, y: ty };
-    if (!e.path) { steer(e, tx, ty, speed, dt); return dst(e.x, e.y, tx, ty); }
+  e.yielding=false;e.lastWalk=S.min;
+  const distance=dst(e.x,e.y,tx,ty);
+  if(distance<1)return distance;
+  const changed=!e.goal||dst(e.goal.x,e.goal.y,tx,ty)>12||e.pathRevision!==navRevision;
+  if(changed){e.path=null;e.routeRetry=0;}
+  if(!e.path){
+    if(e.routeRetry>0){e.routeRetry-=dt;return distance;}
+    e.goal={x:tx,y:ty};e.pathRevision=navRevision;e.pi=0;
+    const direct=distance<260 && clearWalk(e.x,e.y,tx,ty,e.r) &&
+      !anoms.some(a=>{
+        const dx=tx-e.x,dy=ty-e.y,t=clamp(((a.x-e.x)*dx+(a.y-e.y)*dy)/(distance*distance),0,1);
+        return dst(a.x,a.y,e.x+t*dx,e.y+t*dy)<a.r+e.r;
+      });
+    e.path=direct?[e.goal]:findPath(e.x,e.y,tx,ty,true);
+    if(!e.path){e.routeRetry=.9;return distance;}
+    if(!direct)e.path.push(e.goal);
+    e.stuck=0;
   }
-  const p = e.path[e.pi];
-  if (!p) { e.path = null; steer(e, tx, ty, speed, dt); return dst(e.x, e.y, tx, ty); }
-  steer(e, p.x, p.y, speed, dt);
-  e.ang += angD(e.ang, Math.atan2(p.y - e.y, p.x - e.x)) * Math.min(1, dt * 6);
-  if (dst(e.x, e.y, p.x, p.y) < 12) { e.pi++; if (e.pi >= e.path.length) e.path = null; }
-  if (e.stuck > 1.5) { e.path = null; e.stuck = 0; }
-  return dst(e.x, e.y, tx, ty);
+  // Reach the centre before turning at a door jamb. Clamp the last step to the waypoint.
+  let p=e.path[e.pi];
+  while(p){
+    const next=e.path[e.pi+1],gap=dE(e,p);
+    // Travellers sharing a gate can pass on either side of the waypoint centre.
+    if(gap>=1 && !(next&&gap<24&&clearWalk(e.x,e.y,next.x,next.y,e.r)))break;
+    p=e.path[++e.pi];
+  }
+  if(!p){e.path=null;return distance;}
+  // At a shared corner, let one traveller complete the turn before the next enters.
+  if(e.kind==='human' && dE(e,p)<T*1.6 && ents.some(o=>{
+    if(o===e||!o.alive||o.id>=e.id||!o.path||S.min-o.lastWalk>.2||dE(o,e)>T*1.7)return false;
+    const next=o.path[o.pi];return next&&dE(next,p)<8&&dE(o,p)<T*1.5;
+  })){
+    e.yielding=true;return distance;
+  }
+  const d=dE(e,p),dx=(p.x-e.x)/d,dy=(p.y-e.y)/d;
+  const step=Math.min(d,speed*dt*(swampAt(e.x,e.y)?.55:1)),ox=e.x,oy=e.y;
+  moveE(e,dx*step,dy*step);
+  e.step+=dst(ox,oy,e.x,e.y);
+  e.ang+=angD(e.ang,Math.atan2(dy,dx))*Math.min(1,dt*6);
+  e.stuck=d-dE(e,p)<step*.2?(e.stuck||0)+dt:0;
+  if(e.stuck>.45){e.path=null;e.routeRetry=.15;}
+  return dst(e.x,e.y,tx,ty);
 }
 
 /* ===================== стрельба ===================== */
@@ -2701,11 +2765,11 @@ function findCover(e, t, minD, maxD) {
   }
   return best;
 }
-function npcHeal(e) {
+function npcHeal(e,patient=e) {
   const id = e.inv.medkit ? 'medkit' : e.inv.bandage ? 'bandage' : null;
   if (!id) return false;
   e.inv[id]--; if (!e.inv[id]) delete e.inv[id];
-  e.hp = Math.min(e.maxhp, e.hp + (id === 'medkit' ? 45 : 18));
+  patient.hp = Math.min(patient.maxhp, patient.hp + (id === 'medkit' ? 45 : 18));
   return true;
 }
 function npcGrenade(e, x, y) {
@@ -2716,7 +2780,7 @@ function npcGrenade(e, x, y) {
   if (dst(x, y, P.x, P.y) < 300) msg('Граната! Уходи с места!', 'bad');
 }
 function combatHuman(e, t, W, dt) {
-  e.sit = 0; e.campRise = null; e.trip = null;
+  e.sit = 0; e.campRise = null; e.trip = null; e.aidTarget=null;
   const d = dE(e, t), see = seesActor(e, t);
   if (see) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
@@ -2742,7 +2806,7 @@ function combatHuman(e, t, W, dt) {
   if (!see) {
     e.crouch = 0; e.inCover = 0;
     if (e.nade && e.unseen > 2.5 && e.lastSeen && dst(e.x, e.y, e.lastSeen.x, e.lastSeen.y) < 280 && dst(e.x, e.y, e.lastSeen.x, e.lastSeen.y) > 90 && chance(dt * 0.8)) { npcGrenade(e, e.lastSeen.x, e.lastSeen.y); return; }
-    if (e.lastSeen) goTo(e, e.lastSeen.x, e.lastSeen.y, e.role === 'push' ? 100 : 72, dt);
+    if (e.lastSeen && !e.guard) goTo(e, e.lastSeen.x, e.lastSeen.y, e.role === 'push' ? 100 : 72, dt);
     if (e.mem <= 0) { e.tgt = null; e.role = null; }
     return;
   }
@@ -2787,9 +2851,44 @@ function setCampSeat(e, sitting) {
     e.campRise = e.sit ? 0 : 1;
   e.sit = sitting ? 1 : 0;
 }
+// On a quiet stretch a free stalker can interrupt an errand to dress a companion's wound.
+function helpCompanion(e,dt){
+  if(e.fac!=='loner'||e.follow||e.guard||e.stay||e.named||e.sos||e.jobTag||e.squadMate)return false;
+  const patient=o=>o!==e&&o!==P&&o.alive&&o.fac===e.fac&&!o.wounded&&!o.captive&&!o.tgt&&
+    o.hp<o.maxhp*.5&&dE(e,o)<160;
+  if(e.aidTarget && (!patient(e.aidTarget)||!(e.inv.medkit||e.inv.bandage)))e.aidTarget=null;
+  if(!e.aidTarget){
+    e.aidCheck=(e.aidCheck||0)-dt;if(e.aidCheck>0)return false;
+    e.aidCheck=2+(e.id%5)*.23;
+    if(e.hp<e.maxhp*.5||!(e.inv.medkit||e.inv.bandage))return false;
+    let nearest=Infinity;
+    for(const o of ents)if(patient(o)&&dE(e,o)<nearest&&seesActor(e,o)&&
+      !ents.some(m=>m.alive&&m!==e&&m.aidTarget===o)&&walkAnchor(o.x,o.y)>=0){
+      e.aidTarget=o;nearest=dE(e,o);
+    }
+    if(!e.aidTarget)return false;
+    if(e.sit){e.seat=1;e.trip ||= {stage:2};setCampSeat(e,false);}
+    e.aidTime=0;
+  }
+  const o=e.aidTarget;e.aidTime+=dt;
+  if(dE(e,o)<34&&clearWalk(e.x,e.y,o.x,o.y,e.r)){
+    npcHeal(e,o);e.assisted=o.assisted=true; sayLine(e,'Держись. Сейчас перевяжу.');
+    e.aidTarget=null;e.aidCheck=12;
+  }else if(e.aidTime>8){e.aidTarget=null;e.aidCheck=10;}
+  else goTo(e,o.x,o.y,78,dt);
+  return true;
+}
 function idleHuman(e, dt) {
   if(e.squadMate && chapter()==='battle'){ const p=northCamp(); if(dE(e,p)>90)goTo(e,p.x,p.y,90,dt); return; }
   if (followTick(e, dt)) return;
+  if(e.trip?.returnTo){
+    const dest=e.trip.returnTo;
+    if(goTo(e,dest.x,dest.y,82,dt)<7){
+      e.trip=null;if(e.seat)setCampSeat(e,true);
+    }
+    return;
+  }
+  if(helpCompanion(e,dt))return;
   if (e.guard) {
     if (dE(e, e.home) > 8) goTo(e, e.home.x, e.home.y, 70, dt);
     else { e.ang += angD(e.ang, (e.guard === 'south' || (BIG && e.sid==='a1')) ? -Math.PI / 2 : Math.PI / 2) * dt * 2; }
@@ -2797,7 +2896,7 @@ function idleHuman(e, dt) {
   }
   if (e.sit) {
     e.ang += angD(e.ang, Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x)) * dt * 2;
-    if (e.fac === 'loner' && !e.named && e.fireRef === FIRE && chance(dt * 0.004)) { setCampSeat(e, false); startTrip(e); }
+    if (e.fac === 'loner' && !e.named && !e.stay && !e.squadMate && chance(dt * 0.004)) { setCampSeat(e, false); startTrip(e); }
     return;
   }
   if (e.trip) {
@@ -2824,16 +2923,28 @@ function idleHuman(e, dt) {
       const a = rnd(0, 6.28), r = rnd(20, e.stay ? 50 : 110);
       const wx = e.home.x + Math.cos(a) * r, wy = e.home.y + Math.sin(a) * r;
       const ti = Math.floor(wy / T) * MW + Math.floor(wx / T);
-      if (nav[ti] && los(e.x, e.y, wx, wy)) e.wander = { x: wx, y: wy };
+      if (nav[ti] && clearWalk(e.x,e.y,wx,wy,e.r)) e.wander = { x: wx, y: wy };
     } else e.ang += rnd(-1.2, 1.2);
   }
   if (e.fac === 'loner' && !e.stay && !e.named && chance(dt * 0.003)) startTrip(e);
 }
 function startTrip(e) {
-  const keys = Object.keys(POI).filter(k => k !== 'atp' || S.flags.atpClear);
-  const p = POI[keys[ri(0, keys.length - 1)]];
-  e.seat = e.seat || (dE(e, FIRE) < 110 ? 1 : 0);
-  e.trip = { x: p.x + rnd(-30, 30), y: p.y + rnd(-30, 30), stage: 0 };
+  // In poor weather prefer the local camp, in daylight favour a nearby unoccupied stop.
+  const resting=night()||WX.rain>.45||e.hp<e.maxhp*.65;
+  const spots=LOCATIONS.filter(l=>!['danger','anomaly'].includes(l.type) &&
+    l.id!=='sid' && (l.anchors.fire||l.entrances?.length)).map(l=>{
+    const [x,y]=l.anchors.fire||l.entrances[0],p=freeTile(x,y);
+    const dest={x:p.x*T,y:p.y*T},distance=dE(e,dest);
+    const busy=ents.filter(m=>m!==e&&m.alive&&m.trip?.stage===0&&dE(m.trip,dest)<60).length;
+    const score=distance*(.8+Math.random()*.4)+busy*180+(resting&&!l.anchors.fire?750:0);
+    return {dest,score,distance};
+  }).filter(s=>s.distance>90&&s.distance<2600).sort((a,b)=>a.score-b.score);
+  for(const {dest} of spots){
+    if(ents.some(o=>o.alive&&hostile(e,o)&&dE(o,dest)<220)||!findPath(e.x,e.y,dest.x,dest.y,true))continue;
+    e.seat=e.seat||(dE(e,FIRE)<110?1:0);
+    e.trip={...dest,stage:0};return;
+  }
+  if(e.seat)setCampSeat(e,true);
 }
 function aiDog(e, dt) {
   e.cool -= dt; e.think -= dt; e.barkT -= dt;
@@ -3215,6 +3326,35 @@ function explode(n) {
   ents.forEach(e => { if (e !== P && e.alive && dE(e, n) < 600 && hostile(e, P)) { e.lastSeen = { x: P.x, y: P.y }; e.mem = 6; } });
 }
 
+function resolveActorContacts(dt){
+  // толкотня и отдача
+  for (let i = 0; i < ents.length; i++) {
+    const a = ents[i]; if (!a.alive) continue;
+    if (a.sid === 'sid') { a.x = a.home.x; a.y = a.home.y; a.kx = a.ky = 0; }
+    if (a.kx || a.ky) { moveE(a, a.kx * dt, a.ky * dt); a.kx *= Math.pow(0.02, dt); a.ky *= Math.pow(0.02, dt); if (Math.abs(a.kx) + Math.abs(a.ky) < 2) a.kx = a.ky = 0; }
+    a.flash = Math.max(0, a.flash - dt);
+    for (let j = i + 1; j < ents.length; j++) {
+      const b = ents[j]; if (!b.alive) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const other = a === P ? b : b === P ? a : null;
+      const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
+      const rr = atSeat ? 40 : a.r + b.r;
+      if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
+      const d = Math.hypot(dx, dy);
+      if (atSeat && d < rr) {
+        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
+        const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
+        moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
+      } else if (d < rr && d > 0.01) {
+        const overlap=rr-d,ux=dx/d,uy=dy/d;
+        const share=a.yielding&&!b.yielding?.95:b.yielding&&!a.yielding?.05:.5;
+        if (!a.captive && a.sid !== 'sid') moveE(a,-ux*overlap*share,-uy*overlap*share);
+        if (!b.captive && b.sid !== 'sid') moveE(b,ux*overlap*(1-share),uy*overlap*(1-share));
+      }
+    }
+  }
+}
+
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
@@ -3236,36 +3376,12 @@ function update(dt) {
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
-    if (e.qaHold || lonerBlowoutAI(e, dt)) continue;
+    if (e.qaHold || blowoutHumanAI(e, dt)) continue;
     if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt) continue;
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
     if (e.kind === 'dog') aiDog(e, dt); else if (e.kind === 'boar') aiBoar(e, dt); else if (e.kind === 'sucker') aiSucker(e, dt); else aiHuman(e, dt);
   }
-  // толкотня и отдача
-  for (let i = 0; i < ents.length; i++) {
-    const a = ents[i]; if (!a.alive) continue;
-    if (a.sid === 'sid') { a.x = a.home.x; a.y = a.home.y; a.kx = a.ky = 0; }
-    if (a.kx || a.ky) { moveE(a, a.kx * dt, a.ky * dt); a.kx *= Math.pow(0.02, dt); a.ky *= Math.pow(0.02, dt); if (Math.abs(a.kx) + Math.abs(a.ky) < 2) a.kx = a.ky = 0; }
-    a.flash = Math.max(0, a.flash - dt);
-    for (let j = i + 1; j < ents.length; j++) {
-      const b = ents[j]; if (!b.alive) continue;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const other = a === P ? b : b === P ? a : null;
-      const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
-      const rr = atSeat ? 40 : a.r + b.r;
-      if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
-      const d = Math.hypot(dx, dy);
-      if (atSeat && d < rr) {
-        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
-        const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
-        moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
-      } else if (d < rr && d > 0.01) {
-        const push = (rr - d) / 2, ux = dx / d, uy = dy / d;
-        if (!a.captive && a.sid !== 'sid') moveE(a, -ux * push, -uy * push);
-        if (!b.captive && b.sid !== 'sid') moveE(b, ux * push, uy * push);
-      }
-    }
-  }
+  resolveActorContacts(dt);
   updateBolts(dt);
   updateAnoms(dt);
   deliverLonerReports();
@@ -4769,11 +4885,11 @@ function rebuildShelterRoutes(routes) {
   shelterOwner.fill(-1);
   shelterDoors.length = 0;
   let head = 0, tail = 0;
-  function seed(x, y) {
+  function seed(x, y, house) {
     const cx = Math.floor(x / T), cy = Math.floor(y / T), i = cy * MW + cx;
     if (!inb(cx, cy) || !nav[i] || shelterOwner[i] >= 0) return;
     shelterOwner[i] = shelterDoors.length;
-    shelterDoors.push({ x, y });
+    shelterDoors.push({ x, y, house });
     bfsQ[tail++] = i;
   }
   for (const h of HOUSES) {
@@ -4783,7 +4899,7 @@ function rebuildShelterRoutes(routes) {
       for (let lane = 0; lane < lanes; lane++) {
         const offset = (lane - (lanes - 1) / 2) * T;
         seed(h.x*T + d.x - 1.5*T*d.nx + offset*d.ny,
-             h.y*T + d.y - 1.5*T*d.ny + offset*d.nx);
+             h.y*T + d.y - 1.5*T*d.ny + offset*d.nx,h);
       }
     }
   }
@@ -4801,38 +4917,83 @@ function rebuildShelterRoutes(routes) {
 }
 function routeToShelter(actor, routes) {
   if (routes.revision !== navRevision) rebuildShelterRoutes(routes);
-  const cell = nearestNav(Math.floor(actor.x / T), Math.floor(actor.y / T));
+  const cell = walkAnchor(actor.x,actor.y);
   return routes.doors[routes.owner[cell]] || null;
 }
 function blowShelterTarget() {
   if (!P || !P.alive || !S.blow?.stage || sheltered(P.x, P.y)) return null;
   return routeToShelter(P, playerShelters);
 }
-function lonerBlowoutAI(e, dt) {
-  if (e.fac !== 'loner' || e.captive || e.wounded) return false;
-  if (!S.blow?.stage) {
-    if (e.evacuating) {
-      e.evacuating = false;
-      e.path = null;
-      if (e.seat && !e.sit && !e.trip && !e.follow) e.trip = { stage: 2 };
+// Pick a reachable place behind the doorway. A narrow shop may only have its landing.
+function roomShelterPlace(e,door){
+  const h=door.house,start=Math.floor(door.y/T)*MW+Math.floor(door.x/T);
+  const queue=[start],seen=new Set(queue);
+  const neighbours=ents.filter(o=>o!==e&&o.alive&&o.kind==='human'&&
+    (o.shelterSpot || sheltered(o.x,o.y))).map(o=>o.shelterSpot||o);
+  let best=null,score=Infinity;
+  for(let i=0;i<queue.length;i++){
+    const n=queue[i],x=n%MW,y=Math.floor(n/MW),p={x:(x+.5)*T,y:(y+.5)*T};
+    const nearDoor=h.entrances.some(d=>dst(p.x,p.y,h.x*T+d.x,h.y*T+d.y)<2*T);
+    const cost=dE(p,door)+(nearDoor?140:0)+neighbours.reduce((v,o)=>v+Math.max(0,50-dE(o,p))*9,0);
+    if(cost<score && neighbours.every(o=>dE(o,p)>2*e.r+3)){best=p;score=cost;}
+    for(let k=0;k<4;k++){
+      const m=navNeighbor(x,y,k),nx=m%MW,ny=Math.floor(m/MW);
+      if(m>=0&&!seen.has(m)&&nx>h.x&&nx<h.x+h.w-1&&ny>h.y&&ny<h.y+h.h-1){
+        seen.add(m);queue.push(m);
+      }
+    }
+  }
+  return best && {...best,house:h.ok};
+}
+function shelterPlace(e,avoid){
+  const nearest=routeToShelter(e,lonerShelters);
+  if(nearest && nearest.house.ok!==avoid){
+    const spot=roomShelterPlace(e,nearest);if(spot)return spot;
+  }
+  const doors=lonerShelters.doors.slice().sort((a,b)=>dE(e,a)-dE(e,b));
+  for(const d of doors){
+    if(d===nearest || d.house.ok===avoid)continue;
+    const spot=roomShelterPlace(e,d);
+    if(spot && findPath(e.x,e.y,spot.x,spot.y,true))return spot;
+  }
+  return nearest && {x:nearest.x,y:nearest.y,house:nearest.house.ok};
+}
+function blowoutHumanAI(e, dt) {
+  if(e.kind!=='human'||e.sid==='sid'||e.wounded||e.captive)return false;
+  if(!S.blow?.stage){
+    if(e.evacuating){
+      e.evacuating=false;e.shelterSpot=null;e.path=null;e.routeRetry=0;
+      if(e.trip?.shelter)e.trip=null;
+      if(e.trip?.stage===1)e.trip.stage=0;
+      // Followers retain their current orders; travellers retain their destination and stage.
+      if(!e.follow && !e.trip && e.shelterOrigin && dE(e,e.shelterOrigin)>5)
+        e.trip={stage:2,returnTo:e.shelterOrigin};
+      else if(e.seat&&!e.sit&&!e.follow&&!e.trip)e.trip={stage:2};
+      e.shelterOrigin=null;
     }
     return false;
   }
-  if (!e.evacuating) {
-    e.evacuating = true;
-    e.path = null;
-    e.cover = e.role = null;
-    e.inCover = 0;
-    if (e.trip?.shelter) e.trip = null;
+  if(!e.evacuating){
+    e.evacuating=true;e.shelterOrigin={x:e.x,y:e.y};
+    e.shelterProbe=null;e.shelterRevision=-1;
+    e.path=e.cover=e.role=e.aidTarget=null;e.inCover=0;e.routeRetry=0;
+    if(e.trip?.shelter)e.trip=null;
+    if(e.sit)e.seat=1;
   }
-  e.tgt = e.lastSeen = null;
-  e.mem = e.aw = 0;
-  if (sheltered(e.x, e.y)) return true;
-  if (e.sit) e.seat = 1;
-  e.sit = e.crouch = 0;
-  e.campRise = null;
-  const door = routeToShelter(e, lonerShelters);
-  if (door) goTo(e, door.x, door.y, 122, dt);
+  e.tgt=e.lastSeen=null;e.mem=e.aw=0;
+  if(!e.shelterSpot && sheltered(e.x,e.y))return true;
+  const probe=e.shelterProbe;
+  if(probe)probe.time-=dt;
+  const stalled=probe && probe.time<=0 && dE(e,probe)<12 && !sheltered(e.x,e.y);
+  if(e.shelterRevision!==navRevision || stalled){
+    if(!clearFooting(e.x,e.y,e.r))moveE(e,0,0);
+    e.shelterSpot=shelterPlace(e,stalled?e.shelterSpot?.house:null);
+    e.shelterRevision=navRevision;e.path=null;
+  }
+  if(!probe||probe.time<=0)e.shelterProbe={x:e.x,y:e.y,time:2.5};
+  e.sit=e.crouch=0;e.campRise=null;
+  if(e.shelterSpot && dE(e,e.shelterSpot)>5)goTo(e,e.shelterSpot.x,e.shelterSpot.y,122,dt);
+  else {e.path=null;e.yielding=false;}
   return true;
 }
 function blowout(dt) {
@@ -4840,12 +5001,6 @@ function blowout(dt) {
   if (B.stage === 0 && S.min >= B.next && P.alive) {
     B.stage = 1; B.t = 80;
     radioNews(BLOW_WARNING, true);
-    ents.forEach(e => {
-      if (!e.alive || e === P || e.kind !== 'human' || e.fac === 'loner' || sheltered(e.x, e.y) || e.captive || e.guard) return;
-      let best = null, bd = 1100;
-      HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
-      if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
-    });
   }
   if (B.stage === 1) {
     B.t -= dt; WX.red = lerp(WX.red, 0.5, dt * 0.05);
@@ -6411,8 +6566,9 @@ function followTick(e, dt) {
   // догоняющий телепорт: только вне камеры, вне боя и в проверенную безопасную точку позади игрока
   if (d > 900 && !loftAt(P) && !inBunker(P.x, P.y) && !(P.combatT > 0) && offCam(e)) {
     const back = VW / 2 / Z / T + 3, p = freeTile(P.x / T - Math.cos(P.ang) * back, P.y / T - Math.sin(P.ang) * back);
-    if (offCam({ x: p.x * T, y: p.y * T }) && !nearAnom(p.x * T, p.y * T, 20) && findPath(p.x * T, p.y * T, P.x, P.y)) { e.x = p.x * T; e.y = p.y * T; e.path = null; }
-    return true;
+    if (offCam({ x: p.x * T, y: p.y * T }) && !nearAnom(p.x * T, p.y * T, 20) && findPath(p.x * T, p.y * T, P.x, P.y,true)) {
+      e.x = p.x * T; e.y = p.y * T; e.path = null; return true;
+    }
   }
   const an = nearAnom(e.x, e.y, 26);
   if (an) { steer(e, e.x + (e.x - an.x), e.y + (e.y - an.y), 110, dt); return true; }   // в известную аномалию не идёт
@@ -6683,13 +6839,14 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.resident || e.evacuating || (e.angry && !e.sid))).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
-    ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip } } : {}),
+    ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip, shelterOrigin:e.shelterOrigin, shelterSpot:e.shelterSpot } } : {}),
+    ...(e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
-    sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, inv: e.traded ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
+    sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, assisted: e.assisted || undefined, inv: e.traded || e.assisted ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
   }));
 }
 function dynRestore() {
@@ -6717,7 +6874,9 @@ function dynRestore() {
     Object.assign(e, { uid: r.uid, x: r.x, y: r.y, hp: r.hp, maxhp: r.maxhp || e.maxhp, follow: r.follow, wait: r.wait, waitAt: r.waitAt, hireEnd: r.hireEnd, hirePaid: r.hirePaid,
       sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, ringPt: r.ringPt });
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
-    if (r.traded) { if (r.inv) e.inv = r.inv; if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; if(r.guns) e.guns=r.guns; }
+    if (r.assisted) e.assisted = true;
+    if (r.inv && (r.traded || r.assisted)) e.inv = r.inv;
+    if (r.traded) { if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; if(r.guns) e.guns=r.guns; }
     if (e.sid === 'sid') {
       const seat = NPCDEF.find(d => d.sid === 'sid');
       Object.assign(e, {x: seat.x*T, y: seat.y*T, hp: seat.hp, maxhp: seat.hp,
@@ -6726,7 +6885,8 @@ function dynRestore() {
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;
     if (e.follow) { e.sit = 0; e.trip = null; }
-    if (r.evacuation) Object.assign(e, r.evacuation, { evacuating: true });
+    if(r.returnTrip)Object.assign(e,{trip:r.returnTrip,seat:r.seat,sit:0});
+    if (r.evacuation) Object.assign(e, r.evacuation, { evacuating: true, shelterOrigin:r.evacuation.shelterOrigin || e.home });
   });
   // заказ без живой группы (старое сохранение) — досоздать остаток, без повтора уже убитых
   const j = S.jobs.act;
@@ -10006,7 +10166,7 @@ function touchesProp(p,e,push=false) {
 }
 function buildFieldProps(){
   propCells.clear(); fieldProps.length=0;
-  if(!ART) return;
+  if(!ART){cachePropNavigation();return;}
   for(const [kind,tx,ty,angle] of DECOR){
     if(kind==='ford'||(kind==='fence' && BIG && C1)) continue;
     const art=C1 && C1DECOR[kind], id=art?art[0]:kind, sp=ART.m.sprites[id];
@@ -10014,7 +10174,7 @@ function buildFieldProps(){
     const w=art?art[1]:sp.logicalSize[0], h=art?w*sp.rect[3]/sp.rect[2]:sp.logicalSize[1];
     addFootprint(id,tx*T,ty*T,w,h,angle);
   }
-  if(!C1) return;
+  if(!C1){cachePropNavigation();return;}
   if(BIG) for(const [id,tx,ty,w,a] of CORDON_DETAILS){
     if(id==='c1_trace_apples') continue;
     const r=ART.m.sprites[id].rect;
@@ -10033,6 +10193,29 @@ function buildFieldProps(){
       blockedScatter.add(y*MW+x);continue;
     }
     addFootprint(p.id,p.cx,p.cy,p.w,p.hh,p.a);
+  }
+  cachePropNavigation();
+}
+function cachePropNavigation(){
+  // These hulls are static. Cache the few edges cut by them once, not on every crate change.
+  propEdgeBlocks.fill(0);propBlockedCenters.clear();
+  for(const p of fieldProps){
+    const xs=p.vertices.map(v=>v[0]),ys=p.vertices.map(v=>v[1]);
+    const xmin=Math.floor((Math.min(...xs)-11)/T)-1,xmax=Math.floor((Math.max(...xs)+11)/T)+1;
+    const ymin=Math.floor((Math.min(...ys)-11)/T)-1,ymax=Math.floor((Math.max(...ys)+11)/T)+1;
+    for(let y=ymin;y<=ymax;y++)for(let x=xmin;x<=xmax;x++){
+      if(!inb(x,y))continue;
+      const key=y*MW+x,cx=(x+.5)*T,cy=(y+.5)*T;
+      if(touchesProp(p,{x:cx,y:cy,r:11}))propBlockedCenters.add(key);
+      for(const k of [0,2,4,5]){
+        const [dx,dy]=DIRS[k];if(!inb(x+dx,y+dy))continue;
+        for(let j=1;j<6;j++)if(touchesProp(p,{x:cx+dx*T*j/6,y:cy+dy*T*j/6,r:11})){
+          propEdgeBlocks[key]|=1<<k;
+          const opposite=k===0?1:k===2?3:k===4?7:6;
+          propEdgeBlocks[key+dx+dy*MW]|=1<<opposite;break;
+        }
+      }
+    }
   }
 }
 

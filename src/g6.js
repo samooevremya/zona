@@ -143,11 +143,11 @@ function rebuildShelterRoutes(routes) {
   shelterOwner.fill(-1);
   shelterDoors.length = 0;
   let head = 0, tail = 0;
-  function seed(x, y) {
+  function seed(x, y, house) {
     const cx = Math.floor(x / T), cy = Math.floor(y / T), i = cy * MW + cx;
     if (!inb(cx, cy) || !nav[i] || shelterOwner[i] >= 0) return;
     shelterOwner[i] = shelterDoors.length;
-    shelterDoors.push({ x, y });
+    shelterDoors.push({ x, y, house });
     bfsQ[tail++] = i;
   }
   for (const h of HOUSES) {
@@ -157,7 +157,7 @@ function rebuildShelterRoutes(routes) {
       for (let lane = 0; lane < lanes; lane++) {
         const offset = (lane - (lanes - 1) / 2) * T;
         seed(h.x*T + d.x - 1.5*T*d.nx + offset*d.ny,
-             h.y*T + d.y - 1.5*T*d.ny + offset*d.nx);
+             h.y*T + d.y - 1.5*T*d.ny + offset*d.nx,h);
       }
     }
   }
@@ -175,38 +175,83 @@ function rebuildShelterRoutes(routes) {
 }
 function routeToShelter(actor, routes) {
   if (routes.revision !== navRevision) rebuildShelterRoutes(routes);
-  const cell = nearestNav(Math.floor(actor.x / T), Math.floor(actor.y / T));
+  const cell = walkAnchor(actor.x,actor.y);
   return routes.doors[routes.owner[cell]] || null;
 }
 function blowShelterTarget() {
   if (!P || !P.alive || !S.blow?.stage || sheltered(P.x, P.y)) return null;
   return routeToShelter(P, playerShelters);
 }
-function lonerBlowoutAI(e, dt) {
-  if (e.fac !== 'loner' || e.captive || e.wounded) return false;
-  if (!S.blow?.stage) {
-    if (e.evacuating) {
-      e.evacuating = false;
-      e.path = null;
-      if (e.seat && !e.sit && !e.trip && !e.follow) e.trip = { stage: 2 };
+// Pick a reachable place behind the doorway. A narrow shop may only have its landing.
+function roomShelterPlace(e,door){
+  const h=door.house,start=Math.floor(door.y/T)*MW+Math.floor(door.x/T);
+  const queue=[start],seen=new Set(queue);
+  const neighbours=ents.filter(o=>o!==e&&o.alive&&o.kind==='human'&&
+    (o.shelterSpot || sheltered(o.x,o.y))).map(o=>o.shelterSpot||o);
+  let best=null,score=Infinity;
+  for(let i=0;i<queue.length;i++){
+    const n=queue[i],x=n%MW,y=Math.floor(n/MW),p={x:(x+.5)*T,y:(y+.5)*T};
+    const nearDoor=h.entrances.some(d=>dst(p.x,p.y,h.x*T+d.x,h.y*T+d.y)<2*T);
+    const cost=dE(p,door)+(nearDoor?140:0)+neighbours.reduce((v,o)=>v+Math.max(0,50-dE(o,p))*9,0);
+    if(cost<score && neighbours.every(o=>dE(o,p)>2*e.r+3)){best=p;score=cost;}
+    for(let k=0;k<4;k++){
+      const m=navNeighbor(x,y,k),nx=m%MW,ny=Math.floor(m/MW);
+      if(m>=0&&!seen.has(m)&&nx>h.x&&nx<h.x+h.w-1&&ny>h.y&&ny<h.y+h.h-1){
+        seen.add(m);queue.push(m);
+      }
+    }
+  }
+  return best && {...best,house:h.ok};
+}
+function shelterPlace(e,avoid){
+  const nearest=routeToShelter(e,lonerShelters);
+  if(nearest && nearest.house.ok!==avoid){
+    const spot=roomShelterPlace(e,nearest);if(spot)return spot;
+  }
+  const doors=lonerShelters.doors.slice().sort((a,b)=>dE(e,a)-dE(e,b));
+  for(const d of doors){
+    if(d===nearest || d.house.ok===avoid)continue;
+    const spot=roomShelterPlace(e,d);
+    if(spot && findPath(e.x,e.y,spot.x,spot.y,true))return spot;
+  }
+  return nearest && {x:nearest.x,y:nearest.y,house:nearest.house.ok};
+}
+function blowoutHumanAI(e, dt) {
+  if(e.kind!=='human'||e.sid==='sid'||e.wounded||e.captive)return false;
+  if(!S.blow?.stage){
+    if(e.evacuating){
+      e.evacuating=false;e.shelterSpot=null;e.path=null;e.routeRetry=0;
+      if(e.trip?.shelter)e.trip=null;
+      if(e.trip?.stage===1)e.trip.stage=0;
+      // Followers retain their current orders; travellers retain their destination and stage.
+      if(!e.follow && !e.trip && e.shelterOrigin && dE(e,e.shelterOrigin)>5)
+        e.trip={stage:2,returnTo:e.shelterOrigin};
+      else if(e.seat&&!e.sit&&!e.follow&&!e.trip)e.trip={stage:2};
+      e.shelterOrigin=null;
     }
     return false;
   }
-  if (!e.evacuating) {
-    e.evacuating = true;
-    e.path = null;
-    e.cover = e.role = null;
-    e.inCover = 0;
-    if (e.trip?.shelter) e.trip = null;
+  if(!e.evacuating){
+    e.evacuating=true;e.shelterOrigin={x:e.x,y:e.y};
+    e.shelterProbe=null;e.shelterRevision=-1;
+    e.path=e.cover=e.role=e.aidTarget=null;e.inCover=0;e.routeRetry=0;
+    if(e.trip?.shelter)e.trip=null;
+    if(e.sit)e.seat=1;
   }
-  e.tgt = e.lastSeen = null;
-  e.mem = e.aw = 0;
-  if (sheltered(e.x, e.y)) return true;
-  if (e.sit) e.seat = 1;
-  e.sit = e.crouch = 0;
-  e.campRise = null;
-  const door = routeToShelter(e, lonerShelters);
-  if (door) goTo(e, door.x, door.y, 122, dt);
+  e.tgt=e.lastSeen=null;e.mem=e.aw=0;
+  if(!e.shelterSpot && sheltered(e.x,e.y))return true;
+  const probe=e.shelterProbe;
+  if(probe)probe.time-=dt;
+  const stalled=probe && probe.time<=0 && dE(e,probe)<12 && !sheltered(e.x,e.y);
+  if(e.shelterRevision!==navRevision || stalled){
+    if(!clearFooting(e.x,e.y,e.r))moveE(e,0,0);
+    e.shelterSpot=shelterPlace(e,stalled?e.shelterSpot?.house:null);
+    e.shelterRevision=navRevision;e.path=null;
+  }
+  if(!probe||probe.time<=0)e.shelterProbe={x:e.x,y:e.y,time:2.5};
+  e.sit=e.crouch=0;e.campRise=null;
+  if(e.shelterSpot && dE(e,e.shelterSpot)>5)goTo(e,e.shelterSpot.x,e.shelterSpot.y,122,dt);
+  else {e.path=null;e.yielding=false;}
   return true;
 }
 function blowout(dt) {
@@ -214,12 +259,6 @@ function blowout(dt) {
   if (B.stage === 0 && S.min >= B.next && P.alive) {
     B.stage = 1; B.t = 80;
     radioNews(BLOW_WARNING, true);
-    ents.forEach(e => {
-      if (!e.alive || e === P || e.kind !== 'human' || e.fac === 'loner' || sheltered(e.x, e.y) || e.captive || e.guard) return;
-      let best = null, bd = 1100;
-      HOUSES.forEach(h => { if (h.ruin) return; const cx = (h.x + h.w / 2) * T, cy = (h.y + h.h / 2) * T, d = dst(e.x, e.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } });
-      if (best) { e.sit = 0; e.campRise = null; e.tgt = null; e.trip = { x: best.x + rnd(-20, 20), y: best.y + rnd(-14, 14), stage: 0, shelter: 1 }; e.path = null; }
-    });
   }
   if (B.stage === 1) {
     B.t -= dt; WX.red = lerp(WX.red, 0.5, dt * 0.05);

@@ -343,23 +343,59 @@ function openBarrier() { const b = objs.find(o => o.key === 'bar'); if (b && b.s
 /* сетки проходимости и видимости */
 const nav = new Uint8Array(MW * MH), opq = new Uint8Array(MW * MH);
 const fences = [];
+// Spatial buckets for short walking probes. Transparent furniture and mesh fences
+// still stop a body, so a visibility ray cannot answer this question.
+const walkSolids=new Map(), propEdgeBlocks=new Uint8Array(MW*MH), propBlockedCenters=new Set();
+function clearFooting(x,y,r){
+  const body={x,y,r};
+  for(let j=Math.floor((y-r)/T);j<=Math.floor((y+r)/T);j++)
+    for(let i=Math.floor((x-r)/T);i<=Math.floor((x+r)/T);i++){
+      if(!inb(i,j))return false;
+      const cell=j*MW+i;
+      if(SOLID[map[cell]] && Math.hypot(x-clamp(x,i*T,(i+1)*T),y-clamp(y,j*T,(j+1)*T))<r)return false;
+      const solids=walkSolids.get(cell);
+      if(solids)for(const o of solids)if(o.solid &&
+        Math.hypot(x-clamp(x,o.x,o.x+o.w),y-clamp(y,o.y,o.y+o.h))<r)return false;
+      const props=propCells.get(cell);
+      if(props && props.some(p=>touchesProp(p,body)))return false;
+    }
+  return true;
+}
+function clearWalk(x,y,tx,ty,r=11){
+  const n=Math.max(1,Math.ceil(Math.hypot(tx-x,ty-y)/7));
+  for(let i=1;i<=n;i++)if(!clearFooting(x+(tx-x)*i/n,y+(ty-y)*i/n,r))return false;
+  return true;
+}
+function walkAnchor(px,py){
+  const tx=Math.floor(px/T),ty=Math.floor(py/T);
+  for(let ring=0;ring<=4;ring++){
+    let best=-1,dist=Infinity;
+    for(let y=ty-ring;y<=ty+ring;y++)for(let x=tx-ring;x<=tx+ring;x++){
+      if(!inb(x,y)||Math.max(Math.abs(x-tx),Math.abs(y-ty))!==ring||!nav[y*MW+x])continue;
+      const wx=(x+.5)*T,wy=(y+.5)*T,d=Math.hypot(wx-px,wy-py);
+      if(d<dist&&clearWalk(px,py,wx,wy)){best=y*MW+x;dist=d;}
+    }
+    if(best>=0)return best;
+  }
+  return -1;
+}
 let navRevision = 0;
 function buildGrids() {
   navRevision++;
-  fences.length = 0;
+  fences.length = 0;walkSolids.clear();
   for (let i = 0; i < MW * MH; i++) { nav[i] = SOLID[map[i]] ? 0 : 1; opq[i] = OPAQ[map[i]]; }
   objs.forEach(o => {
     if (!o.solid) return;
     if (o.k === 'fence') fences.push(o);
     for (let y = Math.floor(o.y / T); y <= Math.floor((o.y + o.h - 1) / T); y++)
       for (let x = Math.floor(o.x / T); x <= Math.floor((o.x + o.w - 1) / T); x++) if (inb(x, y)) {
+        const cell=y*MW+x;
+        if(!walkSolids.has(cell))walkSolids.set(cell,[]);
+        walkSolids.get(cell).push(o);
         nav[y * MW + x] = 0; if (o.opaque) opq[y * MW + x] = 1;
       }
   });
-  for (const [key,props] of propCells) {
-    const center={x:(key%MW+.5)*T, y:(Math.floor(key/MW)+.5)*T, r:10};
-    if(props.some(p=>touchesProp(p,center))) nav[key]=0;
-  }
+  for(const cell of propBlockedCenters)nav[cell]=0;
   ANOM0.forEach(a => {
     for (let y = Math.floor((a.y - a.r - 14) / T); y <= Math.floor((a.y + a.r + 14) / T); y++)
       for (let x = Math.floor((a.x - a.r - 14) / T); x <= Math.floor((a.x + a.r + 14) / T); x++)
@@ -377,6 +413,7 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -
 function navNeighbor(x, y, k) {
   const nx = x + DIRS[k][0], ny = y + DIRS[k][1];
   if (!inb(nx, ny) || !nav[ny * MW + nx]) return -1;
+  if (propEdgeBlocks[y*MW+x] & (1<<k)) return -1;
   if (k >= 4 && (!nav[y * MW + nx] || !nav[ny * MW + x])) return -1;
   return ny * MW + nx;
 }
@@ -386,8 +423,9 @@ function nearestNav(tx, ty) {
   }
   return -1;
 }
-function findPath(sx, sy, tx, ty) {
-  const s = nearestNav(Math.floor(sx / T), Math.floor(sy / T)), g = nearestNav(Math.floor(tx / T), Math.floor(ty / T));
+function findPath(sx, sy, tx, ty, walking=false) {
+  const s=walking?walkAnchor(sx,sy):nearestNav(Math.floor(sx/T),Math.floor(sy/T));
+  const g=walking?walkAnchor(tx,ty):nearestNav(Math.floor(tx/T),Math.floor(ty/T));
   if (s < 0 || g < 0) return null;
   bfsPrev.fill(-1); bfsPrev[s] = s;
   let h = 0, t = 0; bfsQ[t++] = s;
@@ -403,6 +441,7 @@ function findPath(sx, sy, tx, ty) {
   if (bfsPrev[g] < 0) return null;
   const pts = []; let c = g;
   while (c !== s) { pts.push({ x: (c % MW) * T + 16, y: ((c / MW) | 0) * T + 16 }); c = bfsPrev[c]; }
+  if(walking)pts.push({x:(s%MW+.5)*T,y:(Math.floor(s/MW)+.5)*T});
   pts.reverse();
   return pts;
 }
