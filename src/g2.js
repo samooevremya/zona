@@ -183,6 +183,7 @@ function spawnWorld() {
   if (bridgeBarrier) { bridgeBarrier.solid = S.flags.bridgePaid ? 0 : 1; buildGrids(); }
   S.q2 = S.q2 || { fox: 0, tolik: 0 };
   P = mkPlayer(); ents.push(P);
+  delete S.dead.sid; // Сохранение из версии, где торговца можно было убить.
   NPCDEF.forEach(d => {
     if (S.dead[d.sid]) return;
     const e = mkHuman(d);
@@ -197,7 +198,7 @@ function spawnWorld() {
   rcSpawnObjs();
   cordonCast();
   boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
-  for(const e of ents) if(e!==P && e.home) clearPropSpawn(e);
+
   anoms = ANOM0.map(spawnAnomaly);
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
 }
@@ -444,11 +445,11 @@ function shotBarrier(sh, ca, sa, reach) {
   return sh.crouch ? Math.min(wall, rayFence(sh.x, sh.y, ca, sa, 0, Math.min(wall, FENCE_REACH))) : wall;
 }
 const ballOff = sh => (sh.r || 11) + 8;
-function shotTrace(sh, a, W) {   // чистая функция исхода одного луча: {t, best, wall}
+function shotTrace(sh, a, W, passFriends = sh === P && combatNear()) {   // чистая функция исхода одного луча: {t, best, wall}
   const ca = Math.cos(a), sa = Math.sin(a), reach = W.range + ballOff(sh);
   const wallT = shotBarrier(sh, ca, sa, reach);
   let best = null, bt = wallT;
-  const passFriends = sh === P && combatNear();
+
   for (const e of ents) {
     if (!e.alive || e === sh) continue;
     if (passFriends && !hostile(P, e)) continue;
@@ -469,8 +470,11 @@ function fire(sh, ang, W, spread) {
   const ca0 = Math.cos(ang), sa0 = Math.sin(ang), mzT = Math.max(0, (mz.x - sh.x) * ca0 + (mz.y - sh.y) * sa0);
   const w0 = shotBarrier(sh, ca0, sa0, mzT + 1), blocked = w0 < mzT;   // ствол упёрся в стену: вспышка у стены, не за ней
   const fx = blocked ? sh.x + ca0 * Math.max(0, w0 - 1) : mz.x, fy = blocked ? sh.y + sa0 * Math.max(0, w0 - 1) : mz.y;
+  const passFriends = sh === P && combatNear();
+  // Дробины одного выстрела считаются одним попаданием по своим.
+  const shot = sh === P ? {} : null;
   for (let k = 0; k < n; k++) {
-    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
+    const a = ang + (Math.random() - 0.5) * 2 * spread, r = shotTrace(sh, a, W, passFriends), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
     if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
@@ -478,10 +482,10 @@ function fire(sh, ang, W, spread) {
       const cx = best.x - ca * 22, cy = best.y - sa * 22;
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
       for (let i = 0; i < 4; i++) parts.push({ x: cx, y: cy, vx: rnd(-90, 90), vy: rnd(-90, 90), life: rnd(0.15, 0.3), c: '#d8c9a0', s: 1.6 });
-    } else if (best) {
+    } else if (best && best.sid !== 'sid') {
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
       if (sh === P) { P.hitT = 0.18; if (best.hp - W.dmg * fall <= 0) P.killT = 0.4; }
-      hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a);
+      hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
     } else if (r.wall) for (let i = 0; i < 3; i++) parts.push({ x: ex - ca * 1.5, y: ey - sa * 1.5, vx: rnd(-80, 80) - ca * 60, vy: rnd(-80, 80) - sa * 60, life: rnd(0.15, 0.3), c: '#e8d9a0', s: 1.5 });
   }
   flashes.push({ x: fx, y: fy, a: ang, life: 0.06 });
@@ -516,9 +520,10 @@ function lineClear(sh, t) {
   return true;
 }
 function melee(sh, W) {
+  const passFriends = sh === P && combatNear();
   let hit = null, bd = 1e9;
   ents.forEach(e => {
-    if (!e.alive || e === sh) return;
+    if (!e.alive || e === sh || (passFriends && !hostile(sh, e))) return;
     const d = dE(e, sh);
     if (d < W.range + e.r + sh.r && Math.abs(angD(sh.ang, Math.atan2(e.y - sh.y, e.x - sh.x))) < 0.9 && d < bd) { hit = e; bd = d; }
   });
@@ -532,8 +537,8 @@ function melee(sh, W) {
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
-function hurt(e, dmg, src, ang) {
-  if (!e.alive) return;
+function hurt(e, dmg, src, ang, shot) {
+  if (!e.alive || e.sid === 'sid') return;
   if (src && (src === P || src.follow)) {
     e.hitByP = 1;
     if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
@@ -549,13 +554,20 @@ function hurt(e, dmg, src, ang) {
   const n = Math.min(6, 2 + Math.floor(dmg / 8));
   for (let i = 0; i < n; i++) parts.push({ x: e.x, y: e.y, vx: Math.cos((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), vy: Math.sin((ang || 0) + rnd(-0.6, 0.6)) * rnd(40, 160), life: rnd(0.2, 0.4), c: '#7a1d14', s: 2, blood: 1 });
   if (e !== P && src && src.alive !== undefined) {
-    if (src === P && e.fac === 'loner' && e.hp > 0) witnessLonerAttack(e, false);
+    if (src === P && e.fac === 'loner' && e.hp > 0 && !hostile(e, P)) {
+      if (shot && (e.lastStrayShot === shot || !(e.strayUntil > S.min))) {
+        if (e.lastStrayShot !== shot) sayLine(e, 'Свои! Следи за огнём!');
+        e.lastStrayShot = shot;
+        e.strayUntil = S.min + 6;
+      } else witnessLonerAttack(e, false);
+    }
     if (src === P && e.fac === 'army' && !hostile(e, P)) anger(e);
     if (hostile(e, src)) { e.tgt = src; e.lastSeen = { x: src.x, y: src.y }; e.mem = 6; e.react = Math.min(e.react, 0.15); }
   }
   if (e.hp <= 0) kill(e, src);
 }
 function kill(e, src) {
+  if (e.sid === 'sid') return;
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
   if (e.sid) S.dead[e.sid] = 1;

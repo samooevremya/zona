@@ -998,8 +998,8 @@ addEventListener('keyup', e => { KEYS[e.code] = false; });
 function resetInput() {
   IN.sprint = false; IN.runPointer = null; $('b-run').classList.remove('on');
   for (const k in KEYS) KEYS[k] = false;
-  IN.fire = false; IN.touchFire = false; IN.btnFire = false; IN.fireStick = null; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
-  const fb = document.getElementById('b-fire'); if (fb) { fb.classList.remove('on'); fb.style.setProperty('--fx', '0px'); fb.style.setProperty('--fy', '0px'); }
+  IN.fire = false; IN.btnFire = false; IN.firePointer = null; IN.left = null; IN.aimStick = null; IN.moveX = IN.moveY = 0;
+  const fb = document.getElementById('b-fire'); if (fb) fb.classList.remove('on');
   if (typeof joyReset === 'function') joyReset();
 }
 addEventListener('blur', resetInput);
@@ -1044,12 +1044,12 @@ cv.addEventListener('pointermove', e => {
   const m = Math.hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
   s.dx = dx; s.dy = dy;
   if (s === IN.left) { IN.moveX = dx; IN.moveY = dy; JOYK.style.transform = 'translate(' + (dx * Math.min(34,(s.radius || 56)*.6)) + 'px,' + (dy * Math.min(34,(s.radius || 56)*.6)) + 'px)'; }
-  else { if (m > 0.2) s.a = Math.atan2(dy, dx); IN.touchFire = m > 0.92; }
+  else if (m > 0.2) s.a = Math.atan2(dy, dx);
 });
 function endPtr(e) {
   if (e.pointerType === 'mouse') { IN.fire = false; return; }
   if (IN.left && IN.left.id === e.pointerId) { IN.left = null; IN.moveX = IN.moveY = 0; joyReset(); }
-  if (IN.aimStick && IN.aimStick.id === e.pointerId) { IN.aimStick = null; IN.touchFire = false; }
+  if (IN.aimStick && IN.aimStick.id === e.pointerId) { IN.aimStick = null; }
 }
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1074,9 +1074,18 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 const fireB = $('b-fire');
-fireB.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); try { fireB.setPointerCapture(e.pointerId); } catch (x) {} const r = fireB.getBoundingClientRect(); IN.fireStick = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, a: 0, m: 0 }; IN.btnFire = true; fireB.classList.add('on'); });
-fireB.addEventListener('pointermove', e => { const f = IN.fireStick; if (!f) return; const dx = e.clientX - f.cx, dy = e.clientY - f.cy, m = Math.min(1, Math.hypot(dx, dy) / 60); f.m = m; if (m > 0.25) f.a = Math.atan2(dy, dx); fireB.style.setProperty('--fx', (Math.cos(f.a) * m * 14) + 'px'); fireB.style.setProperty('--fy', (Math.sin(f.a) * m * 14) + 'px'); });
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => fireB.addEventListener(t, () => { IN.btnFire = false; IN.fireStick = null; fireB.classList.remove('on'); fireB.style.setProperty('--fx', '0px'); fireB.style.setProperty('--fy', '0px'); }));
+fireB.addEventListener('pointerdown', e => {
+  if (IN.firePointer != null || panel || title.open || !P?.alive) return;
+  e.preventDefault(); e.stopPropagation(); audioInit();
+  fireB.setPointerCapture(e.pointerId);
+  IN.firePointer = e.pointerId; IN.btnFire = true; fireB.classList.add('on');
+});
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  fireB.addEventListener(event, e => {
+    if (IN.firePointer !== e.pointerId) return;
+    IN.firePointer = null; IN.btnFire = false; fireB.classList.remove('on');
+  });
+}
 $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); if (!panel) interact(); });
 $('rot-skip').addEventListener('click', () => document.body.classList.add('portrait-ok'));
 Object.keys(TB).forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); if (P.alive && !panel) TB[id](); }));

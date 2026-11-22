@@ -19,6 +19,17 @@ async def run(vw, vh):
         mv=[vw*0.18, vh*0.75]
         async def touch(t, pts): await cdp.send('Input.dispatchTouchEvent',{'type':t,'touchPoints':[{'x':x,'y':y,'id':i} for i,(x,y) in pts]})
         res={}
+        # Dragging on the open right half must only aim, at any distance.
+        point=await pg.evaluate("""()=>{for(let y=innerHeight*.32;y<innerHeight*.72;y+=12)
+          for(let x=innerWidth*.54;x<innerWidth*.82;x+=10)
+            if(document.elementFromPoint(x,y)?.tagName==='CANVAS') return [x,y];
+          throw Error('No open aiming area')}""")
+        await touch('touchStart',[(1,point)])
+        await touch('touchMove',[(1,(point[0]+77,point[1]+8))])
+        await pg.wait_for_timeout(300)
+        aim=await pg.evaluate("({stick:__z.IN.aimStick?.dx || 0, mag:__z.S.mag.w_pm, fire:!!__z.IN.btnFire})")
+        await touch('touchEnd',[])
+        res['aim_only']={'ok':aim['stick']>.9 and aim['mag']==8 and not aim['fire'], 'during':aim}
         # движение + огонь
         await touch('touchStart',[(0,mv)]); await touch('touchMove',[(0,(mv[0]+40,mv[1]-10))])
         await touch('touchStart',[(0,(mv[0]+40,mv[1]-10)),(1,fire)])

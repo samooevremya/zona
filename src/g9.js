@@ -489,6 +489,11 @@ function dynRestore() {
       sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, ringPt: r.ringPt });
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.traded) { if (r.inv) e.inv = r.inv; if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; if(r.guns) e.guns=r.guns; }
+    if (e.sid === 'sid') {
+      const seat = NPCDEF.find(d => d.sid === 'sid');
+      Object.assign(e, {x: seat.x*T, y: seat.y*T, hp: seat.hp, maxhp: seat.hp,
+        home: {x: seat.x*T, y: seat.y*T}, stay: 1, follow: 0});
+    }
     if (r.name) e.name = r.name;
     if (r.mag != null) e.mag = r.mag;
     if (e.follow) { e.sit = 0; e.trip = null; }
