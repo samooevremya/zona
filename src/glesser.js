@@ -229,7 +229,7 @@ function makeLesserZone() {
     ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
     ['lz_rivet','Радист',170,48,'w_obrez','army']
   ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:81.2*T,y:(Y+55.55)*T}:LESSER_FIRE});
-  DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
+  DOGDEF.push({sid:'lz_yard_dog',pack:'lz_yard',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz_fuel',x:186,y:Y+69});
 }
 // World tiles. The east end shares both gauge and sleeper phase with the Cordon.
 const railAxis = x => NORTH_ROWS+57.5-.0034*Math.max(0,176-x)**2;

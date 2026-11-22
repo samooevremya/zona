@@ -67,7 +67,7 @@ if (MAP_ID === 'rc1') {
   CLEAR_SPOTS.length = 0; locAnchors('clear').forEach(a => CLEAR_SPOTS.push([a.x, a.y, 'у ' + LOC[a.loc].gen, a.loc]));
   const sh = locPt('lair', 'sucker'); SUCKER_HOME.x = sh.x; SUCKER_HOME.y = sh.y;
 }
-function boarDefs() { return MAP_ID === 'rc1' ? RC1.boars.map(b => ({ sid: b.sid, x: b.at[0], y: b.at[1] })) : [{ sid: 'k1', x: 52, y: 12 }, { sid: 'k2', x: 54.5, y: 13 }, { sid: 'k3', x: 76, y: 24 }]; }
+function boarDefs() { return MAP_ID === 'rc1' ? RC1.boars.map(b => ({ sid: b.sid, pack: b.pack, x: b.at[0], y: b.at[1] })) : [{ sid: 'k1', x: 52, y: 12 }, { sid: 'k2', x: 54.5, y: 13 }, { sid: 'k3', x: 76, y: 24 }]; }
 
 /* ---------- геометрия RC1 ---------- */
 function rcClear(x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const t = tAt(x, y); if (t === TR || t === BU) setT(x, y, GR); } reserve(x0, y0, x1, y1); }

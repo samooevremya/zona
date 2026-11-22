@@ -398,6 +398,12 @@ function findInteract() {
     if ((o.k==='crate' && o.broken && !o.looted) || o.kind==='sack') {
       nearbyGroundItems(o,cand); continue;
     }
+    if (o.k === 'body' && MUTANT_TROPHIES[o.kind]) {
+      const trophy=MUTANT_TROPHIES[o.kind], d=dE(P,o);
+      if (o.loot[trophy] && d<42 && clearNPCShot(P,o))
+        cand(d,{k:'carve',o,label:S.weapon==='knife'?'Срезать трофей · '+ITEMS[trophy].n:'Для разделки нужен нож'});
+      continue;
+    }
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
     if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
@@ -413,6 +419,16 @@ function findInteract() {
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
   plusInteract(cand);
   return best;
+}
+function carveMutant(o) {
+  const id = MUTANT_TROPHIES[o.kind];
+  if (!id || !o.loot[id] || !objs.includes(o) || dE(P,o)>=42 || !clearNPCShot(P,o)) return;
+  if (S.weapon !== 'knife') { msg('Возьми нож в руки.', 'say'); return; }
+  const error = receiveError(id,1);
+  if (error) { msg(error,'bad'); return; }
+  collectStock(o,id,1);
+  play('knife',P.x,P.y);
+  msg('Получен трофей · '+ITEMS[id].n,'say');
 }
 function lootAll(o) {
   let pickedUp = false;

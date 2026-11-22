@@ -241,6 +241,15 @@ function makeGarbage() {
     ['c1_bricks',400.5,39,32,-.19],['c1_sandbags',406.5,31,41,.08],
     ['c1_tires',375.8,36.3,34,.24],['c1_trace_reel',379.2,38,25,.1]
   );
+  // Small side clearings with an open south approach; no structures on the roads.
+  rcClear(384,96,390,104);
+  rcClear(302,74,308,82);
+  CORDON_DETAILS.push(['c1_trace_pipes',386.5,96.5,61,-.17],
+    ['c1_tires',389.5,98,26,.31],['c1_rock0',303,75,48,.4]);
+  for(const [i,x,y] of [[1,386.5,98.5],[2,388.5,98.5],[3,387.5,99.5]])
+    DOGDEF.push({sid:'dump_dog'+i,pack:'dump_pipes',x,y});
+  for(const [i,x,y] of [[1,304.5,77.5],[2,306.5,77.5]])
+    RC1.boars.push({sid:'dump_boar'+i,pack:'dump_hollow',at:[x,y]});
   WORLD_FIRES.push(dumpFire);
   addObj({k:'fire',x:dumpFire.x-10,y:dumpFire.y-10,w:20,h:20,solid:1});
   for(const [stash,k,x,y,loot] of [

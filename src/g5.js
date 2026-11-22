@@ -859,6 +859,7 @@ function interact() {
   else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'groundItem') pickGroundItem(n);
   else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
+  else if (n.k === 'carve') carveMutant(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);

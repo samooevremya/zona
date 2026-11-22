@@ -258,6 +258,51 @@ function mkPlayer() {
   return { id: 0, kind: 'human', fac: 'player', name: 'Меченый', x: S.x, y: S.y, r: 11, hp: S.hp, maxhp: 100, ang: -Math.PI / 2, alive: 1,
     cool: 0, reload: 0, bloom: 0, st: 100, kx: 0, ky: 0, flash: 0, step: 0, medT: 0, seed: 7, rank: 0 };
 }
+const DEN_RECOVERY = 24 * 60;
+let mutantDens = new Map();
+function registerDens() {
+  mutantDens = new Map();
+  for (const d of DOGDEF) register(d, mkDog, d.pack);
+  for (const d of boarDefs()) register(d, mkBoar, d.pack || (d.sid === 'k3' ? 'boar_east' : 'boar'));
+  function register(d, make, pack) {
+    if (!mutantDens.has(pack)) mutantDens.set(pack, []);
+    mutantDens.get(pack).push({def:{...d,pack}, make});
+  }
+}
+function spawnDenMember(member) {
+  const e = member.make(member.def);
+  e.den = member.def.pack;
+  clearPropSpawn(e);
+  ents.push(e);
+}
+function clearedDen(pack) {
+  const members = mutantDens.get(pack);
+  if (members && members.every(m => S.dead[m.def.sid])) {
+    const deadlines = S.flags.denRecovery ||= {};
+    deadlines[pack] ??= S.min + DEN_RECOVERY;
+  }
+}
+function renewDens() {
+  const deadlines = S.flags.denRecovery;
+  if (!deadlines) return;
+  for (const [pack, until] of Object.entries(deadlines)) {
+    const members = mutantDens.get(pack);
+    if (!members || S.min < until) continue;
+    const safeToSpawn = members.every(({def}) => {
+      const x = def.x*T, y = def.y*T;
+      const onScreen = Math.abs(cam.x-x)<VW/(2*Z)+4*T && Math.abs(cam.y-y)<VH/(2*Z)+4*T;
+      return S.dead[def.sid] && !onScreen && dst(P.x,P.y,x,y)>1200;
+    });
+    if (!safeToSpawn) continue;
+    for (const member of members) {
+      const sid = member.def.sid;
+      ents = ents.filter(e => e.sid !== sid || e.alive);
+      delete S.dead[sid];
+      spawnDenMember(member);
+    }
+    delete deadlines[pack];
+  }
+}
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
@@ -279,10 +324,14 @@ function spawnWorld() {
     if (S.flags.angry && S.flags.angry[d.sid]) e.angry = 1;
     ents.push(e);
   });
-  DOGDEF.forEach(d => { if (!S.dead[d.sid]) ents.push(mkDog(d)); });
+  registerDens();
+  for (const [pack,members] of mutantDens) {
+    for (const member of members) if (!S.dead[member.def.sid]) spawnDenMember(member);
+    clearedDen(pack); // Also initialise the cooldown for a cleared den in an older save.
+  }
   rcSpawnObjs();
   campaignCast();
-  boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
+
 
   anoms = ANOM0.map(spawnAnomaly);
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
@@ -785,6 +834,7 @@ function kill(e, src) {
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
   if (e.sid) S.dead[e.sid] = 1;
+  if (e.den) clearedDen(e.den);
   const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e) : null;
   (witnesses || ents).forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
   decals.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), r: rnd(10, 16), a: 0.75 });
@@ -803,11 +853,11 @@ function kill(e, src) {
   }
   plusKill(e, src);
 }
+const MUTANT_TROPHIES = {dog:'tail', boar:'hoof', sucker:'tentacle'};
 function dropBody(e) {
   const loot = {};
-  if (e.kind === 'dog') { if (chance(0.55)) loot.tail = 1; }
-  else if (e.kind === 'boar') { if (chance(0.7)) loot.hoof = 1; }
-  else if (e.kind === 'sucker') { loot.tentacle = 1; }
+  const trophy = MUTANT_TROPHIES[e.kind];
+  if (trophy) loot[trophy] = 1;
   else {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
@@ -1238,12 +1288,5 @@ function spawnTick() {
     }
     news('Сводка: на дорогу с востока вышла группа бандитов.');
   }
-  if (S.min - (S.flags.dogT || 0) > 360 && S.q.pack !== 1) {
-    S.flags.dogT = S.min;
-    ['lair', 'north'].forEach(pk => {
-      const home = (h => ({ x: h[0], y: h[1] }))(pk === 'lair' ? RMt(10.5, 42.5) : RMt(71, 20.5));
-      if (ents.filter(e => e.alive && e.pack === pk).length < 2 && far(home.x * T, home.y * T))
-        for (let i = 0; i < 2; i++) ents.push(mkDog({ pack: pk, x: home.x + i, y: home.y }));
-    });
-  }
+  renewDens();
 }
