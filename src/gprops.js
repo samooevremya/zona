@@ -64,7 +64,7 @@ function touchesProp(p,e,push=false) {
 }
 function buildFieldProps(){
   propCells.clear(); fieldProps.length=0;
-  if(!ART) return;
+  if(!ART){cachePropNavigation();return;}
   for(const [kind,tx,ty,angle] of DECOR){
     if(kind==='ford'||(kind==='fence' && BIG && C1)) continue;
     const art=C1 && C1DECOR[kind], id=art?art[0]:kind, sp=ART.m.sprites[id];
@@ -72,7 +72,7 @@ function buildFieldProps(){
     const w=art?art[1]:sp.logicalSize[0], h=art?w*sp.rect[3]/sp.rect[2]:sp.logicalSize[1];
     addFootprint(id,tx*T,ty*T,w,h,angle);
   }
-  if(!C1) return;
+  if(!C1){cachePropNavigation();return;}
   if(BIG) for(const [id,tx,ty,w,a] of CORDON_DETAILS){
     if(id==='c1_trace_apples') continue;
     const r=ART.m.sprites[id].rect;
@@ -91,6 +91,29 @@ function buildFieldProps(){
       blockedScatter.add(y*MW+x);continue;
     }
     addFootprint(p.id,p.cx,p.cy,p.w,p.hh,p.a);
+  }
+  cachePropNavigation();
+}
+function cachePropNavigation(){
+  // These hulls are static. Cache the few edges cut by them once, not on every crate change.
+  propEdgeBlocks.fill(0);propBlockedCenters.clear();
+  for(const p of fieldProps){
+    const xs=p.vertices.map(v=>v[0]),ys=p.vertices.map(v=>v[1]);
+    const xmin=Math.floor((Math.min(...xs)-11)/T)-1,xmax=Math.floor((Math.max(...xs)+11)/T)+1;
+    const ymin=Math.floor((Math.min(...ys)-11)/T)-1,ymax=Math.floor((Math.max(...ys)+11)/T)+1;
+    for(let y=ymin;y<=ymax;y++)for(let x=xmin;x<=xmax;x++){
+      if(!inb(x,y))continue;
+      const key=y*MW+x,cx=(x+.5)*T,cy=(y+.5)*T;
+      if(touchesProp(p,{x:cx,y:cy,r:11}))propBlockedCenters.add(key);
+      for(const k of [0,2,4,5]){
+        const [dx,dy]=DIRS[k];if(!inb(x+dx,y+dy))continue;
+        for(let j=1;j<6;j++)if(touchesProp(p,{x:cx+dx*T*j/6,y:cy+dy*T*j/6,r:11})){
+          propEdgeBlocks[key]|=1<<k;
+          const opposite=k===0?1:k===2?3:k===4?7:6;
+          propEdgeBlocks[key+dx+dy*MW]|=1<<opposite;break;
+        }
+      }
+    }
   }
 }
 

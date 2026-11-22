@@ -168,6 +168,35 @@ function explode(n) {
   ents.forEach(e => { if (e !== P && e.alive && dE(e, n) < 600 && hostile(e, P)) { e.lastSeen = { x: P.x, y: P.y }; e.mem = 6; } });
 }
 
+function resolveActorContacts(dt){
+  // толкотня и отдача
+  for (let i = 0; i < ents.length; i++) {
+    const a = ents[i]; if (!a.alive) continue;
+    if (a.sid === 'sid') { a.x = a.home.x; a.y = a.home.y; a.kx = a.ky = 0; }
+    if (a.kx || a.ky) { moveE(a, a.kx * dt, a.ky * dt); a.kx *= Math.pow(0.02, dt); a.ky *= Math.pow(0.02, dt); if (Math.abs(a.kx) + Math.abs(a.ky) < 2) a.kx = a.ky = 0; }
+    a.flash = Math.max(0, a.flash - dt);
+    for (let j = i + 1; j < ents.length; j++) {
+      const b = ents[j]; if (!b.alive) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const other = a === P ? b : b === P ? a : null;
+      const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
+      const rr = atSeat ? 40 : a.r + b.r;
+      if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
+      const d = Math.hypot(dx, dy);
+      if (atSeat && d < rr) {
+        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
+        const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
+        moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
+      } else if (d < rr && d > 0.01) {
+        const overlap=rr-d,ux=dx/d,uy=dy/d;
+        const share=a.yielding&&!b.yielding?.95:b.yielding&&!a.yielding?.05:.5;
+        if (!a.captive && a.sid !== 'sid') moveE(a,-ux*overlap*share,-uy*overlap*share);
+        if (!b.captive && b.sid !== 'sid') moveE(b,ux*overlap*(1-share),uy*overlap*(1-share));
+      }
+    }
+  }
+}
+
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
@@ -189,36 +218,12 @@ function update(dt) {
   worldFx(dt);
   for (const e of ents) {
     if (!e.alive || e === P) continue;
-    if (e.qaHold || lonerBlowoutAI(e, dt)) continue;
+    if (e.qaHold || blowoutHumanAI(e, dt)) continue;
     if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt) continue;
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
     if (e.kind === 'dog') aiDog(e, dt); else if (e.kind === 'boar') aiBoar(e, dt); else if (e.kind === 'sucker') aiSucker(e, dt); else aiHuman(e, dt);
   }
-  // толкотня и отдача
-  for (let i = 0; i < ents.length; i++) {
-    const a = ents[i]; if (!a.alive) continue;
-    if (a.sid === 'sid') { a.x = a.home.x; a.y = a.home.y; a.kx = a.ky = 0; }
-    if (a.kx || a.ky) { moveE(a, a.kx * dt, a.ky * dt); a.kx *= Math.pow(0.02, dt); a.ky *= Math.pow(0.02, dt); if (Math.abs(a.kx) + Math.abs(a.ky) < 2) a.kx = a.ky = 0; }
-    a.flash = Math.max(0, a.flash - dt);
-    for (let j = i + 1; j < ents.length; j++) {
-      const b = ents[j]; if (!b.alive) continue;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const other = a === P ? b : b === P ? a : null;
-      const atSeat = other && other.sit && other.fac === 'loner' && other.fireRef === FIRE && dE(other, FIRE) < 130;
-      const rr = atSeat ? 40 : a.r + b.r;
-      if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
-      const d = Math.hypot(dx, dy);
-      if (atSeat && d < rr) {
-        // Не сдвигать сидящего игроком. Запас учитывает ноги, вытянутые перед ним.
-        const angle = d > 0.01 ? Math.atan2(P.y - other.y, P.x - other.x) : other.ang + Math.PI;
-        moveE(P, (rr - d) * Math.cos(angle), (rr - d) * Math.sin(angle));
-      } else if (d < rr && d > 0.01) {
-        const push = (rr - d) / 2, ux = dx / d, uy = dy / d;
-        if (!a.captive && a.sid !== 'sid') moveE(a, -ux * push, -uy * push);
-        if (!b.captive && b.sid !== 'sid') moveE(b, ux * push, uy * push);
-      }
-    }
-  }
+  resolveActorContacts(dt);
   updateBolts(dt);
   updateAnoms(dt);
   deliverLonerReports();

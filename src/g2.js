@@ -363,23 +363,48 @@ function steer(e, tx, ty, speed, dt) {
   return moved;
 }
 function goTo(e, tx, ty, speed, dt) {
-  if (e.path && e.goal && dst(e.goal.x, e.goal.y, tx, ty) > 48) e.path = null;
-  if (!e.path) {
-    if (los(e.x, e.y, tx, ty) && dst(e.x, e.y, tx, ty) < 260 && !(e.stuck > 0.6)) {
-      steer(e, tx, ty, speed, dt); e.ang += angD(e.ang, Math.atan2(ty - e.y, tx - e.x)) * Math.min(1, dt * 6);
-      if (e.stuck > 0.6) { e.path = findPath(e.x, e.y, tx, ty); e.pi = 0; e.goal = { x: tx, y: ty }; e.stuck = 0; }
-      return dst(e.x, e.y, tx, ty);
-    }
-    e.path = findPath(e.x, e.y, tx, ty); e.pi = 0; e.goal = { x: tx, y: ty };
-    if (!e.path) { steer(e, tx, ty, speed, dt); return dst(e.x, e.y, tx, ty); }
+  e.yielding=false;e.lastWalk=S.min;
+  const distance=dst(e.x,e.y,tx,ty);
+  if(distance<1)return distance;
+  const changed=!e.goal||dst(e.goal.x,e.goal.y,tx,ty)>12||e.pathRevision!==navRevision;
+  if(changed){e.path=null;e.routeRetry=0;}
+  if(!e.path){
+    if(e.routeRetry>0){e.routeRetry-=dt;return distance;}
+    e.goal={x:tx,y:ty};e.pathRevision=navRevision;e.pi=0;
+    const direct=distance<260 && clearWalk(e.x,e.y,tx,ty,e.r) &&
+      !anoms.some(a=>{
+        const dx=tx-e.x,dy=ty-e.y,t=clamp(((a.x-e.x)*dx+(a.y-e.y)*dy)/(distance*distance),0,1);
+        return dst(a.x,a.y,e.x+t*dx,e.y+t*dy)<a.r+e.r;
+      });
+    e.path=direct?[e.goal]:findPath(e.x,e.y,tx,ty,true);
+    if(!e.path){e.routeRetry=.9;return distance;}
+    if(!direct)e.path.push(e.goal);
+    e.stuck=0;
   }
-  const p = e.path[e.pi];
-  if (!p) { e.path = null; steer(e, tx, ty, speed, dt); return dst(e.x, e.y, tx, ty); }
-  steer(e, p.x, p.y, speed, dt);
-  e.ang += angD(e.ang, Math.atan2(p.y - e.y, p.x - e.x)) * Math.min(1, dt * 6);
-  if (dst(e.x, e.y, p.x, p.y) < 12) { e.pi++; if (e.pi >= e.path.length) e.path = null; }
-  if (e.stuck > 1.5) { e.path = null; e.stuck = 0; }
-  return dst(e.x, e.y, tx, ty);
+  // Reach the centre before turning at a door jamb. Clamp the last step to the waypoint.
+  let p=e.path[e.pi];
+  while(p){
+    const next=e.path[e.pi+1],gap=dE(e,p);
+    // Travellers sharing a gate can pass on either side of the waypoint centre.
+    if(gap>=1 && !(next&&gap<24&&clearWalk(e.x,e.y,next.x,next.y,e.r)))break;
+    p=e.path[++e.pi];
+  }
+  if(!p){e.path=null;return distance;}
+  // At a shared corner, let one traveller complete the turn before the next enters.
+  if(e.kind==='human' && dE(e,p)<T*1.6 && ents.some(o=>{
+    if(o===e||!o.alive||o.id>=e.id||!o.path||S.min-o.lastWalk>.2||dE(o,e)>T*1.7)return false;
+    const next=o.path[o.pi];return next&&dE(next,p)<8&&dE(o,p)<T*1.5;
+  })){
+    e.yielding=true;return distance;
+  }
+  const d=dE(e,p),dx=(p.x-e.x)/d,dy=(p.y-e.y)/d;
+  const step=Math.min(d,speed*dt*(swampAt(e.x,e.y)?.55:1)),ox=e.x,oy=e.y;
+  moveE(e,dx*step,dy*step);
+  e.step+=dst(ox,oy,e.x,e.y);
+  e.ang+=angD(e.ang,Math.atan2(dy,dx))*Math.min(1,dt*6);
+  e.stuck=d-dE(e,p)<step*.2?(e.stuck||0)+dt:0;
+  if(e.stuck>.45){e.path=null;e.routeRetry=.15;}
+  return dst(e.x,e.y,tx,ty);
 }
 
 /* ===================== стрельба ===================== */
@@ -749,11 +774,11 @@ function findCover(e, t, minD, maxD) {
   }
   return best;
 }
-function npcHeal(e) {
+function npcHeal(e,patient=e) {
   const id = e.inv.medkit ? 'medkit' : e.inv.bandage ? 'bandage' : null;
   if (!id) return false;
   e.inv[id]--; if (!e.inv[id]) delete e.inv[id];
-  e.hp = Math.min(e.maxhp, e.hp + (id === 'medkit' ? 45 : 18));
+  patient.hp = Math.min(patient.maxhp, patient.hp + (id === 'medkit' ? 45 : 18));
   return true;
 }
 function npcGrenade(e, x, y) {
@@ -764,7 +789,7 @@ function npcGrenade(e, x, y) {
   if (dst(x, y, P.x, P.y) < 300) msg('Граната! Уходи с места!', 'bad');
 }
 function combatHuman(e, t, W, dt) {
-  e.sit = 0; e.campRise = null; e.trip = null;
+  e.sit = 0; e.campRise = null; e.trip = null; e.aidTarget=null;
   const d = dE(e, t), see = seesActor(e, t);
   if (see) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
@@ -790,7 +815,7 @@ function combatHuman(e, t, W, dt) {
   if (!see) {
     e.crouch = 0; e.inCover = 0;
     if (e.nade && e.unseen > 2.5 && e.lastSeen && dst(e.x, e.y, e.lastSeen.x, e.lastSeen.y) < 280 && dst(e.x, e.y, e.lastSeen.x, e.lastSeen.y) > 90 && chance(dt * 0.8)) { npcGrenade(e, e.lastSeen.x, e.lastSeen.y); return; }
-    if (e.lastSeen) goTo(e, e.lastSeen.x, e.lastSeen.y, e.role === 'push' ? 100 : 72, dt);
+    if (e.lastSeen && !e.guard) goTo(e, e.lastSeen.x, e.lastSeen.y, e.role === 'push' ? 100 : 72, dt);
     if (e.mem <= 0) { e.tgt = null; e.role = null; }
     return;
   }
@@ -835,9 +860,44 @@ function setCampSeat(e, sitting) {
     e.campRise = e.sit ? 0 : 1;
   e.sit = sitting ? 1 : 0;
 }
+// On a quiet stretch a free stalker can interrupt an errand to dress a companion's wound.
+function helpCompanion(e,dt){
+  if(e.fac!=='loner'||e.follow||e.guard||e.stay||e.named||e.sos||e.jobTag||e.squadMate)return false;
+  const patient=o=>o!==e&&o!==P&&o.alive&&o.fac===e.fac&&!o.wounded&&!o.captive&&!o.tgt&&
+    o.hp<o.maxhp*.5&&dE(e,o)<160;
+  if(e.aidTarget && (!patient(e.aidTarget)||!(e.inv.medkit||e.inv.bandage)))e.aidTarget=null;
+  if(!e.aidTarget){
+    e.aidCheck=(e.aidCheck||0)-dt;if(e.aidCheck>0)return false;
+    e.aidCheck=2+(e.id%5)*.23;
+    if(e.hp<e.maxhp*.5||!(e.inv.medkit||e.inv.bandage))return false;
+    let nearest=Infinity;
+    for(const o of ents)if(patient(o)&&dE(e,o)<nearest&&seesActor(e,o)&&
+      !ents.some(m=>m.alive&&m!==e&&m.aidTarget===o)&&walkAnchor(o.x,o.y)>=0){
+      e.aidTarget=o;nearest=dE(e,o);
+    }
+    if(!e.aidTarget)return false;
+    if(e.sit){e.seat=1;e.trip ||= {stage:2};setCampSeat(e,false);}
+    e.aidTime=0;
+  }
+  const o=e.aidTarget;e.aidTime+=dt;
+  if(dE(e,o)<34&&clearWalk(e.x,e.y,o.x,o.y,e.r)){
+    npcHeal(e,o);e.assisted=o.assisted=true; sayLine(e,'Держись. Сейчас перевяжу.');
+    e.aidTarget=null;e.aidCheck=12;
+  }else if(e.aidTime>8){e.aidTarget=null;e.aidCheck=10;}
+  else goTo(e,o.x,o.y,78,dt);
+  return true;
+}
 function idleHuman(e, dt) {
   if(e.squadMate && chapter()==='battle'){ const p=northCamp(); if(dE(e,p)>90)goTo(e,p.x,p.y,90,dt); return; }
   if (followTick(e, dt)) return;
+  if(e.trip?.returnTo){
+    const dest=e.trip.returnTo;
+    if(goTo(e,dest.x,dest.y,82,dt)<7){
+      e.trip=null;if(e.seat)setCampSeat(e,true);
+    }
+    return;
+  }
+  if(helpCompanion(e,dt))return;
   if (e.guard) {
     if (dE(e, e.home) > 8) goTo(e, e.home.x, e.home.y, 70, dt);
     else { e.ang += angD(e.ang, (e.guard === 'south' || (BIG && e.sid==='a1')) ? -Math.PI / 2 : Math.PI / 2) * dt * 2; }
@@ -845,7 +905,7 @@ function idleHuman(e, dt) {
   }
   if (e.sit) {
     e.ang += angD(e.ang, Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x)) * dt * 2;
-    if (e.fac === 'loner' && !e.named && e.fireRef === FIRE && chance(dt * 0.004)) { setCampSeat(e, false); startTrip(e); }
+    if (e.fac === 'loner' && !e.named && !e.stay && !e.squadMate && chance(dt * 0.004)) { setCampSeat(e, false); startTrip(e); }
     return;
   }
   if (e.trip) {
@@ -872,16 +932,28 @@ function idleHuman(e, dt) {
       const a = rnd(0, 6.28), r = rnd(20, e.stay ? 50 : 110);
       const wx = e.home.x + Math.cos(a) * r, wy = e.home.y + Math.sin(a) * r;
       const ti = Math.floor(wy / T) * MW + Math.floor(wx / T);
-      if (nav[ti] && los(e.x, e.y, wx, wy)) e.wander = { x: wx, y: wy };
+      if (nav[ti] && clearWalk(e.x,e.y,wx,wy,e.r)) e.wander = { x: wx, y: wy };
     } else e.ang += rnd(-1.2, 1.2);
   }
   if (e.fac === 'loner' && !e.stay && !e.named && chance(dt * 0.003)) startTrip(e);
 }
 function startTrip(e) {
-  const keys = Object.keys(POI).filter(k => k !== 'atp' || S.flags.atpClear);
-  const p = POI[keys[ri(0, keys.length - 1)]];
-  e.seat = e.seat || (dE(e, FIRE) < 110 ? 1 : 0);
-  e.trip = { x: p.x + rnd(-30, 30), y: p.y + rnd(-30, 30), stage: 0 };
+  // In poor weather prefer the local camp, in daylight favour a nearby unoccupied stop.
+  const resting=night()||WX.rain>.45||e.hp<e.maxhp*.65;
+  const spots=LOCATIONS.filter(l=>!['danger','anomaly'].includes(l.type) &&
+    l.id!=='sid' && (l.anchors.fire||l.entrances?.length)).map(l=>{
+    const [x,y]=l.anchors.fire||l.entrances[0],p=freeTile(x,y);
+    const dest={x:p.x*T,y:p.y*T},distance=dE(e,dest);
+    const busy=ents.filter(m=>m!==e&&m.alive&&m.trip?.stage===0&&dE(m.trip,dest)<60).length;
+    const score=distance*(.8+Math.random()*.4)+busy*180+(resting&&!l.anchors.fire?750:0);
+    return {dest,score,distance};
+  }).filter(s=>s.distance>90&&s.distance<2600).sort((a,b)=>a.score-b.score);
+  for(const {dest} of spots){
+    if(ents.some(o=>o.alive&&hostile(e,o)&&dE(o,dest)<220)||!findPath(e.x,e.y,dest.x,dest.y,true))continue;
+    e.seat=e.seat||(dE(e,FIRE)<110?1:0);
+    e.trip={...dest,stage:0};return;
+  }
+  if(e.seat)setCampSeat(e,true);
 }
 function aiDog(e, dt) {
   e.cool -= dt; e.think -= dt; e.barkT -= dt;
