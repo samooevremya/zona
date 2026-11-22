@@ -12,7 +12,7 @@ function slotPicker(nav,writing,back){
   for(const slot of writing?MANUAL_SLOTS:[0,...MANUAL_SLOTS]){
     const d=loadSave(slot),label=slot?'Слот '+slot:'Автосохранение';
     const chapterName=d?.campaign?CHAPTERS[Math.min(8,STORY[d.campaign.stage]?.[0]??0)]:'Кордон';
-    const text=d?label+' · '+clockStr(d.min)+' · '+chapterName:label+' · пусто';
+    const text=d?label+' · '+clockStr(d.min)+' · '+chapterName+' · '+DIFFICULTIES[difficultyKey(d.difficulty)].name:label+' · пусто';
     nav.appendChild(btn('',text,()=>{
       if(!writing){if(panel)closePanel();applyState(d);if(title.open)hideTitle();save(true);return;}
       if(!d){write(slot);return;}

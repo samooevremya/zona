@@ -312,9 +312,9 @@ function stockCond(e, id) {
 }
 function tradeStock(e) {
   if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
-    id,q:1,p:Math.ceil((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
+    id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
   }));
-  return STOCK.map(s=>({...s,c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+  return STOCK.map(s=>({...s,p:purchaseCost(s.p),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
 
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }

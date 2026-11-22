@@ -45,9 +45,10 @@ function jobGen(day) {
     let j = null;
     if (k === 'hunt') { const n = 3 + Math.floor(r() * 3); j = { k: 'hunt', kind: 'dog', n: n, got: 0, pay: n * 160, n_: 'Отстрел: слепые псы ×' + n, d: 'Псы обнаглели, к самому бункеру подходят. Перебей ' + n + ' штук где угодно на Кордоне. Засчитываются твои выстрелы и выстрелы нанятого напарника.' }; }
     if (k === 'hunt2') { const n = 1 + Math.floor(r() * 2); j = { k: 'hunt', kind: 'boar', n: n, got: 0, pay: n * 420, n_: 'Отстрел: кабаны ×' + n, d: 'Кабаны за насыпью разбивают тропу. Завали ' + n + '. Засчитываются твои выстрелы и выстрелы нанятого напарника.' }; }
-    if (k === 'trophy') { const it = r() < 0.5 ? 'tail' : 'hoof', n = it === 'tail' ? 2 + Math.floor(r() * 2) : 1 + Math.floor(r() * 2); j = { k: 'trophy', item: it, n: n, pay: ITEMS[it].sell * 2 * n, n_: 'Трофеи: ' + ITEMS[it].n + ' ×' + n, d: 'Заказчик из-за кордона платит вдвое против обычного: ' + ITEMS[it].sell * 2 + ' RU за штуку вместо ' + ITEMS[it].sell + '. Принеси ' + n + ' шт.' }; }
+    if (k === 'trophy') { const it = r() < 0.5 ? 'tail' : 'hoof', n = it === 'tail' ? 2 + Math.floor(r() * 2) : 1 + Math.floor(r() * 2); j = { k: 'trophy', item: it, n: n, pay: sellPrice(it) * 2 * n, n_: 'Трофеи: ' + ITEMS[it].n + ' ×' + n, d: 'Заказчик из-за кордона платит вдвое против обычного: ' + sellPrice(it) * 2 + ' RU за штуку вместо ' + sellPrice(it) + '. Принеси ' + n + ' шт.' }; }
     if (k === 'art') j = { k: 'art', pay: 0, n_: 'Любой артефакт', d: 'Клиенту всё равно какой, лишь бы светился. Плачу в полтора раза больше обычной цены. Какой отдать, выберешь сам.' };
     if (k === 'clear') { const okSp = CLEAR_SPOTS.filter(clearReachable); if (!okSp.length) continue; const sp = okSp[Math.floor(r() * okSp.length)]; j = { k: 'clear', loc: sp[3], x: sp[0], y: sp[1], where: sp[2], n: 3, got: 0, pay: 1100, n_: 'Зачистка: бандиты ' + sp[2], d: 'Там встала группа бандитов и трясёт новичков. Убери всех троих. Неважно, кто их добьёт: важно, чтобы группы не стало.' }; }
+    if (j.pay && k!=='trophy') j.pay=earnings(j.pay);
     j.t = k; out.push(j);
   }
   return out;
@@ -386,7 +387,7 @@ function sosTick() {
     const e = dog ? mkDog({ pack: 'sos', x: st.x, y: st.y }) : mkHuman({ fac: 'bandit', x: st.x, y: st.y, wpn: chance(0.6) ? 'w_pm' : 'w_obrez' });
     e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; if(!dog)e.home={...e.ringPt}; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
   }
-  s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: ri(25, 55) * 10, gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
+  s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: earnings(ri(25, 55) * 10), gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
   radioNews('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»');
   play('siren', undefined, undefined, 0.25);
 }

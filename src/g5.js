@@ -206,7 +206,7 @@ function drawDialog() {
 function repairOffer() {
   const worn=gunsBelow(95);
   if(!worn.length) return null;
-  const cost=worn.reduce((sum,w)=>sum+Math.ceil((100-w.cond)*ITEMS[w.id].price/4000)*10,0);
+  const cost=purchaseCost(worn.reduce((sum,w)=>sum+Math.ceil((100-w.cond)*ITEMS[w.id].price/4000)*10,0));
   return {t:'Починить оружие · '+cost+' RU',d:S.money<cost,fn:()=>{
     if(S.money<cost || !gunsBelow(95).length) return;
     S.money-=cost; repairCopies(worn,100); P.jam=0; say('Готово. Можешь забирать.'); sys('Оружие починено.');
@@ -301,7 +301,11 @@ function openTrade(e) {
   openPanel('trade', e ? 'Торг: ' + e.name : 'Торг: Сидорович');
   panel.e = e; refresh(); pbody.scrollTop = 0;
 }
-function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefined ? Math.floor(it.sell * (toNpc ? 0.8 : 1)) : Math.max(1, Math.floor((it.price || 0) * (toNpc ? 0.5 : 0.35))); }
+function sellPrice(id,toNpc=false) {
+  const it=ITEMS[id];
+  if (it.sell!==undefined) return earnings(Math.floor(it.sell*(toNpc ? .8 : 1)));
+  return Math.max(1,earnings(Math.floor((it.price || 0)*(toNpc ? .5 : .35))));
+}
 function openLoot(o) {
   if (!cacheFieldQuiet(o)) {
     msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
@@ -378,6 +382,7 @@ function drawMenu() {
   const card=$('pause-card'), nav=el('nav','start-nav');
   // The title mark is shared with the start screen, which retains its own node.
   const heading=el('h2','pause-caption','Пауза');
+  heading.textContent='Пауза · '+rules().name;
   heading.id='pause-heading';
   nav.setAttribute('aria-labelledby',heading.id);
   card.replaceChildren(title.name.cloneNode(true),heading,nav);
@@ -408,7 +413,7 @@ function drawMenu() {
     heading.textContent='Начать заново?';
     nav.appendChild(el('p','pause-note','Текущая игра начнётся с начала Кордона.'));
     nav.appendChild(btn('start-primary','Отмена',()=>{delete panel.pausePage;drawMenu();card.querySelector('.restart').focus();}));
-    nav.appendChild(btn('','Начать новую игру',()=>{applyState(freshS());closePanel();intro();}));
+    newGameControls(nav,'Начать новую игру','',S.difficulty);
     return;
   }
   const message=el('p','pause-note');
@@ -1082,6 +1087,27 @@ if (window.matchMedia && matchMedia('(pointer: coarse)').matches) setTouch(true)
 
 /* ===================== заставка и смерть ===================== */
 const title = { open: true, el: $('title'), name: document.querySelector('#tcard .start-name') };
+function newGameControls(nav,label,buttonClass,initialLevel='normal') {
+  const group=el('div','new-campaign'), field=el('label','difficulty-label','Сложность новой игры');
+  const select=el('select'), note=el('p','difficulty-note');
+  for (const [id,level] of Object.entries(DIFFICULTIES)) {
+    const option=el('option','',level.name); option.value=id; select.append(option);
+  }
+  note.id=panel ? 'restart-difficulty-note' : 'title-difficulty-note';
+  select.setAttribute('aria-label','Сложность новой игры');
+  select.setAttribute('aria-describedby',note.id);
+  select.value=difficultyKey(initialLevel);
+  const describe=()=>{ note.textContent=DIFFICULTIES[select.value].note; };
+  select.onchange=describe; describe();
+  field.append(select);
+  group.append(field,note,btn(buttonClass,label,()=>{
+    audioInit(); applyState(freshS(select.value));
+    if (panel) closePanel();
+    if (title.open) hideTitle();
+    intro();
+  }));
+  nav.append(group);
+}
 function showTitle(kind) {
   resetInput();
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
@@ -1092,7 +1118,7 @@ function showTitle(kind) {
     c.appendChild(el('p', '', 'Последнее сохранение делается само у костра в деревне и у Сидоровича.'));
     const b = el('div', 'tbtns');
     b.appendChild(btn('go','Загрузить сохранение',()=>slotPicker(b,false,()=>showTitle('death'))));
-    b.appendChild(btn('alt', 'Начать заново', () => { applyState(freshS()); hideTitle(); intro(); }));
+    newGameControls(b,'Начать заново','alt',S.difficulty);
     c.appendChild(b);
     return;
   }
@@ -1102,9 +1128,7 @@ function showTitle(kind) {
   if (saved) nav.appendChild(btn('start-primary','Продолжить',()=>{
     audioInit(); applyState(saved); hideTitle();
   }));
-  nav.appendChild(btn(saved?'':'start-primary','Новая игра',()=>{
-    audioInit(); applyState(freshS()); hideTitle(); intro();
-  }));
+  newGameControls(nav,'Новая игра',saved?'':'start-primary');
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
   nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));

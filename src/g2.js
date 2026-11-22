@@ -63,8 +63,26 @@ function radioNews(t, urgent = false) {
   if (radioNotice(t, urgent)) { news(t); play('pda'); }
 }
 
-function freshS() {
-  return { v: 1, money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
+const DIFFICULTIES = {
+  rookie: {name:'Новичок', note:'Больше припасов, выгодная торговля. Легче попасть и пережить ранение.',
+    buy:.8, income:1.20, loot:1.40, incoming:.65, spread:.75},
+  normal: {name:'Средний', note:'Обычные цены, запасы и урон.',
+    buy:1, income:1, loot:1, incoming:1, spread:1},
+  hard: {name:'Сложный', note:'Патронов меньше, снаряжение дороже. Противники бьют сильнее.',
+    buy:1.25, income:.80, loot:.75, incoming:1.25, spread:1.10},
+  master: {name:'Мастер', note:'Скудная добыча, дорогой ремонт и низкий заработок. Ошибки в бою обходятся дорого.',
+    buy:1.55, income:.60, loot:.50, incoming:1.55, spread:1.20}
+};
+function difficultyKey(id) {
+  return Object.prototype.hasOwnProperty.call(DIFFICULTIES,id) ? id : 'normal';
+}
+function rules() { return DIFFICULTIES[difficultyKey(S?.difficulty)]; }
+const purchaseCost = base => Math.ceil(base*rules().buy);
+const earnings = base => Math.round(base*rules().income);
+const supplyCount = count => Math.max(1,Math.round(count*rules().loot));
+
+function freshS(difficulty='normal') {
+  return { v: 1, difficulty:difficultyKey(difficulty), money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
     q: { flash: 0, medusa: 0, pack: 0 }, rep: 0, stats: { kS: 0, kM: 0, q: 0, art: 0 }, news: [], flags: {}, dead: {}, min: 420,
     fog: '', mapVersion: MAP_VERSION, trackedQuestId: null, x: locPt('sid', 'spawn').x, y: locPt('sid', 'spawn').y, hp: 100, rad: 0, q2: { fox: 0, tolik: 0 } };
 }
@@ -225,9 +243,9 @@ const FAC_N = { loner: 'Одиночки', bandit: 'Бандиты', army: 'Во
 const nameI = { loner: 0, bandit: 3 };
 function rollInv(fac) {
   const inv = {};
-  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance(FOOD[i] ? .16 : .3)) inv[i] = 1; });
-  if (chance(fac === 'army' ? 0.5 : 0.25)) inv.medkit = 1;
-  if (chance(0.15)) inv.antirad = 1;
+  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance((FOOD[i] ? .16 : .3)*rules().loot)) inv[i] = 1; });
+  if (chance((fac === 'army' ? 0.5 : 0.25)*rules().loot)) inv.medkit = 1;
+  if (chance(.15*rules().loot)) inv.antirad = 1;
   return inv;
 }
 function mkHuman(d) {
@@ -239,7 +257,7 @@ function mkHuman(d) {
     x: d.x * T, y: d.y * T, r: 11, hp: d.hp || base + rank * 10, ang: d.ang !== undefined ? d.ang : rnd(-3, 3), alive: 1,
     wpn: d.wpn || 'w_pm', mag: W.mag || 0, cool: 0, reload: 0, think: Math.random() * 0.3, react: 0.5, mem: 0,
     home: { x: d.x * T, y: d.y * T }, sit: d.sit, stay: d.stay, guard: d.guard, captive: d.captive, named: d.named, rank: rank,
-    money: (d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120, inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
+    money: earnings((d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120), inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null, score: [ri(2, 14), ri(15, 44), ri(45, 80)][Math.min(rank, 2)] };
   if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
@@ -806,6 +824,7 @@ function hurt(e, dmg, src, ang, shot) {
     if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
   }
   if (e === P) {
+    if (src?.kind && src!==P) dmg*=rules().incoming;
     dmg *= 1 - def(); hurtFlash = Math.min(0.6, hurtFlash + 0.35); play('hurt'); shake(4);
     if (src && src.x !== undefined) { HURTDIR.push({ a: Math.atan2(src.y - P.y, src.x - P.x), life: 1.2 }); if (HURTDIR.length > 6) HURTDIR.shift(); }
     if (src && src.alive !== undefined && S.bleed < 3 && chance(src.kind === 'dog' ? 0.4 : 0.3 - def())) { S.bleed++; msg(S.bleed > 1 ? 'Сильное кровотечение! Перевяжись.' : 'Кровотечение. Бинт его остановит.', 'bad'); }
@@ -863,7 +882,7 @@ function dropBody(e) {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
     const W = WP[e.wpn];
-    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + (W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
+    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + supplyCount(W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
     if (e.fac === 'army' && chance(0.3)) loot.grenade = 1;
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }

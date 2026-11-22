@@ -855,6 +855,16 @@ body.is-touch #medpick[data-anchor]{left:var(--pick-x)!important;top:var(--pick-
 .fire-setting select{background:#252720;color:#f4ead7;border:1px solid #867a60;padding:0 8px;font:inherit}
 .start-nav .fire-hint{margin:0;color:#d5cebd;font:14px/1.35 Arial}
 
+.new-campaign{display:grid;gap:5px}
+.difficulty-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#e4ddca;font:600 14px/1.25 Arial,sans-serif}
+.difficulty-label select{min-height:44px;min-width:104px;border:1px solid #867a60;border-radius:2px;background:#282a24;color:#f4ead7;padding:0 7px;font:inherit}
+.difficulty-note{margin:0;color:#d4cdbd;text-shadow:0 1px 3px #111;font:13px/1.35 Arial,sans-serif}
+@media(orientation:landscape) and (max-height:540px){
+  #title.start .start-name{position:absolute;left:max(5vw,env(safe-area-inset-left));bottom:max(6vh,env(safe-area-inset-bottom))}
+  #title.start .menu-card{gap:0}
+  #title.start .start-nav{gap:4px}
+}
+
 </style>
 </head>
 <body>
@@ -2065,8 +2075,26 @@ function radioNews(t, urgent = false) {
   if (radioNotice(t, urgent)) { news(t); play('pda'); }
 }
 
-function freshS() {
-  return { v: 1, money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
+const DIFFICULTIES = {
+  rookie: {name:'Новичок', note:'Больше припасов, выгодная торговля. Легче попасть и пережить ранение.',
+    buy:.8, income:1.20, loot:1.40, incoming:.65, spread:.75},
+  normal: {name:'Средний', note:'Обычные цены, запасы и урон.',
+    buy:1, income:1, loot:1, incoming:1, spread:1},
+  hard: {name:'Сложный', note:'Патронов меньше, снаряжение дороже. Противники бьют сильнее.',
+    buy:1.25, income:.80, loot:.75, incoming:1.25, spread:1.10},
+  master: {name:'Мастер', note:'Скудная добыча, дорогой ремонт и низкий заработок. Ошибки в бою обходятся дорого.',
+    buy:1.55, income:.60, loot:.50, incoming:1.55, spread:1.20}
+};
+function difficultyKey(id) {
+  return Object.prototype.hasOwnProperty.call(DIFFICULTIES,id) ? id : 'normal';
+}
+function rules() { return DIFFICULTIES[difficultyKey(S?.difficulty)]; }
+const purchaseCost = base => Math.ceil(base*rules().buy);
+const earnings = base => Math.round(base*rules().income);
+const supplyCount = count => Math.max(1,Math.round(count*rules().loot));
+
+function freshS(difficulty='normal') {
+  return { v: 1, difficulty:difficultyKey(difficulty), money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
     q: { flash: 0, medusa: 0, pack: 0 }, rep: 0, stats: { kS: 0, kM: 0, q: 0, art: 0 }, news: [], flags: {}, dead: {}, min: 420,
     fog: '', mapVersion: MAP_VERSION, trackedQuestId: null, x: locPt('sid', 'spawn').x, y: locPt('sid', 'spawn').y, hp: 100, rad: 0, q2: { fox: 0, tolik: 0 } };
 }
@@ -2227,9 +2255,9 @@ const FAC_N = { loner: 'Одиночки', bandit: 'Бандиты', army: 'Во
 const nameI = { loner: 0, bandit: 3 };
 function rollInv(fac) {
   const inv = {};
-  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance(FOOD[i] ? .16 : .3)) inv[i] = 1; });
-  if (chance(fac === 'army' ? 0.5 : 0.25)) inv.medkit = 1;
-  if (chance(0.15)) inv.antirad = 1;
+  ['bandage', 'sausage', 'bread', 'vodka', 'cans'].forEach(i => { if (chance((FOOD[i] ? .16 : .3)*rules().loot)) inv[i] = 1; });
+  if (chance((fac === 'army' ? 0.5 : 0.25)*rules().loot)) inv.medkit = 1;
+  if (chance(.15*rules().loot)) inv.antirad = 1;
   return inv;
 }
 function mkHuman(d) {
@@ -2241,7 +2269,7 @@ function mkHuman(d) {
     x: d.x * T, y: d.y * T, r: 11, hp: d.hp || base + rank * 10, ang: d.ang !== undefined ? d.ang : rnd(-3, 3), alive: 1,
     wpn: d.wpn || 'w_pm', mag: W.mag || 0, cool: 0, reload: 0, think: Math.random() * 0.3, react: 0.5, mem: 0,
     home: { x: d.x * T, y: d.y * T }, sit: d.sit, stay: d.stay, guard: d.guard, captive: d.captive, named: d.named, rank: rank,
-    money: (d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120, inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
+    money: earnings((d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120), inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null, score: [ri(2, 14), ri(15, 44), ri(45, 80)][Math.min(rank, 2)] };
   if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
@@ -2808,6 +2836,7 @@ function hurt(e, dmg, src, ang, shot) {
     if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
   }
   if (e === P) {
+    if (src?.kind && src!==P) dmg*=rules().incoming;
     dmg *= 1 - def(); hurtFlash = Math.min(0.6, hurtFlash + 0.35); play('hurt'); shake(4);
     if (src && src.x !== undefined) { HURTDIR.push({ a: Math.atan2(src.y - P.y, src.x - P.x), life: 1.2 }); if (HURTDIR.length > 6) HURTDIR.shift(); }
     if (src && src.alive !== undefined && S.bleed < 3 && chance(src.kind === 'dog' ? 0.4 : 0.3 - def())) { S.bleed++; msg(S.bleed > 1 ? 'Сильное кровотечение! Перевяжись.' : 'Кровотечение. Бинт его остановит.', 'bad'); }
@@ -2865,7 +2894,7 @@ function dropBody(e) {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
     const W = WP[e.wpn];
-    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + (W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
+    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + supplyCount(W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
     if (e.fac === 'army' && chance(0.3)) loot.grenade = 1;
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }
@@ -3491,7 +3520,7 @@ function playerFire() {
   S.mag[S.weapon] = m - 1; P.cool = W.rate;
   const moving = Math.abs(IN.moveX) + Math.abs(IN.moveY) > 0.1;
   const spread = W.spread + P.bloom + (moving ? .035 : 0) + (100-cond(S.weapon))*.0008 - (P.crouch ? .015 : 0);
-  fire(P, P.ang, W, Math.max(0, spread));
+  fire(P, P.ang, W, Math.max(0, spread)*rules().spread);
   P.bloom = Math.min(.14, P.bloom + (W.auto ? .018 : .03));
   P.bloomDelay = .24;
   P.shotFlash = .12;
@@ -3983,7 +4012,7 @@ function loadSave(slot=0) {
   try { const raw = localStorage.getItem(slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
 }
 function applyState(d) {
-  S = d; prepareCampaign(); lastShiftState=null;
+  S = d; S.difficulty=difficultyKey(d.difficulty); prepareCampaign(); lastShiftState=null;
   if (BIG && (S.mapVersion==='kordon-big' || S.mapVersion==='kordon-west')) migrateNorthernWorld(S);
   restoreKit();
   fog.fill(0);
@@ -6844,9 +6873,10 @@ function jobGen(day) {
     let j = null;
     if (k === 'hunt') { const n = 3 + Math.floor(r() * 3); j = { k: 'hunt', kind: 'dog', n: n, got: 0, pay: n * 160, n_: 'Отстрел: слепые псы ×' + n, d: 'Псы обнаглели, к самому бункеру подходят. Перебей ' + n + ' штук где угодно на Кордоне. Засчитываются твои выстрелы и выстрелы нанятого напарника.' }; }
     if (k === 'hunt2') { const n = 1 + Math.floor(r() * 2); j = { k: 'hunt', kind: 'boar', n: n, got: 0, pay: n * 420, n_: 'Отстрел: кабаны ×' + n, d: 'Кабаны за насыпью разбивают тропу. Завали ' + n + '. Засчитываются твои выстрелы и выстрелы нанятого напарника.' }; }
-    if (k === 'trophy') { const it = r() < 0.5 ? 'tail' : 'hoof', n = it === 'tail' ? 2 + Math.floor(r() * 2) : 1 + Math.floor(r() * 2); j = { k: 'trophy', item: it, n: n, pay: ITEMS[it].sell * 2 * n, n_: 'Трофеи: ' + ITEMS[it].n + ' ×' + n, d: 'Заказчик из-за кордона платит вдвое против обычного: ' + ITEMS[it].sell * 2 + ' RU за штуку вместо ' + ITEMS[it].sell + '. Принеси ' + n + ' шт.' }; }
+    if (k === 'trophy') { const it = r() < 0.5 ? 'tail' : 'hoof', n = it === 'tail' ? 2 + Math.floor(r() * 2) : 1 + Math.floor(r() * 2); j = { k: 'trophy', item: it, n: n, pay: sellPrice(it) * 2 * n, n_: 'Трофеи: ' + ITEMS[it].n + ' ×' + n, d: 'Заказчик из-за кордона платит вдвое против обычного: ' + sellPrice(it) * 2 + ' RU за штуку вместо ' + sellPrice(it) + '. Принеси ' + n + ' шт.' }; }
     if (k === 'art') j = { k: 'art', pay: 0, n_: 'Любой артефакт', d: 'Клиенту всё равно какой, лишь бы светился. Плачу в полтора раза больше обычной цены. Какой отдать, выберешь сам.' };
     if (k === 'clear') { const okSp = CLEAR_SPOTS.filter(clearReachable); if (!okSp.length) continue; const sp = okSp[Math.floor(r() * okSp.length)]; j = { k: 'clear', loc: sp[3], x: sp[0], y: sp[1], where: sp[2], n: 3, got: 0, pay: 1100, n_: 'Зачистка: бандиты ' + sp[2], d: 'Там встала группа бандитов и трясёт новичков. Убери всех троих. Неважно, кто их добьёт: важно, чтобы группы не стало.' }; }
+    if (j.pay && k!=='trophy') j.pay=earnings(j.pay);
     j.t = k; out.push(j);
   }
   return out;
@@ -7185,7 +7215,7 @@ function sosTick() {
     const e = dog ? mkDog({ pack: 'sos', x: st.x, y: st.y }) : mkHuman({ fac: 'bandit', x: st.x, y: st.y, wpn: chance(0.6) ? 'w_pm' : 'w_obrez' });
     e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; if(!dog)e.home={...e.ringPt}; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
   }
-  s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: ri(25, 55) * 10, gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
+  s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: earnings(ri(25, 55) * 10), gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
   radioNews('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»');
   play('siren', undefined, undefined, 0.25);
 }
@@ -7789,9 +7819,9 @@ function stockCond(e, id) {
 }
 function tradeStock(e) {
   if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
-    id,q:1,p:Math.ceil((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
+    id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
   }));
-  return STOCK.map(s=>({...s,c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+  return STOCK.map(s=>({...s,p:purchaseCost(s.p),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
 
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }
@@ -8548,7 +8578,7 @@ function slotPicker(nav,writing,back){
   for(const slot of writing?MANUAL_SLOTS:[0,...MANUAL_SLOTS]){
     const d=loadSave(slot),label=slot?'Слот '+slot:'Автосохранение';
     const chapterName=d?.campaign?CHAPTERS[Math.min(8,STORY[d.campaign.stage]?.[0]??0)]:'Кордон';
-    const text=d?label+' · '+clockStr(d.min)+' · '+chapterName:label+' · пусто';
+    const text=d?label+' · '+clockStr(d.min)+' · '+chapterName+' · '+DIFFICULTIES[difficultyKey(d.difficulty)].name:label+' · пусто';
     nav.appendChild(btn('',text,()=>{
       if(!writing){if(panel)closePanel();applyState(d);if(title.open)hideTitle();save(true);return;}
       if(!d){write(slot);return;}
@@ -10796,7 +10826,13 @@ function restoreContainer(o){
   o.scatterStart = null;
   if(!o.initialLoot) o.initialLoot={...o.loot};
   o.looted=!!S.flags['st_'+o.stash];
-  o.loot=o.looted?{}:{...(S.flags['contents_'+o.stash]||o.initialLoot)};
+  const remaining=S.flags['contents_'+o.stash];
+  o.loot=o.looted?{}:{...(remaining || o.initialLoot)};
+  if (!o.looted && !remaining && o.k==='crate') {
+    for (const [id,n] of Object.entries(o.loot)) {
+      if (ITEMS[id]?.ammo || id==='money') o.loot[id]=supplyCount(n);
+    }
+  }
   if(o.k==='crate'){
     o.broken=o.looted||!!S.flags['broken_'+o.stash];
     o.solid=!o.broken;
@@ -11118,9 +11154,10 @@ function chooseFieldSite(stock, previous) {
 function fieldCrateLoot() {
   const ammo = ['a9','a12','a545'][ri(0,2)];
   const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
-  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12) };
-  if (!FOOD[supplies] || chance(.55)) loot[supplies]=1;
-  if (ri(1,4) === 1) loot.money = ri(15,65);
+  const loot = { [ammo]: supplyCount(ammo === 'a12' ? ri(2,5) : ri(4,12)) };
+  const supplyChance=(FOOD[supplies] ? .55 : 1)*rules().loot;
+  if (supplyChance>=1 || chance(supplyChance)) loot[supplies]=1;
+  if (ri(1,4) === 1) loot.money = earnings(ri(15,65));
   return loot;
 }
 
@@ -12752,7 +12789,7 @@ function drawDialog() {
 function repairOffer() {
   const worn=gunsBelow(95);
   if(!worn.length) return null;
-  const cost=worn.reduce((sum,w)=>sum+Math.ceil((100-w.cond)*ITEMS[w.id].price/4000)*10,0);
+  const cost=purchaseCost(worn.reduce((sum,w)=>sum+Math.ceil((100-w.cond)*ITEMS[w.id].price/4000)*10,0));
   return {t:'Починить оружие · '+cost+' RU',d:S.money<cost,fn:()=>{
     if(S.money<cost || !gunsBelow(95).length) return;
     S.money-=cost; repairCopies(worn,100); P.jam=0; say('Готово. Можешь забирать.'); sys('Оружие починено.');
@@ -12847,7 +12884,11 @@ function openTrade(e) {
   openPanel('trade', e ? 'Торг: ' + e.name : 'Торг: Сидорович');
   panel.e = e; refresh(); pbody.scrollTop = 0;
 }
-function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefined ? Math.floor(it.sell * (toNpc ? 0.8 : 1)) : Math.max(1, Math.floor((it.price || 0) * (toNpc ? 0.5 : 0.35))); }
+function sellPrice(id,toNpc=false) {
+  const it=ITEMS[id];
+  if (it.sell!==undefined) return earnings(Math.floor(it.sell*(toNpc ? .8 : 1)));
+  return Math.max(1,earnings(Math.floor((it.price || 0)*(toNpc ? .5 : .35))));
+}
 function openLoot(o) {
   if (!cacheFieldQuiet(o)) {
     msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
@@ -12924,6 +12965,7 @@ function drawMenu() {
   const card=$('pause-card'), nav=el('nav','start-nav');
   // The title mark is shared with the start screen, which retains its own node.
   const heading=el('h2','pause-caption','Пауза');
+  heading.textContent='Пауза · '+rules().name;
   heading.id='pause-heading';
   nav.setAttribute('aria-labelledby',heading.id);
   card.replaceChildren(title.name.cloneNode(true),heading,nav);
@@ -12954,7 +12996,7 @@ function drawMenu() {
     heading.textContent='Начать заново?';
     nav.appendChild(el('p','pause-note','Текущая игра начнётся с начала Кордона.'));
     nav.appendChild(btn('start-primary','Отмена',()=>{delete panel.pausePage;drawMenu();card.querySelector('.restart').focus();}));
-    nav.appendChild(btn('','Начать новую игру',()=>{applyState(freshS());closePanel();intro();}));
+    newGameControls(nav,'Начать новую игру','',S.difficulty);
     return;
   }
   const message=el('p','pause-note');
@@ -13628,6 +13670,27 @@ if (window.matchMedia && matchMedia('(pointer: coarse)').matches) setTouch(true)
 
 /* ===================== заставка и смерть ===================== */
 const title = { open: true, el: $('title'), name: document.querySelector('#tcard .start-name') };
+function newGameControls(nav,label,buttonClass,initialLevel='normal') {
+  const group=el('div','new-campaign'), field=el('label','difficulty-label','Сложность новой игры');
+  const select=el('select'), note=el('p','difficulty-note');
+  for (const [id,level] of Object.entries(DIFFICULTIES)) {
+    const option=el('option','',level.name); option.value=id; select.append(option);
+  }
+  note.id=panel ? 'restart-difficulty-note' : 'title-difficulty-note';
+  select.setAttribute('aria-label','Сложность новой игры');
+  select.setAttribute('aria-describedby',note.id);
+  select.value=difficultyKey(initialLevel);
+  const describe=()=>{ note.textContent=DIFFICULTIES[select.value].note; };
+  select.onchange=describe; describe();
+  field.append(select);
+  group.append(field,note,btn(buttonClass,label,()=>{
+    audioInit(); applyState(freshS(select.value));
+    if (panel) closePanel();
+    if (title.open) hideTitle();
+    intro();
+  }));
+  nav.append(group);
+}
 function showTitle(kind) {
   resetInput();
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
@@ -13638,7 +13701,7 @@ function showTitle(kind) {
     c.appendChild(el('p', '', 'Последнее сохранение делается само у костра в деревне и у Сидоровича.'));
     const b = el('div', 'tbtns');
     b.appendChild(btn('go','Загрузить сохранение',()=>slotPicker(b,false,()=>showTitle('death'))));
-    b.appendChild(btn('alt', 'Начать заново', () => { applyState(freshS()); hideTitle(); intro(); }));
+    newGameControls(b,'Начать заново','alt',S.difficulty);
     c.appendChild(b);
     return;
   }
@@ -13648,9 +13711,7 @@ function showTitle(kind) {
   if (saved) nav.appendChild(btn('start-primary','Продолжить',()=>{
     audioInit(); applyState(saved); hideTitle();
   }));
-  nav.appendChild(btn(saved?'':'start-primary','Новая игра',()=>{
-    audioInit(); applyState(freshS()); hideTitle(); intro();
-  }));
+  newGameControls(nav,'Новая игра',saved?'':'start-primary');
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
   nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));

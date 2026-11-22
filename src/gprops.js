@@ -162,7 +162,13 @@ function restoreContainer(o){
   o.scatterStart = null;
   if(!o.initialLoot) o.initialLoot={...o.loot};
   o.looted=!!S.flags['st_'+o.stash];
-  o.loot=o.looted?{}:{...(S.flags['contents_'+o.stash]||o.initialLoot)};
+  const remaining=S.flags['contents_'+o.stash];
+  o.loot=o.looted?{}:{...(remaining || o.initialLoot)};
+  if (!o.looted && !remaining && o.k==='crate') {
+    for (const [id,n] of Object.entries(o.loot)) {
+      if (ITEMS[id]?.ammo || id==='money') o.loot[id]=supplyCount(n);
+    }
+  }
   if(o.k==='crate'){
     o.broken=o.looted||!!S.flags['broken_'+o.stash];
     o.solid=!o.broken;
@@ -484,9 +490,10 @@ function chooseFieldSite(stock, previous) {
 function fieldCrateLoot() {
   const ammo = ['a9','a12','a545'][ri(0,2)];
   const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
-  const loot = { [ammo]: ammo === 'a12' ? ri(2,5) : ri(4,12) };
-  if (!FOOD[supplies] || chance(.55)) loot[supplies]=1;
-  if (ri(1,4) === 1) loot.money = ri(15,65);
+  const loot = { [ammo]: supplyCount(ammo === 'a12' ? ri(2,5) : ri(4,12)) };
+  const supplyChance=(FOOD[supplies] ? .55 : 1)*rules().loot;
+  if (supplyChance>=1 || chance(supplyChance)) loot[supplies]=1;
+  if (ri(1,4) === 1) loot.money = earnings(ri(15,65));
   return loot;
 }
 
