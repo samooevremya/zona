@@ -263,8 +263,8 @@ function makeGarbage() {
     ['dump_scale','Латунь',386.4,25.4,'loner','w_pm'],
     ['dump_sorter','Скоба',390.3,31.4,'loner','w_pm'],
     ['dump_driver','Букса',355,102.2,'loner','w_obrez'],
-    ['dump_band1','Шкурник',273,38,'bandit','w_pm'],
-    ['dump_band2','Крюк',297,34,'bandit','w_obrez'],
+    ['dump_band1','Шкурник',273,38,'bandit','w_aps'],
+    ['dump_band2','Крюк',297,34,'bandit','w_akms'],
     ['dump_band3','Копоть',290.1,46,'bandit','w_pm']
   ]) NPCDEF.push({sid,name,x:x+.5,y:y+.5,fac,wpn,named:1,stay:1,sit:sid==='dump_sorter',localFire:dumpFire});
   for(const [x,y] of [[334,84],[376,41],[332,31]]) rads.push({x:x*T,y:y*T,r:85,p:2.2});

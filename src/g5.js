@@ -114,7 +114,7 @@ function sv(tag, attrs, text) { const e = document.createElementNS(NS, tag); for
 function icon(id) { const s = sv('svg', { 'class': 'ic', viewBox: '0 0 24 24', 'aria-hidden': 'true' }); s.appendChild(sv('use', { href: '#' + id })); return s; }
 function btn(cls, text, fn, dis) { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', e => { e.stopPropagation(); fn(); }); if (dis) b.disabled = true; return b; }
 const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-aksu', medkit: 'i-medkit', bandage: 'i-bandage', antirad: 'i-antirad',
-  vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
+  vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo', a762: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash', damaged_pda: 'i-map', restored_pda: 'i-map', post_case: 'i-pack' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
 function itemIcon(id) { if(id==='engraved_pm')id='w_pm'; if (id === 'energy') return icon('i-energy'); if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
@@ -254,7 +254,7 @@ function talk(e) {
   }, 'dialog', e);
 }
 function robNpc(e) {
-  const tier = { knife: 0, w_pm: 1, w_obrez: 2, w_aksu: 3 };
+  const tier = { knife: 0, w_pm: 1, w_aps: 1, w_obrez: 2, w_toz34: 2, w_aksu: 3, w_akms: 3 };
   const p = clamp(0.45 + (tier[S.weapon] - tier[e.wpn]) * 0.18 + (P.hp > 60 ? 0.1 : -0.1) - (e.rank || 0) * 0.08, 0.1, 0.9);
   const crowd = ents.filter(o => o.alive && o.fac === 'loner' && o !== e && dE(o, e) < 300).length;
   S.rep -= crowd ? 25 : 15;
@@ -906,8 +906,12 @@ addEventListener('keydown', e => {
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
   if (/^Digit[1-8]$/.test(k)) {
-    const id=WORDER[Number(k.slice(-1))-1];
-    if (id==='knife' || kitItem(kitSlot(id))===id) setWeapon(id);
+    const keyWeapon=WORDER[Number(k.slice(-1))-1];
+    const equipped=kitItem(kitSlot(keyWeapon));
+    if (keyWeapon==='knife') setWeapon('knife');
+    else if (equipped===keyWeapon || (keyWeapon==='w_pm' && equipped) ||
+             (keyWeapon==='w_obrez' && WP[equipped]?.pellets) ||
+             (keyWeapon==='w_aksu' && WP[equipped]?.auto)) setWeapon(equipped);
   }
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }

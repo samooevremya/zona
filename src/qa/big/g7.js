@@ -9,7 +9,7 @@ const S = () => z.S, P = () => z.P;
 const T_ = (name, fn) => { try { R[name] = fn(); } catch (e) { R[name] = { ok: false, ERROR: String(e).slice(0, 260) }; } };
 let SEEDN = 900;
 const reset = () => { z.seed(++SEEDN); z.closePanel(); z.applyState(z.freshS()); const s = S(); s.flags.intro = 1; s.money = 5000;
-  ['w_pm', 'w_obrez', 'w_aksu'].forEach(w => { s.inv[w] = 1; s.cond[w] = 100; }); s.inv.a9 = 200; s.inv.a12 = 200; s.inv.a545 = 300; s.weapon = 'w_aksu'; s.mag.w_aksu = 30; };
+  ['w_pm', 'w_obrez', 'w_aksu', 'w_aps', 'w_toz34', 'w_akms'].forEach(w => { s.inv[w] = 1; s.cond[w] = 100; }); s.inv.a9 = 200; s.inv.a12 = 200; s.inv.a545 = 300; s.weapon = 'w_aksu'; s.mag.w_aksu = 30; };
 // открытая площадка: 9×9 клеток без препятствий
 let FIELD = null;
 for (let ty = 60; ty < 100 && !FIELD; ty++) for (let tx = 20; tx < 110 && !FIELD; tx++) {
@@ -26,7 +26,7 @@ const C0 = () => [(FIELD[0] + 0.5) * T, (FIELD[1] + 0.5) * T];
 /* G1: одна геометрия дула — нарисованный конец ствола совпадает с расчётной точкой (все углы, стволы, позы) */
 function muzzleCheck(modeLabel) {
   reset(); const rest = isolate(); const [cx, cy] = C0(); const out = []; let maxErr = 0, n = 0, nullBoth = 0;
-  for (const w of ['w_pm', 'w_obrez', 'w_aksu']) for (const pose of ['idle', 'walk', 'crouch']) for (let k = 0; k < 8; k++) {
+  for (const w of ['w_pm', 'w_obrez', 'w_aksu', 'w_aps', 'w_toz34', 'w_akms']) for (const pose of ['idle', 'walk', 'crouch']) for (let k = 0; k < 8; k++) {
     const a = k * Math.PI / 4; S().weapon = w; place(P(), cx, cy, a); P().crouch = pose === 'crouch' ? 1 : 0; P().qaRig = 0;
     if (G.rigActive(P())) G.qaRig(P(), pose === 'walk' ? 17 : 0, 60, pose === 'walk' ? 'walk' : pose === 'crouch' ? 'crouch' : 'idle');
     for (let i = 0; i < 30; i++) G.qaRig(P(), 0, 60, pose === 'walk' ? 'walk' : pose === 'crouch' ? 'crouch' : 'idle');   // переход позы завершён
@@ -46,7 +46,7 @@ T_('G1_muzzle_draw_equals_calc', () => muzzleCheck(location.hash));
 /* G2: стена между центром и дулом: игрок в центре клетки, стена в соседней (16 px), дуло АКС ≈29 px, цель за стеной */
 T_('G2_wall_before_muzzle', () => {
   reset(); const rest = isolate(); const [cx, cy] = C0(); const res = {};
-  for (const w of ['w_pm', 'w_obrez', 'w_aksu']) for (let k = 0; k < 8; k++) {
+  for (const w of ['w_pm', 'w_obrez', 'w_aksu', 'w_aps', 'w_toz34', 'w_akms']) for (let k = 0; k < 8; k++) {
     const a = k * Math.PI / 4, dx = Math.round(Math.cos(a)), dy = Math.round(Math.sin(a)), wi = (FIELD[1] + dy) * MW + FIELD[0] + dx;
     const t = tgt(cx + Math.cos(a) * 60, cy + Math.sin(a) * 60); S().weapon = w; place(P(), cx, cy, a);
     const was = opq[wi]; opq[wi] = 1; const tr0 = G.tracers.length, fl0 = G.flashes.length;
@@ -63,7 +63,7 @@ T_('G2_wall_before_muzzle', () => {
 /* G3: цель вплотную (центр перед/за дулом, круг перекрывает стрелка) — попадание; та же цель за тонкой стеной — нет */
 T_('G3_point_blank', () => {
   reset(); const rest = isolate(); const [cx, cy] = C0(); const res = {};
-  for (const w of ['w_pm', 'w_obrez', 'w_aksu']) for (const d of [8, 16, 24, 28, 36]) for (let k = 0; k < 8; k++) {
+  for (const w of ['w_pm', 'w_obrez', 'w_aksu', 'w_aps', 'w_toz34', 'w_akms']) for (const d of [8, 16, 24, 28, 36]) for (let k = 0; k < 8; k++) {
     const a = k * Math.PI / 4, t = tgt(cx + Math.cos(a) * d, cy + Math.sin(a) * d); t.r = 10; S().weapon = w; place(P(), cx, cy, a);
     const hits = shoot(P(), a, w); res[w + '@' + d + '/' + k * 45] = hits.includes(t); z.ents.splice(z.ents.indexOf(t), 1);
   }
@@ -78,7 +78,7 @@ T_('G4_corner_and_open', () => {
   const t = tgt(cx + 50, cy + 50); place(P(), cx, cy, Math.PI / 4); S().weapon = 'w_aksu';
   out.cornerHit = shoot(P(), Math.PI / 4, 'w_aksu').includes(t); opq[a1] = w1; opq[a2] = w2; z.ents.splice(z.ents.indexOf(t), 1);
   let open = 0, all = 0;
-  for (const w of ['w_pm', 'w_obrez', 'w_aksu']) for (const cr of [0, 1]) for (let k = 0; k < 8; k++) {
+  for (const w of ['w_pm', 'w_obrez', 'w_aksu', 'w_aps', 'w_toz34', 'w_akms']) for (const cr of [0, 1]) for (let k = 0; k < 8; k++) {
     const a = k * Math.PI / 4, tt = tgt(cx + Math.cos(a) * 100, cy + Math.sin(a) * 100); S().weapon = w; P().crouch = cr; place(P(), cx, cy, a);
     all++; if (shoot(P(), a, w).includes(tt)) open++; z.ents.splice(z.ents.indexOf(tt), 1);
   }
@@ -107,7 +107,7 @@ T_('G5_friendly_fire_rules', () => {
 /* G6: дальность от расчётного дула одинакова: r+8+range (не зависит от графики) */
 T_('G6_range_rule', () => {
   reset(); const rest = isolate(); const [cx, cy] = C0(); place(P(), cx, cy, 0); const res = {};
-  for (const w of ['w_pm', 'w_obrez', 'w_aksu']) {
+  for (const w of ['w_pm', 'w_obrez', 'w_aksu', 'w_aps', 'w_toz34', 'w_akms']) {
     const reach = G.WP[w].range + G.ballOff(P());
     const tin = G.shotTrace(P(), 0, G.WP[w]);
     res[w] = { reach, ballOff: G.ballOff(P()) };

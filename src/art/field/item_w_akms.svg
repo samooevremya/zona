@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="198" height="62" viewBox="0 0 198 62">
+<defs><linearGradient id="wood" x2="0" y2="1"><stop offset="0" stop-color="#332720"/><stop offset="0.18" stop-color="#80573a"/><stop offset="0.42" stop-color="#986c49"/><stop offset="0.78" stop-color="#67442f"/><stop offset="1" stop-color="#402d24"/></linearGradient>
+<linearGradient id="steel" x2="0" y2="1"><stop offset="0" stop-color="#2b2b29"/><stop offset="0.18" stop-color="#838178"/><stop offset="0.42" stop-color="#585850"/><stop offset="0.78" stop-color="#474741"/><stop offset="1" stop-color="#272925"/></linearGradient>
+<linearGradient id="grip" x2="0" y2="1"><stop offset="0" stop-color="#32251f"/><stop offset="0.18" stop-color="#74503b"/><stop offset="0.42" stop-color="#83614b"/><stop offset="0.78" stop-color="#523a2e"/><stop offset="1" stop-color="#342820"/></linearGradient>
+<linearGradient id="case" x2="0" y2="1"><stop offset="0" stop-color="#3c3625"/><stop offset="0.18" stop-color="#a99a63"/><stop offset="0.42" stop-color="#998658"/><stop offset="0.78" stop-color="#615537"/><stop offset="1" stop-color="#443920"/></linearGradient>
+<filter id="patina" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency=".29 .47" numOctaves="3" seed="17" result="grain"/>
+  <feColorMatrix in="grain" type="saturate" values="0"/>
+  <feComponentTransfer><feFuncR type="linear" slope=".97" intercept=".02"/><feFuncG type="linear" slope=".95" intercept=".015"/><feFuncB type="linear" slope=".91" intercept=".01"/></feComponentTransfer>
+  <feBlend in="SourceGraphic" mode="soft-light"/>
+  <feComposite in2="SourceGraphic" operator="in" result="weathered"/>
+  <feComposite in="SourceGraphic" in2="weathered" operator="arithmetic" k2=".77" k3=".23"/>
+</filter></defs>
+<g filter="url(#patina)">
+<g stroke="#292923" stroke-linejoin="round" stroke-width="1.3">
+ <path d="M5 33L57 18 61 20 7 37 8 44 59 26 62 29 8 48 4 47 2 35Z" fill="url(#steel)"/>
+ <path d="M63 28L79 28 73 46 68 48 60 45Z" fill="url(#grip)"/>
+ <path d="M88 28L102 27Q105 42 123 49L118 59Q95 52 88 33Z" fill="url(#steel)"/>
+ <path d="M58 14L66 10 100 10 104 14 121 14 119 24 104 29 61 30 55 26Z" fill="url(#steel)"/>
+ <path d="M112 13L138 12 143 16 141 23 111 24Z" fill="url(#wood)"/>
+ <path d="M119 9L139 10 143 14 115 15Z" fill="url(#wood)"/>
+ <path d="M143 14h14l6 4 24-1 8-1v6l-8-1-45 1Z" fill="url(#steel)"/>
+ <path d="M179 17l2-11 4 1 1 10z" fill="url(#steel)"/>
+ <path d="M79 29q-1 8 9 7l4-5m-8-3q-1 4 2 5" fill="none" stroke-width="2"/>
+</g>
+<path d="M11 33l37-11M64 13l32-1m-25 9 26-1m-17 4 9-1M144 17l13 .3m9 1.5h11" fill="none" stroke="#b4afa1" opacity=".62"/>
+<path d="M94 32q4 15 22 22m-19-23q4 13 21 20m-17-20q3 10 17 16" fill="none" stroke="#252621"/>
+<path d="M114 18q12 2 23-1m-20 4 17-1m-9-8 8-.4" fill="none" stroke="#c59b74" opacity=".65"/>
+<circle cx="61" cy="23" r="2.3" fill="#8b897c"/><circle cx="99" cy="20" r="1.1" fill="#a6a193"/>
+</g>
+</svg>

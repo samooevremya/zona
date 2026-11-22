@@ -11,6 +11,9 @@ const GLOVE_FRAMES = {
 const G8_WALK = ['walk_left','walk_pass_left','walk_right','walk_pass_right'];
 // Move the dominant hand, then place the supporting palm along the item.
 const HELD_POSES = {
+  w_aps:   { side:0.65, forward:2.4 },
+  w_toz34: { side:0.25, forward:-0.6, support:9.2, turn:0.50 },
+  w_akms:  { side:0.2, forward:-0.8, support:8.6, turn:0.52 },
   knife:   { side:-1.0, forward:0.6 },
   w_pm:    { side:0.7, forward:2.6 },
   w_obrez: { side:0.4, forward:0.0, support:6.2, turn:0.44 },
@@ -18,6 +21,9 @@ const HELD_POSES = {
   grenade: { side:-0.4, forward:-0.3 }
 };
 const HELD_SPRITES = {
+  w_aps:   {file:'assets/field/hand_w_aps.svg', width:3.6, grip:.22},
+  w_toz34: {file:'assets/field/hand_w_toz34.svg', width:3.5, grip:.31},
+  w_akms:  {file:'assets/field/hand_w_akms.svg', width:4.0, grip:.36},
   knife:   {file:'assets/g8/hand_knife.webp',   width:2.35, grip:.32},
   w_pm:    {file:'assets/g8/hand_w_pm.webp',     width:3.9,  grip:.23},
   w_obrez: {file:'assets/g8/hand_w_obrez.webp',  width:4.5,  grip:.32},

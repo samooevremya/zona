@@ -5,13 +5,14 @@ const carryLimit = (armor = S.armor) => armor === 'ar_zarya' ? 50 : 35;
 const isGun = id => !!ITEMS[id]?.weapon;
 function footprint(id) {
   if (id === 'w_aksu' || id === 'w_obrez') return [3,1];
-  if (id === 'w_pm') return [2,1];
+  if (kitSlot(id) === 'sidearm') return [2,1];
+  if (id === 'w_toz34' || id === 'w_akms') return [4,1];
   return ITEMS[id]?.armor ? [2,2] : [1,1];
 }
 const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
 const KIT_LABELS = {sidearm:'Пистолет', primary:'Основное', grenade:'Граната', detector:'Детектор'};
 function kitSlot(id) {
-  if (id === 'w_pm') return 'sidearm';
+  if (id === 'w_pm' || id === 'w_aps') return 'sidearm';
   if (isGun(id)) return 'primary';
   if (id === 'grenade') return 'grenade';
   if (DETECTORS[id]) return 'detector';

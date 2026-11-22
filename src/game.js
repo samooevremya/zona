@@ -50,9 +50,13 @@ const ITEMS = {
   sausage: { n: 'Колбаса', price: 60, heal: 8, w: 0.4, d: '+8 здоровья' },
   cans: { n: 'Консервы', price: 90, heal: 12, w: 0.5, d: '+12 здоровья' },
   grenade: { n: 'Граната Ф-1', price: 350, w: 0.6, d: 'Кнопка G или «Граната». Взрыв через полторы секунды' },
-  a9: { n: 'Патроны 9×18', price: 8, ammo: 1, w: 0.01, d: 'Для ПМ' },
-  a12: { n: 'Дробь 12 калибра', price: 20, ammo: 1, w: 0.04, d: 'Для обреза' },
+  a9: { n: 'Патроны 9×18', price: 8, ammo: 1, w: 0.01, d: 'Для ПМ и АПС' },
+  a12: { n: 'Дробь 12 калибра', price: 20, ammo: 1, w: 0.04, d: 'Для обреза и ТОЗ-34' },
   a545: { n: 'Патроны 5,45×39', price: 15, ammo: 1, w: 0.012, d: 'Для АКС-74У' },
+  a762: { n: 'Патроны 7,62×39', price: 18, ammo: 1, w: 0.016, d: 'Для АКМС' },
+  w_aps: { n: 'АПС', price: 2100, weapon: 1, w: 1.05, d: 'Автоматический пистолет. При удержании спуска стреляет очередью.' },
+  w_toz34: { n: 'ТОЗ-34', price: 2700, weapon: 1, w: 3.1, d: 'Длинная охотничья двустволка. Дробь ложится плотнее, чем у обреза.' },
+  w_akms: { n: 'АКМС', price: 6200, weapon: 1, w: 3.3, d: 'Автомат со складным прикладом. Пуля мощнее, чем у АКС-74У, но патроны тяжелее.' },
   w_pm: { n: 'ПМ', price: 600, weapon: 1, w: 0.8 },
   w_obrez: { n: 'Обрез', price: 1200, weapon: 1, w: 1.9 },
   w_aksu: { n: 'АКС-74У', price: 4500, weapon: 1, w: 2.7 },
@@ -76,18 +80,22 @@ const ITEMS = {
 const ARTFX = { art_medusa: 'На поясе: радиация копится вдвое медленнее и уходит сама', art_bengal: 'На поясе: защита +5%, электра бьёт вдвое слабее', art_blood: 'На поясе: понемногу лечит, но слегка фонит' };
 const WP = {
   knife: { n: 'Нож', melee: 1, dmg: 34, rate: 0.5, range: 26, pref: 0 },
+  w_aps: { n: 'АПС', ammo: 'a9', mag: 20, dmg: 19, rate: 0.13, spread: 0.065, range: 465, reload: 1.75, snd: 'p', pref: 175, auto: 1 },
+  w_toz34: { n: 'ТОЗ-34', ammo: 'a12', mag: 2, dmg: 22, pellets: 7, rate: 0.19, spread: 0.095, range: 395, reload: 2.15, snd: 's', pref: 150 },
+  w_akms: { n: 'АКМС', ammo: 'a762', mag: 30, dmg: 22, rate: 0.115, spread: 0.073, range: 660, reload: 2.6, snd: 'r', pref: 285, auto: 1 },
   w_pm: { n: 'ПМ', ammo: 'a9', mag: 8, dmg: 22, rate: 0.24, spread: 0.04, range: 520, reload: 1.4, snd: 'p', pref: 200 },
   w_obrez: { n: 'Обрез', ammo: 'a12', mag: 2, dmg: 23, pellets: 7, rate: 0.16, spread: 0.16, range: 300, reload: 1.9, snd: 's', pref: 110 },
   w_aksu: { n: 'АКС-74У', ammo: 'a545', mag: 30, dmg: 17, rate: 0.095, spread: 0.06, range: 620, reload: 2.3, snd: 'r', pref: 280, auto: 1 },
   grenade: { n: 'Граната', melee: 1, toss: 1, dmg: 110, rate: 1, range: 0, pref: 0 }   // выбирается в ячейке оружия, «Огонь» бросает
 };
-const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS)];
+const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS), 'w_aps', 'w_toz34', 'w_akms'];
 const STOCK = [
   ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 }, { id: 'energy', q: 1, p: 150 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
   { id: 'a9', q: 20, p: 160 }, { id: 'a12', q: 10, p: 200 }, { id: 'a545', q: 30, p: 450 },
-  { id: 'w_pm', q: 1, p: 600 }, { id: 'w_obrez', q: 1, p: 1200 }, { id: 'w_aksu', q: 1, p: 4500 }, { id: 'ar_zarya', q: 1, p: 6000 }
+  { id: 'w_pm', q: 1, p: 600 }, { id: 'w_obrez', q: 1, p: 1200 }, { id: 'w_aksu', q: 1, p: 4500 }, { id: 'ar_zarya', q: 1, p: 6000 },
+  { id: 'a762', q: 30, p: 540 }, ...['w_aps', 'w_toz34', 'w_akms'].map(id => ({id, q: 1, p: ITEMS[id].price}))
 ];
 const RANKS = ['новичок', 'опытный', 'ветеран', 'мастер'];
 const LONER_NAMES = ['Костя Шнурок', 'Лёха Компас', 'Витя Ржавый', 'Саня Глухарь', 'Миха Полтора', 'Дима Чайник', 'Гена Сова', 'Тоха Барсук',
@@ -517,13 +525,14 @@ const carryLimit = (armor = S.armor) => armor === 'ar_zarya' ? 50 : 35;
 const isGun = id => !!ITEMS[id]?.weapon;
 function footprint(id) {
   if (id === 'w_aksu' || id === 'w_obrez') return [3,1];
-  if (id === 'w_pm') return [2,1];
+  if (kitSlot(id) === 'sidearm') return [2,1];
+  if (id === 'w_toz34' || id === 'w_akms') return [4,1];
   return ITEMS[id]?.armor ? [2,2] : [1,1];
 }
 const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
 const KIT_LABELS = {sidearm:'Пистолет', primary:'Основное', grenade:'Граната', detector:'Детектор'};
 function kitSlot(id) {
-  if (id === 'w_pm') return 'sidearm';
+  if (id === 'w_pm' || id === 'w_aps') return 'sidearm';
   if (isGun(id)) return 'primary';
   if (id === 'grenade') return 'grenade';
   if (DETECTORS[id]) return 'detector';
@@ -1581,7 +1590,7 @@ function dropBody(e) {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
     const W = WP[e.wpn];
-    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + supplyCount(W.ammo === 'a545' ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
+    if (W && W.ammo) { loot[W.ammo] = (loot[W.ammo] || 0) + supplyCount((W.ammo === 'a545' || W.ammo === 'a762') ? ri(15, 35) : W.ammo === 'a12' ? ri(3, 8) : ri(6, 14)); loot[e.wpn] = (loot[e.wpn] || 0)+1; }
     if (e.fac === 'army' && chance(0.3)) loot.grenade = 1;
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }
@@ -8138,7 +8147,7 @@ function makeLesserZone() {
     ['lz_guest2','Уголёк',81,56,'w_obrez','loner'],
     ['lz_tech','Клемма',86.5,52.8,'w_pm','loner'],['lz_spool','Катушка',89,49,'w_pm','loner'],['lz_sieve','Сито',92,50,'w_obrez','loner'],
     ['lz_millhand','Мельник',54,70,'w_pm','loner'],['lz_meter','Шкала',75,80,'w_pm','loner'],
-    ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
+    ['lz_watch','Кряж',23,9,'w_toz34','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
     ['lz_rivet','Радист',170,48,'w_obrez','army']
   ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:81.2*T,y:(Y+55.55)*T}:LESSER_FIRE});
   DOGDEF.push({sid:'lz_yard_dog',pack:'lz_yard',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz_fuel',x:186,y:Y+69});
@@ -8585,8 +8594,8 @@ function makeGarbage() {
     ['dump_scale','Латунь',386.4,25.4,'loner','w_pm'],
     ['dump_sorter','Скоба',390.3,31.4,'loner','w_pm'],
     ['dump_driver','Букса',355,102.2,'loner','w_obrez'],
-    ['dump_band1','Шкурник',273,38,'bandit','w_pm'],
-    ['dump_band2','Крюк',297,34,'bandit','w_obrez'],
+    ['dump_band1','Шкурник',273,38,'bandit','w_aps'],
+    ['dump_band2','Крюк',297,34,'bandit','w_akms'],
     ['dump_band3','Копоть',290.1,46,'bandit','w_pm']
   ]) NPCDEF.push({sid,name,x:x+.5,y:y+.5,fac,wpn,named:1,stay:1,sit:sid==='dump_sorter',localFire:dumpFire});
   for(const [x,y] of [[334,84],[376,41],[332,31]]) rads.push({x:x*T,y:y*T,r:85,p:2.2});
@@ -8735,6 +8744,9 @@ const GLOVE_FRAMES = {
 const G8_WALK = ['walk_left','walk_pass_left','walk_right','walk_pass_right'];
 // Move the dominant hand, then place the supporting palm along the item.
 const HELD_POSES = {
+  w_aps:   { side:0.65, forward:2.4 },
+  w_toz34: { side:0.25, forward:-0.6, support:9.2, turn:0.50 },
+  w_akms:  { side:0.2, forward:-0.8, support:8.6, turn:0.52 },
   knife:   { side:-1.0, forward:0.6 },
   w_pm:    { side:0.7, forward:2.6 },
   w_obrez: { side:0.4, forward:0.0, support:6.2, turn:0.44 },
@@ -8742,6 +8754,9 @@ const HELD_POSES = {
   grenade: { side:-0.4, forward:-0.3 }
 };
 const HELD_SPRITES = {
+  w_aps:   {file:'assets/field/hand_w_aps.svg', width:3.6, grip:.22},
+  w_toz34: {file:'assets/field/hand_w_toz34.svg', width:3.5, grip:.31},
+  w_akms:  {file:'assets/field/hand_w_akms.svg', width:4.0, grip:.36},
   knife:   {file:'assets/g8/hand_knife.webp',   width:2.35, grip:.32},
   w_pm:    {file:'assets/g8/hand_w_pm.webp',     width:3.9,  grip:.23},
   w_obrez: {file:'assets/g8/hand_w_obrez.webp',  width:4.5,  grip:.32},
@@ -8857,7 +8872,9 @@ function g3Skin(e) {
 /* фаза шага — от пройденного пути; путь и таймер обновляются в update (g7Tick), отрисовка только читает */
 function g3Gait(e) { return gaitOf(e); }
 /* временный слой оружия (до атласа стволов): рисуется в южной системе координат тела, +y — вперёд */
-const G3W = { w_pm: { len: 11, w: 3.2 }, w_obrez: { len: 17, w: 3.6 }, w_aksu: { len: 21, w: 3.6, mag: 1 }, knife: { len: 9, w: 2, blade: 1 }, grenade: {len: 0, w: 3.8, toss: 1} };
+const G3W = {
+  w_aps: { len: 12, w: 3.3 }, w_toz34: { len: 23, w: 3.4 }, w_akms: { len: 22, w: 3.7, mag: 1 },
+  w_pm: { len: 11, w: 3.2 }, w_obrez: { len: 17, w: 3.6 }, w_aksu: { len: 21, w: 3.6, mag: 1 }, knife: { len: 9, w: 2, blade: 1 }, grenade: {len: 0, w: 3.8, toss: 1} };
 const G3_GRIP = [1.5, 8];   // точка хвата в кадре (уточнена по рукам idle/walk/crouch; см. отчёт)
 /* дуло для выстрела/вспышки — та же геометрия, что и у слоя оружия (gg7.js: weaponLocal → localToWorld) */
 function g3Muzzle(e, ang) { return g7Muzzle(e, ang); }
@@ -9128,7 +9145,7 @@ function g7PoseFrame(skin, pose) {
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
   const id = e === P ? S.weapon : e.wpn, W = G3W[id] || (DETECTORS[id] && { len: 5 }); if (!W) return null;
-  const grip = id === 'w_pm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
+  const grip = kitSlot(id) === 'sidearm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
   const r = rigActive(e);
   if (r) {
     const s = CordonRig.sockets(r.rig.pose, grip);
@@ -9839,7 +9856,7 @@ function chooseFieldSite(stock, previous) {
 }
 
 function fieldCrateLoot() {
-  const ammo = ['a9','a12','a545'][ri(0,2)];
+  const ammo = ['a9','a12','a545','a762'][ri(0,3)];
   const supplies = ['bandage','bread','cans','antirad','medkit','energy'][ri(0,5)];
   const loot = { [ammo]: supplyCount(ammo === 'a12' ? ri(2,5) : ri(4,12)) };
   const supplyChance=(FOOD[supplies] ? .55 : 1)*rules().loot;
@@ -11359,7 +11376,7 @@ function sv(tag, attrs, text) { const e = document.createElementNS(NS, tag); for
 function icon(id) { const s = sv('svg', { 'class': 'ic', viewBox: '0 0 24 24', 'aria-hidden': 'true' }); s.appendChild(sv('use', { href: '#' + id })); return s; }
 function btn(cls, text, fn, dis) { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', e => { e.stopPropagation(); fn(); }); if (dis) b.disabled = true; return b; }
 const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-aksu', medkit: 'i-medkit', bandage: 'i-bandage', antirad: 'i-antirad',
-  vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
+  vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo', a762: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash', damaged_pda: 'i-map', restored_pda: 'i-map', post_case: 'i-pack' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
 function itemIcon(id) { if(id==='engraved_pm')id='w_pm'; if (id === 'energy') return icon('i-energy'); if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
@@ -11524,7 +11541,7 @@ function talk(e) {
   }, 'dialog', e);
 }
 function robNpc(e) {
-  const tier = { knife: 0, w_pm: 1, w_obrez: 2, w_aksu: 3 };
+  const tier = { knife: 0, w_pm: 1, w_aps: 1, w_obrez: 2, w_toz34: 2, w_aksu: 3, w_akms: 3 };
   const p = clamp(0.45 + (tier[S.weapon] - tier[e.wpn]) * 0.18 + (P.hp > 60 ? 0.1 : -0.1) - (e.rank || 0) * 0.08, 0.1, 0.9);
   const crowd = ents.filter(o => o.alive && o.fac === 'loner' && o !== e && dE(o, e) < 300).length;
   S.rep -= crowd ? 25 : 15;
@@ -12176,8 +12193,12 @@ addEventListener('keydown', e => {
   if (k === 'KeyV') startJump();
   if (k === 'KeyL') toggleTorch();
   if (/^Digit[1-8]$/.test(k)) {
-    const id=WORDER[Number(k.slice(-1))-1];
-    if (id==='knife' || kitItem(kitSlot(id))===id) setWeapon(id);
+    const keyWeapon=WORDER[Number(k.slice(-1))-1];
+    const equipped=kitItem(kitSlot(keyWeapon));
+    if (keyWeapon==='knife') setWeapon('knife');
+    else if (equipped===keyWeapon || (keyWeapon==='w_pm' && equipped) ||
+             (keyWeapon==='w_obrez' && WP[equipped]?.pellets) ||
+             (keyWeapon==='w_aksu' && WP[equipped]?.auto)) setWeapon(equipped);
   }
   if (k === 'KeyC' || k === 'ControlLeft') { P.crouch = !P.crouch; }
   if (k === 'KeyI' || k === 'Tab') { e.preventDefault(); openPanel('inv', 'Рюкзак'); refresh(); }
