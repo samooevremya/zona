@@ -114,9 +114,9 @@ function icon(id) { const s = sv('svg', { 'class': 'ic', viewBox: '0 0 24 24', '
 function btn(cls, text, fn, dis) { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', e => { e.stopPropagation(); fn(); }); if (dis) b.disabled = true; return b; }
 const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-aksu', medkit: 'i-medkit', bandage: 'i-bandage', antirad: 'i-antirad',
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo',
-  ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash' };
+  ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash', damaged_pda: 'i-map', restored_pda: 'i-map', post_case: 'i-pack' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { if (id === 'energy') return icon('i-energy'); if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if(id==='engraved_pm')id='w_pm'; if (id === 'energy') return icon('i-energy'); if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
 /*AVATAR*/
 function person(c) {
@@ -218,17 +218,7 @@ function talk(e) {
     {t:'Что слышно про маки?',fn:()=>say('Начнут слипаться глаза — выпей энергетик или выбирайся на дорогу. Кто лёг среди цветов, уже не встаёт.')},
     {t:'До встречи',close:1}
   ],'dialog',e);
-  if (e.storyMan) return cordonSurvivor(e);
-  if (cordonStage()==='voice' && e.sid==='shust') {
-    cordonSet('confirm','Шустрый узнал свой голос, но такого приказа не давал. Сверь позывные у Волка.');
-    return cordonMessage('Шустрый',['«Слушай. Это мой голос, даже кашель мой. Только в тот день я сидел в гараже, а рацию у меня отобрали».',
-      'С записи доносится: «Катушка, Мел, жду у колонны». Потом другой голос: «Приняли, выходим». Волк ведёт вахтенный журнал у костра.']);
-  }
-  if (BIG && e.sid==='shust' && S.flags.shustFree && S.q.flash>0 && S.q.flash<3) {
-    give('flash',1); S.q.flash=3;
-    return cordonMessage('Шустрый',['«Флешка в подкладке. Отнеси Сидоровичу, пока он зря людей не послал».']);
-  }
-  if (e.sid === 'wolf') return talkWolf(e);
+  if (STORY_KEYS.includes(e.sid) || e.squadMate)return storyTalk(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
     if(e.guard!=='bridge' && e.guard!=='south'){
@@ -243,17 +233,6 @@ function talk(e) {
       { t: 'Уйти', close: 1 }
     ], 'dialog', e);
   }
-  if (e.sid === 'fox') return dialog(cardOf(e), [S.q2.fox === 3 ? 'Отбились. Ты меня второй раз за день спасаешь, Меченый.' : 'Чего тебе?'], () => {
-    const o = [];
-    if (S.q2.fox === 3) o.push({ t: 'Что знаешь про Стрелка?', k: 'key', fn: () => {
-      say('Стрелок? Слышал. Ходил на север дальше всех и возвращался. Лично не знал. А вот брат мой, Серый, с его группой пересекался. Он на Свалке, в ангаре. Скажешь, что от Лиса.');
-      S.q2.fox = 4; S.stats.q++; S.rep += 10; give('a12', 6); S.money += 300; sys('Получено: 300 RU, Дробь ×6. Задание выполнено.'); bulletin('Выполнено: Найти Лиса. Серый ждёт на Свалке.'); save(true);
-    } });
-    o.push({ t: 'Бывай', close: 1 });
-    return o;
-  }, 'dialog', e);
-  if (e.sid === 'tolik') return dialog(cardOf(e), ['Меченый! Если б не ты, лежать бы мне у той дороги.'], () => [{ t: 'Бывай', close: 1 }], 'dialog', e);
-  if (e.sid === 'shust') return dialog(cardOf(e), ['Меченый! Век не забуду, что ты меня вытащил. Буду в деревне, отлежусь.'], () => [{ t: 'Береги себя', close: 1 }], 'dialog', e);
   if (e.sid === 'petr' || e.sid === 'petr2') {
     return dialog(cardOf(e), [S.flags.atpClear ? 'Ну ты дал! АТП теперь наше. Тут пока и осядем.' : 'Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
       { t: 'Что там внутри?', fn: () => say('Двор, два гаража. Человек семь, главарь с автоматом сидит в большом гараже. Там же и Шустрого держат.') },
@@ -293,73 +272,11 @@ function robNpc(e) {
     anger(e); closePanel();
   }
 }
-function talkWolf(e) {
-  dialog(cardOf(e), [S.q.flash === 1 ? 'Меченый? Сидорович по рации предупредил. Про Шустрого знаешь?' : 'Здорово, Меченый.'], () => {
-    const o = [];
-    if (cordonStage()==='confirm') o.push({t:'Кто ушёл к разбитой колонне?',k:'key',fn:cordonConfirm});
-    if (S.q.flash === 1) o.push({ t: 'Я насчёт Шустрого', k: 'key', fn: () => {
-      say('Его взяли бандиты, держат на АТП, это к востоку от большой дороги. Мои, Петруха с Хомяком, залегли у забора и ждут. С ножом туда идти нельзя: держи ПМ и три обоймы.');
-      const equipped=give('w_pm',1,{cond:85,mag:8}); give('a9',16); if (equipped) mountGear('w_pm',cnt('w_pm')-1,true); S.q.flash = 2;
-      sys('Получено: ПМ, Патроны 9×18 ×24. Задание обновлено.');
-      bulletin('Волк выдал ПМ. Цель: АТП на востоке.');
-    } });
-    if (S.q.flash >= 2 && S.q.pack === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
-      say('Есть. В лесу на северо-западе завелась стая слепых псов, уже двоих наших порвали. Перебьёшь, отдам обрез и патроны к нему.');
-      S.q.pack = 1; bulletin('Задание: перебить стаю слепых псов в северо-западном лесу.');
-    } });
-    if (S.q.pack === 2) o.push({ t: 'Стаи больше нет', k: 'key', fn: () => {
-      if (!has('w_obrez')) { give('w_obrez', 1); give('a12', 12); sys('Получено: Обрез, Дробь ×12.'); } else { give('a12', 12); S.money += 500; sys('Получено: Дробь ×12, 500 RU.'); }
-      say('Уважаю. Слово держу. И людям расскажу, что ты наш.');
-      S.q.pack = 3; S.stats.q++; S.rep += 10; bulletin('Выполнено: Стая у леса.'); save(true);
-    } });
-    wolfPlusOpts().forEach(x => o.push(x));
-    o.push({ t: 'Что посоветуешь?', fn: () => say('Не стой на открытом, двигайся. Кидай болты, где воздух дрожит. Ночью включай голову: псы в темноте видят лучше тебя. И считай патроны, магазин кончается всегда не вовремя.') });
-    o.push({ t: 'Бывай', close: 1 });
-    return o;
-  }, 'dialog', e);
-}
 function talkTrader() {
-  if (!S.flags.intro || !S.q.flash) {
-    S.flags.intro = 1;
-    return dialog(SIDCARD(), ['Очухался, Меченый? Тебя сняли с грузовика смерти, с таких живыми не возвращаются. Ты первый на моей памяти.', 'В КПК у тебя одна запись: «Убить Стрелка». Имени не помнишь, так и будешь Меченым, по наколке. Я тебе жизнь спас, за тобой должок.'], () => [
-      { t: 'Что за работа?', k: 'key', fn: () => {
-        say('Мой курьер, Шустрый, пропал вместе с флешкой. Говорят, его взяли бандиты. Иди к Волку в деревню новичков, он поможет. Флешку принесёшь мне, остальное потом.');
-        S.q.flash = 1; bulletin('Задание: Флешка Шустрого. Найди Волка в деревне новичков.');
-        sys('Задание: Флешка Шустрого. Метка на миникарте.');
-        panel.opts = traderOpts;
-      } }
-    ], 'trader');
-  }
-  dialog(SIDCARD(), ['Ну, чего тебе?'], traderOpts, 'trader');
+  dialog(SIDCARD(),[chapter()==='wake'?'Очнулся? У тебя на руке метка. Меченым и будем звать.':'Слушаю тебя, Меченый.'],traderOpts,'trader');
 }
-function traderOpts() {
-  const o = [{ t: 'Торговать', k: 'key', fn: () => openTrade(null) }];
-  if (cordonStage()==='decode') o.push({t:'Прочитать память КПК Шустрого',k:'key',fn:()=>{
-    S.flags.courierDecoded=1;
-    if (!S.q2.fox) S.q2.fox=1;
-    cordonSet('waitFox','Память прочитана. Ищи Лиса на ферме за насыпью.');
-    say('Память жива. Слышишь два позывных? Сохрани копию. А про Стрелка спроси Лиса. Он на ферме за насыпью. За живого курьера я бы заплатил, за эту весть платить нечем.');
-    cordonStart();
-  }});
-  if (S.q.flash === 3 && has('flash')) o.push({ t: 'Отдать флешку Шустрого', k: 'key', fn: () => {
-    take('flash', 1); S.money += 1500; S.q.flash = 4; S.flags.flashDone = 1; S.stats.q++; S.rep += 15;
-    say('Вот это дело. Держи полторы тысячи, заработал.');
-    sys('Получено: 1500 RU. Задание выполнено.'); bulletin('Выполнено: Флешка Шустрого.'); save(true);
-  } });
-  if (S.q.flash === 4 && S.flags.flashDone && S.q2.fox === 0) o.push({ t: 'Что со Стрелком?', k: 'key', fn: () => {
-    say('Есть сталкер по кличке Лис, он ходил с людьми, что Стрелка знали. Ушёл за насыпь, к разрушенной ферме на северо-востоке, и пропал со связи. Найди его. Вояки под мостом берут пятьсот за проход. Жадные, но слово держат. Кому жалко денег, лезет через туннель левее, а там электры. Справа есть канава: брось болт в разряд и проходи, пока тихо.');
-    S.q2.fox = 1; bulletin('Задание: Найти Лиса за насыпью.');
-  } });
-  if (S.q.medusa === 1 && has('art_medusa')) o.push({ t: 'Отдать «Медузу» за 1000 RU', k: 'key', fn: () => {
-    take('art_medusa', 1); S.money += 1000; S.q.medusa = 2; S.stats.q++;
-    say('Она самая. Тысяча, как договаривались.'); sys('Получено: 1000 RU.'); bulletin('Выполнено: «Медуза» для Сидоровича.');
-  } });
-  if (S.q.medusa === 0) o.push({ t: 'Есть ещё работа?', fn: () => {
-    const landmark = TOLIK_AT_JUNCTION ? 'к северу от развилки на АТП' : 'за ржавым автобусом у дороги';
-    say('Нужна «Медуза». Ищи на поле аномалий ' + landmark + '. Обычно беру за семьсот, под заказ дам тысячу. Детекторы есть у меня. Возьми прибор в руки и слушай. А границу аномалии проверяй болтом.');
-    S.q.medusa = 1; bulletin('Задание: «Медуза» для Сидоровича.');
-  } });
-  jobOpts().forEach(x => o.push(x));
+function traderOpts(){
+  const o=storyTraderOptions().concat([{t:'Торговать',fn:()=>openTrade(null)}]);
   if (S.rep <= -30) o.push({ t: 'Уладить с одиночками · 2000 RU', k: 'key', d: S.money < 2000, fn: () => {
     S.money -= 2000; S.rep = 0; S.flags.angry = {}; ents.forEach(e => { if (e.fac === 'loner') e.angry = 0; });
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
@@ -384,11 +301,6 @@ function sellPrice(id, toNpc) { const it = ITEMS[id]; return it.sell !== undefin
 function openLoot(o) {
   if (!cacheFieldQuiet(o)) {
     msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
-    return;
-  }
-  if (cordonStage()==='cache' && o.stash==='column_wayman') {
-    cordonSet('tracks','Записка в схроне: «Ногу Мелу зажало. Тащу его к машине». Осмотри след у крышки.');
-    cordonMessage('Записка в схроне',['«Ногу Мелу зажало. Руки заняты, лишнее оставлю здесь. Тащу его к машине. Катушка». Под крышкой прилип клочок мокрой лямки.']);
     return;
   }
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
@@ -497,15 +409,8 @@ function drawMenu() {
   const message=el('p','pause-note');
   message.setAttribute('role','status');
   nav.appendChild(btn('start-primary','Продолжить игру',closePanel));
-  nav.appendChild(btn('','Сохранить игру',()=>{
-    if (ents.some(e=>e.alive && e!==P && hostile(e,P) && dE(e,P)<450)) message.textContent='Рядом враги, сохраниться нельзя.';
-    else message.textContent=save(true)?'Игра сохранена.':'Не удалось записать сохранение.';
-  }));
-  nav.appendChild(btn('','Загрузить сохранение',()=>{
-    const saved=loadSave();
-    if (saved) {applyState(saved);closePanel();}
-    else message.textContent='Сохранений пока нет.';
-  }));
+  nav.appendChild(btn('','Сохранить игру',()=>slotPicker(nav,true,drawMenu)));
+  nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,drawMenu)));
   nav.appendChild(btn('pause-settings','Настройки',()=>{
     panel.pausePage='settings'; drawMenu();
     card.querySelector('button').focus();
@@ -947,7 +852,8 @@ function interact() {
   else if (n.k === 'up') goThrough(false);
   else if (n.k === 'heal') {
     const e = n.e;
-    if (healWounded(e)) dialog(cardOf(e), e.sid === 'fox' ? ['Спасибо, брат... Тихо! Слышишь вой? Стая вернулась, бери ствол!'] : ['Живой... Спасибо, братишка. Держи, что есть: деньги и антирад. Я твой должник.'], () => [{ t: e.sid === 'fox' ? 'К бою' : 'Береги себя', close: 1 }], 'dialog', e);
+    if(STORY_KEYS.includes(e.sid))return helpStory(e);
+    if (healWounded(e)) dialog(cardOf(e), [e.sid === 'tolik' ? 'Живой… Спасибо, братишка. Держи деньги и антирад. Я твой должник.' : 'Спасибо, брат. Выручил.'], () => [{ t: 'Береги себя', close: 1 }], 'dialog', e);
   }
   else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'groundItem') pickGroundItem(n);
@@ -960,9 +866,10 @@ function interact() {
   else if (n.k === 'exit') exitUse();
   else if (n.k === 'art') takeArt(n.a);
   else if (n.k === 'free') {
-    if (ents.some(e => e.alive && e.fac === 'bandit' && dE(e, n.e) < 260)) { msg('Сначала разберись с бандитами рядом.', 'bad'); return; }
-    freeShust(n.e);
-    dialog(cardOf(n.e), ['Думал, всё, спишут меня. Флешка при мне, в подкладку зашита, эти олухи не нашли. Отнеси Сидоровичу, я пока в деревню, отлежусь.'], () => [{ t: 'Иди, я прикрою', close: 1 }], 'dialog', n.e);
+    if(n.e.sid!=='shust' || chapter()!=='rescue'){msg('Пока рано.','say');return;}
+    if(ATP_BANDITS.some(id=>byS(id))){msg('Сначала обезопась АТП.','say');return;}
+    occupyATP();S.inv.flash=1;S.q.flash=3;nextChapter('flash');
+    storyRead('Шустрый',['Флешка у меня в подкладке. Отнеси Сидоровичу. А я здесь останусь — обживём гараж.']);
   }
 }
 const KEYS = {};
@@ -1133,7 +1040,7 @@ function showTitle(kind) {
     c.appendChild(el('div', 'tape'));
     c.appendChild(el('p', '', 'Последнее сохранение делается само у костра в деревне и у Сидоровича.'));
     const b = el('div', 'tbtns');
-    b.appendChild(btn('go', 'Загрузить сохранение', () => { const d = loadSave(); applyState(d || freshS()); hideTitle(); if (!d) intro(); }));
+    b.appendChild(btn('go','Загрузить сохранение',()=>slotPicker(b,false,()=>showTitle('death'))));
     b.appendChild(btn('alt', 'Начать заново', () => { applyState(freshS()); hideTitle(); intro(); }));
     c.appendChild(b);
     return;
@@ -1147,6 +1054,7 @@ function showTitle(kind) {
   nav.appendChild(btn(saved?'':'start-primary','Новая игра',()=>{
     audioInit(); applyState(freshS()); hideTitle(); intro();
   }));
+  if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
   c.append(title.name,nav);
 }
@@ -1155,8 +1063,6 @@ function goFull() {   // на весь экран там, где браузер 
 }
 function hideTitle() { goFull(); title.open = false; title.el.classList.remove('open'); document.body.classList.remove('title-open'); }
 function onDeath() { showTitle('death'); }
-function intro() { setTimeout(() => { if (!panel && P.alive) { msg('Ты очнулся в бункере у торговца. Подойди к прилавку и поговори с Сидоровичем.', 'say'); } }, 400); }
-
 /* ===================== цикл ===================== */
 let last = performance.now();
 /* автоподстройка: если в игре кадр в среднем дольше 22 мс, кроны деревьев рисуются мельче (меньше заливки для слабого телефона) */

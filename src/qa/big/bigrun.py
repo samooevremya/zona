@@ -6,7 +6,7 @@ async def main():
         pg=await (await b.new_context(viewport={'width':844,'height':390},device_scale_factor=2,has_touch=True,is_mobile=True)).new_page()
         errs=[]; pg.on('pageerror',lambda e:errs.append(str(e)[:200]))
         await pg.goto('file:///home/claude/zona2d/index_big.html#qa-seed=7'); await pg.wait_for_timeout(1500)
-        await pg.get_by_role('button',name='Новая игра').tap(); await pg.wait_for_timeout(300)
+        await pg.get_by_role('button',name='Новая игра').tap(); await pg.get_by_role('button',name='Пропустить').tap(); await pg.wait_for_timeout(300)
         r=json.loads(await pg.evaluate(open('qa/big/big.js').read())); r['pageErrors']=errs
         json.dump(r,open('qa/big/big_result.json','w'),ensure_ascii=False,indent=1)
         for k,v in r.items():

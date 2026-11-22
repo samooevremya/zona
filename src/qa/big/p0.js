@@ -31,7 +31,7 @@ T('2_contract_isolation', () => {
   const A = { k: 'clear', x: __RM.t(46, 58)[0], y: __RM.t(46, 58)[1], where: 'A', n: 3, got: 0, pay: 1100, n_: 'A', d: '' };
   X.jobTake(A); step(40);
   const aGroup = z.ents.filter(e => e.alive && e.jobTag).length;
-  const cancel = optBy('Отказаться'); cancel.fn(); z.closePanel(); step(40);
+  X.jobCancel(); z.closePanel(); step(40);
   const B = { k: 'clear', x: __RM.t(110, 30)[0], y: __RM.t(110, 30)[1], where: 'B', n: 3, got: 0, pay: 1100, n_: 'B', d: '' };
   X.jobTake(B); step(40);
   const bGroup = z.ents.filter(e => e.alive && e.jobTag && Math.hypot(e.x - RPx(110 * 32, 30 * 32), e.y - RPy(110 * 32, 30 * 32)) < 400).length;

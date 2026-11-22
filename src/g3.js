@@ -49,6 +49,7 @@ function playerFire() {
     return;
   }
   if (wearAndJam(S.weapon)) { P.cool = 0.3; return; }
+  if(storyArea())alarmPost();
   S.mag[S.weapon] = m - 1; P.cool = W.rate;
   const moving = Math.abs(IN.moveX) + Math.abs(IN.moveY) > 0.1;
   const locked = P.lock && Math.abs(angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x))) < 0.12;
@@ -148,6 +149,7 @@ function throwNade() {
   if (!has('grenade')) { msg('Гранат нет.'); return; }
   if (!kitItem('grenade')) { msg('Положи гранату в слот снаряжения.'); return; }
   if (P.nadeT > 0) return; P.nadeT = 1;
+  if(storyArea())alarmPost();
   take('grenade', 1);
   const a = P.ang;
   nades.push({ x: P.x, y: P.y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340, t: 1.5, z: 0, vz: 160, owner: P });
@@ -173,7 +175,6 @@ function update(dt) {
   renewFieldCrates();
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
-  if (S.q2.fox === 0 && S.q.flash === 4 && S.flags.flashDone && !S.flags.foxTold) { /* задание выдаёт Сидорович */ }
   if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x < PW*T && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
@@ -260,15 +261,15 @@ function update(dt) {
   saveT -= dt;
   if (saveT <= 0 && P.alive && (dE(P, campOf(P)) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
   // штурм АТП с Петрухой
-  if (S.q.flash >= 2 && !S.flags.assault && !S.flags.atpClear) {
-    const p = byS('petr');
+  if (chapter()==='rescue' && !S.flags.assault && !S.flags.atpClear) {
+    const p = byS('petr') || byS('petr2');
     if (p && dE(p, P) < 240) {
       S.flags.assault = 1;
       msg('Петруха: — Наконец-то! Их там человек семь. Заходим через ворота, мы прикроем.', 'say');
-      ['petr', 'petr2'].forEach((s, i) => { const e = byS(s); if (e) { e.home = { x: (89 + i * 2) * T, y: (71 + i) * T }; e.stay = 0; e.path = null; } });
+      ['petr', 'petr2'].forEach(s => { const e = byS(s); if (e) { e.home = locPt('atp',s); e.stay = 0; e.path = null; } });
     }
   }
-  checkQuests();
+  if(BIG)updatePostShift();
   if (radioQueue.length && (radioQueue[0].life -= dt) <= 0) radioQueue.shift();
   for (const m of MSGS) m.life -= dt;
   MSGS = MSGS.filter(m => m.life > 0);
@@ -425,13 +426,6 @@ function takeArt(a) {
   play('pick');
   news('Найден ' + ITEMS[a.id].n + '.');
 }
-function freeShust(e) {
-  const room=loftAt(e); if(room) {e.x=room.stair.x;e.y=room.stair.y;}
-  e.captive = 0; S.flags.shustFree = 1;
-  e.home = (h => ({ x: h[0], y: h[1] }))(RMp(34.5 * T, 80.5 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-  if (S.q.flash === 2 || S.q.flash === 1) { const moved=give('flash',1); S.q.flash=3; bulletin(moved?'Шустрый освобождён. Флешка у тебя.':'Флешка Шустрого в личном ящике. Забери её для Сидоровича.'); }
-}
-
 let fadeT = 0, fadeTo = null;
 function goThrough(down) {
   if (fadeT > 0) return;
@@ -443,14 +437,9 @@ function healWounded(e) {
   if (!has('medkit')) { msg('Нужна аптечка. Купи у Сидоровича.', 'bad'); return false; }
   take('medkit', 1); e.captive = 0; e.wounded = 0; e.hp = e.maxhp * 0.7;
   if (e.sid === 'tolik') {
-    S.flags.tolikUp = 1; S.q2.tolik = 2; S.stats.q++; S.rep += 10; S.money += 300; give('antirad', 1);
+    S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
-    bulletin('Выполнено: раненый у дороги. Толик выжил.');
-  }
-  if (e.sid === 'fox') {
-    S.flags.foxUp = 1; S.q2.fox = 2;
-    for (let i = 0; i < 4; i++) { const d = mkDog({ pack: 'foxdogs', x: 95 + i * 0.7, y: 21 + (i % 2) }); d.tgt = P; ents.push(d); }
-    msg('Лис: — Слышишь? Они вернулись! Держись рядом!', 'bad');
+    news('Толик получил помощь и вернулся в деревню.');
   }
   return true;
 }
@@ -458,20 +447,20 @@ function healWounded(e) {
 /* ===================== сохранение ===================== */
 const KEY = /qa/.test(location.hash) ? 'zona2d-kordon-qa' : 'zona2d-kordon-v2';   // QA-прогоны не трогают сохранение игрока
 const SAVE_VERSION = 3;
-function save(quiet) {
+function save(quiet,slot=0) {
   if (!P || !P.alive) return false;
   S.x = P.x; S.y = P.y; S.hp = P.hp;
   let f = ''; for (let i = 0; i < fog.length; i += 6) { let v = 0; for (let b = 0; b < 6; b++) v |= (fog[i + b] ? 1 : 0) << b; f += String.fromCharCode(48 + v); }
   S.fog = f;
   dynSnapshot();
-  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { if (!quiet) msg('Сохранить не вышло: браузер не даёт места.'); return false; }
+  try { localStorage.setItem(slotKey(slot), JSON.stringify(S)); } catch (e) { if (!quiet) msg('Сохранить не вышло: браузер не даёт места.'); return false; }
   return true;
 }
-function loadSave() {
-  try { const raw = localStorage.getItem(KEY); if (!raw) return null; const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
+function loadSave(slot=0) {
+  try { const raw = localStorage.getItem(slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
 }
 function applyState(d) {
-  S = d;
+  S = d; prepareCampaign(); lastShiftState=null;
   if (BIG && (S.mapVersion==='kordon-big' || S.mapVersion==='kordon-west')) migrateNorthernWorld(S);
   restoreKit();
   fog.fill(0);
@@ -479,6 +468,8 @@ function applyState(d) {
   fogDirty = true; fogRegion = null;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
+  if(S.campaign.liberated)occupyATP();
+  villageAftermath();
   if(BIG){
     // A trader snapshot from the old bar also stores its old home and seat.
     for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust']){

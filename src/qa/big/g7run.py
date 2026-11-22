@@ -5,7 +5,7 @@ async def run(b, suf):
     pg=await (await b.new_context(viewport={'width':844,'height':390},device_scale_factor=2,has_touch=True,is_mobile=True)).new_page()
     errs=[]; pg.on('pageerror',lambda e:errs.append(str(e)[:200]))
     await pg.goto('file:///home/claude/zona2d/index_big.html#qa-seed=7'+suf); await pg.wait_for_timeout(1500)
-    await pg.get_by_role('button',name='Новая игра').tap(); await pg.wait_for_timeout(300)
+    await pg.get_by_role('button',name='Новая игра').tap(); await pg.get_by_role('button',name='Пропустить').tap(); await pg.wait_for_timeout(300)
     r=json.loads(await pg.evaluate(open('qa/big/g7.js').read()))
     if suf=='':
         r.update(json.loads(await pg.evaluate(open('qa/g7fail.js').read())))
@@ -13,7 +13,7 @@ async def run(b, suf):
         r.update(json.loads(await pg.evaluate(open('qa/g7hud.js').read())))
         p2=await (await pg.context.browser.new_context(viewport={'width':390,'height':844},device_scale_factor=3,has_touch=True,is_mobile=True)).new_page()
         await p2.goto('file:///home/claude/zona2d/index_big.html#qa'); await p2.wait_for_timeout(1300)
-        await p2.get_by_role('button',name='Новая игра').tap(); await p2.wait_for_timeout(300)
+        await p2.get_by_role('button',name='Новая игра').tap(); await p2.get_by_role('button',name='Пропустить').tap(); await p2.wait_for_timeout(300)
         try: await p2.click('#rot-skip',timeout=1500)
         except Exception: pass
         u=json.loads(await p2.evaluate(open('qa/g7hud.js').read())); r['U1_hud_edges_390x844_dpr3']=u['U1_hud_edges']; await p2.close()
