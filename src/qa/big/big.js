@@ -168,11 +168,8 @@ Tt('K12_sos_radio', () => {
 });
 Tt('K13_pda_quest_bulletin', () => {
   reset(); z.clearMsgs();
-  S().q.pack = 1;
-  z.ents.filter(e => e.pack === 'lair').forEach(e => { e.alive = 0; });
-  // Обычный игровой цикл проверяет завершение задания.
-  step(60);
-  const report = S().news.find(n => n.x.includes('Стая у леса перебита'));
+  z.talkTrader(); z.plus.traderOpts().find(o=>o.t==='Кто меня нашёл?').fn();z.closePanel();
+  const report=S().news.find(n=>n.x.includes('Получить оружие у Волка'));
   const shown = !!report && B.msgs().includes(report.x);
   S().sos.next = S().min;
   z.plus.sosTick();
@@ -482,89 +479,52 @@ Tt('K21_vortex_cache', () => {
 });
 
 // Игровые действия, а не прямое изменение нового сюжетного этапа.
-function cordonPlay(quiet,loss=false) {
-  const checkpoint=()=>S().flags.cordonStage;
-  const assert=(v,n)=>{if(!v) throw Error(n+' / '+checkpoint()+' / '+z.near?.label);};
-  const btn=part=>{const b=[...document.querySelectorAll('#pbody .opt')].find(el=>el.textContent.includes(part));assert(b,part);b.click();};
-  const reload=()=>{z.closePanel();z.save(true);z.applyState(z.loadSave());hold();};
-  const hold=()=>z.ents.forEach(e=>{if(!e.storyMan && e!==P()) e.qaHold=1;});
-  const tick=()=>{S()._plusT=0;step(1);};
-  const interactAt=(p,match)=>{
-    z.closePanel();
-    for(const length of [25,14,35,3,42]) for(let i=0;i<8;i++) {
-      const angle=i*Math.PI/4, x=p.x+length*Math.cos(angle),y=p.y+length*Math.sin(angle);
-      const probe={x,y,r:11};M.collide(probe);if(Math.hypot(x-probe.x,y-probe.y)>1)continue;
-      Object.assign(P(),{x,y});tick();
-      if(match(z.near)){z.interact();return;}
-    }
-    throw Error('Нет точки взаимодействия '+JSON.stringify([p.x,p.y])+' / '+checkpoint()+' / '+z.near?.label);
-  };
-  const actor=id=>z.ents.find(e=>e.alive && e.sid===id);
-  const talk=id=>interactAt(actor(id),n=>n?.k==='talk' && n.e.sid===id);
-  const use=(loc,anchor,kind)=>interactAt(z.loc.locPt(loc,anchor),n=>n?.k===kind);
-  const stage=n=>assert(checkpoint()===n,n);
-  reset();hold();const s=S();
-  if(loss){
-    // Начало через настоящие разговоры, освобождение и лечение, включая повторный визит в бункер.
-    s.q.flash=0;s.flags.intro=0;z.talkTrader();z.closePanel();z.talkTrader();btn('Что за работа');z.closePanel();
-    talk('wolf');btn('Я насчёт');z.closePanel();
-    for(const e of z.ents) if(e.fac==='bandit') e.alive=0;
-    interactAt(actor('shust'),n=>n?.k==='free');assert(S().q.flash===3,'флешка');z.closePanel();
-    z.talkTrader();btn('Отдать флешку');btn('Что со Стрелком');z.closePanel();
-    interactAt(actor('fox'),n=>n?.k==='heal');z.closePanel();for(const d of z.ents) if(d.pack==='foxdogs') d.alive=0;
-    tick();talk('fox');btn('Что знаешь');z.closePanel();tick();stage('voice');
-    talk('shust');stage('confirm');z.closePanel();
-  }else if(quiet){
-    // Сохранение предыдущей версии: Лис уже найден и северные ворота осмотрены.
-    s.flags.flashDone=s.flags.shustFree=s.flags.foxUp=s.flags.reachedExit=1;s.q.flash=s.q2.fox=4;
-    reload();tick();stage('voice');talk('shust');stage('confirm');z.closePanel();
-  }else{
-    // Потеря обоих первоначальных свидетелей и заранее опустошённый схрон.
-    s.dead.shust=s.dead.fox=1;s.q.flash=4;s.flags.flashFail=1;
-    reload();tick();stage('broken');
-    use('atp','garage','story');stage('decode');z.closePanel();z.talkTrader();btn('Прочитать память');stage('foxNote');
-    use('farm','fox','story');stage('confirm');
-    const stash=M.objs.find(o=>o.stash==='column_wayman');stash.loot={};stash.looted=true;
+function playChapter(losses){
+  reset(); const st=()=>S().campaign.stage;
+  const expect=stage=>{if(st()!==stage)throw Error(stage+' / '+st()+' / '+z.near?.label);};
+  const click=name=>{const b=[...document.querySelectorAll('#pbody button')].find(b=>b.textContent.includes(name));if(!b)throw Error('Нет действия '+name+' @ '+st());b.click();};
+  const sid=id=>z.ents.find(e=>e.sid===id && e.alive);
+  function freeze(){for(const e of z.ents)if(e!==P())e.qaHold=1;}
+  function approach(p){z.closePanel();Object.assign(P(),{x:p.x,y:p.y+6});freeze();step(1);}
+  function use(p,k){approach(p);if(z.near?.k!==k)throw Error('Цель '+k+' / '+z.near?.label+' @ '+st());z.interact();}
+  function trader(label){z.closePanel();z.talkTrader();click(label);z.closePanel();}
+  function damage(e){z.rc.hurt(e,999,null);}
+  function reload(){z.closePanel();z.save(true);z.applyState(z.loadSave());freeze();}
+  const target=()=>z.plus.trackedTarget();
+  trader('Кто меня нашёл');expect('wolf');use(sid('wolf'),'talk');click('оружие');expect('rescue');
+  ['b1','b2','b3','b4','b5','b6','boss'].forEach(id=>damage(sid(id)));
+  if(losses)damage(sid('petr2'));
+  use(sid('shust'),'free');expect('flash');reload();
+  if(!sid('shust') || sid('shust').captive || !S().campaign.liberated || (!!sid('petr2')===!!losses))throw Error('Гарнизон АТП после загрузки');
+  trader('Передать флешку');expect('fox');S().inv.medkit=0;
+  use(sid('fox'),'heal');expect('fox');S().inv.medkit=3;use(sid('fox'),'heal');expect('dogs');reload();
+  z.ents.filter(e=>e.trailDog && e.alive).forEach(damage);step(40);expect('favour');
+  use(sid('fox'),'talk');for(const t of ['Как пойму','Поищу','А ты','Идти'])click(t);
+  expect('wreck');use(target(),'story');z.closePanel();reload();use(target(),'story');expect('returnGun');z.closePanel();
+  use(sid('fox'),'talk');for(const t of ['Держи','А вот','Прижать','Ещё раз','Чего так','Убрать'])click(t);
+  expect('device');use(sid('shust'),'talk');click('Это ещё');click('Сидор');expect('bargain');trader('Показать монолитовский');
+  expect('case');S().min=720;use(target(),'story');expect('case');if(z.ents.filter(e=>e.dayGuard).length!==4)throw Error('Дневная смена');
+  S().min=1320;use(target(),'story');expect('escape');
+  if(z.ents.some(e=>e.dayGuard))throw Error('Ночная смена');
+  if(losses){
+    z.rc.hurt(sid('a5'),2,P());expect('case');reload();
+    Object.assign(P(),{x:360*T-120,y:(north+207)*T});step(45);S().min=1460;
+    use(target(),'story');expect('case');S().min=1440+1290;use(target(),'story');expect('escape');
   }
-  talk('wolf');btn('Кто ушёл');stage('relay');
-  use('relay','booth','story');stage('cache');
-  const stash=M.objs.find(o=>o.stash==='column_wayman'),note={x:stash.x+stash.w/2,y:stash.y+stash.h/2},offset=((Math.floor(note.x/T)*17+Math.floor(note.y/T)*31)%80)/10;
-  S().min+=((8-(S().min+offset)%8)%8)+.1;
-  interactAt(note,n=>n?.k==='loot');stage('tracks');
-  interactAt(note,n=>n?.k==='story');stage('rescue');
-  reload();assert(z.ents.filter(e=>e.storyMan).length===2,'двое у колонны');
-  talk('column_spool');btn(quiet?'Сохранить тишину':'Вызвать помощь');
-  stage(quiet?'escort':'pickup');reload();
-  if(loss){
-    for(const e of z.ents.filter(e=>e.storyMan)){e.alive=0;S().dead[e.sid]=1;}
-    tick();stage('lastLog');reload();use('column','wreck','story');
-  }else if(quiet){
-    const safe=z.loc.locPt('farm','safe'),start=actor('column_chalk');
-    Object.assign(P(),safe);tick();stage('escort'); // игрок один не закрывает этап
-    const route=z.findPath(start.x,start.y,safe.x,safe.y);assert(route?.length,'дорога до фермы');
-    for(const p of route){
-      Object.assign(P(),{x:p.x,y:p.y}); // игрок ведёт по дороге, NPC проходят её своим AI
-      for(let i=0;i<9;i++) z.update(1/12);
-    }
-    for(let i=0;i<110 && checkpoint()==='escort';i++) z.update(1/12);
-    assert(checkpoint()==='listen','ферма '+[actor('column_spool'),actor('column_chalk')].map(e=>[Math.round(e.x/T),Math.round(e.y/T)])+' цель '+safe.x/T+','+safe.y/T);
-    use('relay','booth','story');
-  }else{
-    Object.assign(P(),z.loc.locPt('village','fire'));tick();
-    assert(S().flags.cordonExtracted,'прибытие носилок');talk('column_spool');
-  }
-  stage('north');reload();
-  const count=S().stats.q;
-  use('exit','gate','exit');stage('done');
-  assert(z.panel.lines.some(l=>l.t.includes(loss?'Имена тоже':quiet?'Седьмой вагон':'деревни передали')),'ответ Серого');
-  reload();use('exit','gate','exit');assert(S().stats.q===count+1,'финал один раз');
-  const chapters=z.plus.qList().filter(q=>q.id.startsWith('cordon'));
-  assert(chapters.length===4 && chapters.every(q=>q.st==='d'),'четыре главы в журнале');
-  return {ok:true,quiet,chapters:chapters.length};
+  approach(target());step(40);expect('deliver');trader('Отдать кейс');expect('muster');
+  use(sid('wolf'),'talk');click('Встретиться');expect('ready');use(target(),'talk');click('Я готов');expect('battle');reload();
+  const allies=z.ents.filter(e=>e.alive && e.squadMate),enemy=z.ents.filter(e=>e.alive && e.assailant);
+  if(allies.length!==5 || enemy.length!==6)throw Error('Состав отрядов');
+  allies.slice(0,losses).forEach(damage);enemy.forEach(damage);step(45);expect('aid');reload();
+  if(!sid('wolf').wounded || z.ents.filter(e=>e.alive && e.squadMate).length!==5-losses)throw Error('Потери после загрузки');
+  use(sid('wolf'),'heal');expect('reward');z.closePanel();const money=S().money;
+  trader('Получить награду');expect('listen');reload();const paid=S().money-money;
+  trader('Включить восстановленную');expect('west');approach(target());step(45);expect('done');
+  return {ok:paid===5000 && !!S().inv.ar_zarya && z.plus.qList().filter(q=>q.id.startsWith('chapter') && q.st==='d').length===9,losses,paid};
 }
-Tt('K22_open_channel_and_lost_witnesses',()=>cordonPlay(false));
-Tt('K23_radio_silence_and_old_save',()=>cordonPlay(true));
-Tt('K24_fresh_start_and_emergency_log',()=>cordonPlay(false,true));
+Tt('K22_full_campaign_no_losses',()=>playChapter(0));
+Tt('K23_alarm_retreat_next_night_and_losses',()=>playChapter(2));
+Tt('K24_all_allies_lost',()=>playChapter(5));
 
 Tt('K25_bridge_toll', () => {
   const guards=()=>z.ents.filter(e=>e.alive && e.guard==='bridge');
@@ -944,7 +904,7 @@ Tt('G4_station_crossing_and_western_cut',()=>{
   return {ok:!!(crossesOnDeck && walkableBank && closedWest && restored),crossesOnDeck,walkableBank,closedWest,restored};
 });
 Tt('L1_upstairs_rescue_and_depot_gallery',()=>{
-  reset();const p=P();
+  reset();S().campaign.stage='rescue';for(const e of z.ents)if(['b1','b2','b3','b4','b5','b6','boss'].includes(e.sid)){e.alive=0;S().dead[e.sid]=1;}const p=P();
   const stand=(x,y)=>{Object.assign(p,{x:x*T,y:y*T});step(1);};
   const use=(kind)=>{if(z.near?.k!==kind)throw Error('Ожидалось '+kind+', получено '+z.near?.k);z.interact();step(20);};
   stand(438.5,266.73);use('floor');

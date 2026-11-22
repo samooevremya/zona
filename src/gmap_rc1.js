@@ -130,6 +130,4 @@ function rc1Gen() {
   rcClear(58, 2, 72, 8);
   // генератор в деревне и верстак (появляется после ремонта, но место зарезервировано)
   addObj({ k: 'genset', x: 34 * T, y: 86 * T, w: 30, h: 22, solid: 1 });
-  addObj({ k: 'fuelcan', x: 107 * T, y: 66 * T, w: 18, h: 18, pick: 'fuel' });
-  addObj({ k: 'fusebox', x: 35 * T + 4, y: 61 * T, w: 16, h: 14, pick: 'fuse' });
 }

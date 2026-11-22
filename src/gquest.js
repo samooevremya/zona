@@ -6,6 +6,7 @@ const villageLit = () => MAP_ID === 'rc1' && S && S.q5 && S.q5.st === 'completed
 
 /* предметы на земле (предохранитель, канистра): не запекаются в фон, исчезают после подбора */
 function rcSpawnObjs() {
+  if(BIG)return;
   if (MAP_ID !== 'rc1') return;
   for (let i = objs.length - 1; i >= 0; i--) if (objs[i].pick) objs.splice(i, 1);   // повторный applyState (загрузка/новая игра) не дублирует предметы
   [['fuse', 'fusebox', 'pump', 'fuse'], ['fuel', 'fuelcan', 'atp', 'fuel']].forEach(([id, k, loc, an]) => {
@@ -66,14 +67,14 @@ function gensetUse() {
 }
 function qListRC1(L) {
   if (MAP_ID !== 'rc1') return;
-  cordonList(L);
+
   const q = q5();
   if (q.st !== 'not_started') L.push({ id: 'light', loc: 'village', n: 'Свет в деревне', st: q.st === 'completed' ? 'd' : 'a',
     d: q.st === 'completed' ? 'Генератор работает, верстак у костра открыт.' : 'Нужны предохранитель (водокачка) и канистра топлива (АТП) — в любом порядке. ' + (has('fuse') ? 'Предохранитель есть. ' : '') + (has('fuel') ? 'Топливо есть. ' : '') + (q.st === 'ready' ? 'Неси к генератору у костра.' : '') });
 }
 function targetsRC1(out) {
   if (MAP_ID !== 'rc1') return;
-  const story=cordonTarget(); if(story) out.push(story);
+
   const q = q5();
   if (q.st === 'collecting') {
     if (!has('fuse')) { const p = locPt('pump', 'fuse'); out.push({ qid: 'light', x: p.x, y: p.y, n: 'Предохранитель на водокачке' }); }
@@ -95,16 +96,21 @@ function cluesTick() {
 }
 /* переход на Свалку: критерий «добраться до перехода» */
 function exitUse() {
-  if (cordonExit()) return;
+
   if (!S.flags.reachedExit) { S.flags.reachedExit = 1; news('Дошёл до северного перехода на Свалку.'); save(true); }
   msg(BIG ? 'За поворотом начинается дорога к кладбищу техники.' : 'Северный переход.', 'say');
 }
 function interactRC1(cand) {
   if (MAP_ID !== 'rc1') return;
-  storyPrompt(cand);
+  if(BIG){
+    storyPrompt(cand);
+    const gate=locPt('exit','gate'),d=dE(P,gate);
+    if(d<90)cand(d,{k:'exit',label:'Сверить маршрут'});
+    return;
+  }
   for (const o of objs) if (o.pick) { const d = dst(P.x, P.y, o.x + o.w / 2, o.y + o.h / 2); if (d < 44) cand(d - 15, { k: 'pick', o: o, label: 'Взять: ' + ITEMS[o.pick].n }); }
   const g = locPt('village', 'generator'), dg = dst(P.x, P.y, g.x, g.y);
   if (dg < 56) cand(dg - 5, { k: 'genset', label: q5().st === 'completed' ? 'Верстак у генератора' : 'Генератор' });
   const ex = locPt('exit', 'gate'), de = dst(P.x, P.y, ex.x, ex.y);
-  if (de < 90) cand(de, { k: 'exit', label: cordonStage()==='north'?'Вызвать Серого':BIG?'Сверить маршрут':'Переход на Свалку' });
+  if (de < 90) cand(de, { k: 'exit', label: BIG?'Сверить маршрут':'Переход на Свалку' });
 }

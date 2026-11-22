@@ -7,7 +7,7 @@ async def run(page_file, js):
         pg=await ctx.new_page(); errs=[]
         pg.on('pageerror',lambda e:errs.append(str(e)[:200]))
         await pg.goto('file:///home/claude/zona2d/'+page_file+'#qa-seed=20261118'); await pg.wait_for_timeout(900)
-        await pg.get_by_role('button',name='Новая игра').tap(); await pg.wait_for_timeout(300)
+        await pg.get_by_role('button',name='Новая игра').tap(); await pg.get_by_role('button',name='Пропустить').tap(); await pg.wait_for_timeout(300)
         r=json.loads(await pg.evaluate(js))
         await b.close(); return r, errs
 async def main():

@@ -610,7 +610,7 @@ function plusTick(dt) {
   S._plusT = (S._plusT || 0) - dt;
   if (S._plusT > 0) return;
   S._plusT = 1;
-  sosTick(); suckerTick(); cluesTick(); cordonTick();
+  sosTick(); campaignTick();
 }
 function plusKill(e, src) {
   plusDefaults();
@@ -622,7 +622,7 @@ function plusKill(e, src) {
   }
   const a = S.sos.act;
   if (a && e.sosFoe === a.id && byMe) a.pk = (a.pk || 0) + 1;
-  if (e.kind === 'sucker') { S.q3.sucker = 2; bulletin('Кровосос в хлеву убит. Возвращайся к Волку.'); }
+  if (!BIG && e.kind === 'sucker') { S.q3.sucker = 2; bulletin('Кровосос в хлеву убит. Возвращайся к Волку.'); }
   if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {

@@ -8,7 +8,7 @@ async def run(vw, vh):
         ctx=await b.new_context(viewport={'width':vw,'height':vh},device_scale_factor=2,has_touch=True,is_mobile=True)
         pg=await ctx.new_page(); errs=[]; pg.on('pageerror',lambda e:errs.append(str(e)[:200]))
         await pg.goto('file:///home/claude/zona2d/index_big.html#qa'); await pg.wait_for_timeout(1000)
-        await pg.get_by_role('button',name='Новая игра').tap(); await pg.wait_for_timeout(300)
+        await pg.get_by_role('button',name='Новая игра').tap(); await pg.get_by_role('button',name='Пропустить').tap(); await pg.wait_for_timeout(300)
         if vh>vw:
             try: await pg.click('#rot-skip',timeout=1500)
             except Exception: pass

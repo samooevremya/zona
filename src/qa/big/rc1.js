@@ -34,43 +34,22 @@ T_('R3_rescued_sos_keeps_identity', () => {
   saveLoad(); const res = z.ents.filter(e => e.alive && e.resident).map(e => e.name);
   return { ok: names.length > 0 && names.every(n => res.includes(n)), rescued: names, afterLoad: res, reason: s.sos.last && s.sos.last.reason };
 });
-T_('R4_light_chain_fuel_first', () => {
-  reset(); const q = Q.q5();
-  const fuel = z.map.objs.find(o => o.pick === 'fuel'); Q.pickUp(fuel);          // топливо до начала задания
-  const w = z.ents.find(e => e.name === 'Волк'); P().x = w.x; P().y = w.y + 36; step(2); z.interact();
-  const opt = [...document.querySelectorAll('#pbody .opt')].find(b => /генератор/.test(b.textContent)); opt.click(); z.closePanel();
-  const st1 = q.st; const fuse = z.map.objs.find(o => o.pick === 'fuse'); Q.pickUp(fuse); const st2 = Q.q5().st;
-  const m0 = S().money; Q.gensetUse(); const st3 = Q.q5().st, paid = S().money - m0; Q.gensetUse(); z.closePanel(); saveLoad(); Q.gensetUse(); z.closePanel();
-  return { ok: st1 === 'collecting' && st2 === 'ready' && st3 === 'completed' && paid === 600 && S().money - m0 === 600 && !has2('fuse') && !has2('fuel') && !z.map.objs.some(o => o.pick),
-    states: [st1, st2, st3], reward: paid, afterRepeatAndReload: S().money - m0 };
-  function has2(id) { return (S().inv[id] || 0) > 0; }
+T_('R4_new_journal_after_legacy_load',()=>{
+  reset();const d=S();delete d.campaign;d.flags.flashDone=1;d.flags.cordonStage='north';d.dead.fox=1;d.dead.shust=1;
+  z.applyState(d);const list=X.qList();return {ok:S().campaign.stage==='fox' && !S().dead.fox && !S().dead.shust &&
+    list.some(q=>q.n==='Должок за Кордон' && q.st==='a') && !list.some(q=>/Серый|Медуза|Свет в деревне/.test(q.n))};
 });
-T_('R5_light_chain_quest_first_and_bench', () => {
-  reset(); const w = z.ents.find(e => e.name === 'Волк'); P().x = w.x; P().y = w.y + 36; step(2); z.interact();
-  [...document.querySelectorAll('#pbody .opt')].find(b => /генератор/.test(b.textContent)).click(); z.closePanel();
-  const t1 = X.qTargets().filter(t => t.qid === 'light').map(t => t.n);
-  Q.pickUp(z.map.objs.find(o => o.pick === 'fuse')); saveLoad();
-  const fuelStill = z.map.objs.some(o => o.pick === 'fuel'), fuseGone = !z.map.objs.some(o => o.pick === 'fuse');
-  Q.pickUp(z.map.objs.find(o => o.pick === 'fuel')); Q.gensetUse(); z.closePanel();
-  S().cond.w_aksu = 40; const m0 = S().money; Q.gensetUse(); const b = [...document.querySelectorAll('#pbody .opt')].find(x => /до 70%/.test(x.textContent)); b.click(); z.closePanel();
-  // ночь: огни деревни включены
-  return { ok: t1.length === 2 && fuelStill && fuseGone && Q.q5().st === 'completed' && S().cond.w_aksu === 70 && S().money < m0, targetsAtStart: t1, reloadKeepsPickState: fuelStill && fuseGone, benchCondition: S().cond.w_aksu, benchCost: m0 - S().money };
+T_('R5_independent_slots',()=>{
+  reset();S().money=113;z.save(true,1);S().money=271;z.save(true,2);S().money=59;z.save(true);
+  z.applyState(z.loadSave(1));return {ok:S().money===113 && z.loadSave(2).money===271 && z.loadSave().money===59};
 });
-T_('R6_night_guest_kill_before_clues', () => {
-  reset(); S().q.flash = 2; X.wolfPlusOpts().find(o => /пропадают/.test(o.t)).fn(); z.closePanel(); step(40);
-  saveLoad(); step(40); const nS = z.ents.filter(e => e.kind === 'sucker' && e.alive).length;
-  const s = z.ents.find(e => e.kind === 'sucker'); s.hp = 1; s.cloak = 0; P().x = s.x - 60; P().y = s.y; P().ang = 0; z.IN.touch = true;
-  for (let i = 0; i < 90 && s.alive; i++) { z.IN.btnFire = true; P().ang = Math.atan2(s.y - P().y, s.x - P().x); S().mag.w_aksu = 30; P().hp = 100; z.update(1 / 30); } z.IN.btnFire = false;
-  const st = S().q3.sucker; const m0 = S().money; X.wolfPlusOpts().find(o => /покончено/.test(o.t)).fn(); z.closePanel(); const paid = S().money - m0;
-  saveLoad(); step(30); const again = X.wolfPlusOpts().find(o => /покончено/.test(o.t)); const sAfter = z.ents.filter(e => e.kind === 'sucker' && e.alive).length;
-  return { ok: nS === 1 && st === 2 && paid === 2000 && !again && sAfter === 0 && S().q3.sucker === 3, suckersAfterReload: nS, stateAfterKill: st, reward: paid, rewardOfferedAgain: !!again, suckerRespawned: sAfter };
+T_('R6_wounded_quest_actors',()=>{
+  reset();for(const id of ['fox','wolf','shust'])Q.hurt(z.ents.find(e=>e.sid===id),999,null);
+  saveLoad();return {ok:['fox','wolf','shust'].every(id=>z.ents.some(e=>e.sid===id && e.alive && e.wounded) && !S().dead[id])};
 });
-T_('R7_night_guest_clues', () => {
-  reset(); S().q.flash = 2; X.wolfPlusOpts().find(o => /пропадают/.test(o.t)).fn(); z.closePanel();
-  const w = z.ents.find(e => e.name === 'Волк'); P().x = w.x; P().y = w.y + 36; step(2); z.interact(); const o = [...document.querySelectorAll('#pbody .opt')].find(b => /хлев/.test(b.textContent)); o && o.click(); z.closePanel();
-  goTo('farm', 'tracks'); step(40); goTo('lair', 'porch'); step(40); goTo('lair', 'inside'); step(40);
-  const c = Q.q3c();
-  return { ok: c.story === 1 && c.tracks === 1 && c.warned === 1 && c.barn === 1, clues: c };
+T_('R7_search_checkpoint_persists',()=>{
+  reset();S().campaign.stage='wreck';let p=X.trackedTarget();P().x=p.x;P().y=p.y;step(2);z.interact();z.closePanel();
+  saveLoad();let next=X.trackedTarget();return {ok:S().campaign.pistol && !!S().inv.engraved_pm && Math.hypot(next.x-p.x,next.y-p.y)>30};
 });
 T_('R8_weapon_copies_and_shared_lockers', () => {
   reset();

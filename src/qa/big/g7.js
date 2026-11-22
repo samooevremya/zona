@@ -175,19 +175,10 @@ T_('I1_icons_png', () => {
   const cloth = ['ar_jacket', 'ar_bandit', 'ar_zarya'].map(id => JSON.stringify(r[id].size));
   return { ok: ids.every(id => r[id].png) && new Set(cloth).size === 1, r };
 });
-/* Q1: генератор — предметы на земле (без дублей после повторной загрузки) → инвентарь → потребление → сейв/загрузка */
-T_('Q1_generator_items_flow', () => {
-  reset(); z.applyState(z.loadSave() || z.freshS()); reset();
-  const picks = () => M.objs.filter(o => o.pick).map(o => o.pick).sort().join(',');
-  const p0 = picks(); z.save(true); z.applyState(z.loadSave()); const p1 = picks();
-  const pf = M.objs.find(o => o.pick === 'fuel'), pu = M.objs.find(o => o.pick === 'fuse');
-  Q.pickUp(pf); Q.pickUp(pu); const inv = { fuel: S().inv.fuel, fuse: S().inv.fuse }, icons = ['fuel', 'fuse'].map(id => { const i = z.rc.g7.itemIcon(id); return i.tagName + (i.src && /^data:image\/png/.test(i.src) ? ':png' : ''); });
-  z.save(true); z.applyState(z.loadSave()); const afterLoad = { picks: picks(), fuel: S().inv.fuel, fuse: S().inv.fuse };
-  const q = Q.q5(); if (q.st === 'not_started') q.st = 'ready'; Q.gensetUse(M.objs.find(o => o.k === 'genset'));
-  const used = { st: Q.q5().st, fuel: S().inv.fuel || 0, fuse: S().inv.fuse || 0 };
-  z.save(true); z.applyState(z.loadSave());
-  return { ok: p0 === 'fuel,fuse' && p1 === p0 && inv.fuel === 1 && inv.fuse === 1 && afterLoad.picks === '' && afterLoad.fuel === 1 && used.st === 'completed' && !used.fuel && !used.fuse && Q.q5().st === 'completed' && (icons.every(x => x === 'IMG:png') || /g3-off/.test(location.hash)),
-    picksNew: p0, picksAfterReload: p1, inv, icons, afterLoad, used, stAfterLoad: Q.q5().st };
+T_('Q1_campaign_items_after_load',()=>{
+  reset();S().campaign.stage='wreck';const target=z.plus.trackedTarget();Object.assign(P(),{x:target.x,y:target.y});z.update(1/30);
+  z.interact();z.closePanel();z.save(true);z.applyState(z.loadSave());
+  return {ok:S().campaign.pistol && !!S().inv.engraved_pm && !M.objs.some(o=>o.pick==='fuel'||o.pick==='fuse')};
 });
 T_('G_fence_cover', () => {
   reset(); isolate();
