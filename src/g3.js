@@ -53,9 +53,11 @@ function playerFire() {
   if(storyArea())alarmPost();
   S.mag[S.weapon] = m - 1; P.cool = W.rate;
   const moving = Math.abs(IN.moveX) + Math.abs(IN.moveY) > 0.1;
-  const locked = P.lock && Math.abs(angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x))) < 0.12;
-  fire(P, P.ang, W, (W.spread + P.bloom + (moving ? 0.035 : 0) + (100 - cond(S.weapon)) * 0.0008 - (P.crouch ? 0.015 : 0)) * (locked && IN.touch ? 0.6 : 1));
-  P.bloom = Math.min(0.14, P.bloom + (W.auto ? 0.016 : 0.03));
+  const spread = W.spread + P.bloom + (moving ? .035 : 0) + (100-cond(S.weapon))*.0008 - (P.crouch ? .015 : 0);
+  fire(P, P.ang, W, Math.max(0, spread));
+  P.bloom = Math.min(.14, P.bloom + (W.auto ? .018 : .03));
+  P.bloomDelay = .24;
+  P.shotFlash = .12;
   if (m===1 && cnt(W.ammo)) {
     const gun=S.weapon, shooter=P;
     setTimeout(()=>{if(P===shooter && P.alive && S.weapon===gun && !S.mag[gun]) startReload();},150);
@@ -70,6 +72,7 @@ function setWeapon(w) {
   if (w !== 'hands' && w !== 'knife' && !has(w)) return;
   const slot = kitSlot(w);
   if (slot) S.flags.kit[slot] = w;
+  if (S.weapon !== w) releaseFireStick();
   S.weapon = w;
   P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
@@ -303,9 +306,78 @@ function update(dt) {
   hurtFlash = Math.max(0, hurtFlash - dt * 1.2);
   shakeA = Math.max(0, shakeA - dt * 20);
 }
+const bearingTo = e => Math.atan2(e.y-P.y,e.x-P.x);
+function targetInSight(e,W) {
+  return e?.alive && hostile(P,e) && !e.captive && !(e.cloak>.7) &&
+    dE(P,e)<=W.range+ballOff(P)+e.r && seesActor(P,e) &&
+    !HOUSES.some(h=>h.a>.5 && e.x>h.x*T && e.x<(h.x+h.w)*T && e.y>h.y*T && e.y<(h.y+h.h)*T && !roofHidden(h)) &&
+    shotTrace(P,bearingTo(e),W).best===e;
+}
+function assistedTarget(dir,W,cone) {
+  let best=null, score=Infinity;
+  for (const e of ents) {
+    if (e===P || !e.alive || !hostile(P,e)) continue;
+    const error=Math.abs(angD(dir,bearingTo(e)));
+    if (error>cone) continue;
+    const rank=error + .025*dE(P,e)/W.range;
+    if (rank<score && targetInSight(e,W)) {best=e;score=rank;}
+  }
+  return best;
+}
+function updatePlayerAim(dt,mx,my) {
+  const W=WP[S.weapon], stick=IN.aimStick;
+  let tap=IN.tapShot;
+  if (tap && (!W || tap.weapon!==S.weapon || (tap.ttl-=dt)<=0 || !targetInSight(tap.enemy,W))) tap=IN.tapShot=null;
+  const aiming=!IN.touch || stick?.active || tap;
+  P.aimRay=null;
+  if (!aiming) {
+    P.lock=null;
+    if (P.tapFlash && P.shotFlash>0 && W && !W.melee) {
+      P.aimRay=shotTrace(P,P.ang,W);
+      return;
+    }
+    P.tapFlash=false;
+    if (Math.hypot(mx,my)>.1) P.ang+=angD(P.ang,Math.atan2(my,mx))*Math.min(1,dt*10);
+    return;
+  }
+  const dir=tap ? bearingTo(tap.enemy) : IN.touch ? stick.a : bearingTo(screenToWorld(IN.mx,IN.my));
+  let desired=dir;
+  const gun=W && !W.melee;
+  const assist=firePrefs.strength/100;
+  if (tap) P.lock=tap.enemy;
+  else if (gun && assist>0) {
+    const cone=IN.touch ? .08+.15*assist : .14;
+    P.lockT=(P.lockT || 0)-dt;
+    if (P.lockT<=0 || Math.abs(angD(P.scanDir ?? dir,dir))>.06) {
+      P.lock=assistedTarget(dir,W,cone);
+      P.lockT=.1; P.scanDir=dir;
+    }
+    if (P.lock) {
+      const delta=angD(dir,bearingTo(P.lock));
+      if (Math.abs(delta)>cone || !targetInSight(P.lock,W)) P.lock=null;
+      else desired+=delta*assist;
+    }
+  } else P.lock=null;
+  const delta=angD(P.ang,desired);
+  P.ang+=IN.touch ? clamp(delta,-9*dt,9*dt) : delta;
+  const aligned=Math.abs(angD(P.ang,desired))<.025;
+  if (aligned) P.ang=desired;
+  if (gun && IN.touch) {
+    P.aimRay=shotTrace(P,P.ang,W);
+    if (!P.lock && P.aimRay.best && hostile(P,P.aimRay.best) && targetInSight(P.aimRay.best,W)) P.lock=P.aimRay.best;
+  }
+  if (aligned && (tap || IN.btnFire || IN.fire)) {
+    if (tap && P.cool>0) return;
+    if (tap) IN.tapShot=null;
+    playerFire();
+    P.tapFlash=!!tap && P.shotFlash>0;
+  }
+}
 function updatePlayer(dt) {
   P.cool -= dt; P.medT -= dt; P.boltT = (P.boltT || 0) - dt; P.nadeT = (P.nadeT || 0) - dt;
-  P.bloom = Math.max(0, P.bloom - dt * 0.25);
+  P.bloomDelay = Math.max(0,(P.bloomDelay || 0)-dt);
+  if (!P.bloomDelay) P.bloom = Math.max(0,P.bloom-dt*.17);
+  P.shotFlash = Math.max(0,(P.shotFlash || 0)-dt);
   survival(dt); plusTick(dt);
   if (P.reload > 0) { P.reload -= dt; if (P.reload <= 0) finishReload(); }
   // движение
@@ -331,41 +403,13 @@ function updatePlayer(dt) {
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
-  // прицел
-  // захват цели: видимый враг ближе всего к направлению прицела, с удержанием
-  P.lockT = (P.lockT || 0) - dt; P.combatT = Math.max(0, (P.combatT || 0) - dt);
-  const aimDir = IN.touch ? (IN.aimStick ? IN.aimStick.a : P.ang) : Math.atan2(screenToWorld(IN.mx, IN.my).y - P.y, screenToWorld(IN.mx, IN.my).x - P.x);
-  if (P.lockT <= 0) {
-    P.lockT = 0.12;
-    const cone = IN.touch ? (IN.aimStick ? 0.44 : 0.85) : 0.14;
-    let best = null, bs = 1e9;
-    for (const e of ents) {
-      if (!e.alive || e === P || !hostile(P, e) || e.captive || e.cloak > 0.7) continue;
-      const d = dE(P, e); if (d > 520) continue;
-      const da = Math.abs(angD(aimDir, Math.atan2(e.y - P.y, e.x - P.x)));
-      if (da > cone || !seesActor(P, e)) continue;
-      const sc = da * 260 + d * 0.5 - (e === P.lock ? 120 : 0);
-      if (sc < bs) { bs = sc; best = e; }
-    }
-    P.lock = best;
+  P.combatT = Math.max(0,(P.combatT || 0)-dt);
+  P.hitT = Math.max(0,(P.hitT || 0)-dt);
+  for (let i=HURTDIR.length-1;i>=0;i--) {
+    HURTDIR[i].life-=dt;
+    if (HURTDIR[i].life<=0) HURTDIR.splice(i,1);
   }
-  if (P.lock && (!P.lock.alive || !hostile(P, P.lock))) P.lock = null;
-  if (IN.touch) {
-    const firing = IN.btnFire;
-    if (P.lock && firing && Math.abs(angD(aimDir, Math.atan2(P.lock.y-P.y,P.lock.x-P.x)))<.14) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
-    else if (IN.aimStick) P.ang = IN.aimStick.a;
-    else if (ml > 0.1) P.ang += angD(P.ang, Math.atan2(my, mx)) * Math.min(1, dt * 10);
-  } else {
-    const w = screenToWorld(IN.mx, IN.my);
-    P.ang = Math.atan2(w.y - P.y, w.x - P.x);
-    if (P.lock && IN.fire) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * 0.5;
-  }
-  P.hitT = Math.max(0, (P.hitT || 0) - dt); P.killT = Math.max(0, (P.killT || 0) - dt);
-  for (let i = HURTDIR.length - 1; i >= 0; i--) { HURTDIR[i].life -= dt; if (HURTDIR[i].life <= 0) HURTDIR.splice(i, 1); }
-  if (IN.fire || IN.btnFire) {
-    if (IN.aimStick) IN.aimStick.sampled=true;
-    playerFire();
-  }
+  updatePlayerAim(dt, mx, my);
   // радиация и артефакты
   radRate = 0;
   rads.forEach(z => { const d = dst(P.x, P.y, z.x, z.y); if (d < z.r) radRate += z.p * (1 - d / z.r); });

@@ -57,7 +57,7 @@ T_('R6_night_guest_kill_before_clues', () => {
   reset(); S().q.flash = 2; X.wolfPlusOpts().find(o => /пропадают/.test(o.t)).fn(); z.closePanel(); step(40);
   saveLoad(); step(40); const nS = z.ents.filter(e => e.kind === 'sucker' && e.alive).length;
   const s = z.ents.find(e => e.kind === 'sucker'); s.hp = 1; s.cloak = 0; P().x = s.x - 60; P().y = s.y; P().ang = 0; z.IN.touch = true;
-  for (let i = 0; i < 90 && s.alive; i++) { z.IN.btnFire = true; P().ang = Math.atan2(s.y - P().y, s.x - P().x); S().mag.w_aksu = 30; P().hp = 100; z.update(1 / 30); } z.IN.btnFire = false;
+  for (let i = 0; i < 90 && s.alive; i++) { z.IN.btnFire = true; P().ang = Math.atan2(s.y - P().y, s.x - P().x); z.IN.aimStick={active:true,a:P().ang}; S().mag.w_aksu = 30; P().hp = 100; z.update(1 / 30); } z.resetInput();
   const st = S().q3.sucker; const m0 = S().money; X.wolfPlusOpts().find(o => /покончено/.test(o.t)).fn(); z.closePanel(); const paid = S().money - m0;
   saveLoad(); step(30); const again = X.wolfPlusOpts().find(o => /покончено/.test(o.t)); const sAfter = z.ents.filter(e => e.kind === 'sucker' && e.alive).length;
   return { ok: nS === 1 && st === 2 && paid === 2000 && !again && sAfter === 0 && S().q3.sucker === 3, suckersAfterReload: nS, stateAfterKill: st, reward: paid, rewardOfferedAgain: !!again, suckerRespawned: sAfter };

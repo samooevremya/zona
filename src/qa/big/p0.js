@@ -39,8 +39,8 @@ T('2_contract_isolation', () => {
   leftoverA.forEach(e => { e.hp = 1; }); __setOld(46 * 32 - 150, 58 * 32);
   // убиваем остаток A пулями игрока
   z.IN.touch = true;
-  for (let k = 0; k < 30 * 20 && leftoverA.some(e => e.alive); k++) { const t = leftoverA.find(e => e.alive); P().ang = Math.atan2(t.y - P().y, t.x - P().x); z.IN.btnFire = true; P().hp = 100; S().mag.w_aksu = 30; z.update(1 / 30); }
-  z.IN.btnFire = false;
+  for (let k = 0; k < 30 * 20 && leftoverA.some(e => e.alive); k++) { const t = leftoverA.find(e => e.alive); P().ang = Math.atan2(t.y - P().y, t.x - P().x); z.IN.aimStick={active:true,a:P().ang}; z.IN.btnFire = true; P().hp = 100; S().mag.w_aksu = 30; z.update(1 / 30); }
+  z.resetInput();
   const j = S().jobs.act;
   return { ok: aGroup === 3 && bGroup >= 3 && j && j.got === 0, aGroupSpawned: aGroup, bGroupSpawned: bGroup, leftoverAKilled: leftoverA.filter(e => !e.alive).length, progressB: j && j.got };
 });

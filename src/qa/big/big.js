@@ -190,6 +190,10 @@ function gatherCrate(o) {
   }
   return !Object.keys(o.loot).length;
 }
+function strikeWithStick() {
+  z.IN.touch=true; z.IN.aimStick={active:true,a:P().ang}; z.IN.btnFire=true;
+  step(1); z.resetInput();
+}
 Tt('K14_break_loot_search', () => {
   reset();
   const box = M.objs.find(o => o.stash === 'st9');
@@ -200,7 +204,7 @@ Tt('K14_break_loot_search', () => {
   };
   const attack = weapon => {
     S().weapon = weapon; P().ang = 0; P().cool = P().reload = 0;
-    z.IN.fire = true; step(1); z.IN.fire = false;
+    strikeWithStick();
   };
   left(box);
   const sealed = box.solid && z.near?.o !== box;
@@ -240,7 +244,7 @@ Tt('K14_individual_items_and_capacity', () => {
   for(const e of z.ents) if(e!==P()) e.alive=false;
   const box=M.objs.find(o=>o.stash==='st1');
   P().x=box.x-20; P().y=box.y+box.h/2; P().ang=0; z.IN.touch=true;
-  z.IN.fire=true; step(1); z.IN.fire=false;
+  strikeWithStick();
   const layout=S().flags.groundItems[box.stash];
   const ammo=layout.find(d=>d.id==='a9'), kit=layout.find(d=>d.id==='medkit');
   S().inv={ar_jacket:1,cans:60,bandage:4,a9:7}; // 34,97 кг: ещё три патрона.
@@ -309,7 +313,7 @@ Tt('K16_roaming_field_crates', () => {
   for (const o of initial) {
     for (const e of z.ents) if (e !== P()) e.alive = false;
     P().x=o.x-20; P().y=o.y+o.h/2; P().ang=0; P().cool=0;
-    z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
+    strikeWithStick();
   }
   const timers = stock().slots.map(s=>s.due);
   const broken = !intact().length && timers.every(t=>t>=S().min+118 && t<=S().min+240);
@@ -345,7 +349,7 @@ Tt('K17_crate_remains_expire', () => {
   const hit = o => {
     for (const e of z.ents) if (e !== P()) e.alive = false;
     P().x=o.x-20; P().y=o.y+13; P().ang=0; P().cool=0;
-    z.IN.touch=true; z.IN.fire=true; step(1); z.IN.fire=false;
+    strikeWithStick();
   };
   hit(fixed); hit(full); hit(empty); gatherCrate(empty);
   const end = flags().crateCleanup[fixed.stash];

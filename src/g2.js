@@ -742,8 +742,8 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
     } else if (best && best.sid !== 'sid') {
       if (sh===P && hostile(sh,best)) noteGunfight(sh,best);
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
-      if (sh === P) { P.hitT = 0.18; if (best.hp - W.dmg * fall <= 0) P.killT = 0.4; }
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
+      if (sh===P) { P.hitT=.2; P.impact={x:ex,y:ey,kill:!best.alive}; }
     } else if (r.wall) for (let i = 0; i < 3; i++) parts.push({ x: ex - ca * 1.5, y: ey - sa * 1.5, vx: rnd(-80, 80) - ca * 60, vy: rnd(-80, 80) - sa * 60, life: rnd(0.15, 0.3), c: '#e8d9a0', s: 1.5 });
   }
   flashes.push({ x: fx, y: fy, a: ang, life: 0.06 });

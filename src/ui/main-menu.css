@@ -70,3 +70,8 @@ body.is-touch #medpick[data-anchor]{left:var(--pick-x)!important;top:var(--pick-
 .prologue canvas{position:absolute;inset:0;width:100%;height:100%}
 .prologue-caption{position:absolute;bottom:14%;max-width:78%;margin:0;text-align:center;font:600 clamp(17px,3vw,28px)/1.4 Georgia,serif;text-shadow:0 2px 6px #000}
 .prologue button{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-height:44px;padding:0 14px;background:#1c211ddb;border:1px solid #6a6856;color:#e2dcc9}
+
+.start-nav .fire-setting{display:grid;grid-template-columns:1fr auto;align-items:center;color:#f3e8ce;font:600 15px Arial}
+.fire-setting select,.fire-setting input{grid-column:1/-1;box-sizing:border-box;width:100%;min-height:44px;margin:0;accent-color:#c4a16c}
+.fire-setting select{background:#252720;color:#f4ead7;border:1px solid #867a60;padding:0 8px;font:inherit}
+.start-nav .fire-hint{margin:0;color:#d5cebd;font:14px/1.35 Arial}

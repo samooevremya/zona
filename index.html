@@ -850,6 +850,11 @@ body.is-touch #medpick[data-anchor]{left:var(--pick-x)!important;top:var(--pick-
 .prologue-caption{position:absolute;bottom:14%;max-width:78%;margin:0;text-align:center;font:600 clamp(17px,3vw,28px)/1.4 Georgia,serif;text-shadow:0 2px 6px #000}
 .prologue button{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-height:44px;padding:0 14px;background:#1c211ddb;border:1px solid #6a6856;color:#e2dcc9}
 
+.start-nav .fire-setting{display:grid;grid-template-columns:1fr auto;align-items:center;color:#f3e8ce;font:600 15px Arial}
+.fire-setting select,.fire-setting input{grid-column:1/-1;box-sizing:border-box;width:100%;min-height:44px;margin:0;accent-color:#c4a16c}
+.fire-setting select{background:#252720;color:#f4ead7;border:1px solid #867a60;padding:0 8px;font:inherit}
+.start-nav .fire-hint{margin:0;color:#d5cebd;font:14px/1.35 Arial}
+
 </style>
 </head>
 <body>
@@ -2739,8 +2744,8 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
     } else if (best && best.sid !== 'sid') {
       if (sh===P && hostile(sh,best)) noteGunfight(sh,best);
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
-      if (sh === P) { P.hitT = 0.18; if (best.hp - W.dmg * fall <= 0) P.killT = 0.4; }
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
+      if (sh===P) { P.hitT=.2; P.impact={x:ex,y:ey,kill:!best.alive}; }
     } else if (r.wall) for (let i = 0; i < 3; i++) parts.push({ x: ex - ca * 1.5, y: ey - sa * 1.5, vx: rnd(-80, 80) - ca * 60, vy: rnd(-80, 80) - sa * 60, life: rnd(0.15, 0.3), c: '#e8d9a0', s: 1.5 });
   }
   flashes.push({ x: fx, y: fy, a: ang, life: 0.06 });
@@ -3485,9 +3490,11 @@ function playerFire() {
   if(storyArea())alarmPost();
   S.mag[S.weapon] = m - 1; P.cool = W.rate;
   const moving = Math.abs(IN.moveX) + Math.abs(IN.moveY) > 0.1;
-  const locked = P.lock && Math.abs(angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x))) < 0.12;
-  fire(P, P.ang, W, (W.spread + P.bloom + (moving ? 0.035 : 0) + (100 - cond(S.weapon)) * 0.0008 - (P.crouch ? 0.015 : 0)) * (locked && IN.touch ? 0.6 : 1));
-  P.bloom = Math.min(0.14, P.bloom + (W.auto ? 0.016 : 0.03));
+  const spread = W.spread + P.bloom + (moving ? .035 : 0) + (100-cond(S.weapon))*.0008 - (P.crouch ? .015 : 0);
+  fire(P, P.ang, W, Math.max(0, spread));
+  P.bloom = Math.min(.14, P.bloom + (W.auto ? .018 : .03));
+  P.bloomDelay = .24;
+  P.shotFlash = .12;
   if (m===1 && cnt(W.ammo)) {
     const gun=S.weapon, shooter=P;
     setTimeout(()=>{if(P===shooter && P.alive && S.weapon===gun && !S.mag[gun]) startReload();},150);
@@ -3502,6 +3509,7 @@ function setWeapon(w) {
   if (w !== 'hands' && w !== 'knife' && !has(w)) return;
   const slot = kitSlot(w);
   if (slot) S.flags.kit[slot] = w;
+  if (S.weapon !== w) releaseFireStick();
   S.weapon = w;
   P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
@@ -3735,9 +3743,78 @@ function update(dt) {
   hurtFlash = Math.max(0, hurtFlash - dt * 1.2);
   shakeA = Math.max(0, shakeA - dt * 20);
 }
+const bearingTo = e => Math.atan2(e.y-P.y,e.x-P.x);
+function targetInSight(e,W) {
+  return e?.alive && hostile(P,e) && !e.captive && !(e.cloak>.7) &&
+    dE(P,e)<=W.range+ballOff(P)+e.r && seesActor(P,e) &&
+    !HOUSES.some(h=>h.a>.5 && e.x>h.x*T && e.x<(h.x+h.w)*T && e.y>h.y*T && e.y<(h.y+h.h)*T && !roofHidden(h)) &&
+    shotTrace(P,bearingTo(e),W).best===e;
+}
+function assistedTarget(dir,W,cone) {
+  let best=null, score=Infinity;
+  for (const e of ents) {
+    if (e===P || !e.alive || !hostile(P,e)) continue;
+    const error=Math.abs(angD(dir,bearingTo(e)));
+    if (error>cone) continue;
+    const rank=error + .025*dE(P,e)/W.range;
+    if (rank<score && targetInSight(e,W)) {best=e;score=rank;}
+  }
+  return best;
+}
+function updatePlayerAim(dt,mx,my) {
+  const W=WP[S.weapon], stick=IN.aimStick;
+  let tap=IN.tapShot;
+  if (tap && (!W || tap.weapon!==S.weapon || (tap.ttl-=dt)<=0 || !targetInSight(tap.enemy,W))) tap=IN.tapShot=null;
+  const aiming=!IN.touch || stick?.active || tap;
+  P.aimRay=null;
+  if (!aiming) {
+    P.lock=null;
+    if (P.tapFlash && P.shotFlash>0 && W && !W.melee) {
+      P.aimRay=shotTrace(P,P.ang,W);
+      return;
+    }
+    P.tapFlash=false;
+    if (Math.hypot(mx,my)>.1) P.ang+=angD(P.ang,Math.atan2(my,mx))*Math.min(1,dt*10);
+    return;
+  }
+  const dir=tap ? bearingTo(tap.enemy) : IN.touch ? stick.a : bearingTo(screenToWorld(IN.mx,IN.my));
+  let desired=dir;
+  const gun=W && !W.melee;
+  const assist=firePrefs.strength/100;
+  if (tap) P.lock=tap.enemy;
+  else if (gun && assist>0) {
+    const cone=IN.touch ? .08+.15*assist : .14;
+    P.lockT=(P.lockT || 0)-dt;
+    if (P.lockT<=0 || Math.abs(angD(P.scanDir ?? dir,dir))>.06) {
+      P.lock=assistedTarget(dir,W,cone);
+      P.lockT=.1; P.scanDir=dir;
+    }
+    if (P.lock) {
+      const delta=angD(dir,bearingTo(P.lock));
+      if (Math.abs(delta)>cone || !targetInSight(P.lock,W)) P.lock=null;
+      else desired+=delta*assist;
+    }
+  } else P.lock=null;
+  const delta=angD(P.ang,desired);
+  P.ang+=IN.touch ? clamp(delta,-9*dt,9*dt) : delta;
+  const aligned=Math.abs(angD(P.ang,desired))<.025;
+  if (aligned) P.ang=desired;
+  if (gun && IN.touch) {
+    P.aimRay=shotTrace(P,P.ang,W);
+    if (!P.lock && P.aimRay.best && hostile(P,P.aimRay.best) && targetInSight(P.aimRay.best,W)) P.lock=P.aimRay.best;
+  }
+  if (aligned && (tap || IN.btnFire || IN.fire)) {
+    if (tap && P.cool>0) return;
+    if (tap) IN.tapShot=null;
+    playerFire();
+    P.tapFlash=!!tap && P.shotFlash>0;
+  }
+}
 function updatePlayer(dt) {
   P.cool -= dt; P.medT -= dt; P.boltT = (P.boltT || 0) - dt; P.nadeT = (P.nadeT || 0) - dt;
-  P.bloom = Math.max(0, P.bloom - dt * 0.25);
+  P.bloomDelay = Math.max(0,(P.bloomDelay || 0)-dt);
+  if (!P.bloomDelay) P.bloom = Math.max(0,P.bloom-dt*.17);
+  P.shotFlash = Math.max(0,(P.shotFlash || 0)-dt);
   survival(dt); plusTick(dt);
   if (P.reload > 0) { P.reload -= dt; if (P.reload <= 0) finishReload(); }
   // движение
@@ -3763,41 +3840,13 @@ function updatePlayer(dt) {
   P.jumpCD = (P.jumpCD || 0) - dt;
   if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
-  // прицел
-  // захват цели: видимый враг ближе всего к направлению прицела, с удержанием
-  P.lockT = (P.lockT || 0) - dt; P.combatT = Math.max(0, (P.combatT || 0) - dt);
-  const aimDir = IN.touch ? (IN.aimStick ? IN.aimStick.a : P.ang) : Math.atan2(screenToWorld(IN.mx, IN.my).y - P.y, screenToWorld(IN.mx, IN.my).x - P.x);
-  if (P.lockT <= 0) {
-    P.lockT = 0.12;
-    const cone = IN.touch ? (IN.aimStick ? 0.44 : 0.85) : 0.14;
-    let best = null, bs = 1e9;
-    for (const e of ents) {
-      if (!e.alive || e === P || !hostile(P, e) || e.captive || e.cloak > 0.7) continue;
-      const d = dE(P, e); if (d > 520) continue;
-      const da = Math.abs(angD(aimDir, Math.atan2(e.y - P.y, e.x - P.x)));
-      if (da > cone || !seesActor(P, e)) continue;
-      const sc = da * 260 + d * 0.5 - (e === P.lock ? 120 : 0);
-      if (sc < bs) { bs = sc; best = e; }
-    }
-    P.lock = best;
+  P.combatT = Math.max(0,(P.combatT || 0)-dt);
+  P.hitT = Math.max(0,(P.hitT || 0)-dt);
+  for (let i=HURTDIR.length-1;i>=0;i--) {
+    HURTDIR[i].life-=dt;
+    if (HURTDIR[i].life<=0) HURTDIR.splice(i,1);
   }
-  if (P.lock && (!P.lock.alive || !hostile(P, P.lock))) P.lock = null;
-  if (IN.touch) {
-    const firing = IN.btnFire;
-    if (P.lock && firing && Math.abs(angD(aimDir, Math.atan2(P.lock.y-P.y,P.lock.x-P.x)))<.14) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * Math.min(1, dt * 22);
-    else if (IN.aimStick) P.ang = IN.aimStick.a;
-    else if (ml > 0.1) P.ang += angD(P.ang, Math.atan2(my, mx)) * Math.min(1, dt * 10);
-  } else {
-    const w = screenToWorld(IN.mx, IN.my);
-    P.ang = Math.atan2(w.y - P.y, w.x - P.x);
-    if (P.lock && IN.fire) P.ang += angD(P.ang, Math.atan2(P.lock.y - P.y, P.lock.x - P.x)) * 0.5;
-  }
-  P.hitT = Math.max(0, (P.hitT || 0) - dt); P.killT = Math.max(0, (P.killT || 0) - dt);
-  for (let i = HURTDIR.length - 1; i >= 0; i--) { HURTDIR[i].life -= dt; if (HURTDIR[i].life <= 0) HURTDIR.splice(i, 1); }
-  if (IN.fire || IN.btnFire) {
-    if (IN.aimStick) IN.aimStick.sampled=true;
-    playerFire();
-  }
+  updatePlayerAim(dt, mx, my);
   // радиация и артефакты
   radRate = 0;
   rads.forEach(z => { const d = dst(P.x, P.y, z.x, z.y); if (d < z.r) radRate += z.p * (1 - d / z.r); });
@@ -4532,6 +4581,42 @@ function drawHouseRoof(g, h, i, scale) {
   g.drawImage(ROOFS[i], (h.x*T-3)*scale, (h.y*T-3)*scale,
     (h.w*T+10)*scale, (h.h*T+10+(h.porchDepth || 0))*scale);
 }
+function drawPlayerAim() {
+  const ray=P.aimRay, lock=P.lock;
+  ctx.save();
+  if (ray) {
+    const muzzle=muzzlePoint(P,P.ang);
+    const along=(muzzle.x-P.x)*ray.ca+(muzzle.y-P.y)*ray.sa;
+    if (along<ray.t) {
+      const dx=P.x+ray.ca*ray.t-muzzle.x, dy=P.y+ray.sa*ray.t-muzzle.y;
+      const length=Math.hypot(dx,dy);
+      if (length>0) {
+        const visible=rayWall(muzzle.x,muzzle.y,dx/length,dy/length,length);
+        ctx.strokeStyle=P.shotFlash>0 ? '#ff6651' : 'rgba(244,240,224,.84)';
+        ctx.lineWidth=1.35/Z;ctx.beginPath();ctx.moveTo(muzzle.x,muzzle.y);
+        ctx.lineTo(muzzle.x+dx*visible/length,muzzle.y+dy*visible/length);ctx.stroke();
+      }
+    }
+  }
+  if (lock?.alive) {
+    ctx.strokeStyle='rgba(245,181,104,.95)'; ctx.lineWidth=1.65/Z;
+    const r=lock.r-(lock.captive ? 4 : 0);
+    for (let i=0;i<4;i++) {
+      const a=i*Math.PI/2+.4;
+      ctx.beginPath();ctx.arc(lock.x,lock.y,r,a,a+.76);ctx.stroke();
+    }
+  }
+  if (P.hitT>0 && P.impact) {
+    const {x,y,kill}=P.impact;
+    ctx.strokeStyle=kill?'#ff6754':'#fff6da';ctx.lineWidth=2/Z;
+    ctx.beginPath();
+    for (const dx of [-1,1]) for (const dy of [-1,1]) {
+      ctx.moveTo(x+dx*3/Z,y+dy*3/Z);ctx.lineTo(x+dx*7/Z,y+dy*7/Z);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function roofHidden(h) {
   const px = P.x / T, py = P.y / T;
   return px > h.x + 0.6 && px < h.x + h.w - 0.6 && py > h.y + 0.6 && py < h.y + h.h - 0.6;
@@ -4989,14 +5074,7 @@ function render() {
     ctx.fillStyle = e.fac === 'army' ? '#a9c79a' : '#e6dcb4'; ctx.fillText(e.name, e.x, e.y - 19);
   }
   drawBubbles(inView);
-  // захват цели: уголки вокруг врага
-  if (P && P.alive && P.lock && P.lock.alive) {
-    const L = P.lock, r = L.r + 7, k = 6, on = Math.abs(angD(P.ang, Math.atan2(L.y - P.y, L.x - P.x))) < 0.12;
-    ctx.strokeStyle = on ? 'rgba(235,80,60,0.95)' : 'rgba(230,101,73,0.86)'; ctx.lineWidth = 1.6;
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(c => { ctx.beginPath(); ctx.moveTo(L.x + c[0] * r, L.y + c[1] * (r - k)); ctx.lineTo(L.x + c[0] * r, L.y + c[1] * r); ctx.lineTo(L.x + c[0] * (r - k), L.y + c[1] * r); ctx.stroke(); });
-    if (P.hitT > 0) { const m = 5 + (P.killT > 0 ? 3 : 0); ctx.strokeStyle = P.killT > 0 ? 'rgba(255,70,50,0.95)' : 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L.x - m, L.y - m); ctx.lineTo(L.x - 2, L.y - 2); ctx.moveTo(L.x + m, L.y - m); ctx.lineTo(L.x + 2, L.y - 2); ctx.moveTo(L.x - m, L.y + m); ctx.lineTo(L.x - 2, L.y + 2); ctx.moveTo(L.x + m, L.y + m); ctx.lineTo(L.x + 2, L.y + 2); ctx.stroke(); }
-    ctx.lineWidth = 1;
-  }
+  if (P?.alive) drawPlayerAim();
   // свет, цвет, ночь
   if (shopVisible || loft) ctx.restore();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -11109,12 +11187,44 @@ const CONTROL_NAMES = {
   'b-med':'Аптечка', 'b-bolt':'Болт', 'b-crouch':'Присесть', 'b-jump':'Прыжок', det:'Фонарь'
 };
 const CONTROL_KEY = 'zona-touch-layout-v1';
+const FIRE_KEY='zona-touch-fire-v1';
+const firePrefs={mode:'stick',strength:45};
+function showFireSettings(nav,back) {
+  const mode=el('select'), slider=el('input'), value=el('output');
+  const modeLabel=el('label','fire-setting','Способ стрельбы'), assistLabel=el('label','fire-setting','Автоприцел');
+  const hint=el('p','fire-hint');
+  for (const [id,name] of [['stick','Отклонение стика'],['tap','Касание врага']]) {
+    const option=el('option','',name); option.value=id; mode.appendChild(option);
+  }
+  mode.value=firePrefs.mode;
+  slider.type='range';slider.min=0;slider.max=100;slider.step=5;slider.value=firePrefs.strength;
+  function describe() {
+    value.textContent=slider.value+'%';
+    hint.textContent=mode.value==='stick'
+      ? 'Слегка отклони правый стик, чтобы прицелиться. Доведи его до края, чтобы открыть огонь.'
+      : 'Коснись видимого врага для одного выстрела. Правым стиком можно прицелиться. Нож и граната действуют у края стика.';
+  }
+  function storePrefs() {
+    firePrefs.mode=mode.value; firePrefs.strength=Number(slider.value);
+    try { localStorage.setItem(FIRE_KEY,JSON.stringify(firePrefs)); } catch (_) {}
+    describe();
+  }
+  mode.onchange=storePrefs; slider.oninput=storePrefs;describe();
+  modeLabel.append(mode);assistLabel.append(value,slider);
+  nav.replaceChildren(modeLabel,hint,assistLabel,btn('','Назад',back));
+  mode.focus();
+}
 const controlEditor = document.getElementById('control-editor');
 let layouts = {landscape:{},portrait:{}}, draftLayout = null, priorTouch = false;
 let selectedControl = 'joy', padDrag = null;
 const layoutMode = () => innerWidth >= innerHeight ? 'landscape' : 'portrait';
 
 function readControls() {
+  try {
+    const f=JSON.parse(localStorage.getItem(FIRE_KEY));
+    if (f?.mode==='tap' || f?.mode==='stick') firePrefs.mode=f.mode;
+    if (Number.isFinite(f?.strength)) firePrefs.strength=clamp(f.strength,0,100);
+  } catch (_) {}
   try {
     const data = JSON.parse(localStorage.getItem(CONTROL_KEY));
     for (const mode of Object.keys(layouts)) for (const id of Object.keys(CONTROL_NAMES)) {
@@ -12820,6 +12930,7 @@ function drawMenu() {
   if (panel.pausePage==='settings') {
     heading.textContent='Настройки';
     nav.appendChild(btn('','Настроить управление',openControlEditor));
+    nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,drawMenu)));
     const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
     const sound=btn('',soundLabel(),()=>{
       audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
@@ -12832,7 +12943,7 @@ function drawMenu() {
   if (panel.pausePage==='help') {
     heading.textContent='Управление и сохранения';
     nav.appendChild(el('p','pause-note',IN.touch
-      ? 'Левый джойстик — ходьба. Удерживай кнопку с прицелом для огня и тяни её в сторону цели. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
+      ? 'Левый джойстик — ходьба. Слегка отклони правый стик для прицеливания. Для огня доведи стик до края или коснись врага в режиме стрельбы касанием. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
     if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
     nav.appendChild(el('p','pause-note','Игра сохраняется автоматически у костра и у Сидоровича. Вручную можно сохраниться, когда рядом нет врагов.'));
@@ -13359,7 +13470,7 @@ function keyMove() {
   IN.moveX = (KEYS.KeyD || KEYS.ArrowRight ? 1 : 0) - (KEYS.KeyA || KEYS.ArrowLeft ? 1 : 0);
   IN.moveY = (KEYS.KeyS || KEYS.ArrowDown ? 1 : 0) - (KEYS.KeyW || KEYS.ArrowUp ? 1 : 0);
 }
-function setTouch(on) { if (IN.touch === on) return; IN.touch = on; document.body.classList.toggle('is-touch', on); }
+function setTouch(on) { if (IN.touch === on) return; if (!on) releaseFireStick(); IN.touch = on; document.body.classList.toggle('is-touch', on); }
 const JOY = $('joy'), JOYK = $('joyk');
 function joyAt(x, y, s) {
   const r = JOY.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -13368,6 +13479,18 @@ function joyAt(x, y, s) {
   JOY.classList.add('on');
 }
 function joyReset() { JOY.style.left = JOY.style.top = JOY.style.bottom = ''; JOYK.style.transform = ''; JOY.classList.remove('on'); }
+function enemyUnderFinger(x,y) {
+  const W=WP[S.weapon];
+  if (!W || W.melee) return null;
+  const w=screenToWorld(x,y);
+  let nearest=null, best=Infinity;
+  for (const e of ents) {
+    if (!e.alive || e===P) continue;
+    const d=dE(w,e);
+    if (d<=e.r+6/Z && d<best) {best=d;nearest=e;}
+  }
+  return targetInSight(nearest,W) ? nearest : null;
+}
 cv.addEventListener('pointerdown', e => {
   audioInit();
   if (panel || title.open) return;
@@ -13377,6 +13500,14 @@ cv.addEventListener('pointerdown', e => {
   const jr = JOY.getBoundingClientRect();
   const custom = !!JOY.dataset.layout;
   const onStick = custom ? Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2) <= jr.width/2+6 : e.clientX<VW*.5;
+  const insideJoy=Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2)<=jr.width/2+6;
+  if (firePrefs.mode==='tap' && !insideJoy && !IN.tapFinger) {
+    const enemy=enemyUnderFinger(e.clientX,e.clientY);
+    if (enemy) {
+      IN.tapFinger={id:e.pointerId,x:e.clientX,y:e.clientY,enemy,weapon:S.weapon};
+      cv.setPointerCapture(e.pointerId);return;
+    }
+  }
   if (onStick && !IN.left) {
     cv.setPointerCapture(e.pointerId);
     IN.left = s;
@@ -13387,6 +13518,8 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { IN.mx = e.clientX; IN.my = e.clientY; if (IN.touch) setTouch(false); return; }
+  const finger=IN.tapFinger;
+  if (finger?.id===e.pointerId && Math.hypot(e.clientX-finger.x,e.clientY-finger.y)>9) IN.tapFinger=null;
   const s=IN.left;
   if (!s || s.id!==e.pointerId) return;
   let dx = (e.clientX - s.ox) / (s.radius || 56), dy = (e.clientY - s.oy) / (s.radius || 56);
@@ -13396,9 +13529,18 @@ cv.addEventListener('pointermove', e => {
 });
 function endPtr(e) {
   if (e.pointerType === 'mouse') { IN.fire = false; return; }
+  const finger=IN.tapFinger;
+  if (finger?.id===e.pointerId) {
+    IN.tapFinger=null;
+    if (e.type==='pointerup' && P.alive && !panel && !title.open && !P.jam && !(P.reload>0) &&
+        finger.weapon===S.weapon && S.mag[S.weapon]>0 &&
+        Math.hypot(e.clientX-finger.x,e.clientY-finger.y)<=9 && enemyUnderFinger(e.clientX,e.clientY)===finger.enemy) {
+      IN.tapShot={enemy:finger.enemy,weapon:S.weapon,ttl:.65};
+    }
+  }
   if (IN.left && IN.left.id === e.pointerId) { IN.left = null; IN.moveX = IN.moveY = 0; joyReset(); }
 }
-cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr); cv.addEventListener('lostpointercapture',endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
 const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'b-wpn': () => cycleWeapon(1) };
@@ -13423,8 +13565,10 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 const fireB = $('b-fire');
-function releaseFireStick() {
+function releaseFireStick(clearTaps=true) {
   IN.aimStick=null; IN.btnFire=false;
+  if (clearTaps) { IN.tapShot=null; IN.tapFinger=null; }
+  if (P) { P.aimRay=null; P.lock=null; P.lockT=0; P.shotFlash=0; P.tapFlash=false; }
   fireB.classList.remove('on');
   fireB.style.removeProperty('--aim-x'); fireB.style.removeProperty('--aim-y');
 }
@@ -13432,7 +13576,12 @@ function steerFireStick(e) {
   const s=IN.aimStick;
   if (!s || e.pointerId!==s.id) return;
   const dx=e.clientX-s.cx, dy=e.clientY-s.cy, length=Math.hypot(dx,dy);
-  if (length>s.radius*.16) { s.a=Math.atan2(dy,dx); P.lockT=0; }
+  const amount=length/s.radius;
+  s.active=amount>=.14;
+  if (s.active) s.a=Math.atan2(dy,dx);
+  IN.btnFire=(firePrefs.mode==='stick' || WP[S.weapon]?.melee) && amount>=(IN.btnFire ? .72 : .82);
+  if (!IN.btnFire) P.shotFlash=0;
+  if (!s.active) { P.lock=null; P.lockT=0; P.aimRay=null; }
   const k=Math.min(.34,.34*s.radius/Math.max(length,1));
   fireB.style.setProperty('--aim-x',dx*k+'px'); fireB.style.setProperty('--aim-y',dy*k+'px');
 }
@@ -13442,17 +13591,14 @@ fireB.addEventListener('pointerdown', e => {
   const r=fireB.getBoundingClientRect();
   IN.aimStick={id:e.pointerId,cx:r.left+r.width/2,cy:r.top+r.height/2,radius:r.width/2,a:P.ang};
   fireB.setPointerCapture(e.pointerId);
-  steerFireStick(e); IN.btnFire=true; fireB.classList.add('on');
+  steerFireStick(e); fireB.classList.add('on');
 });
 fireB.addEventListener('pointermove',steerFireStick);
 for (const event of ['pointerup','pointercancel','lostpointercapture']) {
   fireB.addEventListener(event,e=>{
     const stick=IN.aimStick;
     if (stick?.id!==e.pointerId) return;
-    if (event==='pointerup' && !stick.sampled && P?.alive && !panel && !title.open) {
-      P.ang=stick.a; playerFire();
-    }
-    releaseFireStick();
+    releaseFireStick(false);
   });
 }
 $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); if (!panel) interact(); });
@@ -13507,6 +13653,7 @@ function showTitle(kind) {
   }));
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
+  nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));
   c.append(title.name,nav);
 }
 function goFull() {   // на весь экран там, где браузер это умеет (Android, iPad, компьютер); на iPhone — через «На экран Домой»
