@@ -970,6 +970,42 @@ Tt('G3_saved_world_origin',()=>{
   }
   return {ok:true};
 });
+Tt('G6_track_junctions_and_clearance',()=>{
+  const {sidings,lesserMainTrack,freightDecks}=window.__zBig.railLayout();
+  const tiles=window.__bigTiles(), blockers=M.objs.filter(o=>o.solid && o.k!=='freightWagon');
+  const violations=[], disconnects=[];
+  function projection(x,y,a,b) {
+    const dx=b[0]-a[0],dy=b[1]-a[1];
+    const u=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy)));
+    return Math.hypot(x-a[0]-dx*u,y-a[1]-dy*u);
+  }
+  for(const [index,line] of sidings.entries()){
+    for(const [j,p] of [[0,line[0]],[1,line[line.length-1]]]){
+      if((j===1 && index<2) || (j===0 && index===4))continue; // three terminal tracks
+      const joins=[lesserMainTrack,...sidings.filter(other=>other!==line)];
+      if(!joins.some(other=>other.slice(1).some((b,i)=>projection(...p,other[i],b)<.005)))disconnects.push([index,...p]);
+    }
+    for(let i=1;i<line.length;i++){
+      const [x,y]=line[i-1],dx=line[i][0]-x,dy=line[i][1]-y, steps=Math.ceil(Math.hypot(dx,dy)*8);
+      for(let k=0;k<=steps;k++){
+        const xx=x+dx*k/steps,yy=y+dy*k/steps;
+        for(let ty=Math.floor(yy-1.4);ty<=yy+1.4;ty++)for(let tx=Math.floor(xx-1.4);tx<=xx+1.4;tx++)
+          if(tiles[ty*M.MW+tx]===5 && Math.hypot(tx+.5-xx,ty+.5-yy)<1.4)violations.push([index,tx,ty,'tree']);
+        for(const o of blockers){
+          const gap=Math.hypot(Math.max(0,o.x-xx*T,xx*T-o.x-o.w),Math.max(0,o.y-yy*T,yy*T-o.y-o.h));
+          if(gap<T*.76)violations.push([index,xx,yy,o.k]);
+        }
+      }
+    }
+  }
+  const wagons=M.objs.filter(o=>o.k==='freightWagon');
+  const aligned=wagons.every(o=>sidings.some(line=>line.slice(1).some(([x,y],i)=>
+    line[i][1]===y && Math.abs((o.y+o.h/2)/T-y)<.001 && line[i][0]*T<=o.x && x*T>=o.x+o.w)));
+  const crossings=[[247,66.52],[245.43,65.08],[313.29,42]].every(([x,y])=>
+    freightDecks.some(d=>Math.hypot(d.x-x,d.y-y)<.05));
+  return {ok:!disconnects.length && !violations.length && aligned && crossings,
+    disconnects,violations:violations.slice(0,4),aligned,decks:freightDecks.length};
+});
 Tt('G2_wagon_footprints',()=>{
   reset();
   const cars=M.objs.filter(o=>o.k==='freightWagon'), p=P();

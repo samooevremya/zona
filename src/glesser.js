@@ -241,22 +241,15 @@ function buildLesserRail() {
     }
   }
 }
-function drawLesserRail(g) {
-  for(let x=Math.max(0,GW.x0);x<=Math.min(WEST-1,GW.x1);x++){
+const lesserMainTrack=Array.from({length:WEST+1},(_,x)=>[x,railAxis(x)]);
+function drawLesserRail(g,win) {
+  drawFreightTrack(g,lesserMainTrack,win);
+  if(win && (win.x0>148*T || win.x1<143*T || win.y0>railAxis(148)*T+40 || win.y1<railAxis(143)*T-40))return;
+  for(let x=143;x<148;x++){
     const cy=railAxis(x),slope=railAxis(x+1)-cy;
-    if(cy<GW.y0-3 || cy>GW.y1+3) continue;
     g.save();g.translate(x*T,cy*T);g.transform(1,slope,0,1,0,0);
-    if(C1 && ART) drawRailStrip(g,x,-1.5*T-9,3*T+18);
-    else {
-      g.fillStyle='#59534b';g.fillRect(0,-T,T,2*T);
-      g.fillStyle='#43392e';for(let i=0;i<T;i+=8) g.fillRect(i,-15,5,30);
-      g.fillStyle='#8c877c';for(const dy of [-11,11])g.fillRect(0,dy,T,2);
-    }
-    if(levelCrossing(x)){
-      g.fillStyle='#635849';g.fillRect(0,-7,T,14);
-      g.strokeStyle='#403932';g.lineWidth=1;g.beginPath();g.moveTo(0,0);g.lineTo(T,0);g.stroke();
-    }
-    g.restore();
+    g.fillStyle='#635849';g.fillRect(0,-8,T,14);
+    g.fillStyle='#403932';g.fillRect(0,-1,T,1);g.restore();
   }
 }
 const lesserSprites = {};
@@ -305,7 +298,6 @@ function drawTrailSign(g,sign) {
 // куски земли, что и местные декорации. На мини-карте используется тот же план.
 function drawLesserDetails(g) {
   if (!BIG || GW.x0>=WEST) return;
-  drawLesserRail(g);
   const top=LESSER_TOP;
   for(let y=Math.max(-22,GW.y0-top);y<=Math.min(35,GW.y1-top);y++)
     for(let x=Math.max(18,GW.x0);x<=Math.min(71,GW.x1);x++) {
