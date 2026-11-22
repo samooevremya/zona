@@ -1,5 +1,13 @@
 /* ===================== отрисовка ===================== */
-const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: false });
+// Keep the HUD at native CSS resolution. Only the world canvas and terrain cache use the mobile budget.
+const touchRenderer = matchMedia('(pointer: coarse)').matches;
+let touchDensity = 1.25;
+function sizeWorldCanvas() {
+  const limit = touchRenderer ? Math.min(touchDensity, Math.sqrt(600000 / (VW * VH))) : 2;
+  DPR = Math.min(window.devicePixelRatio || 1, limit);
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+}
 let VW = 800, VH = 600, DPR = 1, Z = 1;
 const ZNEAR = 1.25; let HUDZ = 1;   // камера как в референсе: дом ≈ четверть ширины экрана
 const cam = { x: 0, y: 0 };
@@ -114,9 +122,8 @@ function drawFlames(F) {
   if (chance(0.06)) parts.push({ x: F.x + rnd(-3, 3), y: F.y - 4, vx: rnd(-14, 14), vy: rnd(-40, -20), life: rnd(0.4, 0.9), c: '#ffc060', s: 1.2 });
 }
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
   VW = window.innerWidth; VH = window.innerHeight;
-  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+  sizeWorldCanvas();
   cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
   Z = clamp(Math.min(VW, VH) / 430, BIG ? 0.5 : 0.85, 1.35) * (BIG ? ZNEAR : 1);   // большой Кордон: камера ближе, как в референсе; на низком окне — дальше
   // маленькое окно (сайт с панелями браузера): весь HUD пропорционально уменьшается, чтобы не наезжал друг на друга
@@ -142,7 +149,7 @@ function shade(hex, k) {
 }
 /* Земля рисуется кусками (GCH×GCH пикселей) по мере надобности: карта большого Кордона
    8064×7040 px не помещается в один холст телефона. GW — окно в клетках, которое рисуется сейчас. */
-const GCH = 512, GCACHE = new Map(), GS = BIG && !/gs1/.test(location.hash) ? 2 : 1, GMAX = GS > 1 ? 24 : 30;   // GS: пикселей земли на единицу (камера ближе — земля чёткая)
+const GCH = 512, GCACHE = new Map(), GS = BIG && !touchRenderer && !/gs1/.test(location.hash) ? 2 : 1, GMAX = GS > 1 ? 24 : 30;   // GS: пикселей земли на единицу (камера ближе — земля чёткая)
 let GW = { x0: 0, y0: 0, x1: 0, y1: 0 }, GWP = { x0: 0, y0: 0, x1: 0, y1: 0 }, GNOISE = null, gStat = { painted: 0, ms: 0 };
 const inGW = (x, y) => x >= GW.x0 && x <= GW.x1 && y >= GW.y0 && y <= GW.y1;
 function paintGround() { GCACHE.clear(); GPEND = null; if (BIG) { groundChunk(0, 0); GCACHE.clear(); gStat.painted = 0; } if (!BIG) { groundC.width = WW; groundC.height = WH; GW = { x0: 0, y0: 0, x1: MW - 1, y1: MH - 1 }; GWP = { x0: 0, y0: 0, x1: WW, y1: WH }; const it = paintGroundWin(groundC.getContext('2d'), mulberry32(77)); while (!it.next().done); if (ART) c1Grade(groundC, 0, 0, groundC.width, groundC.height); } }
@@ -164,7 +171,7 @@ function chunkStep(p, all) {
   let done = false;
   do {
     if (!p.gen) { if (p.it.next().done) p.gen = 1; }
-    else { const H = GCH * GS, sh = GS > 1 ? 256 : H; p.gy = p.gy || 0; if (ART) c1Grade(p.c, 0, p.gy, H, Math.min(sh, H - p.gy)); p.gy += sh; done = !ART || p.gy >= H; }   // цвет отдельными шагами-полосами
+    else { const H = GCH * GS, sh = touchRenderer ? 128 : GS > 1 ? 256 : H; p.gy = p.gy || 0; if (ART) c1Grade(p.c, 0, p.gy, H, Math.min(sh, H - p.gy)); p.gy += sh; done = !ART || p.gy >= H; }   // цвет отдельными шагами-полосами
   } while (all && !done);
   p.ms += performance.now() - t0;
   if (!all) gStat.stepMax = Math.max(gStat.stepMax || 0, Math.round(performance.now() - t0));
@@ -185,7 +192,7 @@ function drawGround(vx, vy, vw, vh) {
   const c0 = clamp(Math.floor(vx / GCH), 0, nx - 1), c1 = clamp(Math.floor((vx + vw) / GCH), 0, nx - 1);
   const r0 = clamp(Math.floor(vy / GCH), 0, ny - 1), r1 = clamp(Math.floor((vy + vh) / GCH), 0, ny - 1);
   for (let cy = r0; cy <= r1; cy++) for (let cx = c0; cx <= c1; cx++) ctx.drawImage(groundChunk(cx, cy), cx * GCH, cy * GCH, GCH, GCH);
-  if (GPEND) { const t0 = performance.now(); do { gStat.steps = (gStat.steps || 0) + 1; if (chunkStep(GPEND, false)) { GPEND = null; break; } } while (performance.now() - t0 < 5); return; }   // короткие шаги — несколько за кадр, чтобы соседний кусок успевал до подхода
+  if (GPEND) { const t0 = performance.now(); do { gStat.steps = (gStat.steps || 0) + 1; if (chunkStep(GPEND, false)) { GPEND = null; break; } } while (performance.now() - t0 < (touchRenderer ? 2 : 5)); return; }   // короткие шаги — несколько за кадр, чтобы соседний кусок успевал до подхода
   for (let cy = Math.max(0, r0 - 1); cy <= Math.min(ny - 1, r1 + 1); cy++) for (let cx = Math.max(0, c0 - 1); cx <= Math.min(nx - 1, c1 + 1); cx++)
     if (!GCACHE.has(cx + ',' + cy)) { GPEND = chunkStart(cx, cy); chunkStep(GPEND, false); return; }
 }

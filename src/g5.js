@@ -636,9 +636,16 @@ async function buildMini() {
 }
 function updateFog() {
   if (!fogDirty) return; fogDirty = false;
-  const g = fogC.getContext('2d'), id = g.createImageData(PW, MH);
-  for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) { const i = y * PW + x; id.data[i * 4] = 10; id.data[i * 4 + 1] = 12; id.data[i * 4 + 2] = 9; id.data[i * 4 + 3] = fog[y * MW + x] ? 0 : 60; }
-  g.putImageData(id, 0, 0);
+  const [left,top,right,bottom] = fogRegion || [0,0,PW,MH];
+  fogRegion = null;
+  const x0=Math.max(0,left), y0=Math.max(0,top), w=Math.min(right,PW)-x0, h=Math.min(bottom,MH)-y0;
+  if (w<=0 || h<=0) return;
+  const g=fogC.getContext('2d'), id=g.createImageData(w,h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) {
+    const i=4*(y*w+x); id.data[i]=10; id.data[i+1]=12; id.data[i+2]=9;
+    id.data[i+3]=fog[(y0+y)*MW+x0+x] ? 0 : 60;
+  }
+  g.putImageData(id,x0,y0);
 }
 const MAP_INK = {
   shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
@@ -864,8 +871,13 @@ function briefTask() {
   previousTasks=ids;previousGoal=goal;
   if(S.min>=taskUntil && H.quest.textContent) H.quest.replaceChildren();
 }
+let quickHudT = 0;
 function hud(dt) {
   if (!P) return;
+  hudT -= dt;
+  quickHudT -= dt;
+  if (touchRenderer && quickHudT > 0 && hudT > 0) return;
+  quickHudT = 1/12;
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
   H.fd.style.width = clamp(S.food, 0, 100) + '%'; H.fdv.textContent = Math.round(S.food); H.fd.parentNode.classList.toggle('low', S.food < 20);
   H.sRad.classList.toggle('on', S.rad > 1); H.sRad.classList.toggle('hi', S.rad > 40); H.radv.textContent = S.rad > 1 ? Math.round(S.rad) : '';
@@ -878,8 +890,7 @@ function hud(dt) {
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
-  drawMini();   // мини-карта каждый кадр: метки двигаются плавно (туман обновляется реже, ниже)
-  hudT -= dt;
+  drawMini();
   if (hudT > 0) return;
   hudT = 0.15;
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
@@ -1127,8 +1138,16 @@ const AQ = { buf: [], done: /aq-off/.test(location.hash) };
 function autoQuality(ms) {
   if (AQ.done || panel || title.open || document.hidden) return;
   if (ms > 0 && ms < 200) AQ.buf.push(ms);
-  if (AQ.buf.length < 180) return;
+  if (AQ.buf.length < (touchRenderer ? 90 : 180)) return;
   const a = AQ.buf.slice().sort((x, y) => x - y), med = a[a.length >> 1]; AQ.buf.length = 0;
+  if (touchRenderer) {
+    if (med > 24 && touchDensity > 0.85) {
+      touchDensity = touchDensity > 1 ? 1 : 0.85;
+      sizeWorldCanvas();
+    }
+    if (touchDensity <= .85) AQ.done = true;
+    return;
+  }
   if (med > 22 && CAN_SZ > 72) { CAN_SZ = Math.max(72, CAN_SZ - 12); CANOPY.length = 0; buildCanopy(); AQ.lowered = (AQ.lowered || 0) + 1; }
   else AQ.done = true;
 }
@@ -1136,6 +1155,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   autoQuality(now - last);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (document.hidden || (!controlEditor.open && ((title.open && title.el.classList.contains('start')) || panel?.kind==='menu'))) return;
   keyMove();
   if (!panel && !title.open) update(dt);
   render();

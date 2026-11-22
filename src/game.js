@@ -1773,9 +1773,16 @@ function reveal() {
   let ch = false;
   for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++)
     if (inb(x, y) && !fog[y * MW + x] && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) { fog[y * MW + x] = 1; ch = true; }
-  if (ch) fogDirty = true;
+  if (ch) {
+    if (!fogDirty) fogRegion = [cx-r,cy-r,cx+r+1,cy+r+1];
+    else if (fogRegion) {
+      fogRegion[0]=Math.min(fogRegion[0],cx-r); fogRegion[1]=Math.min(fogRegion[1],cy-r);
+      fogRegion[2]=Math.max(fogRegion[2],cx+r+1); fogRegion[3]=Math.max(fogRegion[3],cy+r+1);
+    }
+    fogDirty = true;
+  }
 }
-let fogDirty = true;
+let fogDirty = true, fogRegion = null;
 
 function startReload() {
   const W = WP[S.weapon];
@@ -2229,7 +2236,7 @@ function applyState(d) {
   restoreKit();
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
-  fogDirty = true;
+  fogDirty = true; fogRegion = null;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   if(BIG){
@@ -2292,7 +2299,15 @@ function applyState(d) {
 }
 
 /* ===================== отрисовка ===================== */
-const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: false });
+// Keep the HUD at native CSS resolution. Only the world canvas and terrain cache use the mobile budget.
+const touchRenderer = matchMedia('(pointer: coarse)').matches;
+let touchDensity = 1.25;
+function sizeWorldCanvas() {
+  const limit = touchRenderer ? Math.min(touchDensity, Math.sqrt(600000 / (VW * VH))) : 2;
+  DPR = Math.min(window.devicePixelRatio || 1, limit);
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+}
 let VW = 800, VH = 600, DPR = 1, Z = 1;
 const ZNEAR = 1.25; let HUDZ = 1;   // камера как в референсе: дом ≈ четверть ширины экрана
 const cam = { x: 0, y: 0 };
@@ -2407,9 +2422,8 @@ function drawFlames(F) {
   if (chance(0.06)) parts.push({ x: F.x + rnd(-3, 3), y: F.y - 4, vx: rnd(-14, 14), vy: rnd(-40, -20), life: rnd(0.4, 0.9), c: '#ffc060', s: 1.2 });
 }
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
   VW = window.innerWidth; VH = window.innerHeight;
-  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+  sizeWorldCanvas();
   cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
   Z = clamp(Math.min(VW, VH) / 430, BIG ? 0.5 : 0.85, 1.35) * (BIG ? ZNEAR : 1);   // большой Кордон: камера ближе, как в референсе; на низком окне — дальше
   // маленькое окно (сайт с панелями браузера): весь HUD пропорционально уменьшается, чтобы не наезжал друг на друга
@@ -2435,7 +2449,7 @@ function shade(hex, k) {
 }
 /* Земля рисуется кусками (GCH×GCH пикселей) по мере надобности: карта большого Кордона
    8064×7040 px не помещается в один холст телефона. GW — окно в клетках, которое рисуется сейчас. */
-const GCH = 512, GCACHE = new Map(), GS = BIG && !/gs1/.test(location.hash) ? 2 : 1, GMAX = GS > 1 ? 24 : 30;   // GS: пикселей земли на единицу (камера ближе — земля чёткая)
+const GCH = 512, GCACHE = new Map(), GS = BIG && !touchRenderer && !/gs1/.test(location.hash) ? 2 : 1, GMAX = GS > 1 ? 24 : 30;   // GS: пикселей земли на единицу (камера ближе — земля чёткая)
 let GW = { x0: 0, y0: 0, x1: 0, y1: 0 }, GWP = { x0: 0, y0: 0, x1: 0, y1: 0 }, GNOISE = null, gStat = { painted: 0, ms: 0 };
 const inGW = (x, y) => x >= GW.x0 && x <= GW.x1 && y >= GW.y0 && y <= GW.y1;
 function paintGround() { GCACHE.clear(); GPEND = null; if (BIG) { groundChunk(0, 0); GCACHE.clear(); gStat.painted = 0; } if (!BIG) { groundC.width = WW; groundC.height = WH; GW = { x0: 0, y0: 0, x1: MW - 1, y1: MH - 1 }; GWP = { x0: 0, y0: 0, x1: WW, y1: WH }; const it = paintGroundWin(groundC.getContext('2d'), mulberry32(77)); while (!it.next().done); if (ART) c1Grade(groundC, 0, 0, groundC.width, groundC.height); } }
@@ -2457,7 +2471,7 @@ function chunkStep(p, all) {
   let done = false;
   do {
     if (!p.gen) { if (p.it.next().done) p.gen = 1; }
-    else { const H = GCH * GS, sh = GS > 1 ? 256 : H; p.gy = p.gy || 0; if (ART) c1Grade(p.c, 0, p.gy, H, Math.min(sh, H - p.gy)); p.gy += sh; done = !ART || p.gy >= H; }   // цвет отдельными шагами-полосами
+    else { const H = GCH * GS, sh = touchRenderer ? 128 : GS > 1 ? 256 : H; p.gy = p.gy || 0; if (ART) c1Grade(p.c, 0, p.gy, H, Math.min(sh, H - p.gy)); p.gy += sh; done = !ART || p.gy >= H; }   // цвет отдельными шагами-полосами
   } while (all && !done);
   p.ms += performance.now() - t0;
   if (!all) gStat.stepMax = Math.max(gStat.stepMax || 0, Math.round(performance.now() - t0));
@@ -2478,7 +2492,7 @@ function drawGround(vx, vy, vw, vh) {
   const c0 = clamp(Math.floor(vx / GCH), 0, nx - 1), c1 = clamp(Math.floor((vx + vw) / GCH), 0, nx - 1);
   const r0 = clamp(Math.floor(vy / GCH), 0, ny - 1), r1 = clamp(Math.floor((vy + vh) / GCH), 0, ny - 1);
   for (let cy = r0; cy <= r1; cy++) for (let cx = c0; cx <= c1; cx++) ctx.drawImage(groundChunk(cx, cy), cx * GCH, cy * GCH, GCH, GCH);
-  if (GPEND) { const t0 = performance.now(); do { gStat.steps = (gStat.steps || 0) + 1; if (chunkStep(GPEND, false)) { GPEND = null; break; } } while (performance.now() - t0 < 5); return; }   // короткие шаги — несколько за кадр, чтобы соседний кусок успевал до подхода
+  if (GPEND) { const t0 = performance.now(); do { gStat.steps = (gStat.steps || 0) + 1; if (chunkStep(GPEND, false)) { GPEND = null; break; } } while (performance.now() - t0 < (touchRenderer ? 2 : 5)); return; }   // короткие шаги — несколько за кадр, чтобы соседний кусок успевал до подхода
   for (let cy = Math.max(0, r0 - 1); cy <= Math.min(ny - 1, r1 + 1); cy++) for (let cx = Math.max(0, c0 - 1); cx <= Math.min(nx - 1, c1 + 1); cx++)
     if (!GCACHE.has(cx + ',' + cy)) { GPEND = chunkStart(cx, cy); chunkStep(GPEND, false); return; }
 }
@@ -4005,6 +4019,42 @@ function drawSurfaceEdges(g, tiles) {
   }
 }
 
+// Two radius-two box filters need four neighbouring mask pixels. One extra pixel
+// lets Canvas interpolate across a chunk boundary identically on both sides.
+function surfaceMask(tiles,kind,shoulders,coverage,x,y,width,height) {
+  const left=Math.max(0,Math.floor(x)-5), top=Math.max(0,Math.floor(y)-5);
+  const w=Math.min(PW*4,Math.ceil(x+width)+5)-left, h=Math.min(MH*4,Math.ceil(y+height)+5)-top;
+  const values=new Float32Array(w*h), rowPass=new Float32Array(w*h);
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++)
+    values[j*w+i]=coverage(tiles[((top+j)>>2)*MW+((left+i)>>2)]) ? 1 : 0;
+  for(let pass=0;pass<2;pass++) {
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+      let sum=0;const a=Math.max(0,i-2), b=Math.min(w-1,i+2);
+      for(let k=a;k<=b;k++) sum+=values[j*w+k];
+      rowPass[j*w+i]=sum/(b-a+1);
+    }
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+      let sum=0;const a=Math.max(0,j-2), b=Math.min(h-1,j+2);
+      for(let k=a;k<=b;k++) sum+=rowPass[k*w+i];
+      values[j*w+i]=sum/(b-a+1);
+    }
+  }
+  const canvas=ARTM.surfaceMask || (ARTM.surfaceMask=document.createElement('canvas'));
+  if(canvas.width<w)canvas.width=w;
+  if(canvas.height<h)canvas.height=h;
+  const g=canvas.getContext('2d'), mask=g.createImageData(w,h);
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+    const wx=left+i, wy=top+j, tile=tiles[(wy>>2)*MW+(wx>>2)], base=values[j*w+i];
+    if (!base || (kind===SW && wx>=WEST*4)) continue;
+    if (!GROUNDISH(tile) && !(kind===SW && tile===SW) && !(kind===DI && tile===DI) && !(shoulders && (tile===AS || tile===DI))) continue;
+    const v=base+(vnoise(wx,wy,3)-.5)*.35*Math.min(1,base*4);
+    const a=kind===SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && kind===AS ?
+      clamp((v-.4)*4,0,1)*255 : clamp((v-.12)*2.6,0,1)*235;
+    mask.data[(j*w+i)*4+3]=Math.round(a);
+  }
+  g.putImageData(mask,0,0);
+  return {canvas,x:left,y:top};
+}
 function* artGround(g, R) {
   const shoulders = BIG && C1, tiles = surfaceTiles();
   // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
@@ -4042,8 +4092,10 @@ function* artGround(g, R) {
     mg.putImageData(md, 0, 0); ARTM.dry = mask;
   }
   const mask = ARTM.dry;
-  const CH = 512, cc = ARTM.cc || (ARTM.cc = document.createElement('canvas')); cc.width = cc.height = CH * GS;
+  const CH = 512, cc = ARTM.cc || (ARTM.cc = document.createElement('canvas'));
+  if (cc.width !== CH * GS || cc.height !== CH * GS) cc.width = cc.height = CH * GS;
   const cg = cc.getContext('2d');
+  cg.setTransform(1, 0, 0, 1, 0, 0);
   // кусок земли (GWP, пиксели) обрабатывается полосами по 256 px, между полосами шаг отдаётся кадру
   const wx0 = GWP.x0, wy0 = GWP.y0, wx1 = Math.min(PW * T, GWP.x1), wy1 = Math.min(WH, GWP.y1), SH = BIG ? 256 / GS : CH;
   for (let cy = wy0; cy < wy1; cy += SH) { for (let cx = wx0; cx < wx1; cx += CH) {
@@ -4065,34 +4117,13 @@ function* artGround(g, R) {
   for (const [tt, id] of surfaces) {
     // Гравий заходит под полотно и выступает за его края.
     const coverage = t => t === tt || (shoulders && tt === DI && t === AS);
-    const K = 4, mw = PW * K, mh = MH * K;
-    if (!ARTM[id]) {
-    const a = new Float32Array(mw * mh), b2 = new Float32Array(mw * mh);
-    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) a[y * mw + x] = coverage(tiles[(y / K | 0) * MW + (x / K | 0)]) ? 1 : 0;
-    for (let pass = 0; pass < 2; pass++) {
-      for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < mw) { s += a[y * mw + xx]; n++; } } b2[y * mw + x] = s / n; }
-      for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < mh) { s += b2[yy * mw + x]; n++; } } a[y * mw + x] = s / n; }
-    }
-    const mk = document.createElement('canvas'); mk.width = mw; mk.height = mh;
-    const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
-    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
-      const t = tiles[(y / K | 0) * MW + (x / K | 0)];
-      if (tt === SW && x >= WEST*K) continue;
-      if (!GROUNDISH(t) && !(tt === SW && t === SW) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
-      const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
-      const alpha = tt === SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
-      id2.data[(y * mw + x) * 4 + 3] = Math.round(alpha);
-    }
-    mg2.putImageData(id2, 0, 0); ARTM[id] = mk;
-    }
-    const mk = ARTM[id];
-    const sc = mw / (PW * T);
+    const sc = 4 / T;
     // только прямоугольник вокруг клеток этого покрытия (края расплываются на 3 клетки): кусок без дороги пропускается
     let bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1;
     for (let y = Math.max(0, GW.y0 - 3); y <= Math.min(MH - 1, GW.y1 + 3); y++) for (let x = Math.max(0, GW.x0 - 3); x <= Math.min(PW - 1, GW.x1 + 3); x++)
       if (coverage(tiles[y * MW + x])) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
     if (bx1 >= 0 && (bx1 + 4) * T > GWP.x0 && (bx0 - 3) * T < GWP.x1 && (by1 + 4) * T > GWP.y0 && (by0 - 3) * T < GWP.y1) {
-      const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(GWP.x1, (bx1 + 4) * T), ry1 = Math.min(GWP.y1, (by1 + 4) * T);
+      const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(PW*T,GWP.x1, (bx1 + 4) * T), ry1 = Math.min(MH*T,GWP.y1, (by1 + 4) * T);
       for (let cy = ry0; cy < ry1; cy += CH) for (let cx = rx0; cx < rx1; cx += CH) {
         const w = Math.min(CH, rx1 - cx), h = Math.min(CH, ry1 - cy);
         cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
@@ -4109,7 +4140,8 @@ function* artGround(g, R) {
         }
         cg.setTransform(1, 0, 0, 1, 0, 0);
         cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
-        cg.drawImage(mk, cx * sc, cy * sc, w * sc, h * sc, 0, 0, w * GS, h * GS);
+        const mask = surfaceMask(tiles,tt,shoulders,coverage,cx*sc,cy*sc,w*sc,h*sc);
+        cg.drawImage(mask.canvas,cx*sc-mask.x,cy*sc-mask.y,w*sc,h*sc,0,0,w*GS,h*GS);
         g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
       }
     }
@@ -5314,7 +5346,7 @@ function remapToMap() {
   if (j && j.k === 'clear') { const c = CLEAR_SPOTS.find(c => c[3] === j.loc) || CLEAR_SPOTS.find(c => c[2] === j.where); if (c) { j.loc = c[3]; j.x = c[0]; j.y = c[1]; j.where = c[2]; } }
   const a = S.sos && S.sos.act;
   if (a) { const sp = SOS_SPOTS.find(p => p[2] === a.loc) || SOS_SPOTS.find(p => 'у ' + LOC[p[2]].gen === 'у ' + a.where); if (sp) { const f = freeTile(sp[0], sp[1]); a.x = f.x; a.y = f.y; a.loc = sp[2]; } }
-  if (BIG) { fog.fill(0); fogDirty = true; S.fog = ''; }   // старая маска разведки не совпадает с новой картой
+  if (BIG) { fog.fill(0); fogDirty = true; fogRegion = null; S.fog = ''; }   // старая маска разведки не совпадает с новой картой
   const big = BIG && from === 'kordon-rc1';
   (S.dyn && S.dyn.npcs || []).forEach(r => { if (big) { const q = RMp(r.x, r.y); r.x = q[0]; r.y = q[1]; } const f = freeTile(r.x / T, r.y / T); r.x = f.x * T; r.y = f.y * T; });
   if (!inBunker(S.x, S.y)) {
@@ -10806,9 +10838,16 @@ async function buildMini() {
 }
 function updateFog() {
   if (!fogDirty) return; fogDirty = false;
-  const g = fogC.getContext('2d'), id = g.createImageData(PW, MH);
-  for (let y = 0; y < MH; y++) for (let x = 0; x < PW; x++) { const i = y * PW + x; id.data[i * 4] = 10; id.data[i * 4 + 1] = 12; id.data[i * 4 + 2] = 9; id.data[i * 4 + 3] = fog[y * MW + x] ? 0 : 60; }
-  g.putImageData(id, 0, 0);
+  const [left,top,right,bottom] = fogRegion || [0,0,PW,MH];
+  fogRegion = null;
+  const x0=Math.max(0,left), y0=Math.max(0,top), w=Math.min(right,PW)-x0, h=Math.min(bottom,MH)-y0;
+  if (w<=0 || h<=0) return;
+  const g=fogC.getContext('2d'), id=g.createImageData(w,h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) {
+    const i=4*(y*w+x); id.data[i]=10; id.data[i+1]=12; id.data[i+2]=9;
+    id.data[i+3]=fog[(y0+y)*MW+x0+x] ? 0 : 60;
+  }
+  g.putImageData(id,x0,y0);
 }
 const MAP_INK = {
   shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
@@ -11034,8 +11073,13 @@ function briefTask() {
   previousTasks=ids;previousGoal=goal;
   if(S.min>=taskUntil && H.quest.textContent) H.quest.replaceChildren();
 }
+let quickHudT = 0;
 function hud(dt) {
   if (!P) return;
+  hudT -= dt;
+  quickHudT -= dt;
+  if (touchRenderer && quickHudT > 0 && hudT > 0) return;
+  quickHudT = 1/12;
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
   H.fd.style.width = clamp(S.food, 0, 100) + '%'; H.fdv.textContent = Math.round(S.food); H.fd.parentNode.classList.toggle('low', S.food < 20);
   H.sRad.classList.toggle('on', S.rad > 1); H.sRad.classList.toggle('hi', S.rad > 40); H.radv.textContent = S.rad > 1 ? Math.round(S.rad) : '';
@@ -11048,8 +11092,7 @@ function hud(dt) {
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
   if (H.status.textContent !== stt) H.status.textContent = stt;
-  drawMini();   // мини-карта каждый кадр: метки двигаются плавно (туман обновляется реже, ниже)
-  hudT -= dt;
+  drawMini();
   if (hudT > 0) return;
   hudT = 0.15;
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
@@ -11297,8 +11340,16 @@ const AQ = { buf: [], done: /aq-off/.test(location.hash) };
 function autoQuality(ms) {
   if (AQ.done || panel || title.open || document.hidden) return;
   if (ms > 0 && ms < 200) AQ.buf.push(ms);
-  if (AQ.buf.length < 180) return;
+  if (AQ.buf.length < (touchRenderer ? 90 : 180)) return;
   const a = AQ.buf.slice().sort((x, y) => x - y), med = a[a.length >> 1]; AQ.buf.length = 0;
+  if (touchRenderer) {
+    if (med > 24 && touchDensity > 0.85) {
+      touchDensity = touchDensity > 1 ? 1 : 0.85;
+      sizeWorldCanvas();
+    }
+    if (touchDensity <= .85) AQ.done = true;
+    return;
+  }
   if (med > 22 && CAN_SZ > 72) { CAN_SZ = Math.max(72, CAN_SZ - 12); CANOPY.length = 0; buildCanopy(); AQ.lowered = (AQ.lowered || 0) + 1; }
   else AQ.done = true;
 }
@@ -11306,6 +11357,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   autoQuality(now - last);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (document.hidden || (!controlEditor.open && ((title.open && title.el.classList.contains('start')) || panel?.kind==='menu'))) return;
   keyMove();
   if (!panel && !title.open) update(dt);
   render();

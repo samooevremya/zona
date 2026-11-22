@@ -272,6 +272,42 @@ function drawSurfaceEdges(g, tiles) {
   }
 }
 
+// Two radius-two box filters need four neighbouring mask pixels. One extra pixel
+// lets Canvas interpolate across a chunk boundary identically on both sides.
+function surfaceMask(tiles,kind,shoulders,coverage,x,y,width,height) {
+  const left=Math.max(0,Math.floor(x)-5), top=Math.max(0,Math.floor(y)-5);
+  const w=Math.min(PW*4,Math.ceil(x+width)+5)-left, h=Math.min(MH*4,Math.ceil(y+height)+5)-top;
+  const values=new Float32Array(w*h), rowPass=new Float32Array(w*h);
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++)
+    values[j*w+i]=coverage(tiles[((top+j)>>2)*MW+((left+i)>>2)]) ? 1 : 0;
+  for(let pass=0;pass<2;pass++) {
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+      let sum=0;const a=Math.max(0,i-2), b=Math.min(w-1,i+2);
+      for(let k=a;k<=b;k++) sum+=values[j*w+k];
+      rowPass[j*w+i]=sum/(b-a+1);
+    }
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+      let sum=0;const a=Math.max(0,j-2), b=Math.min(h-1,j+2);
+      for(let k=a;k<=b;k++) sum+=rowPass[k*w+i];
+      values[j*w+i]=sum/(b-a+1);
+    }
+  }
+  const canvas=ARTM.surfaceMask || (ARTM.surfaceMask=document.createElement('canvas'));
+  if(canvas.width<w)canvas.width=w;
+  if(canvas.height<h)canvas.height=h;
+  const g=canvas.getContext('2d'), mask=g.createImageData(w,h);
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+    const wx=left+i, wy=top+j, tile=tiles[(wy>>2)*MW+(wx>>2)], base=values[j*w+i];
+    if (!base || (kind===SW && wx>=WEST*4)) continue;
+    if (!GROUNDISH(tile) && !(kind===SW && tile===SW) && !(kind===DI && tile===DI) && !(shoulders && (tile===AS || tile===DI))) continue;
+    const v=base+(vnoise(wx,wy,3)-.5)*.35*Math.min(1,base*4);
+    const a=kind===SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && kind===AS ?
+      clamp((v-.4)*4,0,1)*255 : clamp((v-.12)*2.6,0,1)*235;
+    mask.data[(j*w+i)*4+3]=Math.round(a);
+  }
+  g.putImageData(mask,0,0);
+  return {canvas,x:left,y:top};
+}
 function* artGround(g, R) {
   const shoulders = BIG && C1, tiles = surfaceTiles();
   // 1. Основа: трава, грунт, асфальт, полы. Болото, насыпь и пустота остаются из прежней отрисовки.
@@ -309,8 +345,10 @@ function* artGround(g, R) {
     mg.putImageData(md, 0, 0); ARTM.dry = mask;
   }
   const mask = ARTM.dry;
-  const CH = 512, cc = ARTM.cc || (ARTM.cc = document.createElement('canvas')); cc.width = cc.height = CH * GS;
+  const CH = 512, cc = ARTM.cc || (ARTM.cc = document.createElement('canvas'));
+  if (cc.width !== CH * GS || cc.height !== CH * GS) cc.width = cc.height = CH * GS;
   const cg = cc.getContext('2d');
+  cg.setTransform(1, 0, 0, 1, 0, 0);
   // кусок земли (GWP, пиксели) обрабатывается полосами по 256 px, между полосами шаг отдаётся кадру
   const wx0 = GWP.x0, wy0 = GWP.y0, wx1 = Math.min(PW * T, GWP.x1), wy1 = Math.min(WH, GWP.y1), SH = BIG ? 256 / GS : CH;
   for (let cy = wy0; cy < wy1; cy += SH) { for (let cx = wx0; cx < wx1; cx += CH) {
@@ -332,34 +370,13 @@ function* artGround(g, R) {
   for (const [tt, id] of surfaces) {
     // Гравий заходит под полотно и выступает за его края.
     const coverage = t => t === tt || (shoulders && tt === DI && t === AS);
-    const K = 4, mw = PW * K, mh = MH * K;
-    if (!ARTM[id]) {
-    const a = new Float32Array(mw * mh), b2 = new Float32Array(mw * mh);
-    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) a[y * mw + x] = coverage(tiles[(y / K | 0) * MW + (x / K | 0)]) ? 1 : 0;
-    for (let pass = 0; pass < 2; pass++) {
-      for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < mw) { s += a[y * mw + xx]; n++; } } b2[y * mw + x] = s / n; }
-      for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < mh) { s += b2[yy * mw + x]; n++; } } a[y * mw + x] = s / n; }
-    }
-    const mk = document.createElement('canvas'); mk.width = mw; mk.height = mh;
-    const mg2 = mk.getContext('2d'), id2 = mg2.createImageData(mw, mh);
-    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
-      const t = tiles[(y / K | 0) * MW + (x / K | 0)];
-      if (tt === SW && x >= WEST*K) continue;
-      if (!GROUNDISH(t) && !(tt === SW && t === SW) && !(tt === DI && t === DI) && !(shoulders && (t === AS || t === DI))) continue;
-      const base = a[y * mw + x], v = base + (vnoise(x, y, 3) - 0.5) * 0.35 * Math.min(1, base * 4);
-      const alpha = tt === SW ? clamp((v-.22)*2.4,0,1)*255 : shoulders && tt === AS ? clamp((v - 0.40) * 4, 0, 1) * 255 : clamp((v - 0.12) * 2.6, 0, 1) * 235;
-      id2.data[(y * mw + x) * 4 + 3] = Math.round(alpha);
-    }
-    mg2.putImageData(id2, 0, 0); ARTM[id] = mk;
-    }
-    const mk = ARTM[id];
-    const sc = mw / (PW * T);
+    const sc = 4 / T;
     // только прямоугольник вокруг клеток этого покрытия (края расплываются на 3 клетки): кусок без дороги пропускается
     let bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1;
     for (let y = Math.max(0, GW.y0 - 3); y <= Math.min(MH - 1, GW.y1 + 3); y++) for (let x = Math.max(0, GW.x0 - 3); x <= Math.min(PW - 1, GW.x1 + 3); x++)
       if (coverage(tiles[y * MW + x])) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
     if (bx1 >= 0 && (bx1 + 4) * T > GWP.x0 && (bx0 - 3) * T < GWP.x1 && (by1 + 4) * T > GWP.y0 && (by0 - 3) * T < GWP.y1) {
-      const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(GWP.x1, (bx1 + 4) * T), ry1 = Math.min(GWP.y1, (by1 + 4) * T);
+      const rx0 = Math.max(GWP.x0, (bx0 - 3) * T), ry0 = Math.max(GWP.y0, (by0 - 3) * T), rx1 = Math.min(PW*T,GWP.x1, (bx1 + 4) * T), ry1 = Math.min(MH*T,GWP.y1, (by1 + 4) * T);
       for (let cy = ry0; cy < ry1; cy += CH) for (let cx = rx0; cx < rx1; cx += CH) {
         const w = Math.min(CH, rx1 - cx), h = Math.min(CH, ry1 - cy);
         cg.globalCompositeOperation = 'source-over'; cg.clearRect(0, 0, w * GS, h * GS);
@@ -376,7 +393,8 @@ function* artGround(g, R) {
         }
         cg.setTransform(1, 0, 0, 1, 0, 0);
         cg.globalCompositeOperation = 'destination-in'; cg.imageSmoothingEnabled = true;
-        cg.drawImage(mk, cx * sc, cy * sc, w * sc, h * sc, 0, 0, w * GS, h * GS);
+        const mask = surfaceMask(tiles,tt,shoulders,coverage,cx*sc,cy*sc,w*sc,h*sc);
+        cg.drawImage(mask.canvas,cx*sc-mask.x,cy*sc-mask.y,w*sc,h*sc,0,0,w*GS,h*GS);
         g.drawImage(cc, 0, 0, w * GS, h * GS, cx, cy, w, h);
       }
     }

@@ -431,7 +431,7 @@ function remapToMap() {
   if (j && j.k === 'clear') { const c = CLEAR_SPOTS.find(c => c[3] === j.loc) || CLEAR_SPOTS.find(c => c[2] === j.where); if (c) { j.loc = c[3]; j.x = c[0]; j.y = c[1]; j.where = c[2]; } }
   const a = S.sos && S.sos.act;
   if (a) { const sp = SOS_SPOTS.find(p => p[2] === a.loc) || SOS_SPOTS.find(p => 'у ' + LOC[p[2]].gen === 'у ' + a.where); if (sp) { const f = freeTile(sp[0], sp[1]); a.x = f.x; a.y = f.y; a.loc = sp[2]; } }
-  if (BIG) { fog.fill(0); fogDirty = true; S.fog = ''; }   // старая маска разведки не совпадает с новой картой
+  if (BIG) { fog.fill(0); fogDirty = true; fogRegion = null; S.fog = ''; }   // старая маска разведки не совпадает с новой картой
   const big = BIG && from === 'kordon-rc1';
   (S.dyn && S.dyn.npcs || []).forEach(r => { if (big) { const q = RMp(r.x, r.y); r.x = q[0]; r.y = q[1]; } const f = freeTile(r.x / T, r.y / T); r.x = f.x * T; r.y = f.y * T; });
   if (!inBunker(S.x, S.y)) {
