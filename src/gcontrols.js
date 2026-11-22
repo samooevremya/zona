@@ -4,12 +4,44 @@ const CONTROL_NAMES = {
   'b-med':'Аптечка', 'b-bolt':'Болт', 'b-crouch':'Присесть', 'b-jump':'Прыжок', det:'Фонарь'
 };
 const CONTROL_KEY = 'zona-touch-layout-v1';
+const FIRE_KEY='zona-touch-fire-v1';
+const firePrefs={mode:'stick',strength:45};
+function showFireSettings(nav,back) {
+  const mode=el('select'), slider=el('input'), value=el('output');
+  const modeLabel=el('label','fire-setting','Способ стрельбы'), assistLabel=el('label','fire-setting','Автоприцел');
+  const hint=el('p','fire-hint');
+  for (const [id,name] of [['stick','Отклонение стика'],['tap','Касание врага']]) {
+    const option=el('option','',name); option.value=id; mode.appendChild(option);
+  }
+  mode.value=firePrefs.mode;
+  slider.type='range';slider.min=0;slider.max=100;slider.step=5;slider.value=firePrefs.strength;
+  function describe() {
+    value.textContent=slider.value+'%';
+    hint.textContent=mode.value==='stick'
+      ? 'Слегка отклони правый стик, чтобы прицелиться. Доведи его до края, чтобы открыть огонь.'
+      : 'Коснись видимого врага для одного выстрела. Правым стиком можно прицелиться. Нож и граната действуют у края стика.';
+  }
+  function storePrefs() {
+    firePrefs.mode=mode.value; firePrefs.strength=Number(slider.value);
+    try { localStorage.setItem(FIRE_KEY,JSON.stringify(firePrefs)); } catch (_) {}
+    describe();
+  }
+  mode.onchange=storePrefs; slider.oninput=storePrefs;describe();
+  modeLabel.append(mode);assistLabel.append(value,slider);
+  nav.replaceChildren(modeLabel,hint,assistLabel,btn('','Назад',back));
+  mode.focus();
+}
 const controlEditor = document.getElementById('control-editor');
 let layouts = {landscape:{},portrait:{}}, draftLayout = null, priorTouch = false;
 let selectedControl = 'joy', padDrag = null;
 const layoutMode = () => innerWidth >= innerHeight ? 'landscape' : 'portrait';
 
 function readControls() {
+  try {
+    const f=JSON.parse(localStorage.getItem(FIRE_KEY));
+    if (f?.mode==='tap' || f?.mode==='stick') firePrefs.mode=f.mode;
+    if (Number.isFinite(f?.strength)) firePrefs.strength=clamp(f.strength,0,100);
+  } catch (_) {}
   try {
     const data = JSON.parse(localStorage.getItem(CONTROL_KEY));
     for (const mode of Object.keys(layouts)) for (const id of Object.keys(CONTROL_NAMES)) {

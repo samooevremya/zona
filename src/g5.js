@@ -384,6 +384,7 @@ function drawMenu() {
   if (panel.pausePage==='settings') {
     heading.textContent='Настройки';
     nav.appendChild(btn('','Настроить управление',openControlEditor));
+    nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,drawMenu)));
     const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
     const sound=btn('',soundLabel(),()=>{
       audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
@@ -396,7 +397,7 @@ function drawMenu() {
   if (panel.pausePage==='help') {
     heading.textContent='Управление и сохранения';
     nav.appendChild(el('p','pause-note',IN.touch
-      ? 'Левый джойстик — ходьба. Удерживай кнопку с прицелом для огня и тяни её в сторону цели. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
+      ? 'Левый джойстик — ходьба. Слегка отклони правый стик для прицеливания. Для огня доведи стик до края или коснись врага в режиме стрельбы касанием. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
     if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
     nav.appendChild(el('p','pause-note','Игра сохраняется автоматически у костра и у Сидоровича. Вручную можно сохраниться, когда рядом нет врагов.'));
@@ -923,7 +924,7 @@ function keyMove() {
   IN.moveX = (KEYS.KeyD || KEYS.ArrowRight ? 1 : 0) - (KEYS.KeyA || KEYS.ArrowLeft ? 1 : 0);
   IN.moveY = (KEYS.KeyS || KEYS.ArrowDown ? 1 : 0) - (KEYS.KeyW || KEYS.ArrowUp ? 1 : 0);
 }
-function setTouch(on) { if (IN.touch === on) return; IN.touch = on; document.body.classList.toggle('is-touch', on); }
+function setTouch(on) { if (IN.touch === on) return; if (!on) releaseFireStick(); IN.touch = on; document.body.classList.toggle('is-touch', on); }
 const JOY = $('joy'), JOYK = $('joyk');
 function joyAt(x, y, s) {
   const r = JOY.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -932,6 +933,18 @@ function joyAt(x, y, s) {
   JOY.classList.add('on');
 }
 function joyReset() { JOY.style.left = JOY.style.top = JOY.style.bottom = ''; JOYK.style.transform = ''; JOY.classList.remove('on'); }
+function enemyUnderFinger(x,y) {
+  const W=WP[S.weapon];
+  if (!W || W.melee) return null;
+  const w=screenToWorld(x,y);
+  let nearest=null, best=Infinity;
+  for (const e of ents) {
+    if (!e.alive || e===P) continue;
+    const d=dE(w,e);
+    if (d<=e.r+6/Z && d<best) {best=d;nearest=e;}
+  }
+  return targetInSight(nearest,W) ? nearest : null;
+}
 cv.addEventListener('pointerdown', e => {
   audioInit();
   if (panel || title.open) return;
@@ -941,6 +954,14 @@ cv.addEventListener('pointerdown', e => {
   const jr = JOY.getBoundingClientRect();
   const custom = !!JOY.dataset.layout;
   const onStick = custom ? Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2) <= jr.width/2+6 : e.clientX<VW*.5;
+  const insideJoy=Math.hypot(e.clientX-jr.x-jr.width/2,e.clientY-jr.y-jr.height/2)<=jr.width/2+6;
+  if (firePrefs.mode==='tap' && !insideJoy && !IN.tapFinger) {
+    const enemy=enemyUnderFinger(e.clientX,e.clientY);
+    if (enemy) {
+      IN.tapFinger={id:e.pointerId,x:e.clientX,y:e.clientY,enemy,weapon:S.weapon};
+      cv.setPointerCapture(e.pointerId);return;
+    }
+  }
   if (onStick && !IN.left) {
     cv.setPointerCapture(e.pointerId);
     IN.left = s;
@@ -951,6 +972,8 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { IN.mx = e.clientX; IN.my = e.clientY; if (IN.touch) setTouch(false); return; }
+  const finger=IN.tapFinger;
+  if (finger?.id===e.pointerId && Math.hypot(e.clientX-finger.x,e.clientY-finger.y)>9) IN.tapFinger=null;
   const s=IN.left;
   if (!s || s.id!==e.pointerId) return;
   let dx = (e.clientX - s.ox) / (s.radius || 56), dy = (e.clientY - s.oy) / (s.radius || 56);
@@ -960,9 +983,18 @@ cv.addEventListener('pointermove', e => {
 });
 function endPtr(e) {
   if (e.pointerType === 'mouse') { IN.fire = false; return; }
+  const finger=IN.tapFinger;
+  if (finger?.id===e.pointerId) {
+    IN.tapFinger=null;
+    if (e.type==='pointerup' && P.alive && !panel && !title.open && !P.jam && !(P.reload>0) &&
+        finger.weapon===S.weapon && S.mag[S.weapon]>0 &&
+        Math.hypot(e.clientX-finger.x,e.clientY-finger.y)<=9 && enemyUnderFinger(e.clientX,e.clientY)===finger.enemy) {
+      IN.tapShot={enemy:finger.enemy,weapon:S.weapon,ttl:.65};
+    }
+  }
   if (IN.left && IN.left.id === e.pointerId) { IN.left = null; IN.moveX = IN.moveY = 0; joyReset(); }
 }
-cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr); cv.addEventListener('lostpointercapture',endPtr);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (!panel) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
 const TB = { 'b-crouch': () => { P.crouch = !P.crouch; $('b-crouch').classList.toggle('on', !!P.crouch); }, 'b-rel': startReload, 'b-bolt': throwBolt, 'b-med': medButton, 'b-jump': startJump, 'b-wpn': () => cycleWeapon(1) };
@@ -987,8 +1019,10 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 const fireB = $('b-fire');
-function releaseFireStick() {
+function releaseFireStick(clearTaps=true) {
   IN.aimStick=null; IN.btnFire=false;
+  if (clearTaps) { IN.tapShot=null; IN.tapFinger=null; }
+  if (P) { P.aimRay=null; P.lock=null; P.lockT=0; P.shotFlash=0; P.tapFlash=false; }
   fireB.classList.remove('on');
   fireB.style.removeProperty('--aim-x'); fireB.style.removeProperty('--aim-y');
 }
@@ -996,7 +1030,12 @@ function steerFireStick(e) {
   const s=IN.aimStick;
   if (!s || e.pointerId!==s.id) return;
   const dx=e.clientX-s.cx, dy=e.clientY-s.cy, length=Math.hypot(dx,dy);
-  if (length>s.radius*.16) { s.a=Math.atan2(dy,dx); P.lockT=0; }
+  const amount=length/s.radius;
+  s.active=amount>=.14;
+  if (s.active) s.a=Math.atan2(dy,dx);
+  IN.btnFire=(firePrefs.mode==='stick' || WP[S.weapon]?.melee) && amount>=(IN.btnFire ? .72 : .82);
+  if (!IN.btnFire) P.shotFlash=0;
+  if (!s.active) { P.lock=null; P.lockT=0; P.aimRay=null; }
   const k=Math.min(.34,.34*s.radius/Math.max(length,1));
   fireB.style.setProperty('--aim-x',dx*k+'px'); fireB.style.setProperty('--aim-y',dy*k+'px');
 }
@@ -1006,17 +1045,14 @@ fireB.addEventListener('pointerdown', e => {
   const r=fireB.getBoundingClientRect();
   IN.aimStick={id:e.pointerId,cx:r.left+r.width/2,cy:r.top+r.height/2,radius:r.width/2,a:P.ang};
   fireB.setPointerCapture(e.pointerId);
-  steerFireStick(e); IN.btnFire=true; fireB.classList.add('on');
+  steerFireStick(e); fireB.classList.add('on');
 });
 fireB.addEventListener('pointermove',steerFireStick);
 for (const event of ['pointerup','pointercancel','lostpointercapture']) {
   fireB.addEventListener(event,e=>{
     const stick=IN.aimStick;
     if (stick?.id!==e.pointerId) return;
-    if (event==='pointerup' && !stick.sampled && P?.alive && !panel && !title.open) {
-      P.ang=stick.a; playerFire();
-    }
-    releaseFireStick();
+    releaseFireStick(false);
   });
 }
 $('prompt').addEventListener('click', e => { e.stopPropagation(); audioInit(); if (!panel) interact(); });
@@ -1071,6 +1107,7 @@ function showTitle(kind) {
   }));
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
+  nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));
   c.append(title.name,nav);
 }
 function goFull() {   // на весь экран там, где браузер это умеет (Android, iPad, компьютер); на iPhone — через «На экран Домой»

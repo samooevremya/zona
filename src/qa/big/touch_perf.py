@@ -30,11 +30,18 @@ async def run(vw, vh):
         aim=await pg.evaluate("({stick:!!__z.IN.aimStick, mag:__z.S.mag.w_pm, fire:!!__z.IN.btnFire})")
         await touch('touchEnd',[])
         res['empty_right']={'ok':not aim['stick'] and aim['mag']==8 and not aim['fire'], 'during':aim}
+        # Small displacement reveals the ray and turns the actor without a shot, including on lift.
+        await touch('touchStart',[(1,fire)])
+        await touch('touchMove',[(1,(fire[0]-13,fire[1]))])
+        await pg.wait_for_timeout(350)
+        res['aim-only']={'ok':await pg.evaluate("!!__z.P.aimRay && __z.S.mag.w_pm===8 && !__z.IN.btnFire")}
+        await touch('touchEnd',[])
+        res['release-without-shot']={'ok':await pg.evaluate("!__z.P.aimRay && !__z.IN.aimStick && __z.S.mag.w_pm===8")}
         # движение + огонь
         await touch('touchStart',[(0,mv)]); await touch('touchMove',[(0,(mv[0]+40,mv[1]-10))])
         await touch('touchStart',[(0,(mv[0]+40,mv[1]-10)),(1,fire)])
         await touch('touchMove',[(0,(mv[0]+40,mv[1]-10)),(1,(fire[0],fire[1]-58))])
-        await pg.wait_for_timeout(250)
+        await pg.wait_for_timeout(500)
         stick=await pg.evaluate("({a:__z.IN.aimStick?.a,bar:parseFloat(document.getElementById('b-fire').style.getPropertyValue('--aim-y')),left:!!__z.IN.left})")
         res['drag_fire']={'ok':stick['left'] and abs(stick['a']+1.5708)<.08 and stick['bar']<-5,'during':stick}
         s1=await pg.evaluate("({mx:__z.IN.moveX,my:__z.IN.moveY,fire:!!__z.IN.btnFire,mag:__z.S.mag.w_pm})")

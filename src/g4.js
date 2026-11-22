@@ -519,6 +519,42 @@ function drawHouseRoof(g, h, i, scale) {
   g.drawImage(ROOFS[i], (h.x*T-3)*scale, (h.y*T-3)*scale,
     (h.w*T+10)*scale, (h.h*T+10+(h.porchDepth || 0))*scale);
 }
+function drawPlayerAim() {
+  const ray=P.aimRay, lock=P.lock;
+  ctx.save();
+  if (ray) {
+    const muzzle=muzzlePoint(P,P.ang);
+    const along=(muzzle.x-P.x)*ray.ca+(muzzle.y-P.y)*ray.sa;
+    if (along<ray.t) {
+      const dx=P.x+ray.ca*ray.t-muzzle.x, dy=P.y+ray.sa*ray.t-muzzle.y;
+      const length=Math.hypot(dx,dy);
+      if (length>0) {
+        const visible=rayWall(muzzle.x,muzzle.y,dx/length,dy/length,length);
+        ctx.strokeStyle=P.shotFlash>0 ? '#ff6651' : 'rgba(244,240,224,.84)';
+        ctx.lineWidth=1.35/Z;ctx.beginPath();ctx.moveTo(muzzle.x,muzzle.y);
+        ctx.lineTo(muzzle.x+dx*visible/length,muzzle.y+dy*visible/length);ctx.stroke();
+      }
+    }
+  }
+  if (lock?.alive) {
+    ctx.strokeStyle='rgba(245,181,104,.95)'; ctx.lineWidth=1.65/Z;
+    const r=lock.r-(lock.captive ? 4 : 0);
+    for (let i=0;i<4;i++) {
+      const a=i*Math.PI/2+.4;
+      ctx.beginPath();ctx.arc(lock.x,lock.y,r,a,a+.76);ctx.stroke();
+    }
+  }
+  if (P.hitT>0 && P.impact) {
+    const {x,y,kill}=P.impact;
+    ctx.strokeStyle=kill?'#ff6754':'#fff6da';ctx.lineWidth=2/Z;
+    ctx.beginPath();
+    for (const dx of [-1,1]) for (const dy of [-1,1]) {
+      ctx.moveTo(x+dx*3/Z,y+dy*3/Z);ctx.lineTo(x+dx*7/Z,y+dy*7/Z);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function roofHidden(h) {
   const px = P.x / T, py = P.y / T;
   return px > h.x + 0.6 && px < h.x + h.w - 0.6 && py > h.y + 0.6 && py < h.y + h.h - 0.6;
@@ -976,14 +1012,7 @@ function render() {
     ctx.fillStyle = e.fac === 'army' ? '#a9c79a' : '#e6dcb4'; ctx.fillText(e.name, e.x, e.y - 19);
   }
   drawBubbles(inView);
-  // захват цели: уголки вокруг врага
-  if (P && P.alive && P.lock && P.lock.alive) {
-    const L = P.lock, r = L.r + 7, k = 6, on = Math.abs(angD(P.ang, Math.atan2(L.y - P.y, L.x - P.x))) < 0.12;
-    ctx.strokeStyle = on ? 'rgba(235,80,60,0.95)' : 'rgba(230,101,73,0.86)'; ctx.lineWidth = 1.6;
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(c => { ctx.beginPath(); ctx.moveTo(L.x + c[0] * r, L.y + c[1] * (r - k)); ctx.lineTo(L.x + c[0] * r, L.y + c[1] * r); ctx.lineTo(L.x + c[0] * (r - k), L.y + c[1] * r); ctx.stroke(); });
-    if (P.hitT > 0) { const m = 5 + (P.killT > 0 ? 3 : 0); ctx.strokeStyle = P.killT > 0 ? 'rgba(255,70,50,0.95)' : 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L.x - m, L.y - m); ctx.lineTo(L.x - 2, L.y - 2); ctx.moveTo(L.x + m, L.y - m); ctx.lineTo(L.x + 2, L.y - 2); ctx.moveTo(L.x - m, L.y + m); ctx.lineTo(L.x - 2, L.y + 2); ctx.moveTo(L.x + m, L.y + m); ctx.lineTo(L.x + 2, L.y + 2); ctx.stroke(); }
-    ctx.lineWidth = 1;
-  }
+  if (P?.alive) drawPlayerAim();
   // свет, цвет, ночь
   if (shopVisible || loft) ctx.restore();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
