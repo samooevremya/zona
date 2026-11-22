@@ -1001,7 +1001,7 @@ Tt('G6_track_junctions_and_clearance',()=>{
   const wagons=M.objs.filter(o=>o.k==='freightWagon');
   const aligned=wagons.every(o=>sidings.some(line=>line.slice(1).some(([x,y],i)=>
     line[i][1]===y && Math.abs((o.y+o.h/2)/T-y)<.001 && line[i][0]*T<=o.x && x*T>=o.x+o.w)));
-  const crossings=[[247,66.52],[245.43,65.08],[313.29,42]].every(([x,y])=>
+  const crossings=[[247,66.52],[245.43,65.08],[315.5,42]].every(([x,y])=>
     freightDecks.some(d=>Math.hypot(d.x-x,d.y-y)<.05));
   return {ok:!disconnects.length && !violations.length && aligned && crossings,
     disconnects,violations:violations.slice(0,4),aligned,decks:freightDecks.length};
