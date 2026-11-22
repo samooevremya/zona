@@ -10,9 +10,16 @@ function reveal() {
   let ch = false;
   for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++)
     if (inb(x, y) && !fog[y * MW + x] && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) { fog[y * MW + x] = 1; ch = true; }
-  if (ch) fogDirty = true;
+  if (ch) {
+    if (!fogDirty) fogRegion = [cx-r,cy-r,cx+r+1,cy+r+1];
+    else if (fogRegion) {
+      fogRegion[0]=Math.min(fogRegion[0],cx-r); fogRegion[1]=Math.min(fogRegion[1],cy-r);
+      fogRegion[2]=Math.max(fogRegion[2],cx+r+1); fogRegion[3]=Math.max(fogRegion[3],cy+r+1);
+    }
+    fogDirty = true;
+  }
 }
-let fogDirty = true;
+let fogDirty = true, fogRegion = null;
 
 function startReload() {
   const W = WP[S.weapon];
@@ -466,7 +473,7 @@ function applyState(d) {
   restoreKit();
   fog.fill(0);
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
-  fogDirty = true;
+  fogDirty = true; fogRegion = null;
   spawnWorld();
   survDefaults(); ensureCaches(); dynRestore();
   if(BIG){
