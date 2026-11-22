@@ -957,6 +957,51 @@ function mkPlayer() {
   return { id: 0, kind: 'human', fac: 'player', name: 'Меченый', x: S.x, y: S.y, r: 11, hp: S.hp, maxhp: 100, ang: -Math.PI / 2, alive: 1,
     cool: 0, reload: 0, bloom: 0, st: 100, kx: 0, ky: 0, flash: 0, step: 0, medT: 0, seed: 7, rank: 0 };
 }
+const DEN_RECOVERY = 24 * 60;
+let mutantDens = new Map();
+function registerDens() {
+  mutantDens = new Map();
+  for (const d of DOGDEF) register(d, mkDog, d.pack);
+  for (const d of boarDefs()) register(d, mkBoar, d.pack || (d.sid === 'k3' ? 'boar_east' : 'boar'));
+  function register(d, make, pack) {
+    if (!mutantDens.has(pack)) mutantDens.set(pack, []);
+    mutantDens.get(pack).push({def:{...d,pack}, make});
+  }
+}
+function spawnDenMember(member) {
+  const e = member.make(member.def);
+  e.den = member.def.pack;
+  clearPropSpawn(e);
+  ents.push(e);
+}
+function clearedDen(pack) {
+  const members = mutantDens.get(pack);
+  if (members && members.every(m => S.dead[m.def.sid])) {
+    const deadlines = S.flags.denRecovery ||= {};
+    deadlines[pack] ??= S.min + DEN_RECOVERY;
+  }
+}
+function renewDens() {
+  const deadlines = S.flags.denRecovery;
+  if (!deadlines) return;
+  for (const [pack, until] of Object.entries(deadlines)) {
+    const members = mutantDens.get(pack);
+    if (!members || S.min < until) continue;
+    const safeToSpawn = members.every(({def}) => {
+      const x = def.x*T, y = def.y*T;
+      const onScreen = Math.abs(cam.x-x)<VW/(2*Z)+4*T && Math.abs(cam.y-y)<VH/(2*Z)+4*T;
+      return S.dead[def.sid] && !onScreen && dst(P.x,P.y,x,y)>1200;
+    });
+    if (!safeToSpawn) continue;
+    for (const member of members) {
+      const sid = member.def.sid;
+      ents = ents.filter(e => e.sid !== sid || e.alive);
+      delete S.dead[sid];
+      spawnDenMember(member);
+    }
+    delete deadlines[pack];
+  }
+}
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
@@ -978,10 +1023,14 @@ function spawnWorld() {
     if (S.flags.angry && S.flags.angry[d.sid]) e.angry = 1;
     ents.push(e);
   });
-  DOGDEF.forEach(d => { if (!S.dead[d.sid]) ents.push(mkDog(d)); });
+  registerDens();
+  for (const [pack,members] of mutantDens) {
+    for (const member of members) if (!S.dead[member.def.sid]) spawnDenMember(member);
+    clearedDen(pack); // Also initialise the cooldown for a cleared den in an older save.
+  }
   rcSpawnObjs();
   campaignCast();
-  boarDefs().forEach(d => { if (!S.dead[d.sid]) ents.push(mkBoar(Object.assign({ pack: 'boar' }, d))); });
+
 
   anoms = ANOM0.map(spawnAnomaly);
   arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
@@ -1484,6 +1533,7 @@ function kill(e, src) {
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
   if (e.sid) S.dead[e.sid] = 1;
+  if (e.den) clearedDen(e.den);
   const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e) : null;
   (witnesses || ents).forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
   decals.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), r: rnd(10, 16), a: 0.75 });
@@ -1502,11 +1552,11 @@ function kill(e, src) {
   }
   plusKill(e, src);
 }
+const MUTANT_TROPHIES = {dog:'tail', boar:'hoof', sucker:'tentacle'};
 function dropBody(e) {
   const loot = {};
-  if (e.kind === 'dog') { if (chance(0.55)) loot.tail = 1; }
-  else if (e.kind === 'boar') { if (chance(0.7)) loot.hoof = 1; }
-  else if (e.kind === 'sucker') { loot.tentacle = 1; }
+  const trophy = MUTANT_TROPHIES[e.kind];
+  if (trophy) loot[trophy] = 1;
   else {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
@@ -1937,14 +1987,7 @@ function spawnTick() {
     }
     news('Сводка: на дорогу с востока вышла группа бандитов.');
   }
-  if (S.min - (S.flags.dogT || 0) > 360 && S.q.pack !== 1) {
-    S.flags.dogT = S.min;
-    ['lair', 'north'].forEach(pk => {
-      const home = (h => ({ x: h[0], y: h[1] }))(pk === 'lair' ? RMt(10.5, 42.5) : RMt(71, 20.5));
-      if (ents.filter(e => e.alive && e.pack === pk).length < 2 && far(home.x * T, home.y * T))
-        for (let i = 0; i < 2; i++) ents.push(mkDog({ pack: pk, x: home.x + i, y: home.y }));
-    });
-  }
+  renewDens();
 }
 
 /* S.min advances by one game minute per second of unpaused play.
@@ -2472,6 +2515,12 @@ function findInteract() {
     if ((o.k==='crate' && o.broken && !o.looted) || o.kind==='sack') {
       nearbyGroundItems(o,cand); continue;
     }
+    if (o.k === 'body' && MUTANT_TROPHIES[o.kind]) {
+      const trophy=MUTANT_TROPHIES[o.kind], d=dE(P,o);
+      if (o.loot[trophy] && d<42 && clearNPCShot(P,o))
+        cand(d,{k:'carve',o,label:S.weapon==='knife'?'Срезать трофей · '+ITEMS[trophy].n:'Для разделки нужен нож'});
+      continue;
+    }
     if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
     if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
@@ -2487,6 +2536,16 @@ function findInteract() {
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
   plusInteract(cand);
   return best;
+}
+function carveMutant(o) {
+  const id = MUTANT_TROPHIES[o.kind];
+  if (!id || !o.loot[id] || !objs.includes(o) || dE(P,o)>=42 || !clearNPCShot(P,o)) return;
+  if (S.weapon !== 'knife') { msg('Возьми нож в руки.', 'say'); return; }
+  const error = receiveError(id,1);
+  if (error) { msg(error,'bad'); return; }
+  collectStock(o,id,1);
+  play('knife',P.x,P.y);
+  msg('Получен трофей · '+ITEMS[id].n,'say');
 }
 function lootAll(o) {
   let pickedUp = false;
@@ -5762,6 +5821,8 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
+  S.flags.mutantBodies = objs.filter(o => o.k==='body' && o.loot[MUTANT_TROPHIES[o.kind]])
+    .map(({k,kind,fac,name,x,y,ang,seed,t,loot}) => ({k,kind,fac,name,x,y,ang,seed,t,loot:{...loot}}));
   S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
@@ -5776,6 +5837,7 @@ function dynRestore() {
   plusDefaults();
   const v = S.dyn.v || 0;
   remapToMap();
+  for (const body of S.flags.mutantBodies || []) objs.push({...body,loot:{...body.loot}});
   // миграция старых сохранений (0.6): заказ без id, SOS без участников
   if (v < DYN_VER) {
     const j = S.jobs.act;
@@ -7081,7 +7143,7 @@ if (MAP_ID === 'rc1') {
   CLEAR_SPOTS.length = 0; locAnchors('clear').forEach(a => CLEAR_SPOTS.push([a.x, a.y, 'у ' + LOC[a.loc].gen, a.loc]));
   const sh = locPt('lair', 'sucker'); SUCKER_HOME.x = sh.x; SUCKER_HOME.y = sh.y;
 }
-function boarDefs() { return MAP_ID === 'rc1' ? RC1.boars.map(b => ({ sid: b.sid, x: b.at[0], y: b.at[1] })) : [{ sid: 'k1', x: 52, y: 12 }, { sid: 'k2', x: 54.5, y: 13 }, { sid: 'k3', x: 76, y: 24 }]; }
+function boarDefs() { return MAP_ID === 'rc1' ? RC1.boars.map(b => ({ sid: b.sid, pack: b.pack, x: b.at[0], y: b.at[1] })) : [{ sid: 'k1', x: 52, y: 12 }, { sid: 'k2', x: 54.5, y: 13 }, { sid: 'k3', x: 76, y: 24 }]; }
 
 /* ---------- геометрия RC1 ---------- */
 function rcClear(x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const t = tAt(x, y); if (t === TR || t === BU) setT(x, y, GR); } reserve(x0, y0, x1, y1); }
@@ -7814,7 +7876,7 @@ function makeLesserZone() {
     ['lz_watch','Кряж',23,9,'w_obrez','loner'],['lz_cut','Дежурный',157,47,'w_pm','army'],
     ['lz_rivet','Радист',170,48,'w_obrez','army']
   ]) NPCDEF.push({sid,name,x:x+.5,y:Y+y+.5,wpn,fac,guard:fac==='army'?'sphere':undefined,named:1,stay:1,sit:['lz_spool','lz_sieve','lz_guest','lz_guest2'].includes(sid),localFire:sid.startsWith('lz_guest')?{x:81.2*T,y:(Y+55.55)*T}:LESSER_FIRE});
-  DOGDEF.push({sid:'lz_yard_dog',pack:'lz',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz',x:186,y:Y+69});
+  DOGDEF.push({sid:'lz_yard_dog',pack:'lz_yard',x:125.5,y:Y+26.5},{sid:'lz_fuel_dog',pack:'lz_fuel',x:186,y:Y+69});
 }
 // World tiles. The east end shares both gauge and sleeper phase with the Cordon.
 const railAxis = x => NORTH_ROWS+57.5-.0034*Math.max(0,176-x)**2;
@@ -8236,6 +8298,15 @@ function makeGarbage() {
     ['c1_bricks',400.5,39,32,-.19],['c1_sandbags',406.5,31,41,.08],
     ['c1_tires',375.8,36.3,34,.24],['c1_trace_reel',379.2,38,25,.1]
   );
+  // Small side clearings with an open south approach; no structures on the roads.
+  rcClear(384,96,390,104);
+  rcClear(302,74,308,82);
+  CORDON_DETAILS.push(['c1_trace_pipes',386.5,96.5,61,-.17],
+    ['c1_tires',389.5,98,26,.31],['c1_rock0',303,75,48,.4]);
+  for(const [i,x,y] of [[1,386.5,98.5],[2,388.5,98.5],[3,387.5,99.5]])
+    DOGDEF.push({sid:'dump_dog'+i,pack:'dump_pipes',x,y});
+  for(const [i,x,y] of [[1,304.5,77.5],[2,306.5,77.5]])
+    RC1.boars.push({sid:'dump_boar'+i,pack:'dump_hollow',at:[x,y]});
   WORLD_FIRES.push(dumpFire);
   addObj({k:'fire',x:dumpFire.x-10,y:dumpFire.y-10,w:20,h:20,solid:1});
   for(const [stash,k,x,y,loot] of [
@@ -11751,6 +11822,7 @@ function interact() {
   else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'groundItem') pickGroundItem(n);
   else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
+  else if (n.k === 'carve') carveMutant(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
   else if (n.k === 'pick') pickUp(n.o);

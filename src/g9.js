@@ -462,6 +462,8 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
+  S.flags.mutantBodies = objs.filter(o => o.k==='body' && o.loot[MUTANT_TROPHIES[o.kind]])
+    .map(({k,kind,fac,name,x,y,ang,seed,t,loot}) => ({k,kind,fac,name,x,y,ang,seed,t,loot:{...loot}}));
   S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
@@ -476,6 +478,7 @@ function dynRestore() {
   plusDefaults();
   const v = S.dyn.v || 0;
   remapToMap();
+  for (const body of S.flags.mutantBodies || []) objs.push({...body,loot:{...body.loot}});
   // миграция старых сохранений (0.6): заказ без id, SOS без участников
   if (v < DYN_VER) {
     const j = S.jobs.act;
