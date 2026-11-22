@@ -80,10 +80,6 @@ function loftSurface(r){
     // Raised gallery visible above the service tracks; diagonal truss shadows run into the well.
     for(let j=2;j<r.h-2;j+=4) beam(g,T,j*T,w-T,(j+.8)*T,5,'rgba(23,20,17,.22)');
   }else{
-    g.save();g.translate(w-92,88);g.rotate(.12);artFill(g,'floor_wood',-28,-18,56,36);
-    g.fillStyle='#4c5041';g.fillRect(-25,-16,50,32);
-    for(let i=-20;i<20;i+=7)beam(g,i,-14,i+4,14,1,'#72705a');
-    g.restore();
     if(ART?.images.roomFittings){
       g.save();g.translate(w-90,89);g.rotate(1.48);
       g.drawImage(ART.images.roomFittings,...roomFittings.bedroll[0],-15,-29,30,58);g.restore();
@@ -103,7 +99,7 @@ function loftSurface(r){
     else if(o.k==='partition')paintPartition(g,o);
   }
   g.restore();
-  const mat=industrial?'wall_brick':'floor_wood';
+  const mat='wall_brick';
   artFill(g,mat,0,0,w,T);artFill(g,mat,0,h-T,w,T);
   for(const x of [0,w-T])artFill(g,mat,x,T,T,h-2*T);
   for(let j=0;j<90;j++){
@@ -117,6 +113,15 @@ function loftSurface(r){
     const light=g.createRadialGradient(w-30,y,1,w-30,y,90);
     light.addColorStop(0,'rgba(217,202,154,.21)');light.addColorStop(1,'rgba(217,202,154,0)');g.fillStyle=light;g.fillRect(w-125,y-90,125,180);
   }
+  g.save();g.beginPath();g.rect(T,T,w-2*T,h-2*T);g.clip();
+  for(const [x,y,angle,len] of [[T,T,0,w-2*T],[w-T,T,Math.PI/2,h-2*T],
+      [w-T,h-T,Math.PI,w-2*T],[T,h-T,-Math.PI/2,h-2*T]]){
+    g.save();g.translate(x,y);g.rotate(angle);
+    const shadow=g.createLinearGradient(0,0,0,10);
+    shadow.addColorStop(0,'rgba(31,26,21,.48)');shadow.addColorStop(1,'rgba(31,26,21,0)');
+    g.fillStyle=shadow;g.fillRect(0,0,len,10);g.restore();
+  }
+  g.restore();
   for(const x of [T,w-T])beam(g,x,0,x,h,5,'rgba(28,24,19,.62)');
   const shade=g.createLinearGradient(0,0,w,h);shade.addColorStop(0,'rgba(20,19,15,.44)');shade.addColorStop(1,'rgba(24,21,15,.14)');
   g.fillStyle=shade;g.fillRect(0,0,w,h);return c;

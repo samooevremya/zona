@@ -165,6 +165,7 @@ function buildEntrances(h) {
       let approach = 'earth';
       if (!declared || h.ruin) approach = 'rubble';
       else if (h.mat === 'conc') approach = 'slab';
+      else if (BIG && home === '78,118' && ny === -1) approach = 'deck';
       else if (hasPorch && ny === 1) approach = 'porch';
       h.entrances.push({
         x: nx ? (nx > 0 ? h.w * T : 0) : mid,
@@ -2224,6 +2225,13 @@ function applyState(d) {
   if(S.campaign.liberated)occupyATP();
   villageAftermath();
   if(BIG){
+    // Saves on the former south threshold should load on their own side of the new wall.
+    const bar=HOUSES.find(h=>h.ok==='78,118');
+    if(bar){
+      const x=(bar.x+Math.floor(bar.w/2))*T,y=(bar.y+bar.h-1)*T;
+      if(P.x>=x-P.r && P.x<=x+T+P.r && P.y>y-P.r && P.y<y+T+P.r)
+        P.y=S.y=P.y<y+T/2?y-P.r-1:y+T+P.r+1;
+    }
     // A trader snapshot from the old bar also stores its old home and seat.
     for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust']){
       const e=byS(sid), d=NPCDEF.find(n=>n.sid===sid);
@@ -4364,6 +4372,12 @@ function drawThresholds(g) {
         g.fillStyle = '#575449'; g.fillRect(left, -8, w, 18);
         if (ART) artFill(g, 'floor_concrete', left, -8, w, 16);
         g.fillStyle = 'rgba(192,184,157,.35)'; g.fillRect(left+1, 7, w-2, 1);
+      } else if (door.approach === 'deck') {
+        // Low plank landing visible above the north eave when approaching from the village.
+        const depth=27;
+        g.fillStyle='#514638';g.fillRect(left-1,-3,w+2,depth+5);
+        if(ART)artFill(g,'floor_wood',left,-3,w,depth+3);
+        for(let y=4;y<=depth;y+=7)beam(g,left+1,y,-left-1,y,1,'rgba(40,32,26,.52)');
       } else if (door.approach === 'porch') {
         g.fillStyle = '#514336'; g.fillRect(left-2, -6, w+4, 25);
         if (ART) artFill(g, 'floor_wood', left-2, -6, w+4, 23);
@@ -7019,6 +7033,12 @@ const VILLAGE_LANES = [
   [[49.5,177.7],[49.9,179]]
 ];
 function bigVillageYards() {
+  // The old yard seats are bark-covered logs. After remapping, keep those only outdoors;
+  // furnishHouses lays out the indoor seats against walls and reserves their aisles.
+  for(let i=DECOR.length-1;i>=0;i--){
+    const [kind,x,y]=DECOR[i];
+    if(kind==='bench' && isFloor(tAt(Math.floor(x),Math.floor(y))))DECOR.splice(i,1);
+  }
   // Машина у западной кромки двора оставляет проход между костром и домом.
   for (const lane of VILLAGE_LANES) bigPath(lane.map(([x,y])=>[x-.5,y-.5]), .7);
   addObj({ k: 'car', x: 53 * T - 37, y: 165.4 * T - 17, w: 74, h: 34, solid: 1, seed: 0, sprite: 'c1_yard_car' });
@@ -7354,9 +7374,11 @@ function makeLesserZone() {
   for (const [x,y,w,h,roof] of cottages) {
     // Leave existing road surfaces along the facade while clearing the plot.
     rcClear(x-1,Y+y-1,x+w,Y+y+h);
-    house(x,Y+y,w,h,[[Math.floor(w/2),h-1]],roof==='conc'?CO:BR,0,roof,random);
-    const doorX=x+Math.floor(w/2);
-    for (let j=0;j<3;j++) setT(doorX,Y+y+h+j,DI);
+    const tavern=x===78 && y===50, mid=Math.floor(w/2);
+    const doors=tavern?[[mid,0],[mid+1,0]]:[[mid,h-1]];
+    house(x,Y+y,w,h,doors,roof==='conc'?CO:BR,0,roof,random);
+    for(const [i] of doors)for(let j=0;j<3;j++)
+      setT(x+i,Y+y+(tavern?-1-j:h+j),DI);
     HOUSES[HOUSES.length-1].ok = x+','+(Y+y-NORTH_ROWS);
   }
   // Open strips between the pens and yards are actual walkable gates.
@@ -7378,7 +7400,7 @@ function makeLesserZone() {
     [47,61,TR],[55,68,BU],[155,37,BU],[168,46,TR],[77,27,BU]]) {
     if(tAt(x,Y+y)===GR) setT(x,Y+y,t);
   }
-  // Bar in the southwest plank house; leave the southern doorway clear.
+  // Bar in the southwest plank house; keep the north aisle open towards the village street.
   for (const [barRole,x,y,w,h] of [
     ['counter',80,53.02,96,20],['bench',87.3,52.4,41,19],
     ['guests',80.5,55.2,44,24],['guests',86.3,55.5,35,23],['shelf',79.2,51.1,83,12],['shelf',82,51.1,61,12]
@@ -9947,10 +9969,6 @@ function loftSurface(r){
     // Raised gallery visible above the service tracks; diagonal truss shadows run into the well.
     for(let j=2;j<r.h-2;j+=4) beam(g,T,j*T,w-T,(j+.8)*T,5,'rgba(23,20,17,.22)');
   }else{
-    g.save();g.translate(w-92,88);g.rotate(.12);artFill(g,'floor_wood',-28,-18,56,36);
-    g.fillStyle='#4c5041';g.fillRect(-25,-16,50,32);
-    for(let i=-20;i<20;i+=7)beam(g,i,-14,i+4,14,1,'#72705a');
-    g.restore();
     if(ART?.images.roomFittings){
       g.save();g.translate(w-90,89);g.rotate(1.48);
       g.drawImage(ART.images.roomFittings,...roomFittings.bedroll[0],-15,-29,30,58);g.restore();
@@ -9970,7 +9988,7 @@ function loftSurface(r){
     else if(o.k==='partition')paintPartition(g,o);
   }
   g.restore();
-  const mat=industrial?'wall_brick':'floor_wood';
+  const mat='wall_brick';
   artFill(g,mat,0,0,w,T);artFill(g,mat,0,h-T,w,T);
   for(const x of [0,w-T])artFill(g,mat,x,T,T,h-2*T);
   for(let j=0;j<90;j++){
@@ -9984,6 +10002,15 @@ function loftSurface(r){
     const light=g.createRadialGradient(w-30,y,1,w-30,y,90);
     light.addColorStop(0,'rgba(217,202,154,.21)');light.addColorStop(1,'rgba(217,202,154,0)');g.fillStyle=light;g.fillRect(w-125,y-90,125,180);
   }
+  g.save();g.beginPath();g.rect(T,T,w-2*T,h-2*T);g.clip();
+  for(const [x,y,angle,len] of [[T,T,0,w-2*T],[w-T,T,Math.PI/2,h-2*T],
+      [w-T,h-T,Math.PI,w-2*T],[T,h-T,-Math.PI/2,h-2*T]]){
+    g.save();g.translate(x,y);g.rotate(angle);
+    const shadow=g.createLinearGradient(0,0,0,10);
+    shadow.addColorStop(0,'rgba(31,26,21,.48)');shadow.addColorStop(1,'rgba(31,26,21,0)');
+    g.fillStyle=shadow;g.fillRect(0,0,len,10);g.restore();
+  }
+  g.restore();
   for(const x of [T,w-T])beam(g,x,0,x,h,5,'rgba(28,24,19,.62)');
   const shade=g.createLinearGradient(0,0,w,h);shade.addColorStop(0,'rgba(20,19,15,.44)');shade.addColorStop(1,'rgba(24,21,15,.14)');
   g.fillStyle=shade;g.fillRect(0,0,w,h);return c;
@@ -10162,7 +10189,7 @@ function drawRestingCaptive(e){
   ctx.restore();
 }
 
-// Top-down cutouts from the project's house, office and hangar sheets. Sizes are world pixels.
+// Top-down cutouts of worn furniture, shared by homes, offices and workshops. Sizes are world pixels.
 const roomFittings={
   bench:[[3,16,110,63],53,29], rack:[[119,4,110,88],42,28],
   cabinet:[[247,3,85,90],29,26], desk:[[357,3,98,90],38,34],
@@ -10173,9 +10200,10 @@ const roomFittings={
 };
 function drawRoomFitting(g,o){
   const [rect,w,h]=roomFittings[o.fitting];
-  g.save();g.translate(o.x+o.w/2,o.y+o.h/2);g.rotate(o.angle);
+  g.save();g.translate(o.x+o.w/2,o.y+o.h/2);
+  spriteShadow(g,2.5,1.7);g.rotate(o.angle);
   if(ART?.images.roomFittings){
-    spriteShadow(g,2.5,1.7);g.drawImage(ART.images.roomFittings,...rect,-w/2,-h/2,w,h);
+    g.drawImage(ART.images.roomFittings,...rect,-w/2,-h/2,w,h);
   }else{
     g.fillStyle='#564d3e';g.fillRect(-w/2,-h/2,w,h);g.strokeStyle='#928269';g.strokeRect(-w/2,-h/2,w,h);
   }
@@ -10423,12 +10451,9 @@ function drawRoomMarks(g,h){
   const layout=h.interior;if(!layout)return;
   for(const mount of layout.mounts){
     g.save();g.translate(mount.x,mount.y);g.rotate(mount.a);
-    if(ART?.images.roomFittings){
-      const type={office:'files',home:'supper',store:'rack',shop:'bench',bar:'rack',ruin:'pallet'}[layout.use];
-      const rect=roomFittings[type][0];
-      g.fillStyle='rgba(26,21,16,.36)';g.fillRect(-13,1,28,7);
-      g.drawImage(ART.images.roomFittings,...rect,-14,-5,28,10);
-    }
+    // Scuffs and worn skirting sit flush against the inside face of the wall.
+    beam(g,-12,1,10,1,2,'rgba(38,31,24,.31)');
+    beam(g,-9,2,4,2,1,'rgba(146,130,102,.29)');
     g.restore();
   }
   const {x,y,a}=layout.mark;

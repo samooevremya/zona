@@ -163,6 +163,7 @@ function buildEntrances(h) {
       let approach = 'earth';
       if (!declared || h.ruin) approach = 'rubble';
       else if (h.mat === 'conc') approach = 'slab';
+      else if (BIG && home === '78,118' && ny === -1) approach = 'deck';
       else if (hasPorch && ny === 1) approach = 'porch';
       h.entrances.push({
         x: nx ? (nx > 0 ? h.w * T : 0) : mid,
