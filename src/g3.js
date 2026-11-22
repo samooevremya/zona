@@ -219,7 +219,7 @@ function update(dt) {
   for (const e of ents) {
     if (!e.alive || e === P) continue;
     if (e.qaHold || blowoutHumanAI(e, dt)) continue;
-    if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt) continue;
+    if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt && !e.returning) continue;
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
     if (e.kind === 'dog') aiDog(e, dt); else if (e.kind === 'boar') aiBoar(e, dt); else if (e.kind === 'sucker') aiSucker(e, dt); else aiHuman(e, dt);
   }

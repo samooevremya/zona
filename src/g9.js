@@ -322,7 +322,7 @@ function finishEncounter(reason) {
   else if (reason === 'timeout') news('Связь с группой ' + lead + ' у ' + a.where + ' потеряна. Чем кончилось, неизвестно.');
   else if (reason === 'lost') news('Сигнал SOS из старой записи не восстановлен. Событие закрыто без последствий.');
   allies.forEach(e => { e.sos = 0; if (reason === 'helped' || reason === 'self') { e.resident = 1; e.rescuedAt = S.min; } else if (!e.angry) e.uid = null; e.stay = 0; e.home = { x: FIRE.x + rnd(-60, 60), y: FIRE.y + rnd(-40, 40) }; e.trip = { x: e.home.x, y: e.home.y, stage: 2 }; });
-  foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; e.home = { x: e.x, y: e.y }; });
+  foes.forEach(e => { e.sosFoe = 0; e.uid = null; e.stay = 0; e.sosPhase = null; if(e.kind==='dog')leaveHunt(e);else e.home={x:e.x,y:e.y}; });
   delete S.flags.sosAssist;
   S.sos.last = { reason: reason, where: a.where, t: S.min };
   S.sos.act = null; S.sos.next = S.min + rnd(SOS_GAP[0], SOS_GAP[1]);
@@ -376,14 +376,20 @@ function sosTick() {
   for (let i = 0; i < nF; i++) {
     const rp = ring[i % ring.length], st = freeTile(rp.x + Math.cos(a0) * 5, rp.y + Math.sin(a0) * 5);
     const e = dog ? mkDog({ pack: 'sos', x: st.x, y: st.y }) : mkHuman({ fac: 'bandit', x: st.x, y: st.y, wpn: chance(0.6) ? 'w_pm' : 'w_obrez' });
-    e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; e.home = { x: e.ringPt.x, y: e.ringPt.y }; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
+    e.sosFoe = id; e.uid = dynId(); e.ringPt = { x: rp.x * T + rnd(-12, 12), y: rp.y * T + rnd(-12, 12) }; if(!dog)e.home={...e.ringPt}; e.sosPhase = 'prep'; e.stay = 1; e.supT = rnd(2, 4); ents.push(e);
   }
   s.act = { id: id, loc: sp[2] || locNear(sp[0], sp[1]).id, x: c.x, y: c.y, where: where, until: S.min + SOS_TIME, start: S.min, dog: dog ? 1 : 0, names: names, pk: 0, seen: 0, nFoes: dog ? 4 : 3, pay: ri(25, 55) * 10, gift: ['medkit', 'a545', 'antirad', 'grenade', 'cans'][ri(0, 4)] };
   radioNews('SOS! Сталкеры у ' + where + ': «' + (dog ? 'Псы окружили, патроны кончаются!' : 'Бандиты прижали, нужна помощь!') + '»');
   play('siren', undefined, undefined, 0.25);
 }
 function dirName(x, y) { return locNear(x, y).gen; }
-function sosStorm(e, a) { e.sosPhase = null; e.stay = 0; e.crouch = 0; e.home = { x: a.x * T, y: a.y * T }; }
+function sosStorm(e,a){
+  e.sosPhase=null;e.stay=0;e.crouch=0;
+  const centre={x:a.x*T,y:a.y*T};
+  if(e.kind!=='dog'){e.home=centre;return;}
+  const prey=ents.find(o=>o.sos===a.id && mutantPrey(o));
+  if(prey){e.tgt=prey;e.trail=centre;e.scentTime=6;}
+}
 /* поведение нападающего SOS до штурма; true — кадр обработан здесь */
 function sosFoeAI(e, dt) {
   const a = S.sos.act;
@@ -391,8 +397,9 @@ function sosFoeAI(e, dt) {
   if ((e.hitByP || e.hp < e.maxhp * 0.5) && e.sosPhase !== 'retreat') { sosStorm(e, a); return false; }   // ранил игрок или тяжело ранен — отвечает сам
   const c = { x: a.x * T, y: a.y * T };
   if (e.sosPhase === 'retreat') {
-    goTo(e, e.retreatTo.x, e.retreatTo.y, 130, dt);
-    if (dst(e.x, e.y, c.x, c.y) > 560 || dst(e.x, e.y, e.retreatTo.x, e.retreatTo.y) < 20) { e.sosFoe = 0; e.uid = null; e.sosPhase = null; e.stay = 0; e.home = { x: e.x, y: e.y }; }
+    const dest=e.retreatTo||e.home;
+    goTo(e,dest.x,dest.y,130,dt);
+    if (dst(e.x, e.y, c.x, c.y) > 560 || dE(e,dest)<20) { e.sosFoe = 0; e.uid = null; e.sosPhase = null; e.stay = 0; if(e.kind==='dog')leaveHunt(e);else e.home={x:e.x,y:e.y}; }
     return true;
   }
   if (e.sosPhase === 'prep') {
@@ -403,7 +410,7 @@ function sosFoeAI(e, dt) {
     const ang = Math.atan2(c.y - e.y, c.x - e.x);
     if (e.kind === 'dog') {
       e.orb = (e.orb || rnd(0, 6.28)) + dt * 0.5;
-      steer(e, e.ringPt.x + Math.cos(e.orb) * 20, e.ringPt.y + Math.sin(e.orb) * 20, 55, dt);
+      goTo(e,e.ringPt.x+Math.cos(e.orb)*20,e.ringPt.y+Math.sin(e.orb)*20,55,dt);
       e.ang += angD(e.ang, ang) * Math.min(1, dt * 3);
       if (chance(dt * 0.15)) play('dog', e.x, e.y, 0.4);
     } else {
@@ -462,7 +469,7 @@ function dynSnapshot() {
     ...((e.inBattle && e.trip) || e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
-    sosPhase: e.sosPhase || null, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, assisted: e.assisted || undefined, inv: e.traded || e.assisted ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
+    sosPhase: e.sosPhase || null, retreatTo: e.sosPhase==='retreat'?e.retreatTo:undefined, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, assisted: e.assisted || undefined, inv: e.traded || e.assisted ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
   }));
 }
 function dynRestore() {
@@ -488,7 +495,7 @@ function dynRestore() {
       ents.push(e);
     }
     Object.assign(e, { uid: r.uid, x: r.x, y: r.y, hp: r.hp, maxhp: r.maxhp || e.maxhp, follow: r.follow, wait: r.wait, waitAt: r.waitAt, hireEnd: r.hireEnd, hirePaid: r.hirePaid,
-      sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, ringPt: r.ringPt });
+      sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, retreatTo:r.retreatTo, ringPt: r.ringPt });
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.assisted) e.assisted = true;
     if (r.inv && (r.traded || r.assisted)) e.inv = r.inv;
@@ -531,40 +538,30 @@ function aiSucker(e, dt) {
     if (decals.length > 400) decals.splice(0, decals.length - 400);
   }
   if (e.breathT <= 0) { e.breathT = rnd(3, 6); if (e.state !== 'lurk' || dE(e, P) < 300) play('breath', e.x, e.y, 0.9); }
-  if (e.think <= 0) {
-    e.think = 0.3;
-    if (!e.tgt || !e.tgt.alive || dE(e, e.tgt) > 650) {
-      e.tgt = null;
-      for (const o of ents) if (o.alive && o.kind === 'human' && o.fac !== 'trader' && !o.captive && !inBunker(o.x, o.y) && dE(e, o) < (night() ? 420 : 260) && los(e.x, e.y, o.x, o.y)) { e.tgt = o; break; }
-      if (e.tgt && e.state === 'lurk') { e.state = 'stalk'; play('sucker', e.x, e.y, 0.6); }
-    }
+  const t=mutantTarget(e,dt,night()?420:260,650);
+  if(!t){e.state='lurk';roamDen(e,dt,40);return;}
+  if(e.state==='lurk'){
+    e.state='stalk';play('sucker',e.x,e.y,.6);
   }
-  const t = e.tgt;
-  if (!t || e.state === 'lurk') {
-    e.state = 'lurk'; e.idleT = (e.idleT || 0) - dt;
-    if (e.idleT <= 0) { e.idleT = rnd(3, 7); const a = rnd(0, 6.28); e.wander = { x: e.home.x + Math.cos(a) * rnd(10, 70), y: e.home.y + Math.sin(a) * rnd(10, 60) }; }
-    if (dE(e, e.home) > 500) goTo(e, e.home.x, e.home.y, 90, dt);
-    else if (e.wander) { steer(e, e.wander.x, e.wander.y, 40, dt); if (dst(e.x, e.y, e.wander.x, e.wander.y) < 10) e.wander = null; }
-    return;
-  }
-  const a = Math.atan2(t.y - e.y, t.x - e.x), d = dE(e, t);
+  const a=Math.atan2(e.trail.y-e.y,e.trail.x-e.x),d=dE(e,e.trail);
   if (e.state === 'flee') {
-    steer(e, e.x - Math.cos(a) * 80, e.y - Math.sin(a) * 80, 150, dt);
+    goTo(e,e.home.x,e.home.y,150,dt);
     if (e.st <= 0) { e.state = 'stalk'; e.cool = 1; }
     return;
   }
   if (e.state === 'stalk') {
     e.ang += angD(e.ang, a) * Math.min(1, dt * 5);
     const side = Math.sin(S.min * 0.9 + e.id) * 0.9;
-    if (d > 120) goTo(e, t.x + Math.cos(a + 1.57) * side * 70, t.y + Math.sin(a + 1.57) * side * 70, 135, dt);
-    else steer(e, t.x, t.y, 175, dt);
-    if (d < 46 && e.cool <= 0) { e.state = 'strike'; e.st = 0.35; play('sucker', e.x, e.y, 1); }
+    const flank={x:e.trail.x+Math.cos(a+1.57)*side*70,y:e.trail.y+Math.sin(a+1.57)*side*70};
+    const skirt=d>120 && clearWalk(e.trail.x,e.trail.y,flank.x,flank.y,e.r);
+    mutantApproach(e,skirt?flank:e.trail,d>120?135:175,dt);
+    if (e.cool <= 0 && canStrike(e,t,46)) { e.state = 'strike'; e.st = 0.35; play('sucker', e.x, e.y, 1); }
     return;
   }
   if (e.state === 'strike') {
-    e.ang = a; steer(e, t.x, t.y, 60, dt);
+    e.ang=a;mutantApproach(e,e.trail,60,dt);
     if (e.st <= 0) {
-      if (d < 50) {
+      if (canStrike(e,t,50)) {
         hurt(t, rnd(18, 26), e, a);
         if (t === P) { S.bleed = Math.min(3, (S.bleed || 0) + 1); msg('Тебя схватили! Кровотечение.', 'bad'); }
         e.hp = Math.min(e.maxhp, e.hp + 15); e.hp0 = e.hp;

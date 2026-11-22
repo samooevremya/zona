@@ -345,6 +345,7 @@ const nav = new Uint8Array(MW * MH), opq = new Uint8Array(MW * MH);
 const fences = [];
 // Spatial buckets for short walking probes. Transparent furniture and mesh fences
 // still stop a body, so a visibility ray cannot answer this question.
+const broadPropEdges=new Uint8Array(MW*MH);
 const walkSolids=new Map(), propEdgeBlocks=new Uint8Array(MW*MH), propBlockedCenters=new Set();
 function clearFooting(x,y,r){
   const body={x,y,r};
@@ -366,14 +367,14 @@ function clearWalk(x,y,tx,ty,r=11){
   for(let i=1;i<=n;i++)if(!clearFooting(x+(tx-x)*i/n,y+(ty-y)*i/n,r))return false;
   return true;
 }
-function walkAnchor(px,py){
+function walkAnchor(px,py,r=11){
   const tx=Math.floor(px/T),ty=Math.floor(py/T);
   for(let ring=0;ring<=4;ring++){
     let best=-1,dist=Infinity;
     for(let y=ty-ring;y<=ty+ring;y++)for(let x=tx-ring;x<=tx+ring;x++){
       if(!inb(x,y)||Math.max(Math.abs(x-tx),Math.abs(y-ty))!==ring||!nav[y*MW+x])continue;
       const wx=(x+.5)*T,wy=(y+.5)*T,d=Math.hypot(wx-px,wy-py);
-      if(d<dist&&clearWalk(px,py,wx,wy)){best=y*MW+x;dist=d;}
+      if(d<dist&&clearWalk(px,py,wx,wy,r)){best=y*MW+x;dist=d;}
     }
     if(best>=0)return best;
   }
@@ -410,10 +411,10 @@ function los(ax, ay, bx, by) {
 }
 const bfsPrev = new Int32Array(MW * MH), bfsQ = new Int32Array(MW * MH);
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-function navNeighbor(x, y, k) {
+function navNeighbor(x, y, k, r=11) {
   const nx = x + DIRS[k][0], ny = y + DIRS[k][1];
   if (!inb(nx, ny) || !nav[ny * MW + nx]) return -1;
-  if (propEdgeBlocks[y*MW+x] & (1<<k)) return -1;
+  if ((r>11 ? broadPropEdges : propEdgeBlocks)[y*MW+x] & (1<<k)) return -1;
   if (k >= 4 && (!nav[y * MW + nx] || !nav[ny * MW + x])) return -1;
   return ny * MW + nx;
 }
@@ -423,9 +424,9 @@ function nearestNav(tx, ty) {
   }
   return -1;
 }
-function findPath(sx, sy, tx, ty, walking=false) {
-  const s=walking?walkAnchor(sx,sy):nearestNav(Math.floor(sx/T),Math.floor(sy/T));
-  const g=walking?walkAnchor(tx,ty):nearestNav(Math.floor(tx/T),Math.floor(ty/T));
+function findPath(sx, sy, tx, ty, walking=false,r=11) {
+  const s=walking?walkAnchor(sx,sy,r):nearestNav(Math.floor(sx/T),Math.floor(sy/T));
+  const g=walking?walkAnchor(tx,ty,r):nearestNav(Math.floor(tx/T),Math.floor(ty/T));
   if (s < 0 || g < 0) return null;
   bfsPrev.fill(-1); bfsPrev[s] = s;
   let h = 0, t = 0; bfsQ[t++] = s;
@@ -433,7 +434,7 @@ function findPath(sx, sy, tx, ty, walking=false) {
     const c = bfsQ[h++]; if (c === g) break;
     const cx = c % MW, cy = (c / MW) | 0;
     for (let k = 0; k < 8; k++) {
-      const ni = navNeighbor(cx, cy, k);
+      const ni = navNeighbor(cx, cy, k,r);
       if (ni < 0 || bfsPrev[ni] >= 0) continue;
       bfsPrev[ni] = c; bfsQ[t++] = ni;
     }

@@ -107,32 +107,117 @@ function mkBoar(d) {
   return { id: nextId++, kind: 'boar', sid: d.sid, fac: 'mutant', name: 'Кабан', pack: d.pack, x: d.x * T, y: d.y * T, r: 14, hp: 130, maxhp: 130,
     ang: rnd(-3, 3), alive: 1, cool: 0, think: Math.random() * 0.3, home: { x: d.x * T, y: d.y * T }, kx: 0, ky: 0, flash: 0, step: 0, idleT: rnd(1, 4), state: 'idle', st: 0 };
 }
+// Perception supplies a remembered position. Hidden actors never supply fresh coordinates.
+function mutantPrey(o){
+  return o && o.alive && o.kind==='human' && o.fac!=='trader' && !o.captive && !inBunker(o.x,o.y);
+}
+function leaveHunt(e){
+  e.tgt=e.trail=e.path=e.wander=null;e.routeRetry=0;e.returning=true;
+  e.scentTime=0;e.searchBlocked=0;e.fleeT=0;e.huntProbe=null;
+  e.state=e.kind==='sucker'?'lurk':'idle';
+}
+function mutantTarget(e,dt,sightRange,chaseRange){
+  if(e.returning)return null;
+  if(e.tgt)e.scentTime=(e.scentTime||0)-dt;
+  if(e.tgt && (!mutantPrey(e.tgt) || dE(e,e.tgt)>chaseRange)){
+    leaveHunt(e);return null;
+  }
+  if(e.think<=0){
+    e.think=.25;
+    let best=null,nearest=Infinity;
+    for(const o of ents){
+      if(!mutantPrey(o))continue;
+      const range=o===e.tgt?chaseRange:sightRange*(e.kind==='dog'&&o===P?clamp(pVis()*1.1,.5,1.2):1);
+      const d=dE(e,o);
+      if(d>=range || d>=nearest || !clearNPCShot(e,o,true))continue;
+      nearest=d;best=o;
+    }
+    if(best){
+      if(e.kind==='dog'){
+        for(const mate of ents)if(mate!==e&&mate.alive&&mate.kind==='dog'&&mate.pack===e.pack&&
+            (!mate.tgt||mate.tgt===best)&&!mate.returning&&dE(e,mate)<220){
+          mate.tgt=best;mate.trail={x:best.x,y:best.y};mate.scentTime=4;
+        }
+      }
+      e.tgt=best;e.trail={x:best.x,y:best.y};e.scentTime=4;
+    }
+    if(e.tgt){
+      // Give up an unreachable target even when it can be seen through wire mesh.
+      const moved=e.huntProbe?dE(e,e.huntProbe):Infinity;
+      if(moved<4 && (e.routeRetry>0 || e.stuck>.1))e.searchBlocked=(e.searchBlocked||0)+.25;
+      else e.searchBlocked=0;
+      e.huntProbe={x:e.x,y:e.y};
+    }
+  }
+  if(e.tgt && (!e.trail || e.scentTime<=0 || e.searchBlocked>=3)){
+    leaveHunt(e);return null;
+  }
+  return e.tgt;
+}
+function roamDen(e,dt,speed){
+  if(e.returning || dE(e,e.home)>120){
+    e.returning=true;
+    if(e.denRevision!==navRevision || !e.denSpot){
+      e.denRevision=navRevision;e.denSpot=e.home;
+      if(!clearFooting(e.home.x,e.home.y,e.r)){
+        // A respawned crate can occupy the original resting spot.
+        const cx=Math.floor(e.home.x/T),cy=Math.floor(e.home.y/T);
+        let nearest=Infinity;
+        for(let y=cy-2;y<=cy+2;y++)for(let x=cx-2;x<=cx+2;x++){
+          if(!inb(x,y)||!nav[y*MW+x])continue;
+          const p={x:(x+.5)*T,y:(y+.5)*T},d=dE(p,e.home);
+          if(d<nearest&&clearFooting(p.x,p.y,e.r)&&findPath(e.x,e.y,p.x,p.y,true,e.r)){
+            e.denSpot=p;nearest=d;
+          }
+        }
+      }
+    }
+    if(goTo(e,e.denSpot.x,e.denSpot.y,90,dt)<11){
+      e.returning=false;e.wander=e.path=null;e.idleT=rnd(2,5);
+    }
+    return;
+  }
+  e.idleT=(e.idleT||0)-dt;
+  if(e.wander){
+    if(goTo(e,e.wander.x,e.wander.y,speed,dt)<8 || e.routeRetry>0)e.wander=null;
+  }else if(e.idleT<=0){
+    e.idleT=rnd(2,6);
+    const a=rnd(0,Math.PI*2),r=rnd(20,80),x=e.home.x+Math.cos(a)*r,y=e.home.y+Math.sin(a)*r;
+    if(walkAnchor(x,y,e.r)>=0 && clearFooting(x,y,e.r))e.wander={x,y};
+  }
+}
+function mutantApproach(e,point,speed,dt){
+  // A human can hug a wall closer than a boar. Aim for a point just short of the prey.
+  const d=dE(e,point),pad=Math.min(d,Math.max(0,e.r-9)+2);
+  if(d<1)return;
+  const x=point.x+(e.x-point.x)*pad/d,y=point.y+(e.y-point.y)*pad/d;
+  const dest=clearFooting(x,y,e.r)?{x,y}:point;
+  goTo(e,dest.x,dest.y,speed,dt);
+}
+function canStrike(e,t,reach){
+  return mutantPrey(t) && dE(e,t)<reach && clearNPCShot(e,t);
+}
 /* кабан: замечает, роет землю, бросается рывком по прямой; после рывка оглушён — уходи в сторону */
 function aiBoar(e, dt) {
   e.cool -= dt; e.think -= dt; e.st -= dt;
-  if (e.think <= 0) {
-    e.think = 0.3;
-    if (!e.tgt || !e.tgt.alive || dE(e, e.tgt) > 560) {
-      e.tgt = null;
-      for (const o of ents) if (o.alive && o.fac !== 'mutant' && !o.captive && dE(e, o) < 300 && los(e.x, e.y, o.x, o.y)) { e.tgt = o; break; }
-    }
-  }
-  const t = e.tgt;
-  if (!t) { e.state = 'idle'; e.idleT -= dt; if (e.idleT <= 0) { e.idleT = rnd(2, 6); const a = rnd(0, 6.28); e.wander = { x: e.home.x + Math.cos(a) * rnd(20, 90), y: e.home.y + Math.sin(a) * rnd(20, 90) }; } if (e.wander) { steer(e, e.wander.x, e.wander.y, 45, dt); e.ang += angD(e.ang, Math.atan2(e.wander.y - e.y, e.wander.x - e.x)) * dt * 3; if (dst(e.x, e.y, e.wander.x, e.wander.y) < 10) e.wander = null; } return; }
-  const want = Math.atan2(t.y - e.y, t.x - e.x);
+  const t=mutantTarget(e,dt,300,560);
+  if(!t){roamDen(e,dt,45);return;}
+  const want=Math.atan2(e.trail.y-e.y,e.trail.x-e.x);
   if (e.state === 'idle' || e.state === 'stalk') {
     e.state = 'stalk'; e.ang += angD(e.ang, want) * Math.min(1, dt * 4);
-    if (dE(e, t) > 240) goTo(e, t.x, t.y, 90, dt);
-    else if (e.cool <= 0 && los(e.x, e.y, t.x, t.y)) { e.state = 'wind'; e.st = 0.6; play('dog', e.x, e.y, 0.7); }
-    else steer(e, e.x + Math.cos(want + 1.57) * 40, e.y + Math.sin(want + 1.57) * 40, 50, dt);
+    if (dE(e,e.trail)>240 || !clearWalk(e.x,e.y,e.trail.x,e.trail.y,e.r)) mutantApproach(e,e.trail,90,dt);
+    else if (e.cool <= 0 && canStrike(e,t,241)) { e.state = 'wind'; e.st = 0.6; play('dog', e.x, e.y, 0.7); }
+    else mutantApproach(e,e.trail,50,dt);
   } else if (e.state === 'wind') {
     e.ang += angD(e.ang, want) * Math.min(1, dt * 6);
     if (chance(dt * 12)) parts.push({ x: e.x - Math.cos(e.ang) * 10, y: e.y - Math.sin(e.ang) * 10, vx: rnd(-40, 40), vy: rnd(-40, 40), life: 0.4, c: '#5a4a34', s: 2 });
     if (e.st <= 0) { e.state = 'charge'; e.st = 0.85; e.hit = 0; }
   } else if (e.state === 'charge') {
     const sp = 330 * dt, ox = e.x, oy = e.y;
-    moveE(e, Math.cos(e.ang) * sp, Math.sin(e.ang) * sp); e.step += sp;
-    if (!e.hit) for (const o of ents) { if (o.alive && o !== e && o.fac !== 'mutant' && dE(o, e) < e.r + o.r + 4) { e.hit = 1; hurt(o, rnd(24, 34), e, e.ang); o.kx += Math.cos(e.ang) * 320; o.ky += Math.sin(e.ang) * 320; } }
+    const nx=ox+Math.cos(e.ang)*sp,ny=oy+Math.sin(e.ang)*sp;
+    if(clearWalk(ox,oy,nx,ny,e.r))moveE(e,nx-ox,ny-oy);
+    e.step+=dst(ox,oy,e.x,e.y);
+    if (!e.hit) for (const o of ents) { if (canStrike(e,o,e.r+o.r+4)) { e.hit = 1; hurt(o, rnd(24, 34), e, e.ang); o.kx += Math.cos(e.ang) * 320; o.ky += Math.sin(e.ang) * 320; break; } }
     if (e.st <= 0 || dst(ox, oy, e.x, e.y) < sp * 0.3) { e.state = 'stun'; e.st = 1.1; e.cool = 1.6; }
   } else if (e.state === 'stun') { if (e.st <= 0) e.state = 'stalk'; }
 }
@@ -376,7 +461,7 @@ function goTo(e, tx, ty, speed, dt) {
         const dx=tx-e.x,dy=ty-e.y,t=clamp(((a.x-e.x)*dx+(a.y-e.y)*dy)/(distance*distance),0,1);
         return dst(a.x,a.y,e.x+t*dx,e.y+t*dy)<a.r+e.r;
       });
-    e.path=direct?[e.goal]:findPath(e.x,e.y,tx,ty,true);
+    e.path=direct?[e.goal]:findPath(e.x,e.y,tx,ty,true,e.r);
     if(!e.path){e.routeRetry=.9;return distance;}
     if(!direct)e.path.push(e.goal);
     e.stuck=0;
@@ -391,7 +476,7 @@ function goTo(e, tx, ty, speed, dt) {
   }
   if(!p){e.path=null;return distance;}
   // At a shared corner, let one traveller complete the turn before the next enters.
-  if(e.kind==='human' && dE(e,p)<T*1.6 && ents.some(o=>{
+  if((e.kind==='human'||e.fac==='mutant') && dE(e,p)<T*1.6 && ents.some(o=>{
     if(o===e||!o.alive||o.id>=e.id||!o.path||S.min-o.lastWalk>.2||dE(o,e)>T*1.7)return false;
     const next=o.path[o.pi];return next&&dE(next,p)<8&&dE(o,p)<T*1.5;
   })){
@@ -1098,40 +1183,22 @@ function startTrip(e) {
 }
 function aiDog(e, dt) {
   e.cool -= dt; e.think -= dt; e.barkT -= dt;
-  if (e.think <= 0) {
-    e.think = 0.3;
-    let best = null, bd = 1e9;
-    for (const o of ents) {
-      if (!o.alive || o.fac === 'mutant' || o.captive) continue;
-      const d = dE(e, o);
-      const k = o === P ? clamp(pVis() * 1.1, 0.5, 1.2) : 1;
-      if (d < (night() ? 320 : 280) * k && d < bd && (d < 150 * k || los(e.x, e.y, o.x, o.y))) { best = o; bd = d; }
-    }
-    if (best && !e.tgt) { ents.forEach(o => { if (o.kind === 'dog' && o.alive && o.pack === e.pack && !o.tgt && dE(o, e) < 220) o.tgt = best; }); }
-    if (best) e.tgt = best;
-    if (e.tgt && (!e.tgt.alive || dE(e, e.tgt) > 520)) e.tgt = null;
-  }
-  const t = e.tgt;
+  const t=mutantTarget(e,dt,night()?320:280,520);
   if (t) {
     if (e.barkT <= 0) { e.barkT = rnd(2, 5); play('dog', e.x, e.y); }
-    const want = Math.atan2(t.y - e.y, t.x - e.x), d = dE(e, t);
-    e.ang += angD(e.ang, want) * Math.min(1, dt * 9);
+    const want=Math.atan2(e.trail.y-e.y,e.trail.x-e.x);
+    e.ang+=angD(e.ang,want)*Math.min(1,dt*9);
     if (e.hp < e.maxhp * 0.35 && !e.fled) { e.fleeT = 2; e.fled = 1; }
-    if (e.fleeT > 0) { e.fleeT -= dt; steer(e, e.x - Math.cos(want) * 60, e.y - Math.sin(want) * 60, 170, dt); return; }
-    if (d > e.r + t.r + 4) {
-      if (los(e.x, e.y, t.x, t.y)) steer(e, t.x + Math.cos(e.id) * 6, t.y + Math.sin(e.id) * 6, 172, dt);
-      else goTo(e, t.x, t.y, 160, dt);
-    } else if (e.cool <= 0) {
+    if(e.fleeT>0){e.fleeT-=dt;goTo(e,e.home.x,e.home.y,170,dt);return;}
+    if(!canStrike(e,t,e.r+t.r+4))mutantApproach(e,e.trail,172,dt);
+    else if (e.cool <= 0) {
       e.cool = rnd(0.7, 1.1);
       hurt(t, rnd(7, 13), e, want);
       e.kx -= Math.cos(want) * 140; e.ky -= Math.sin(want) * 140;
     }
     return;
   }
-  e.idleT -= dt;
-  if (dE(e, e.home) > 160) { goTo(e, e.home.x, e.home.y, 90, dt); return; }
-  if (e.wander) { if (steer(e, e.wander.x, e.wander.y, 55, dt) < 0.2 || dst(e.x, e.y, e.wander.x, e.wander.y) < 10) e.wander = null; e.ang += angD(e.ang, Math.atan2((e.wander ? e.wander.y : e.y) - e.y, (e.wander ? e.wander.x : e.x) - e.x)) * dt * 5; }
-  else if (e.idleT <= 0) { e.idleT = rnd(2, 6); const a = rnd(0, 6.28), r = rnd(20, 90); e.wander = { x: e.home.x + Math.cos(a) * r, y: e.home.y + Math.sin(a) * r }; }
+  roamDen(e,dt,55);
 }
 
 /* ===================== задания ===================== */
