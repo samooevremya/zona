@@ -251,6 +251,12 @@ const VILLAGE_LANES = [
   [[49.5,177.7],[49.9,179]]
 ];
 function bigVillageYards() {
+  // The old yard seats are bark-covered logs. After remapping, keep those only outdoors;
+  // furnishHouses lays out the indoor seats against walls and reserves their aisles.
+  for(let i=DECOR.length-1;i>=0;i--){
+    const [kind,x,y]=DECOR[i];
+    if(kind==='bench' && isFloor(tAt(Math.floor(x),Math.floor(y))))DECOR.splice(i,1);
+  }
   // Машина у западной кромки двора оставляет проход между костром и домом.
   for (const lane of VILLAGE_LANES) bigPath(lane.map(([x,y])=>[x-.5,y-.5]), .7);
   addObj({ k: 'car', x: 53 * T - 37, y: 165.4 * T - 17, w: 74, h: 34, solid: 1, seed: 0, sprite: 'c1_yard_car' });

@@ -95,7 +95,7 @@ Tt('K10_walk_through_doors', () => {
   const houses = z.gfxSnap().HOUSES;
   let villageHouses = 0, villageGroups = 0;
   let groups = 0, openCells = 0;
-  const approaches = {earth:0, rubble:0, slab:0, porch:0};
+  const approaches = {earth:0, rubble:0, slab:0, porch:0, deck:0};
   for (const h of houses) {
     if (h.x >= bounds[0] && h.x < bounds[2] && h.y >= bounds[1] && h.y < bounds[3]) {
       villageHouses++; villageGroups += h.entrances.length;
@@ -114,6 +114,7 @@ Tt('K10_walk_through_doors', () => {
       groups++;
       if (Object.hasOwn(approaches, d.approach)) approaches[d.approach]++;
       else failures.push([h.ok, 'unknown approach', d.approach]);
+      if (d.approach === 'deck' && (h.ok !== '78,118' || d.ny !== -1)) failures.push([h.ok,'bar landing']);
       if (d.breach && d.approach !== 'rubble') failures.push([h.ok, 'breach surface']);
       if (d.approach === 'porch' && (d.ny !== 1 || !h.porchDepth)) failures.push([h.ok,'canopy missing']);
       const x = h.x*T+d.x, y = h.y*T+d.y;

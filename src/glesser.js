@@ -155,9 +155,11 @@ function makeLesserZone() {
   for (const [x,y,w,h,roof] of cottages) {
     // Leave existing road surfaces along the facade while clearing the plot.
     rcClear(x-1,Y+y-1,x+w,Y+y+h);
-    house(x,Y+y,w,h,[[Math.floor(w/2),h-1]],roof==='conc'?CO:BR,0,roof,random);
-    const doorX=x+Math.floor(w/2);
-    for (let j=0;j<3;j++) setT(doorX,Y+y+h+j,DI);
+    const tavern=x===78 && y===50, mid=Math.floor(w/2);
+    const doors=tavern?[[mid,0],[mid+1,0]]:[[mid,h-1]];
+    house(x,Y+y,w,h,doors,roof==='conc'?CO:BR,0,roof,random);
+    for(const [i] of doors)for(let j=0;j<3;j++)
+      setT(x+i,Y+y+(tavern?-1-j:h+j),DI);
     HOUSES[HOUSES.length-1].ok = x+','+(Y+y-NORTH_ROWS);
   }
   // Open strips between the pens and yards are actual walkable gates.
@@ -179,7 +181,7 @@ function makeLesserZone() {
     [47,61,TR],[55,68,BU],[155,37,BU],[168,46,TR],[77,27,BU]]) {
     if(tAt(x,Y+y)===GR) setT(x,Y+y,t);
   }
-  // Bar in the southwest plank house; leave the southern doorway clear.
+  // Bar in the southwest plank house; keep the north aisle open towards the village street.
   for (const [barRole,x,y,w,h] of [
     ['counter',80,53.02,96,20],['bench',87.3,52.4,41,19],
     ['guests',80.5,55.2,44,24],['guests',86.3,55.5,35,23],['shelf',79.2,51.1,83,12],['shelf',82,51.1,61,12]

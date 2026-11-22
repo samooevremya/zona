@@ -471,6 +471,13 @@ function applyState(d) {
   if(S.campaign.liberated)occupyATP();
   villageAftermath();
   if(BIG){
+    // Saves on the former south threshold should load on their own side of the new wall.
+    const bar=HOUSES.find(h=>h.ok==='78,118');
+    if(bar){
+      const x=(bar.x+Math.floor(bar.w/2))*T,y=(bar.y+bar.h-1)*T;
+      if(P.x>=x-P.r && P.x<=x+T+P.r && P.y>y-P.r && P.y<y+T+P.r)
+        P.y=S.y=P.y<y+T/2?y-P.r-1:y+T+P.r+1;
+    }
     // A trader snapshot from the old bar also stores its old home and seat.
     for(const sid of ['lz_barman','lz_guest','lz_guest2','a1','a2','shust']){
       const e=byS(sid), d=NPCDEF.find(n=>n.sid===sid);

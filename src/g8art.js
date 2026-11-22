@@ -642,6 +642,12 @@ function drawThresholds(g) {
         g.fillStyle = '#575449'; g.fillRect(left, -8, w, 18);
         if (ART) artFill(g, 'floor_concrete', left, -8, w, 16);
         g.fillStyle = 'rgba(192,184,157,.35)'; g.fillRect(left+1, 7, w-2, 1);
+      } else if (door.approach === 'deck') {
+        // Low plank landing visible above the north eave when approaching from the village.
+        const depth=27;
+        g.fillStyle='#514638';g.fillRect(left-1,-3,w+2,depth+5);
+        if(ART)artFill(g,'floor_wood',left,-3,w,depth+3);
+        for(let y=4;y<=depth;y+=7)beam(g,left+1,y,-left-1,y,1,'rgba(40,32,26,.52)');
       } else if (door.approach === 'porch') {
         g.fillStyle = '#514336'; g.fillRect(left-2, -6, w+4, 25);
         if (ART) artFill(g, 'floor_wood', left-2, -6, w+4, 23);

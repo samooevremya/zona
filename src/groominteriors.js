@@ -1,4 +1,4 @@
-// Top-down cutouts from the project's house, office and hangar sheets. Sizes are world pixels.
+// Top-down cutouts of worn furniture, shared by homes, offices and workshops. Sizes are world pixels.
 const roomFittings={
   bench:[[3,16,110,63],53,29], rack:[[119,4,110,88],42,28],
   cabinet:[[247,3,85,90],29,26], desk:[[357,3,98,90],38,34],
@@ -9,9 +9,10 @@ const roomFittings={
 };
 function drawRoomFitting(g,o){
   const [rect,w,h]=roomFittings[o.fitting];
-  g.save();g.translate(o.x+o.w/2,o.y+o.h/2);g.rotate(o.angle);
+  g.save();g.translate(o.x+o.w/2,o.y+o.h/2);
+  spriteShadow(g,2.5,1.7);g.rotate(o.angle);
   if(ART?.images.roomFittings){
-    spriteShadow(g,2.5,1.7);g.drawImage(ART.images.roomFittings,...rect,-w/2,-h/2,w,h);
+    g.drawImage(ART.images.roomFittings,...rect,-w/2,-h/2,w,h);
   }else{
     g.fillStyle='#564d3e';g.fillRect(-w/2,-h/2,w,h);g.strokeStyle='#928269';g.strokeRect(-w/2,-h/2,w,h);
   }
@@ -259,12 +260,9 @@ function drawRoomMarks(g,h){
   const layout=h.interior;if(!layout)return;
   for(const mount of layout.mounts){
     g.save();g.translate(mount.x,mount.y);g.rotate(mount.a);
-    if(ART?.images.roomFittings){
-      const type={office:'files',home:'supper',store:'rack',shop:'bench',bar:'rack',ruin:'pallet'}[layout.use];
-      const rect=roomFittings[type][0];
-      g.fillStyle='rgba(26,21,16,.36)';g.fillRect(-13,1,28,7);
-      g.drawImage(ART.images.roomFittings,...rect,-14,-5,28,10);
-    }
+    // Scuffs and worn skirting sit flush against the inside face of the wall.
+    beam(g,-12,1,10,1,2,'rgba(38,31,24,.31)');
+    beam(g,-9,2,4,2,1,'rgba(146,130,102,.29)');
     g.restore();
   }
   const {x,y,a}=layout.mark;
