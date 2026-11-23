@@ -241,7 +241,7 @@ function paintHatchRuts(g, sheen) {
   for (const [dx,dy,w,h,a] of hatchRuts) {
     g.save(); g.translate(HATCH.x+dx,HATCH.y+dy); g.rotate(a);
     if(sheen){
-      g.globalAlpha=.35*WX.rain;
+      g.globalAlpha=.35*(livingZone?ditchWater:WX.rain);
       g.drawImage(yardReflection(),-w*.42,-h*.42,w*.84,h*.84);
     } else {
       g.globalAlpha=.87;
@@ -541,7 +541,7 @@ function* artGround(g) {
       }
       g.clip('evenodd'); ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h); g.restore();
     }
-    if (BIG) drawVillageLanes(g);
+    if (BIG){drawVillageLanes(g);paintWorkSites(g);}
     if (villageAtmosphere) {
       paintVillageHearth(g);
       if (nearGroundChunk(HATCH.x,HATCH.y,190)) paintHatchRuts(g,false);

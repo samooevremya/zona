@@ -256,7 +256,10 @@ function advanceWorldTime(minutes, ctx) {
     }
   }
   S.min=end;
-  if(r.minutes>0)updateCoat(r.minutes);
+  if(r.minutes>0){
+    updateCoat(r.minutes);
+    if(livingZone)updateEnvironment(r.minutes);
+  }
   cleanExpiredCrates();
   renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';

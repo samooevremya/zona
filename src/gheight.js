@@ -126,17 +126,23 @@ function texturedFace(a, b, k, tex) {
   ctx.drawImage(tex,0,0,1,tex.height,-overhang,0,overhang,tex.height);
   ctx.drawImage(tex,tex.width-1,0,1,tex.height,tex.width,0,overhang,tex.height);
   ctx.drawImage(tex,0,0);
+  lampShadowOnWall(a,b,tex);
   ctx.restore();
+}
+function roofLift(h){
+  return houseHeight*(h.ruin ? .72 : h.mat==='depot' ? 1.55 : h.w*T<110 ? .68 : h.w*T>300 ? 1.12 : 1);
+}
+function clipRoofsFromLight(g,x,y,w,h,inView){
+  for(const house of HOUSES){
+    const width=house.w*T,height=house.h*T,left=house.x*T,top=house.y*T;
+    if(house.a<.52 || !inView(left+width/2,top+height/2,Math.max(width,height)*.64+40))continue;
+    const lift=perspective && ART?roofLift(house):0,[u,v]=roofPoint(left-3,top-3,lift);
+    g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(u,v,(width+6)*(1+lift),(height+6)*(1+lift));g.clip('evenodd');
+  }
 }
 function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
-  const k = houseHeight *
-      (h.ruin                ? .72 :
-           h.mat === 'depot' ? 1.55 :
-           w < 110           ? .68 :
-           w > 300           ? 1.12 :
-                               1),
-        corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
+  const k=roofLift(h), corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
   const ends = [[0, 1], [1, 2], [3, 2], [0, 3]], vis = [cam.y<y, cam.x>x + w, cam.y > y + d, cam.x < x];
   for (let s = 0; s < 4; s++)
     if (vis[s]) {

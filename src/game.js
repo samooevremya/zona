@@ -1390,7 +1390,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
   function tileBlocks(i,j){
     if(!inb(i,j))return true;
     const tile=map[j*MW+i];
-    return OPAQ[tile] || tile===RA;
+    return OPAQ[tile] || (tile===RA && vision!=='light');
   }
   while(near<limit){
     if(tileBlocks(i,j))return near;
@@ -1399,7 +1399,10 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
     const solids=walkSolids.get(cell),props=propCells.get(cell);
     if(solids)for(const o of solids)if(o.solid && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
-    if(props)for(const p of props)hit=Math.min(hit,propRay(p,x,y,dx,dy,near,far));
+    if(props)for(const p of props){
+      if(vision==='light' && p.vaultable)continue;
+      hit=Math.min(hit,propRay(p,x,y,dx,dy,near,far));
+    }
     const mid=(near+far)/2;
     if(terrainLevel(x+dx*mid,y+dy*mid)>base+slope*mid)hit=Math.min(hit,mid);
     else if(terrainLevel(x+dx*far,y+dy*far)>base+slope*far)hit=Math.min(hit,far);
@@ -1483,7 +1486,7 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
     const a = shots ? shots[k].a : ang + (Math.random() - 0.5) * 2 * spread, r = shots ? shots[k].r : shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
-    if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
+    if(r.box && sh===P && r.box.k==='crate'){surfaceImpact(ex,ey,ca,sa,r.box);breakCrate(r.box);continue;}
     if (best && coverBlocks(best, sh.x, sh.y) && chance(best === P ? 0.6 : 0.5)) {
       const cx = best.x - ca * 22, cy = best.y - sa * 22;
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
@@ -1493,7 +1496,7 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
       if (sh===P) { P.hitT=.2; P.impact={x:ex,y:ey,kill:!best.alive}; }
-    } else if (r.wall) for (let i = 0; i < 3; i++) parts.push({ x: ex - ca * 1.5, y: ey - sa * 1.5, vx: rnd(-80, 80) - ca * 60, vy: rnd(-80, 80) - sa * 60, life: rnd(0.15, 0.3), c: '#e8d9a0', s: 1.5 });
+    } else if (r.wall) surfaceImpact(ex,ey,ca,sa,r.box);
   }
   flashes.push({ x: fx, y: fy, a: ang, life: 0.06 });
   play(W.snd || 'p', sh.x, sh.y);
@@ -1643,7 +1646,11 @@ function pVis() {
   const moving = Math.hypot(IN.moveX, IN.moveY) > 0.1 || P.jumpT > 0;
   if (P.crouch) v *= 0.55;
   if (!moving) v *= 0.75; else if (P.sprinting) v *= 1.25;
-  if (darkness() > 0.3) v *= S.torch === false ? 0.6 : 1.1;   // ночью фонарь выдаёт, без него замечают на 40% позже
+  if(darkness()>.3){
+    let light=0;
+    for(const lamp of siteLights())light=Math.max(light,lampExposure(lamp,P));
+    v*=S.torch===false ? .6+.46*light : 1.1+.1*light;
+  }   // ночью фонарь выдаёт, без него замечают на 40% позже
   return v;
 }
 /* враг ещё не в бою с игроком: копит подозрение (0..1). Видит только перед собой (~115°), сзади — только на слух */
@@ -3102,7 +3109,7 @@ function fireGroundLight(fire) {
   glow.addColorStop(0, 'rgba(255,159,72,' + (BIG ? .24 : .34) + ')');
   glow.addColorStop(.42, 'rgba(236,133,48,' + (BIG ? .09 : .16) + ')');
   glow.addColorStop(1, 'rgba(224,115,40,0)');
-  ctx.save(); ctx.globalAlpha = fireFlick(); ctx.fillStyle = glow;
+  ctx.save();ctx.clip(lightFootprint(fire,0,Math.PI,r));ctx.globalAlpha = fireFlick(); ctx.fillStyle = glow;
   ctx.fillRect(fire.x - r, fire.y - r, r * 2, r * 2); ctx.restore();
 }
 /* костёр: вытянутые колеблющиеся языки с ярким центром поверх основания из камней */
@@ -3878,12 +3885,13 @@ function render() {
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
-  if(villageAtmosphere && ART && WX.rain>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
+  if(villageAtmosphere && ART && (livingZone?ditchWater:WX.rain)>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
     paintHatchRuts(ctx,true);
   if(livingZone){
-    if(ART && C1 && !loft && !shopVisible)drawRunoff(inView);
+    if(ART && C1 && !loft && !shopVisible){drawRoadWetness(vx,vy,vw,vh);drawRunoff(inView);}
     drawBootMarks(loft,inView);
   }
+  if(!loft && !shopVisible)drawLampShadows(inView);
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -3959,7 +3967,7 @@ function render() {
     ctx.fillStyle = 'rgba(255,220,120,0.95)'; ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(12, 0); ctx.lineTo(0, 3); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,220,0.9)'; ctx.beginPath(); ctx.arc(1, 0, 3, 0, 6.28); ctx.fill(); ctx.restore();
   }
-  for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.hearth) { drawHearthSmoke(p, 1-k); } else if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
+  for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.fragment) {drawFragment(p);} else if (p.hearth) { drawHearthSmoke(p, 1-k); } else if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
   ctx.globalAlpha = 1;
   // крыши: скрывают дом, пока ты не внутри
   HOUSES.forEach((h, i) => {
@@ -4089,17 +4097,25 @@ function render() {
     lctx.fillStyle = 'rgba(4,7,12,' + dk + ')'; lctx.fillRect(0, 0, LW, LH);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, a) => { const s = toS(x, y), rr = r * Z / 2; if (s[0] < -rr || s[1] < -rr || s[0] > LW + rr || s[1] > LH + rr) return; const g = lctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], rr); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.beginPath(); lctx.arc(s[0], s[1], rr, 0, 6.28); lctx.fill(); };
-    if (P.alive && S.torch === false) hole(P.x, P.y, 60, 0.45);   // без фонаря: только тусклый круг
-    else if (P.alive) {
-      hole(P.x, P.y, 95, 0.75);
-      const s = toS(P.x, P.y), L = 330 * Z / 2;
-      const g = lctx.createRadialGradient(s[0], s[1], 4, s[0], s[1], L);
-      g.addColorStop(0, 'rgba(0,0,0,0.95)'); g.addColorStop(0.7, 'rgba(0,0,0,0.6)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-      lctx.fillStyle = g; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, P.ang - 0.42, P.ang + 0.42); lctx.closePath(); lctx.fill();
+    lctx.save();
+    const unit=Z/2,origin=toS(0,0);
+    lctx.setTransform(unit,0,0,unit,origin[0],origin[1]);
+    if(!shopVisible && !loft)clipRoofsFromLight(lctx,vx,vy,vw,vh,inView);
+    if(P.alive){
+      if(S.torch===false)castLight(lctx,P,0,Math.PI,60,.45);
+      else {castLight(lctx,P,0,Math.PI,95,.75);castLight(lctx,P,P.ang,.42,330,.95);}
     }
-    hole(FIRE.x, FIRE.y, 200 * fireFlick() + 30, 0.95);
-    if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => hole(l[0] * T, l[1] * T, 120 + Math.sin(S.min * 3 + i) * 3, 0.85));
-    for(const f of WORLD_FIRES) if(f!==FIRE) hole(f.x,f.y,170+Math.sin(S.min*8)*8,.9);
+    for(const e of vis)if(e!==P && e.kind==='human' && !e.sit && !e.captive && e.fac!=='bandit' && e.sid!=='sid')
+      castLight(lctx,e,e.ang,.35,180,.70);
+    if(!loft && !shopVisible){
+      for(const l of siteLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
+      for(const f of WORLD_FIRES)if(inView(f.x,f.y,200))
+        castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
+      if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120))
+        castLight(lctx,lamp,0,Math.PI,120,.85);
+    }
+    lctx.restore();
+
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
@@ -4107,18 +4123,24 @@ function render() {
     for (const a of anoms) if (a.k === 'e' && (anomalyPhase(a)==='active' || a.fx>.3)) hole(a.x, a.y, 70 + a.fx * 120, 0.5);
     const range = activeDetectorRange();
     if (range) for (const a of arts) if (dE(a, P) <= range) hole(a.x, a.y, 40, 0.6);
-    ents.forEach(e => { if (e !== P && e.alive && e.kind === 'human' && !(SID_SHOP && e.sid === 'sid') && !e.sit && !e.captive && e.fac !== 'bandit' && dE(e, P) < 700) { const s = toS(e.x, e.y), L = 180 * Z / 2; const g2 = lctx.createRadialGradient(s[0], s[1], 2, s[0], s[1], L); g2.addColorStop(0, 'rgba(0,0,0,0.7)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g2; lctx.beginPath(); lctx.moveTo(s[0], s[1]); lctx.arc(s[0], s[1], L, e.ang - 0.35, e.ang + 0.35); lctx.closePath(); lctx.fill(); } });
+
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightC, 0, 0, VW, VH);
-    // тёплый свет костра поверх
-    const fs = toS(FIRE.x, FIRE.y);
-    const fg = ctx.createRadialGradient(fs[0] * 2, fs[1] * 2, 0, fs[0] * 2, fs[1] * 2, 160 * Z);
-    fg.addColorStop(0, 'rgba(255,150,60,' + (0.22 * dk * fireFlick()) + ')'); fg.addColorStop(1, 'rgba(255,150,60,0)');
-    ctx.fillStyle = fg; ctx.fillRect(0, 0, VW, VH);
-    // лампы деревни после ремонта генератора: тёплые пятна света (процедурно; растр ламп ожидается)
-    if (villageLit()) LOC.village.anchors.lamps.forEach((l, i) => { const s2 = toS(l[0] * T, l[1] * T), lg = ctx.createRadialGradient(s2[0] * 2, s2[1] * 2, 0, s2[0] * 2, s2[1] * 2, 110 * Z);
-      lg.addColorStop(0, 'rgba(255,214,140,' + (0.32 * dk) + ')'); lg.addColorStop(0.15, 'rgba(255,200,120,' + (0.16 * dk) + ')'); lg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, VW, VH);
-      ctx.fillStyle = 'rgba(255,240,200,' + (0.9 * dk) + ')'; ctx.beginPath(); ctx.arc(s2[0] * 2, s2[1] * 2, 3 * Z, 0, 6.28); ctx.fill(); });
+    if(!loft && !shopVisible){
+      ctx.save();ctx.translate(origin[0]*2,origin[1]*2);ctx.scale(Z,Z);
+      clipRoofsFromLight(ctx,vx,vy,vw,vh,inView);
+      for(const l of siteLights())if(inView(l.x,l.y,l.r)){
+        castLight(ctx,l,l.angle,l.half,l.r,dk*.32,'255,188,103');
+        ctx.fillStyle='#3c3932';ctx.fillRect(l.x-4,l.y-2,8,5);
+        ctx.fillStyle='#e8c588';ctx.fillRect(l.x-2.5,l.y+1,5,1.6);
+      }
+      if(inView(FIRE.x,FIRE.y,205))castLight(ctx,FIRE,0,Math.PI,205,dk*.22,'255,150,60');
+      if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120)){
+        castLight(ctx,lamp,0,Math.PI,120,dk*.32,'255,203,132');
+        ctx.fillStyle='#d8ba86';ctx.beginPath();ctx.arc(lamp.x,lamp.y,2,0,Math.PI*2);ctx.fill();
+      }
+      ctx.restore();
+    }
   }
   for (const f of flashes) if (f.big) { const s = toS(f.x, f.y); const g = ctx.createRadialGradient(s[0] * 2, s[1] * 2, 0, s[0] * 2, s[1] * 2, 140 * Z); g.addColorStop(0, f.blue ? 'rgba(180,220,255,0.6)' : 'rgba(255,200,120,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
   if (villageAtmosphere && !bunk) {
@@ -4147,12 +4169,18 @@ function render() {
 }
 
 /* ===================== погода, выброс, шаги, голоса, гитара ===================== */
-const WX = { cloud: 0.15, rain: 0, fog: 0, wind: 0.35, flash: 0, red: 0, clouds: [], drops: [] };
-const WXT = { clear: [0.1, 0, 0], cloudy: [0.65, 0, 0], rain: [0.85, 0.6, 0.06], storm: [1, 1, 0.06], fog: [0.45, 0, 0.8] };
+const WX = { cloud: 0.15, rain: 0, fog: 0, gust:0, sleet:0, time:0, wind: 0.35, flash: 0, red: 0, clouds: [], drops: [] };
+// Cloud, rain, fog, mean wind, dry leaves and sleet. The save stores the weather name.
+const WXT = {
+  clear:[.10,0,0,.17],cloudy:[.65,0,0,.32],rain:[.85,.60,.06,.61],storm:[1,1,.06,.98],
+  fog:[.45,0,.8,.10],gust:[.40,0,.04,.92,1],sleet:[.88,.10,.25,.65,0,1]
+};
 for (let i = 0; i < 7; i++) WX.clouds.push({ x: rnd(0, WW), y: rnd(0, WH), r: rnd(350, 700) });
 function pickWeather() {
   const r = Math.random(), h = hour();
-  const k = r < 0.34 ? 'clear' : r < 0.58 ? 'cloudy' : r < 0.78 ? 'rain' : r < 0.87 ? 'storm' : (h < 9 || h > 18 ? 'fog' : 'cloudy');
+  const cold=h<9 || h>18;
+  const k = r<.23?'clear':r<.40?'cloudy':r<.57?'gust':r<.72?'rain':r<.80?'storm':
+    r<.91?(cold?'fog':'cloudy'):(cold?'sleet':'gust');
   S.wx = { k: k, until: S.min + rnd(120, 300) };
 }
 const sheltered = (x, y) => !!loftAt({x,y}) || inBunker(x, y) || HOUSES.some(h => x > h.x*T && x < (h.x+h.w)*T && y > h.y*T && y < (h.y+h.h)*T);
@@ -4238,7 +4266,8 @@ function worldFx(dt) {
   if (S.min > S.wx.until) pickWeather();
   const tg = WXT[S.wx.k] || WXT.clear, k = Math.min(1, dt * 0.05);
   WX.cloud = lerp(WX.cloud, tg[0], k); WX.rain = lerp(WX.rain, tg[1], k); WX.fog = lerp(WX.fog, tg[2], k);
-  WX.wind = 0.3 + WX.rain * 0.6;
+  WX.time+=dt;WX.gust=lerp(WX.gust,tg[4]||0,k);WX.sleet=lerp(WX.sleet,tg[5]||0,k);
+  WX.wind=lerp(WX.wind,tg[3]+.18*WX.gust*Math.sin(WX.time*.74),Math.min(1,dt*.21));
   WX.clouds.forEach(c => { c.x += WX.wind * 40 * dt; c.y += WX.wind * 12 * dt; if (c.x > WW + 700) { c.x = -700; c.y = rnd(0, WH); } if (c.y > WH + 700) c.y = -700; });
   WX.flash = Math.max(0, WX.flash - dt * 3);
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
@@ -4492,23 +4521,25 @@ function drawWeatherScreen() {
   const bunk = P && (loftAt(P) || inBunker(P.x, P.y));
   if (!bunk) {
     if (WX.cloud > 0.3 || WX.rain > 0.1) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(' + Math.round(255 - WX.cloud * 45) + ',' + Math.round(255 - WX.cloud * 40) + ',' + Math.round(255 - WX.cloud * 25) + ')'; ctx.fillRect(0, 0, VW, VH); ctx.globalCompositeOperation = 'source-over'; }
+    const room=HOUSES.find(h=>!h.ruin && roofHidden(h));
+    ctx.save();
+    if(room){
+      ctx.beginPath();ctx.rect(0,0,VW,VH);
+      ctx.rect((room.x*T-cam.x)*Z+VW/2,(room.y*T-cam.y)*Z+VH/2,room.w*T*Z,room.h*T*Z);
+      ctx.clip('evenodd');
+    }
     if (WX.fog > 0.05) {
       const s = [(P.x - cam.x) * Z + VW / 2, (P.y - cam.y) * Z + VH / 2];
       const g = ctx.createRadialGradient(s[0], s[1], 60 * Z, s[0], s[1], 460 * Z);
       g.addColorStop(0, 'rgba(170,176,166,' + WX.fog * 0.12 + ')'); g.addColorStop(1, 'rgba(170,176,166,' + WX.fog * 0.72 + ')');
       ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     }
+    drawWeatherFront();
     const n = Math.floor(WX.rain * 240);
     while (WX.drops.length < n) WX.drops.push({ x: rnd(0, VW), y: rnd(-VH, VH), l: rnd(10, 22), v: rnd(700, 1000) });
     if (WX.drops.length > n) WX.drops.length = n;
     if (n) {
       ctx.save();
-      const house=HOUSES.find(h=>!h.ruin && P.x>h.x*T && P.x<(h.x+h.w)*T && P.y>h.y*T && P.y<(h.y+h.h)*T);
-      if(house){
-        ctx.beginPath();ctx.rect(0,0,VW,VH);
-        ctx.rect((house.x*T-cam.x)*Z+VW/2,(house.y*T-cam.y)*Z+VH/2,house.w*T*Z,house.h*T*Z);
-        ctx.clip('evenodd');
-      }
       ctx.strokeStyle = 'rgba(190,200,210,0.32)'; ctx.lineWidth = 1; ctx.beginPath();
       const sx = WX.wind * 0.35;
       for (const d of WX.drops) {
@@ -4521,6 +4552,7 @@ function drawWeatherScreen() {
       for (let i = 0; i < n / 8; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * VW, Math.random() * VH, 3, 1.2, 0, 0, 6.28); ctx.fill(); }
       ctx.restore();
     }
+    ctx.restore();
   }
   const exposed = S.blow?.stage && !sheltered(P.x, P.y);
   if (WX.red > 0.02 && exposed) {
@@ -4857,7 +4889,7 @@ function paintHatchRuts(g, sheen) {
   for (const [dx,dy,w,h,a] of hatchRuts) {
     g.save(); g.translate(HATCH.x+dx,HATCH.y+dy); g.rotate(a);
     if(sheen){
-      g.globalAlpha=.35*WX.rain;
+      g.globalAlpha=.35*(livingZone?ditchWater:WX.rain);
       g.drawImage(yardReflection(),-w*.42,-h*.42,w*.84,h*.84);
     } else {
       g.globalAlpha=.87;
@@ -5157,7 +5189,7 @@ function* artGround(g) {
       }
       g.clip('evenodd'); ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h); g.restore();
     }
-    if (BIG) drawVillageLanes(g);
+    if (BIG){drawVillageLanes(g);paintWorkSites(g);}
     if (villageAtmosphere) {
       paintVillageHearth(g);
       if (nearGroundChunk(HATCH.x,HATCH.y,190)) paintHatchRuts(g,false);
@@ -6190,7 +6222,10 @@ function advanceWorldTime(minutes, ctx) {
     }
   }
   S.min=end;
-  if(r.minutes>0)updateCoat(r.minutes);
+  if(r.minutes>0){
+    updateCoat(r.minutes);
+    if(livingZone)updateEnvironment(r.minutes);
+  }
   cleanExpiredCrates();
   renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
@@ -10894,17 +10929,23 @@ function texturedFace(a, b, k, tex) {
   ctx.drawImage(tex,0,0,1,tex.height,-overhang,0,overhang,tex.height);
   ctx.drawImage(tex,tex.width-1,0,1,tex.height,tex.width,0,overhang,tex.height);
   ctx.drawImage(tex,0,0);
+  lampShadowOnWall(a,b,tex);
   ctx.restore();
+}
+function roofLift(h){
+  return houseHeight*(h.ruin ? .72 : h.mat==='depot' ? 1.55 : h.w*T<110 ? .68 : h.w*T>300 ? 1.12 : 1);
+}
+function clipRoofsFromLight(g,x,y,w,h,inView){
+  for(const house of HOUSES){
+    const width=house.w*T,height=house.h*T,left=house.x*T,top=house.y*T;
+    if(house.a<.52 || !inView(left+width/2,top+height/2,Math.max(width,height)*.64+40))continue;
+    const lift=perspective && ART?roofLift(house):0,[u,v]=roofPoint(left-3,top-3,lift);
+    g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(u,v,(width+6)*(1+lift),(height+6)*(1+lift));g.clip('evenodd');
+  }
 }
 function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
-  const k = houseHeight *
-      (h.ruin                ? .72 :
-           h.mat === 'depot' ? 1.55 :
-           w < 110           ? .68 :
-           w > 300           ? 1.12 :
-                               1),
-        corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
+  const k=roofLift(h), corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
   const ends = [[0, 1], [1, 2], [3, 2], [0, 3]], vis = [cam.y<y, cam.x>x + w, cam.y > y + d, cam.x < x];
   for (let s = 0; s < 4; s++)
     if (vis[s]) {
@@ -11964,26 +12005,31 @@ function drawRoomMarks(g,h){
 
 // Transient world effects use world pixels and simulation time. They never enter the save.
 const livingZone=BIG && !location.hash.includes('living-off');
-let surfaceWater=0,wetBoots=0,footSide=1,environmentTime=0;
+let surfaceWater=0,wetBoots=0,muddyBoots=false,footSide=1,environmentTime=0;
 const bootMarks=[],plantBlocks=new Map(),bentPlants=new Map();
 function resetEnvironment(){
   bootMarks.length=0;bentPlants.clear();
-  surfaceWater=WXT[S.wx?.k]?.[1] || 0; wetBoots=0;environmentTime=0;footSide=1;
+  const state=WXT[S.wx?.k]||WXT.clear;
+  Object.assign(WX,{cloud:state[0],rain:state[1],fog:state[2],wind:state[3],gust:state[4]||0,sleet:state[5]||0,time:0});
+  surfaceWater=Math.max(WX.rain,WX.sleet*.55);roadFilm=ditchWater=surfaceWater;drainage.clear(); wetBoots=0;muddyBoots=false;environmentTime=0;footSide=1;
 }
 function updateEnvironment(dt){
   environmentTime+=dt;
-  surfaceWater=lerp(surfaceWater,WX.rain,1-Math.exp(-dt/(WX.rain>surfaceWater?6:55)));
+  const wet=Math.max(WX.rain,WX.sleet*.55);
+  surfaceWater=lerp(surfaceWater,wet,1-Math.exp(-dt/(wet>surfaceWater?6:55)));
+  roadFilm=lerp(roadFilm,wet,1-Math.exp(-dt/(wet>roadFilm?4:42)));
+  ditchWater=lerp(ditchWater,wet,1-Math.exp(-dt/(wet>ditchWater?12:125)));
   while(bootMarks.length && environmentTime-bootMarks[0].time>23)bootMarks.shift();
   for(const [plant,bend] of bentPlants)if(environmentTime-bend.time>1.35)bentPlants.delete(plant);
 }
 function leaveBootMark(e){
   const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T));
-  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24)){wetBoots=1;return;}
+  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y))){wetBoots=1;muddyBoots=t!==SW;return;}
   if(wetBoots<.08)return;
   if(t===CF || t===FL || t===AS || loftAt(e)){
     footSide*=-1;
     const a=e.ang,side=4*footSide;
-    bootMarks.push({x:e.x-Math.sin(a)*side,y:e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,level:loftAt(e)});
+    bootMarks.push({x:e.x-Math.sin(a)*side,y:e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,mud:muddyBoots,level:loftAt(e)});
     if(bootMarks.length>45)bootMarks.shift();
   }
   wetBoots*=.72;
@@ -11993,8 +12039,10 @@ function drawBootMarks(level,inView){
     if(m.level!==level || !inView(m.x,m.y,12))continue;
     ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.a);
     ctx.globalAlpha=.66*m.wet*(1-(environmentTime-m.time)/23);
-    ctx.fillStyle='#3a342a';ctx.beginPath();ctx.ellipse(2,0,4.3,2.4,0,0,6.29);ctx.fill();
-    ctx.fillRect(-5,-1.9,2.7,3.8);ctx.restore();
+    ctx.fillStyle=m.mud?'#493927':'#373b38';ctx.beginPath();ctx.ellipse(2,0,4.3,2.4,0,0,6.29);ctx.fill();
+    ctx.fillRect(-5,-1.9,2.7,3.8);
+    if(m.mud){ctx.fillStyle='#847660';for(let i=-1;i<5;i+=2.2)ctx.fillRect(i,-1.9,.65,3.8);}
+    ctx.restore();
   }
 }
 function reactiveTuft(x,y){return hash2(y+9,x+61)<.52;}
@@ -12109,11 +12157,12 @@ function underRainCover(x,y){
 }
 function updateCoat(dt){
   const wet=S.flags.coatWetness||0;
-  if(!wet && WX.rain<.12)return;
+  const precip=Math.max(WX.rain,WX.sleet*.55);
+  if(!wet && precip<.12)return;
   const cover=underRainCover(P.x,P.y);
   if(!wet && cover)return;
   const byFire=!inBunker(P.x,P.y) && !loftAt(P) && WORLD_FIRES.some(f=>dE(f,P)<80);
-  const change=byFire ? -1/23 : cover ? -1/85 : WX.rain>.12 ? WX.rain/55 : -1/170;
+  const change=byFire ? -1/23 : cover ? -1/85 : precip>.12 ? precip/55 : -1/170;
   S.flags.coatWetness=clamp(wet+change*dt,0,1);
 }
 
@@ -12144,6 +12193,268 @@ function investigateFootfall(e,dt){
   q.turn-=dt;
   if(q.turn<=0 && dE(e,q)>25 && dE(e,e.home)<110 && !e.stay)goTo(e,q.x,q.y,50,dt);
   return true;
+}
+
+// Light paths are in world coordinates, so moving the camera never moves a shadow.
+const beamCache=new WeakMap();
+function lightFootprint(source,angle,half,radius) {
+  let slots=beamCache.get(source);
+  if(!slots){slots=new Map();beamCache.set(source,slots);}
+  const cached=slots.get(radius);
+  if(cached && cached.x===source.x && cached.y===source.y && cached.angle===angle && cached.half===half && cached.rev===navRevision)return cached.path;
+  const path=new Path2D(),full=half>=Math.PI,steps=full?44:22;
+  const reach=a=>npcBarrier(source,Math.cos(a),Math.sin(a),radius,null,'light');
+  const point=(a,r)=>path.lineTo(source.x+Math.cos(a)*r,source.y+Math.sin(a)*r);
+  // Bracket the shadow edge near a door instead of joining a near jamb directly to the far wall.
+  function edge(a,r,b,s,depth){
+    if(depth && Math.abs(r-s)>10){
+      const mid=(a+b)*.5,m=reach(mid);
+      edge(a,r,mid,m,depth-1);edge(mid,m,b,s,depth-1);
+    }else point(b,s);
+  }
+  let a=angle-half,r=reach(a);
+  if(!full)path.moveTo(source.x,source.y);
+  point(a,r);
+  for(let i=1;i<=steps;i++){
+    const b=angle-half+half*2*i/steps,s=reach(b);
+    edge(a,r,b,s,3);a=b;r=s;
+  }
+  path.closePath();slots.set(radius,{x:source.x,y:source.y,angle,half,rev:navRevision,path});return path;
+}
+function castLight(g,source,angle,half,radius,strength,tint){
+  const path=lightFootprint(source,angle,half,radius);
+  const fade=g.createRadialGradient(source.x,source.y,1,source.x,source.y,radius);
+  const color=tint||'0,0,0';
+  fade.addColorStop(0,'rgba('+color+','+strength+')');
+  fade.addColorStop(.63,'rgba('+color+','+(strength*.58)+')');
+  fade.addColorStop(1,'rgba('+color+',0)');
+  g.fillStyle=fade;g.fill(path);
+}
+let outdoorLamps, settlementLights;
+function villageBulbs(){
+  return settlementLights ||= (LOC.village.anchors.lamps||[]).map(([x,y])=>({x:x*T,y:y*T}));
+}
+function siteLights(){
+  if(!outdoorLamps)outdoorLamps=BIG?[
+    {x:HATCH.x,y:HATCH.y+10,angle:Math.PI*.48,half:.39,r:96},
+    {...worldPoint(122.5,202.5),angle:1.0,half:1.34,r:167}
+  ]:[];
+  return outdoorLamps;
+}
+function lampExposure(lamp,p){
+  const d=dE(lamp,p);
+  if(d>=lamp.r || Math.abs(angD(lamp.angle,Math.atan2(p.y-lamp.y,p.x-lamp.x)))>lamp.half)return 0;
+  return d<1 || npcBarrier(lamp,(p.x-lamp.x)/d,(p.y-lamp.y)/d,d,null,'light')>=d-.1?1-d/lamp.r:0;
+}
+function drawLampShadows(inView){
+  const dk=darkness();if(!SHADOWS || dk<.14)return;
+  for(const l of siteLights()){
+    if(!inView(l.x,l.y,l.r))continue;
+    ctx.save();ctx.clip(lightFootprint(l,l.angle,l.half,l.r));
+    for(const e of ents){
+      if(!e.alive || e.kind!=='human')continue;
+      const lit=lampExposure(l,e);if(lit<=0)continue;
+      const a=Math.atan2(e.y-l.y,e.x-l.x),length=12+(1-lit)*31;
+      ctx.save();ctx.translate(e.x,e.y);ctx.rotate(a);
+      const fade=ctx.createLinearGradient(0,0,length,0);
+      fade.addColorStop(0,'rgba(15,15,14,'+(.55*dk*lit)+')');fade.addColorStop(1,'rgba(15,15,14,0)');
+      ctx.fillStyle=fade;ctx.beginPath();ctx.ellipse(length*.46,0,length*.55,e.crouch?6:8,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+    ctx.restore();
+  }
+}
+
+function hitSurface(x,y,dx,dy,box){
+  const p={x:x+dx*.7,y:y+dy*.7,r:.8},tx=Math.floor(p.x/T),ty=Math.floor(p.y/T),cell=ty*MW+tx;
+  let kind=box?.k;
+  if(!kind){
+    const solid=walkSolids.get(cell)?.find(o=>o.solid && p.x>=o.x-1 && p.x<=o.x+o.w+1 && p.y>=o.y-1 && p.y<=o.y+o.h+1);
+    kind=solid?.material||solid?.k||propCells.get(cell)?.find(o=>touchesProp(o,p))?.id||'';
+  }
+  if(/crate|stockade|picket|log|bench|plank|stump|wood|sleeper/.test(kind))return 'wood';
+  if(/concrete|pier|rock|stone/i.test(kind))return 'stone';
+  if(/car|wagon|barrel|metal|bus|drum|barrier|steel|fence|tank|truck|pipe/i.test(kind))return 'metal';
+  const tile=tAt(tx,ty);
+  if(tile===TR)return 'wood';
+  if(tile===CO)return 'stone';
+  if(tile===BR){
+    const h=HOUSES.find(h=>tx>=h.x && tx<h.x+h.w && ty>=h.y && ty<h.y+h.h);
+    return h && !['conc','depot','brick'].includes(h.mat)?'wood':'brick';
+  }
+  return tile===RA?'metal':'earth';
+}
+const impactColors={wood:['#ba9466','#806044'],brick:['#b68a72','#907465'],stone:['#bbb7a3','#969487'],metal:['#ffcf80','#ffe4ac'],earth:['#968671','#84755f']};
+function surfaceImpact(x,y,dx,dy,box){
+  if(!P || dE(P,{x,y})>970 || parts.length>200)return;
+  const material=hitSurface(x,y,dx,dy,box),colors=impactColors[material];
+  for(let i=0;i<4;i++){
+    const speed=rnd(26,material==='metal'?160:92),angle=Math.atan2(-dy,-dx)+rnd(-1.2,1.2);
+    parts.push({x:x-dx,y:y-dy,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rnd(.12,.30),c:colors[i%2],
+      s:rnd(1,2.4),fragment:material});
+  }
+  if(material==='brick' || material==='stone' || material==='earth')
+    parts.push({x:x-2*dx,y:y-2*dy,vx:-dx*13,vy:-dy*13,rise:6,life:.43,c:colors[1],s:4,smoke:1});
+}
+function drawFragment(p){
+  if(p.fragment==='metal' || p.fragment==='wood'){
+    const scale=p.fragment==='metal' ? .047 : .034;
+    ctx.strokeStyle=p.c;ctx.lineWidth=p.fragment==='metal'?1:p.s;
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*scale,p.y-p.vy*scale);ctx.stroke();
+  }else{ctx.beginPath();ctx.moveTo(p.x-p.s,p.y);ctx.lineTo(p.x,p.y-p.s);ctx.lineTo(p.x+p.s,p.y+p.s*.7);ctx.fill();}
+}
+
+function paintWorkSites(g){
+  const wolfHouse=HOUSES.find(h=>h.ok==='15,72');
+  if(wolfHouse){
+    const x=(wolfHouse.x+.6)*T,y=(wolfHouse.y+wolfHouse.h)*T+8;
+    if(nearGroundChunk(x,y,68)){
+      g.save();g.translate(x,y);
+      g.drawImage(trailPrint(true,1),-21,-7,48,22);
+      const rand=mulberry32(311);
+      for(let row=0;row<3;row++)for(let i=0;i<4-row;i++){
+        const u=-16+i*8+row*3,v=7-row*3;
+        g.fillStyle='#463a2e';g.fillRect(u-1,v-15,7,17);
+        beam(g,u+1,v-13,u+1.7,v,1,'#978974');
+        g.fillStyle=rand()>.4?'#a58b65':'#8e795a';g.beginPath();g.ellipse(u+2,v,3.5,2.1,-.16,0,Math.PI*2);g.fill();
+      }
+      for(let i=0;i<21;i++){g.fillStyle=i%3?'#89765b':'#564a37';g.fillRect(rand()*36-15,10+rand()*12,1+rand()*3,1);}
+      g.restore();
+    }
+  }
+  const [gx,gy]=LOC.atp.anchors.garage, depot=HOUSES.find(h=>h.mat==='depot');
+  function spill(x,y,w,h,seed){
+    if(!nearGroundChunk(x,y,w))return;
+    const rand=mulberry32(seed);g.save();g.translate(x,y);g.rotate(-.2);
+    g.globalCompositeOperation='multiply';
+    for(let i=0;i<15;i++){g.globalAlpha=i<4 ? .62 : .28;const s=i<4 ? .68+rand()*.32 : .08+rand()*.18;
+      g.drawImage(trailPrint(true,i%4),(rand()-.5)*w-w*s/2,(rand()-.5)*h-h*s/2,w*s,h*s);}
+    g.restore();
+  }
+  spill(gx*T,gy*T,95,41,552);
+  const counter=objs.find(o=>o.barService);
+  if(counter && nearGroundChunk(counter.x,counter.y,110)){
+    // Scuffs from boots at the bar and the rusty rings of a pair of old kegs.
+    g.save();g.globalAlpha=.5;
+    for(let i=0;i<4;i++)g.drawImage(trailPrint(false,i),counter.x+i*17,counter.y+counter.h+3,31,13);
+    g.strokeStyle='#67513a';g.lineWidth=1.6;
+    for(let i=0;i<2;i++){g.beginPath();g.ellipse(counter.x+7+19*i,counter.y-8,7.8,6.7,-.17,.3,5.8);g.stroke();}
+    g.restore();
+  }
+  const lamp=siteLights()[1];
+  if(lamp && nearGroundChunk(lamp.x,lamp.y,40)){
+    g.save();g.translate(lamp.x,lamp.y);
+    g.fillStyle='#49483d';g.fillRect(-14,-12,8,8);
+    beam(g,-11,-9,-6,-5,4,'#373834');beam(g,-6,-5,0,0,3,'#5c5645');
+    beam(g,-11,-10,-1,-1,1,'#94846f');g.fillStyle='#48483d';g.fillRect(-4,-3,9,5);
+    g.restore();
+  }
+  if(depot && nearGroundChunk((depot.x+depot.w/2)*T,(depot.y+depot.h/2)*T,depot.w*T)){
+    for(let i=2;i<depot.w-2;i+=2){
+      const x=(depot.x+i)*T,y=(depot.y+8.5)*T;
+      spill(x,y+19,63,18,492+i);
+      if(nearGroundChunk(x,y,70)){g.save();g.globalAlpha=.32;g.drawImage(trailPrint(false,i%4),x-34,y-9,69,17);g.restore();}
+    }
+  }
+  for(const o of objs)if(o.k==='freightWagon' && nearGroundChunk(o.x+o.w/2,o.y+o.h/2,o.w)){
+    spill(o.x+o.w*.28,o.y+o.h,65,24,786);spill(o.x+o.w*.79,o.y+o.h-2,56,22,138);
+  }
+}
+
+// Small local wet depressions use three separate drying rates. Static positions are cached per sector.
+const drainage=new Map();
+let roadFilm=0,ditchWater=0;
+function catchmentBlock(bx,by){
+  const key=bx+','+by;if(drainage.has(key))return drainage.get(key);
+  const spots=[];
+  for(let j=0;j<8;j++)for(let i=0;i<8;i++){
+    const tx=bx*8+i,ty=by*8+j,t=tAt(tx,ty);
+    if(t!==AS && t!==DI && t!==GR)continue;
+    const noise=hash2(tx+48,ty-7),hard=t===AS;
+    if(noise>(hard ? .5 : .27))continue;
+    const dx=tAt(tx-1,ty)===AS || tAt(tx+1,ty)===AS,dy=tAt(tx,ty-1)===AS || tAt(tx,ty+1)===AS;
+    if(!hard && !(dx||dy || t===DI && (tAt(tx-1,ty)===GR || tAt(tx,ty+1)===GR)))continue;
+    const x=(tx+.5)*T,y=(ty+.5)*T;
+    if(underRainCover(x,y))continue;
+    const underVehicle=walkSolids.get(ty*MW+tx)?.some(o=>['bus','car','freightWagon'].includes(o.k) &&
+      x>=o.x-8 && x<=o.x+o.w+8 && y>=o.y-8 && y<=o.y+o.h+8);
+    if(!underVehicle)spots.push({x,y,hard,a:(!hard&&dx?Math.PI/2:0)+(noise-.2)*1.7,w:hard?24+noise*23:14+noise*60,h:hard?10:6+noise*14});
+  }
+  if(drainage.size>=100)drainage.delete(drainage.keys().next().value);
+  drainage.set(key,spots);return spots;
+}
+function drawRoadWetness(x,y,w,h){
+  if(Math.max(roadFilm,ditchWater)<.04)return;
+  ctx.save();
+  for(let by=Math.floor(y/(8*T));by<=Math.floor((y+h)/(8*T));by++)
+    for(let bx=Math.floor(x/(8*T));bx<=Math.floor((x+w)/(8*T));bx++)
+      for(const s of catchmentBlock(bx,by)){
+        const wet=s.hard?roadFilm:ditchWater;
+        if(wet<.04)continue;
+        ctx.save();ctx.translate(s.x,s.y);ctx.rotate(s.a);
+        ctx.globalAlpha=wet*(s.hard ? .43 : .72);ctx.drawImage(yardReflection(),-s.w*.5,-s.h*.5,s.w,s.h);
+        ctx.restore();
+      }
+  ctx.restore();
+}
+let mistSprite;
+function mistBank(){
+  if(mistSprite)return mistSprite;
+  const c=document.createElement('canvas');c.width=144;c.height=62;
+  const g=c.getContext('2d'),r=mulberry32(759);
+  for(let i=0;i<55;i++){
+    const x=21+r()*102,y=22+r()*18,rad=7+r()*13;
+    const fade=g.createRadialGradient(x,y,0,x,y,rad);
+    fade.addColorStop(0,'rgba(185,188,177,.30)');fade.addColorStop(1,'rgba(185,188,177,0)');
+    g.fillStyle=fade;g.fillRect(x-rad,y-rad,rad*2,rad*2);
+  }
+  return mistSprite=c;
+}
+// Repeating world positions scroll through the viewport; particles do not follow the camera.
+function drawWeatherFront(){
+  const fog=WX.fog,leaves=WX.gust,sleet=WX.sleet;
+  if(Math.max(fog,leaves,sleet)<.045)return;
+  const time=WX.time,scale=Z,left=cam.x-VW/(2*scale),top=cam.y-VH/(2*scale);
+  ctx.save();ctx.translate(-left*scale,-top*scale);ctx.scale(scale,scale);
+  function drift(cell,vx,vy,margin,draw){
+    const ox=time*vx,oy=time*vy;
+    for(let j=Math.floor((top-margin-oy)/cell);j<=Math.floor((top+VH/scale+margin-oy)/cell);j++)
+      for(let i=Math.floor((left-margin-ox)/cell);i<=Math.floor((left+VW/scale+margin-ox)/cell);i++){
+        const seed=hash2(i,j);
+        draw((i+seed)*cell+ox,(j+hash2(i+59,j))*cell+oy,seed);
+      }
+  }
+  if(fog>.1){ctx.globalAlpha=fog*.34;drift(240,7,1,165,(x,y,s)=>ctx.drawImage(mistBank(),x-140,y-42,240+s*110,81));}
+  if(leaves>.08){ctx.globalAlpha=leaves*.88;drift(96,66,14,22,(x,y,s)=>{
+    const phase=time*3+s*12;
+    ctx.fillStyle=s>.5?'#95784e':'#665638';ctx.beginPath();ctx.ellipse(x+Math.sin(phase)*5,y+Math.cos(phase)*8,3.5,.6+Math.abs(Math.cos(phase)),.5+phase*.4,0,Math.PI*2);ctx.fill();
+  });}
+  if(sleet>.06){ctx.globalAlpha=sleet*.85;ctx.strokeStyle='#cbd1cb';ctx.lineWidth=1.3;ctx.beginPath();
+    drift(42,39,92,7,(x,y,s)=>{x+=Math.sin(time*1.4+s*18)*3;ctx.moveTo(x,y);ctx.lineTo(x-1.6,y-2-s*3);});ctx.stroke();}
+  ctx.restore();
+}
+
+function lampShadowOnWall(a,b,texture){
+  if(!SHADOWS || darkness()<.14)return;
+  const horizontal=a[1]===b[1],axis=horizontal?1:0,across=1-axis;
+  for(const lamp of siteLights()){
+    const lp=[lamp.x,lamp.y],delta=a[axis]-lp[axis];
+    const nearestX=clamp(lamp.x,Math.min(a[0],b[0]),Math.max(a[0],b[0]));
+    const nearestY=clamp(lamp.y,Math.min(a[1],b[1]),Math.max(a[1],b[1]));
+    if(dst(lamp.x,lamp.y,nearestX,nearestY)>lamp.r)continue;
+    for(const e of ents){
+      if(!e.alive || e.kind!=='human' || dE(lamp,e)>lamp.r)continue;
+      const ep=[e.x,e.y],offset=ep[axis]-lp[axis],ratio=delta/offset;
+      if(!Number.isFinite(ratio)||ratio<1 || ratio>2.9)continue;
+      const u=(lp[across]+(ep[across]-lp[across])*ratio-a[across])/(b[across]-a[across]);
+      if(u<=0 || u>=1)continue;
+      const dx=e.x-lamp.x,dy=e.y-lamp.y,d=Math.hypot(dx,dy),end=d*ratio;
+      if(!d || end>lamp.r || !lampExposure(lamp,e) || npcBarrier(lamp,dx/d,dy/d,end-.8,null,'light')<end-1)continue;
+      const height=(e.crouch?26:48)*ratio,x=u*texture.width;
+      ctx.save();ctx.fillStyle='rgba(27,24,22,'+(.56*(1-end/lamp.r))+')';
+      ctx.beginPath();ctx.ellipse(x,texture.height-4,8*ratio,height*.78,0,0,Math.PI*2);
+      ctx.ellipse(x,texture.height-height,4.6*ratio,5.7*ratio,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+  }
 }
 
 // Field recordings are embedded by build.py so saved offline copies sound the same as Pages.

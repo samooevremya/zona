@@ -1,25 +1,30 @@
 // Transient world effects use world pixels and simulation time. They never enter the save.
 const livingZone=BIG && !location.hash.includes('living-off');
-let surfaceWater=0,wetBoots=0,footSide=1,environmentTime=0;
+let surfaceWater=0,wetBoots=0,muddyBoots=false,footSide=1,environmentTime=0;
 const bootMarks=[],plantBlocks=new Map(),bentPlants=new Map();
 function resetEnvironment(){
   bootMarks.length=0;bentPlants.clear();
-  surfaceWater=WXT[S.wx?.k]?.[1] || 0; wetBoots=0;environmentTime=0;footSide=1;
+  const state=WXT[S.wx?.k]||WXT.clear;
+  Object.assign(WX,{cloud:state[0],rain:state[1],fog:state[2],wind:state[3],gust:state[4]||0,sleet:state[5]||0,time:0});
+  surfaceWater=Math.max(WX.rain,WX.sleet*.55);roadFilm=ditchWater=surfaceWater;drainage.clear(); wetBoots=0;muddyBoots=false;environmentTime=0;footSide=1;
 }
 function updateEnvironment(dt){
   environmentTime+=dt;
-  surfaceWater=lerp(surfaceWater,WX.rain,1-Math.exp(-dt/(WX.rain>surfaceWater?6:55)));
+  const wet=Math.max(WX.rain,WX.sleet*.55);
+  surfaceWater=lerp(surfaceWater,wet,1-Math.exp(-dt/(wet>surfaceWater?6:55)));
+  roadFilm=lerp(roadFilm,wet,1-Math.exp(-dt/(wet>roadFilm?4:42)));
+  ditchWater=lerp(ditchWater,wet,1-Math.exp(-dt/(wet>ditchWater?12:125)));
   while(bootMarks.length && environmentTime-bootMarks[0].time>23)bootMarks.shift();
   for(const [plant,bend] of bentPlants)if(environmentTime-bend.time>1.35)bentPlants.delete(plant);
 }
 function leaveBootMark(e){
   const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T));
-  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24)){wetBoots=1;return;}
+  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y))){wetBoots=1;muddyBoots=t!==SW;return;}
   if(wetBoots<.08)return;
   if(t===CF || t===FL || t===AS || loftAt(e)){
     footSide*=-1;
     const a=e.ang,side=4*footSide;
-    bootMarks.push({x:e.x-Math.sin(a)*side,y:e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,level:loftAt(e)});
+    bootMarks.push({x:e.x-Math.sin(a)*side,y:e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,mud:muddyBoots,level:loftAt(e)});
     if(bootMarks.length>45)bootMarks.shift();
   }
   wetBoots*=.72;
@@ -29,8 +34,10 @@ function drawBootMarks(level,inView){
     if(m.level!==level || !inView(m.x,m.y,12))continue;
     ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.a);
     ctx.globalAlpha=.66*m.wet*(1-(environmentTime-m.time)/23);
-    ctx.fillStyle='#3a342a';ctx.beginPath();ctx.ellipse(2,0,4.3,2.4,0,0,6.29);ctx.fill();
-    ctx.fillRect(-5,-1.9,2.7,3.8);ctx.restore();
+    ctx.fillStyle=m.mud?'#493927':'#373b38';ctx.beginPath();ctx.ellipse(2,0,4.3,2.4,0,0,6.29);ctx.fill();
+    ctx.fillRect(-5,-1.9,2.7,3.8);
+    if(m.mud){ctx.fillStyle='#847660';for(let i=-1;i<5;i+=2.2)ctx.fillRect(i,-1.9,.65,3.8);}
+    ctx.restore();
   }
 }
 function reactiveTuft(x,y){return hash2(y+9,x+61)<.52;}
@@ -145,11 +152,12 @@ function underRainCover(x,y){
 }
 function updateCoat(dt){
   const wet=S.flags.coatWetness||0;
-  if(!wet && WX.rain<.12)return;
+  const precip=Math.max(WX.rain,WX.sleet*.55);
+  if(!wet && precip<.12)return;
   const cover=underRainCover(P.x,P.y);
   if(!wet && cover)return;
   const byFire=!inBunker(P.x,P.y) && !loftAt(P) && WORLD_FIRES.some(f=>dE(f,P)<80);
-  const change=byFire ? -1/23 : cover ? -1/85 : WX.rain>.12 ? WX.rain/55 : -1/170;
+  const change=byFire ? -1/23 : cover ? -1/85 : precip>.12 ? precip/55 : -1/170;
   S.flags.coatWetness=clamp(wet+change*dt,0,1);
 }
 
