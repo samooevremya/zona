@@ -3791,6 +3791,7 @@ function update(dt) {
     const p = parts[i]; p.life -= dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.05, dt); p.vy *= Math.pow(0.05, dt);
     if (p.rise) p.y -= p.rise * dt;
+    if (p.hearth) p.x += (WX.wind*19 + 4*Math.sin(S.min*.39+p.life)) * dt;
     if (p.life <= 0) { if (p.blood && chance(0.4)) decals.push({ x: p.x, y: p.y, r: rnd(2, 4), a: 0.7 }); parts.splice(i, 1); }
   }
   if (decals.length > 160) decals.splice(0, decals.length - 160);
@@ -3803,7 +3804,7 @@ function update(dt) {
     if (!night()) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6) }); }
   }
   for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9; if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
-  [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1 }); } });
+  [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });
   // тела исчезают через двое суток
   for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.k === 'body' && S.min - o.t > 2880 && dst(o.x, o.y, P.x, P.y) > 600) objs.splice(i, 1); }
   // таймеры мира
@@ -4249,6 +4250,21 @@ function drawLitHuman(e) {
   g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
+let hearthSmokeImage;
+function drawHearthSmoke(p, age) {
+  if (!hearthSmokeImage) {
+    const c=document.createElement('canvas'); c.width=c.height=40;
+    const g=c.getContext('2d');
+    for (const [x,y,r] of [[17,19,15],[25,16,12],[22,23,13]]) {
+      const haze=g.createRadialGradient(x,y,0,x,y,r);
+      haze.addColorStop(0,'rgba(170,167,157,.83)'); haze.addColorStop(1,'rgba(139,137,130,0)');
+      g.fillStyle=haze;g.fillRect(x-r,y-r,r*2,r*2);
+    }
+    hearthSmokeImage=c;
+  }
+  const size=p.s*(2.5+age*6);
+  ctx.drawImage(hearthSmokeImage,p.x-size,p.y-size,size*2,size*2);
+}
 function fireGroundLight(fire) {
   const r = FIRE_REACH;
   const glow = ctx.createRadialGradient(fire.x, fire.y, 5, fire.x, fire.y, r);
@@ -4537,6 +4553,15 @@ async function prepareShopGate() {
   const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
   const g=c.getContext('2d'); g.drawImage(im,0,0);
   g.scale(c.width/2,c.height/2);
+  if(villageAtmosphere){
+    // The lamp is painted directly onto the hatch, so it follows the sloped stair texture.
+    g.save();g.translate(1.06,.85);g.scale(.32,.55);
+    const lamp=g.createRadialGradient(.18,-.26,0,0,0,1);
+    lamp.addColorStop(0,'rgba(255,183,91,.58)');lamp.addColorStop(.48,'rgba(226,146,65,.28)');
+    lamp.addColorStop(1,'rgba(198,125,54,0)');g.fillStyle=lamp;g.fillRect(-1,-1,2,2);g.restore();
+    g.fillStyle='#544438';g.fillRect(1.17,.66,.055,.067);
+    g.fillStyle='#ebbe81';g.fillRect(1.178,.68,.036,.025);
+  }
   const fade=g.createRadialGradient(1,1,.74,1,1,1.04);
   fade.addColorStop(0,'#fff'); fade.addColorStop(.85,'rgba(255,255,255,.15)'); fade.addColorStop(1,'transparent');
   g.globalCompositeOperation='destination-in'; g.fillStyle=fade; g.fillRect(0,0,2,2);
@@ -4998,6 +5023,8 @@ function render() {
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
+  if(villageAtmosphere && ART && WX.rain>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
+    paintHatchRuts(ctx,true);
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -5068,7 +5095,7 @@ function render() {
     ctx.fillStyle = 'rgba(255,220,120,0.95)'; ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(12, 0); ctx.lineTo(0, 3); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,220,0.9)'; ctx.beginPath(); ctx.arc(1, 0, 3, 0, 6.28); ctx.fill(); ctx.restore();
   }
-  for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
+  for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.hearth) { drawHearthSmoke(p, 1-k); } else if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
   ctx.globalAlpha = 1;
   // крыши: скрывают дом, пока ты не внутри
   HOUSES.forEach((h, i) => {
@@ -5215,6 +5242,14 @@ function render() {
       ctx.fillStyle = 'rgba(255,240,200,' + (0.9 * dk) + ')'; ctx.beginPath(); ctx.arc(s2[0] * 2, s2[1] * 2, 3 * Z, 0, 6.28); ctx.fill(); });
   }
   for (const f of flashes) if (f.big) { const s = toS(f.x, f.y); const g = ctx.createRadialGradient(s[0] * 2, s[1] * 2, 0, s[0] * 2, s[1] * 2, 140 * Z); g.addColorStop(0, f.blue ? 'rgba(180,220,255,0.6)' : 'rgba(255,200,120,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
+  if (villageAtmosphere && !bunk) {
+    const dawn=clamp(1-Math.abs((S.min%1440)-420)/110,0,1);
+    const local=clamp((1080-Math.hypot(cam.x-(FIRE.x+HATCH.x)/2,cam.y-(FIRE.y+HATCH.y)/2))/400,0,1);
+    if (dawn*local>.001) {
+      ctx.save();ctx.globalAlpha=.16*dawn*local;ctx.fillStyle='#526471';
+      ctx.fillRect(0,0,VW,VH);ctx.restore();
+    }
+  }
   drawWeatherScreen();
   // откуда стреляют: красные дуги по краю экрана
   if (P && P.alive) HURTDIR.forEach(h => {
@@ -5858,6 +5893,90 @@ function trailPrint(wet, variant) {
   g.putImageData(image, 0, 0); trailPrints.set(key, c); return c;
 }
 
+// The yard is painted in world coordinates, including the overlap of neighbouring chunks.
+const villageAtmosphere = BIG && !location.hash.includes('yard-off');
+function nearGroundChunk(x, y, margin) {
+  return x >= GWP.x0-margin && x <= GWP.x1+margin && y >= GWP.y0-margin && y <= GWP.y1+margin;
+}
+function paintVillageHearth(g) {
+  if (!nearGroundChunk(FIRE.x, FIRE.y, 112)) return;
+  const r = mulberry32(9182);
+  g.save(); g.translate(FIRE.x, FIRE.y);
+  for (let i=0; i<28; i++) {
+    const a=r()*Math.PI*2, radius=r()*32, w=18+r()*33;
+    g.globalAlpha=.54;
+    g.drawImage(trailPrint(true,i%4),Math.cos(a)*radius-w/2,Math.sin(a)*radius*.76-11,w,23);
+  }
+  g.globalAlpha=1;
+  for (let i=0; i<130; i++) {
+    const a=r()*Math.PI*2, radius=9+r()*36;
+    g.fillStyle=i%4===0?'rgba(176,166,145,.57)':'rgba(44,36,30,.67)';
+    g.fillRect(Math.cos(a)*radius,Math.sin(a)*radius*.8,1+r()*2,.6+r());
+  }
+  // Split birch and bark chips beside the seating circle.
+  g.translate(54,25); g.rotate(-.35);
+  groundShadow(g,0,0,17,8,0,2);
+  for (let i=0; i<6; i++) {
+    const x=(r()-.5)*8, y=(i%4)*3.2-5;
+    c1Draw(g,'c1_log'+(i%3),x,y,24+r()*8,(r()-.5)*.25,1,1);
+    g.fillStyle='#a88c65'; g.fillRect(x-10+r()*3,y,2.2,1.3);
+  }
+  for (let i=0; i<16; i++) {
+    g.fillStyle=i%3?'#776449':'#a18e71'; g.fillRect((r()-.5)*41,(r()-.5)*23,1+r()*2,.8);
+  }
+  g.restore();
+}
+function paintVillageHouseFeet(g) {
+  for (const h of HOUSES) {
+    const x=h.x*T, y=(h.y+h.h)*T, w=h.w*T;
+    if (!nearGroundChunk(x+w/2,y,w/2+30) || Math.abs(x+w/2-FIRE.x)>350 || Math.abs(y-FIRE.y)>410) continue;
+    const r=mulberry32(137*h.x+h.y);
+    g.save();
+    for (let along=4; along<w-4; along+=8) {
+      const atDoor=h.entrances.some(d=>d.ny===1 && Math.abs(d.x-along)<d.width*.54);
+      if (atDoor) continue;
+      const wet=trailPrint(true,Math.floor(r()*4));
+      g.globalAlpha=.76; g.drawImage(wet,x+along-12,y-5,27,12+r()*6);
+      if(r()<.38){
+        g.strokeStyle='#665f42'; g.lineWidth=.9; g.beginPath();
+        for(let i=0;i<4;i++){
+          const u=x+along+r()*6,v=y+2+r()*3;
+          g.moveTo(u,v);g.lineTo(u-4+r()*7,v-2-r()*5);
+        }
+        g.stroke();
+      }
+    }
+    g.restore();
+  }
+}
+// Short paired depressions at the bend above the hatch. Their damp sheen follows local weather.
+const hatchRuts = [[69,-25,45,6,-.64],[90,-18,57,7,-.70],[127,-74,62,6,-.76],[144,-64,44,5,-.80]];
+function paintHatchRuts(g, sheen) {
+  for (const [dx,dy,w,h,a] of hatchRuts) {
+    g.save(); g.translate(HATCH.x+dx,HATCH.y+dy); g.rotate(a);
+    if(sheen){
+      g.globalAlpha=.35*WX.rain;
+      g.drawImage(yardReflection(),-w*.42,-h*.42,w*.84,h*.84);
+    } else {
+      g.globalAlpha=.87;
+      g.drawImage(trailPrint(true,Math.floor(w)%4),-w*.64,-h,w*1.28,h*2);
+    }
+    g.restore();
+  }
+}
+let rutReflection;
+function yardReflection() {
+  if(rutReflection)return rutReflection;
+  const c=document.createElement('canvas');c.width=96;c.height=18;
+  const g=c.getContext('2d'),r=mulberry32(456);
+  g.drawImage(trailPrint(true,1),0,0,96,18);g.globalCompositeOperation='source-atop';
+  const sky=g.createLinearGradient(0,0,0,18);
+  sky.addColorStop(0,'#4c5048');sky.addColorStop(.57,'#a0a6a3');sky.addColorStop(1,'#777968');
+  g.fillStyle=sky;g.fillRect(0,0,96,18);g.fillStyle='rgba(50,45,39,.5)';
+  for(let i=0;i<28;i++)g.fillRect(r()*95,r()*18,1+r()*7,1);
+  return rutReflection=c;
+}
+
 function drawVillageLanes(g) {
   if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < (NORTH_ROWS+159)*T || GWP.y0 > (NORTH_ROWS+184)*T) return;
   g.save();
@@ -5871,7 +5990,17 @@ function drawVillageLanes(g) {
         const n = hash2(l * 13 + i, j);
         g.save(); g.translate(x, y); g.rotate(Math.atan2(dy, dx) + (n - .5) * .23);
         const w = 56 + n * 16, h = (l === 0 || l === 3 || l === 6 ? 42 : 29) + n * 7;
-        g.globalAlpha = .65; g.drawImage(trailPrint(false, j % 4), -w/2, -h/2, w, h); g.restore();
+        g.globalAlpha = .65; g.drawImage(trailPrint(false, j % 4), -w/2, -h/2, w, h);
+        if (villageAtmosphere && (l === 0 || l === 1 || l === 3)) {
+          // Narrow polished centre and occasional heel scuffs, following the walkable lane.
+          g.globalAlpha=.47; g.drawImage(trailPrint(false,(j+i)%4),-21,-8+n*3,42,16);
+          if(n>.4){
+            const side=j%2?1:-1;
+            g.rotate(side*.13); g.globalAlpha=.55;
+            g.drawImage(trailPrint(true,j%4),-4,side*6-2,8,4);
+          }
+        }
+        g.restore();
       }
     }
   });
@@ -6127,6 +6256,11 @@ function* artGround(g) {
       g.clip('evenodd'); ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h); g.restore();
     }
     if (BIG) drawVillageLanes(g);
+    if (villageAtmosphere) {
+      paintVillageHearth(g);
+      if (nearGroundChunk(HATCH.x,HATCH.y,190)) paintHatchRuts(g,false);
+      if (nearGroundChunk(FIRE.x,FIRE.y,720)) paintVillageHouseFeet(g);
+    }
   }
   // 4. Растительность группами: у стен, заборов, деревьев и насыпи; середина проходов свободна
 
@@ -6334,12 +6468,17 @@ function drawThresholds(g) {
         g.fillStyle = '#9d876c'; g.fillRect(left+1, 19, w-2, 1);
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
-      if (door.approach === 'earth' && seed % 3 !== 0) {
+      const wolfDoor = villageAtmosphere && h.ok==='15,72' && door.ny===1;
+      if (door.approach === 'earth' && (seed % 3 !== 0 || wolfDoor)) {
         const stone = concrete || h.ruin;
         g.fillStyle = stone ? '#635e50' : '#534638';
         g.fillRect(left+2,-3,w-4,5);
         g.fillStyle = stone ? '#918777' : '#8a775e';
         g.fillRect(left+3,0,w-7,1.4);
+        if(wolfDoor){
+          g.fillStyle='#40382f';g.fillRect(left+2,2,w-4,3);
+          g.fillStyle='#a28a6b';g.fillRect(-w*.23,1,w*.41,1.4);
+        }
       }
       g.fillStyle = concrete ? '#807d70' : '#785e46';
       g.fillRect(left - 2, -T / 2 - 5, 3, 10); g.fillRect(-left - 1, -T / 2 - 5, 3, 10);
