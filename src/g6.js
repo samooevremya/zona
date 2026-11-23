@@ -37,7 +37,7 @@ function surf(x, y) {
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
   if (t === AS || t === CF || t === CO) return 'stepHard';
   if (t === FL) return 'stepWood';
-  if (t === SW) return 'stepWet';
+  if (t === SW) return 'stepWater';
   if (t === RA) return Math.floor(x/12)%3 ? 'stepWood' : 'stepGravel';
   const wet=livingZone?surfaceWater:WX.rain;
   if (t === DI) return wet > 0.3 ? 'stepWet' : 'stepDirt';
@@ -94,6 +94,7 @@ function worldFx(dt) {
   WX.clouds.forEach(c => { c.x += WX.wind * 40 * dt; c.y += WX.wind * 12 * dt; if (c.x > WW + 700) { c.x = -700; c.y = rnd(0, WH); } if (c.y > WH + 700) c.y = -700; });
   WX.flash = Math.max(0, WX.flash - dt * 3);
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
+  updateCoat(dt);
   if(livingZone)updateEnvironment(dt);
   mixRecordedRain();
   blowout(dt);
@@ -107,6 +108,7 @@ function worldFx(dt) {
       if (e === P && !(P.jumpT>0)) {
         if(livingZone)leaveBootMark(e);
         const surface=surf(e.x,e.y);
+        emitFootfall(surface);
         play(surface,undefined,undefined,P.crouch ? .36 : P.sprinting ? 1.3 : 1);
         if(surface==='stepWood' && loftAt(e) && Math.floor(e.step/stride)%4===1)play('creak');
       }

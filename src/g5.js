@@ -10,7 +10,7 @@ function audioInit() {
     const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 340;
     const g = AC.createGain(); windGain=g; g.gain.value = 0.05;
-    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0; lfo.connect(lg); lg.connect(g.gain); lfo.start();
     src.connect(f); f.connect(g); g.connect(master); src.start();
     loadFieldAudio();
   } catch (e) { AC = null; }
@@ -63,7 +63,9 @@ const SND = {
 function play(name, x, y, mul) {
   if (!AC || (!SND[name] && !recordings[name])) return;
   let v = mul || 1;
-  if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); v *= clamp(1 - d / 950, 0, 1); if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
+  if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); const gun=name==='p'||name==='s'||name==='r';
+    const level=gun ? .74*Math.max(0,1-d/800)+.26*Math.max(0,1-d/2700)**1.2 : clamp(1-d/950,0,1);
+    v*=level; if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
   try {
     if(playRecording(name,v,x,y))return;
     SND[name]?.(v);

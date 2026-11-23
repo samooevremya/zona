@@ -218,13 +218,15 @@ function canStrike(e,t,reach){
 /* кабан: замечает, роет землю, бросается рывком по прямой; после рывка оглушён — уходи в сторону */
 function aiBoar(e, dt) {
   e.cool -= dt; e.think -= dt; e.st -= dt;
+  e.snortIn=(e.snortIn??(4+e.id%8))-dt;
+  if(e.snortIn<=0){e.snortIn=rnd(7,15);play('boar',e.x,e.y,.65);}
   const t=mutantTarget(e,dt,300,560);
   if(!t){roamDen(e,dt,45);return;}
   const want=Math.atan2(e.trail.y-e.y,e.trail.x-e.x);
   if (e.state === 'idle' || e.state === 'stalk') {
     e.state = 'stalk'; e.ang += angD(e.ang, want) * Math.min(1, dt * 4);
     if (dE(e,e.trail)>240 || !clearWalk(e.x,e.y,e.trail.x,e.trail.y,e.r)) mutantApproach(e,e.trail,90,dt);
-    else if (e.cool <= 0 && canStrike(e,t,241)) { e.state = 'wind'; e.st = 0.6; play('dog', e.x, e.y, 0.7); }
+    else if (e.cool <= 0 && canStrike(e,t,241)) { e.state = 'wind'; e.st = 0.6; play('boarCharge', e.x, e.y, 0.7); }
     else mutantApproach(e,e.trail,50,dt);
   } else if (e.state === 'wind') {
     e.ang += angD(e.ang, want) * Math.min(1, dt * 6);
@@ -814,6 +816,7 @@ function melee(sh, W) {
   }
   if(hit && sh===P && canTakeDown(hit)){takedown(hit);return;}
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
+  if(hit && hit.sid!=='sid')play('knifeHit',hit.x,hit.y);
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang, shot) {
@@ -906,21 +909,16 @@ function pVis() {
   if (darkness() > 0.3) v *= S.torch === false ? 0.6 : 1.1;   // ночью фонарь выдаёт, без него замечают на 40% позже
   return v;
 }
-function pNoise() {
-  if (P.jumpT > 0) return 150;
-  const m = Math.hypot(IN.moveX, IN.moveY); if (m < 0.1) return 0;
-  return P.crouch ? 34 : P.sprinting ? 175 : 95;
-}
 /* враг ещё не в бою с игроком: копит подозрение (0..1). Видит только перед собой (~115°), сзади — только на слух */
 function stealthTick(e, dt) {
   if (!P.alive || !hostile(e, P) || e.tgt === P || P.cloak > 0.7) { if (e.tgt === P) e.aw = 1; return; }
   const d = dE(e, P), aP = Math.atan2(P.y - e.y, P.x - e.x), range = sight(e) * pVis();
   let gain = 0;
   if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && seesActor(e, P)) gain = 0.45 + 2.4 * (1 - d / range);
-  const nz = pNoise(); if (nz && d < nz) gain = Math.max(gain, 0.5 + 1.5 * (1 - d / nz));
+
   const was = e.aw || 0;
   e.aw = gain ? Math.min(1, was + gain * dt) : Math.max(0, was - 0.25 * dt);
-  if (e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
+  if (gain && e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
   if (e.aw > 0.4 && was <= 0.4 && chance(0.7)) sayLine(e, e.fac === 'army' ? 'Стой, кто там?' : e.fac === 'bandit' ? 'Э, кто там шуршит?' : 'Кто здесь?');
   if (e.aw >= 1 && was < 1) ents.forEach(o => { if (o !== e && o.alive && o.fac === e.fac && o.tgt !== P && dE(o, e) < 220) o.aw = Math.max(o.aw || 0, 0.7); });   // поднял своих
 }
@@ -968,7 +966,7 @@ function aiHuman(e, dt) {
     }
   }
   const t = e.tgt;
-  if (t && t.alive && hostile(e, t)) { combatHuman(e, t, W, dt); return; }
+  if (t && t.alive && hostile(e, t)) { e.listen=null;combatHuman(e, t, W, dt); return; }
   if(e.inBattle){
     e.inBattle=false;e.healing=0;e.healT=0;e.firingSpot=null;e.peekTime=0;
     e.path=null;e.routeRetry=0;e.mem=0;e.lastSeen=null;
@@ -990,6 +988,7 @@ function aiHuman(e, dt) {
     if (e.campRise === target) e.campRise = null;
     return;
   }
+  if (e.listen && !(e.mem>0) && investigateFootfall(e,dt))return;
   if (e.mem > 0 && e.lastSeen) {
     e.mem -= dt;
     e.crouch = 0; if (goTo(e, e.lastSeen.x, e.lastSeen.y, 68, dt) < 20) e.mem = 0;
@@ -1297,7 +1296,7 @@ function aiDog(e, dt) {
   e.cool -= dt; e.think -= dt; e.barkT -= dt;
   const t=mutantTarget(e,dt,night()?320:280,520);
   if (t) {
-    if (e.barkT <= 0) { e.barkT = rnd(2, 5); play('dog', e.x, e.y); }
+    if (e.barkT <= 0) { e.barkT = rnd(2, 5); play(dE(e,t)<105?'growl':'dog', e.x, e.y); }
     const want=Math.atan2(e.trail.y-e.y,e.trail.x-e.x);
     e.ang+=angD(e.ang,want)*Math.min(1,dt*9);
     if (e.hp < e.maxhp * 0.35 && !e.fled) { e.fleeT = 2; e.fled = 1; }

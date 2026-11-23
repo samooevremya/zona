@@ -2,13 +2,16 @@
 const fieldBuffers=new Map(),fieldVoices=new Set(),lastTake=new Map();
 const recordings={
   p:[.85,'pistol'],s:[1,'shotgun'],r:[.88,'rifle'],thunder:[.88,'thunder'],
-  stepDirt:[.32,'SandL1','SandR2'],stepGrass:[.30,'leaves01','leaves02'],
-  stepHard:[.32,'StoneL1','StoneR2'],stepWet:[.37,'mud02','waterStep'],stepGravel:[.29,'gravel','gravelStep'],
+  stepDirt:[.30,'earth1','earth2'],stepGrass:[.25,'turf1','turf2'],
+  stepHard:[.32,'StoneL1','StoneR2'],stepWet:[.29,'mud02','earth2'],stepWater:[.38,'wade1','wade2'],stepGravel:[.29,'gravel','gravelStep'],
   stepWood:[.32,'wood01','wood02'],stepMetal:[.35,'impactMetal_heavy_002','impactMetal_medium_001'],
   stepDog:[.15,'leaves01','leaves02'],shell:[.21,'impactMetal_light_000'],bolt:[.29,'impactMetal_medium_001'],
+  knife:[.40,'swing'],knifeHit:[.59,'hit'],crow:[.37,'crow'],
+  dog:[.51,'bark1','bark2'],growl:[.45,'snarl'],boar:[.49,'grunt'],boarCharge:[.65,'charge'],
+  sucker:[.66,'throat'],breath:[.34,'throat'],
   reload:[.46,'metalLatch'],jam:[.36,'metalClick'],click:[.27,'metalClick'],pick:[.32,'clothBelt'],creak:[.15,'creak1']
 };
-let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null;
+let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null,airGain=null;
 function loadFieldAudio(){
   if(!window.ZONE_AUDIO || fieldReady)return;
   fieldReady=true;
@@ -29,7 +32,8 @@ function playRecording(name,volume,x,y){
   const src=AC.createBufferSource(),gain=AC.createGain(),filter=AC.createBiquadFilter();
   src.buffer=buffer;src.playbackRate.value=name==='thunder'?1:.97+Math.random()*.06;
   const distance=x===undefined?0:Math.min(1,dst(P.x,P.y,x,y)/950);
-  filter.type='lowpass';filter.frequency.value=16000-13500*distance;
+  const gun=name==='p'||name==='s'||name==='r';
+  filter.type='lowpass';filter.frequency.value=gun ? 700+15300*(1-distance)**2 : 16000-13500*distance;
   gain.gain.value=entry[0]*volume;
   src.connect(filter);filter.connect(gain);
   const stereo=AC.createStereoPanner?.();
@@ -61,7 +65,13 @@ function mixRecordedRain(){
     hearthGain=AC.createGain();hearthGain.gain.value=0;fire.connect(hearthGain);hearthGain.connect(master);fire.start();
   }
   hearthGain?.gain.setTargetAtTime(fireVolume,now,.22);
-  windGain?.gain.setTargetAtTime(.048*(1-room.enclosure*.89),now,.27);
+  if(!airGain && fieldBuffers.has('wind')){
+    const air=AC.createBufferSource();air.buffer=fieldBuffers.get('wind');air.loop=true;
+    airGain=AC.createGain();airGain.gain.value=0;air.connect(airGain);airGain.connect(master);air.start();
+  }
+  const wind=(.065+.15*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
+  airGain?.gain.setTargetAtTime(wind,now,.45);
+  windGain?.gain.setTargetAtTime(airGain?0:.045*(1-room.enclosure),now,.27);
   const buffer=fieldBuffers.get('rain');if(!buffer)return;
   if(!rainG){
     const src=AC.createBufferSource();src.buffer=buffer;src.loop=true;
