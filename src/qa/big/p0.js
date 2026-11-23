@@ -96,6 +96,8 @@ T('7_rest_vs_hunger_bleed', () => {
     for (let i = 0; i < 3; i++) { X.restAtFire(); const o = z.panel && z.panel.opts ? z.panel.opts : null; z.closePanel(); }
     return { ok: false, note: '0.6: отдых — отдельная кнопка, сытость не тратится, см. код restAtFire' };
   }
+  // Keep random emissions out of this isolated nutrition/contract scenario.
+  S().blow={stage:0,next:S().min+5000,t:0};
   S().food = 50; P().hp = 40; S().bleed = 0; X.advanceWorldTime(180, 'rest');
   r.food3h = +S().food.toFixed(1); r.hp3h = Math.round(P().hp);
   S().food = 50; P().hp = 40; S().bleed = 2; const pv = X.restPreview(3);

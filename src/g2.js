@@ -817,6 +817,7 @@ function melee(sh, W) {
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang, shot) {
+  if(BIG && src===P && chapter()==='rescue' && S.campaign.atpWait && ATP_BANDITS.includes(e.sid))beginAssault();
   if(BIG && src===P && e.guard==='south')alarmPost();
   if (!e.alive || e.sid === 'sid') return;
   if (src && (src === P || src.follow)) {
@@ -947,6 +948,9 @@ function aiHuman(e, dt) {
     return;
   }
   if (e.captive) return;
+  if((e.sid==='petr' || e.sid==='petr2') && !S.flags.assault && !S.flags.atpClear){
+    e.tgt=null;e.path=null;return;
+  }
   e.cool -= dt; e.think -= dt; stealthTick(e, dt);
   const W = WP[e.wpn];
   if (e.reload > 0) { e.reload -= dt; if (e.reload <= 0) e.mag = W.mag; }
@@ -1184,7 +1188,15 @@ function helpCompanion(e,dt){
   return true;
 }
 function idleHuman(e, dt) {
-  if(e.squadMate && chapter()==='battle'){ const p=northCamp(); if(dE(e,p)>90)goTo(e,p.x,p.y,90,dt); return; }
+  if(e.squadMate && chapter()==='battle'){
+    const destination=dE(P,northCamp())<340?northCamp():P;
+    if(dE(e,destination)>90)goTo(e,destination.x,destination.y,90,dt);
+    return;
+  }
+  if((e.sid==='petr' || e.sid==='petr2') && S.flags.assault && !S.flags.atpClear){
+    const goal=locPt('atp',e.sid);if(dE(e,goal)>12)goTo(e,goal.x,goal.y,82,dt);
+    return;
+  }
   if (followTick(e, dt)) return;
   if(e.sid==='shust' && S.campaign?.liberated){
     const room=loftAt(e);
@@ -1205,6 +1217,19 @@ function idleHuman(e, dt) {
   }
   if(e.sid==='wolf'){if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);return;}
   if(helpCompanion(e,dt))return;
+  if(e.guard==='south' && BIG && night()){
+    if((e.aw||0)>.05 && storyArea() && seesActor(e,P)){
+      const direction=Math.atan2(P.y-e.y,P.x-e.x);
+      e.ang+=angD(e.ang,direction)*Math.min(1,dt*3);
+      return;
+    }
+    const west=e.sid==='a4' || e.sid?.startsWith('reliefa4');
+    const route=west?[[123,202],[122,210],[126,210]]:[[132,208],[138,208],[132,211]];
+    const index=e.postWaypoint||0, [x,y]=route[index], dest=worldPoint(x+.5,y+.5);
+    if(dE(e,dest)>12)goTo(e,dest.x,dest.y,42,dt);
+    else if((e.idleT-=dt)<=0){e.postWaypoint=(index+1)%route.length;e.idleT=3;}
+    return;
+  }
   if (e.guard) {
     if (dE(e, e.home) > 8) goTo(e, e.home.x, e.home.y, 70, dt);
     else { e.ang += angD(e.ang, (e.guard === 'south' || (BIG && e.sid==='a1')) ? -Math.PI / 2 : Math.PI / 2) * dt * 2; }

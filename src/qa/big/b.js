@@ -37,7 +37,7 @@ T('B4_tracked_quest', () => {
   reset();S().campaign.stage='rescue';S().trackedQuestId='chapter1';z.update(1/30);
   const hud1=X.trackedTarget().n;S().sos.act=null;S().sos.next=S().min-1;__setOld(60*32,75*32);X.sosTick();z.update(1/30);
   const hud2=X.trackedTarget().n;z.openPanel('pda','КПК',z.PDA_TABS2);z.refresh();btnT(/Сигнал SOS/).click();btnT(/^Отслеживать$/).click();
-  z.closePanel();return {ok:/Шустр/.test(hud1) && hud1===hud2 && X.trackedTarget()?.qid==='sos',hud1,hud2};
+  z.closePanel();return {ok:/Петрух/.test(hud1) && hud1===hud2 && X.trackedTarget()?.qid==='sos',hud1,hud2};
 });
 T('B5_weapon_cycle_kept', () => {
   reset(); S().inv.w_aksu = 1; S().weapon = 'knife';

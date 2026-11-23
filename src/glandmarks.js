@@ -50,6 +50,7 @@ function drawLoftMap(g,r,size){
     g.fillStyle=tAt(r.x+i,r.y+j)===CO?'#35352e':nav[(r.y+j)*MW+r.x+i]?'#787158':'#5a5546';g.fillRect(i*k,j*k,k+.3,k+.3);
   }
   const dot=(p,color)=>{g.fillStyle=color;g.beginPath();g.arc((p.x/T-r.x)*k,(p.y/T-r.y)*k,Math.max(3,k*.34),0,Math.PI*2);g.fill();};
+  for(const body of objs)if(body.k==='body' && body.kind!=='sack' && loftAt(body)===r)dot(body,'#a9a7a0');
   dot(r.landing,'#d5b16b');if(r.id==='atp' && byS('shust')?.captive)dot(byS('shust'),'#d0bc79');dot(P,'#70dbdc');g.restore();
 }
 function beam(g,x,y,x1,y1,w,color){

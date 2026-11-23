@@ -51,6 +51,7 @@ function playerFire() {
   }
   if (wearAndJam(S.weapon)) { P.cool = 0.3; return; }
   if(storyArea())alarmPost();
+  if(S.campaign.atpWait && !S.flags.assault && locAt(P.x/T,P.y/T)?.id==='atp')beginAssault();
   S.mag[S.weapon] = m - 1; P.cool = W.rate;
   const moving = Math.abs(IN.moveX) + Math.abs(IN.moveY) > 0.1;
   const spread = W.spread + P.bloom + (moving ? .035 : 0) + (100-cond(S.weapon))*.0008 - (P.crouch ? .015 : 0);
@@ -290,14 +291,9 @@ function update(dt) {
   fogT -= dt; if (fogT <= 0 && P.alive) { fogT = 0.4; reveal(); }
   saveT -= dt;
   if (saveT <= 0 && P.alive && (dE(P, campOf(P)) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
-  // штурм АТП с Петрухой
-  if (chapter()==='rescue' && !S.flags.assault && !S.flags.atpClear) {
-    const p = byS('petr') || byS('petr2');
-    if (p && dE(p, P) < 240) {
-      S.flags.assault = 1;
-      msg('Петруха: — Наконец-то! Их там человек семь. Заходим через ворота, мы прикроем.', 'say');
-      ['petr', 'petr2'].forEach(s => { const e = byS(s); if (e) { e.home = locPt('atp',s); e.stay = 0; e.path = null; } });
-    }
+  if(chapter()==='rescue' && S.campaign.atpWait && !S.flags.assault){
+    const inside=locAt(P.x/T,P.y/T)?.id==='atp';
+    if(inside && ATP_BANDITS.some(id=>byS(id)?.tgt===P))beginAssault();
   }
   if(BIG)updatePostShift();
   if (radioQueue.length && (radioQueue[0].life -= dt) <= 0) radioQueue.shift();
@@ -388,7 +384,7 @@ function updatePlayer(dt) {
   const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
-  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
+  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
   if (BIG) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
@@ -553,7 +549,21 @@ function applyState(d) {
   if (S.fog) for (let i = 0; i < S.fog.length; i++) { const v = S.fog.charCodeAt(i) - 48; for (let b = 0; b < 6; b++) if (i * 6 + b < fog.length) fog[i * 6 + b] = (v >> b) & 1; }
   fogDirty = true; fogRegion = null;
   spawnWorld();
+  if(BIG && storyArea() && !nav[Math.floor(P.y/T)*MW+Math.floor(P.x/T)]){
+    const p=walkPoint(P);P.x=S.x=p.x;P.y=S.y=p.y;
+  }
+  if(BIG)updatePostShift();
   survDefaults(); ensureCaches(); dynRestore();
+  if(BIG && !S.campaign.northSiteUpdated){
+    if(chapter()==='battle'){
+      const site=northCamp();
+      ents.filter(e=>e.assailant).forEach((e,i)=>{
+        const p=walkPoint(site,(i%3-1)*2,-Math.floor(i/3)*2);
+        e.x=p.x;e.y=p.y;e.home=p;e.path=e.tgt=null;
+      });
+    }
+    S.campaign.northSiteUpdated=true;
+  }
   if(S.campaign.liberated)occupyATP();
   villageAftermath();
   if(BIG){

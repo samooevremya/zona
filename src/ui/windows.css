@@ -294,3 +294,21 @@ img.b1ic.tall{width:62%;height:86%}
 .kpk-wrap.kpk-wrap:not(.zoom):active{cursor:grabbing}
 .kpk-wrap.kpk-wrap:not(.zoom) #bigmap{position:absolute;inset:0 auto auto 0;margin:0;pointer-events:none}
 .chambers{font-size:.65em;line-height:1;color:#cbb489}
+
+/* Conversation seats frame a single scrollback, with replies under the transcript. */
+#pbody .dlg{display:grid;grid-template-columns:minmax(80px,17%) minmax(0,1fr) minmax(80px,17%);gap:8px;align-items:start}
+#pbody .dlg-who{background:linear-gradient(120deg,#38372d,#20211d);border:1px solid #625e4d;align-items:center;text-align:center;min-width:0;overflow:hidden}
+#pbody .dlg-who .ava{width:min(100%,76px);height:auto;aspect-ratio:1;object-fit:cover}
+#pbody .dlg-main{display:grid;grid-template-columns:1fr;grid-template-rows:minmax(75px,1.4fr) minmax(60px,1fr);height:clamp(180px,64dvh,580px);align-items:stretch;gap:6px}
+#pbody .dlg-lines,#pbody .dlg-opts{min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-color:#82765d #22231e}
+#pbody .dlg-lines{background:#20221edc;border:1px solid #685f4c;padding:8px 12px}
+#pbody .dlg-lines strong{display:block;color:#e0b46c;font-size:.88em}
+#pbody .dlg-lines .me strong{color:#a7c6a2}
+#pbody .dlg-lines p{color:#e6dfd1;margin:0 0 8px}
+#pbody .dlg-lines .sys{color:#b8b19d;font-style:italic}
+@media(max-width:520px) and (orientation:portrait){
+ #pbody .dlg{grid-template-columns:1fr 1fr}
+ #pbody .dlg-who{grid-row:1;flex-direction:row;text-align:left}
+ #pbody .dlg-who .ava{max-width:38px}
+ #pbody .dlg-main{grid-column:1/-1;grid-row:2;height:52dvh}
+}

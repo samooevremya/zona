@@ -46,7 +46,7 @@ const chapterReports=[
   ['farm','Лис получил аптечку. Стая у фермы разбежалась.'],
   ['column','Ты вернул Лису именной ПМ. На разбитом КПК уцелел голос Стрелка.'],
   ['atp','Шустрый узнал монолитовский КПК и отправил тебя к Сидоровичу.'],
-  ['army','Кейс доставлен. В документах нашёлся маршрут наёмников.'],
+  ['army','Кейс доставлен. Сидорович занялся ремонтом КПК.'],
   ['village','Деревня отбилась. Волк получил помощь, а ты забрал восстановленный КПК.'],
   ['zalissya','Запись Стрелка привела тебя в Залесье.']
 ];
@@ -60,27 +60,29 @@ function campaignList(){
 }
 function worldPoint(x,y){return {x:(WEST+x)*T,y:(NORTH_ROWS+y)*T};}
 function walkPoint(p,dx=0,dy=0){const t=freeTile(p.x/T+dx,p.y/T+dy);return {x:t.x*T,y:t.y*T};}
-function storyArea(){return P.x/T-WEST>=120 && P.x/T-WEST<=137 && P.y/T-NORTH_ROWS>=201 && P.y/T-NORTH_ROWS<=212;}
+function storyArea(){return P.x/T-WEST>=112 && P.x/T-WEST<=143 && P.y/T-NORTH_ROWS>=198 && P.y/T-NORTH_ROWS<=215;}
 function shiftNumber(){return Math.floor((S.min-21*60)/1440);}
 function raidAllies(){return ents.filter(e=>e.alive && e.squadMate);}
 function campaignLabel(){
   const c=S.campaign;
   if(c.stage==='case' && (c.mustLeave || c.failedShift===shiftNumber()))return c.mustLeave?'Отступить с южного КПП':'Дождаться следующей ночной смены';
+  if(c.stage==='rescue' && !S.flags.assault && atpCompany().length)return 'Поговорить с Петрухой у АТП';
   if(c.stage==='wreck')return c.pistol?'Осмотреть серый рюкзак':c.bag?'Найти наградной ПМ Лиса':STORY.wreck[2];
   return STORY[c.stage][2];
 }
 function storyPoint(stage=chapter()){
   const a=STORY[stage], actor={wolf:'wolf',fox:'fox',favour:'fox',returnGun:'fox',dogs:'fox',device:'shust',rescue:'shust',aid:'wolf',muster:'wolf'}[stage];
+  if(stage==='rescue' && !S.flags.assault && atpCompany().length)return atpCompany()[0];
   if(actor && byS(actor))return routeToActor(byS(actor)) || byS(actor);
   if(a[1]==='sid')return locPt('sid',inBunker(P.x,P.y)?'trader':'hatch');
   if(stage==='wreck')return findSite(S.campaign.pistol?'bag':'pistol');
-  if(stage==='case')return S.campaign.mustLeave?worldPoint(118.5,207.5):findSite('case');
-  if(stage==='escape')return worldPoint(118.5,207.5);
+  if(stage==='case')return S.campaign.mustLeave?worldPoint(110.5,207.5):findSite('case');
+  if(stage==='escape')return worldPoint(110.5,207.5);
   if(stage==='ready')return raidAllies()[0] || FIRE;
   if(stage==='battle')return ents.find(e=>e.alive && e.assailant) || northCamp();
   return LESSER_FIRE;
 }
-function northCamp(){return walkPoint(FIRE,0,-21);}
+function northCamp(){return walkPoint(worldPoint(74.5,128.5));}
 function campaignTargets(){
   const targets=[];
   if(chapter()!=='done'){
@@ -108,7 +110,7 @@ let campaignSites;
 function findSite(id){
   if(!campaignSites){
     const wreck=locPt('column','wreck');
-    campaignSites={pistol:walkPoint(wreck,-1,1),bag:walkPoint(wreck,2,2),case:walkPoint(worldPoint(123.5,208.5))};
+    campaignSites={pistol:walkPoint(wreck,-1,1),bag:walkPoint(wreck,2,2),case:walkPoint(worldPoint(117.5,205.5))};
   }
   return campaignSites[id];
 }
@@ -122,9 +124,10 @@ function helpStory(e){
   if(!has('medkit')){msg('Нужна аптечка. Можно вернуться с ней позже.','say');return;}
   take('medkit',1);delete S.campaign.wounds[e.sid];e.hp=e.maxhp*.7;e.wounded=0;
   e.captive=e.sid==='shust' && !S.campaign.liberated;
-  if(e.sid==='fox' && step==='fox'){S.flags.foxUp=1;nextChapter('dogs');sayLine(e,'Слышишь? Стая вернулась!');}
-  else if(e.sid==='wolf' && step==='aid'){
-    nextChapter('reward');storyRead(e.name,['Спасибо за аптечку, Меченый. Как вы ушли, пришёл второй отряд. Отбились, да не всех уберегли. Я за ранеными присмотрю. Иди к Сидору.']);
+  if(e.sid==='fox' && step==='fox'){
+    S.flags.foxUp=1;nextChapter('dogs');playConversation(e,'fox','Выйти во двор');
+  }else if(e.sid==='wolf' && step==='aid'){
+    nextChapter('reward');playConversation(e,'aid','К Сидоровичу');
   }else {save(true);sayLine(e,'Живой… Спасибо.');}
 }
 function addCast(id,point,def,tag){
@@ -179,60 +182,77 @@ function shustCampLine(){
   return 'Я пока один. Свяжусь с ребятами по КПК, попрошу прийти на АТП.';
 }
 function storyRead(name,lines){dialog({n:name,record:true,grp:'Кордон'},lines,()=>[{t:'Понятно',close:1}]);}
-function storyTalk(e){
-  const id=e.sid,stage=chapter();
-  const conclude=(lines,t,to,extra)=>dialog(cardOf(e),lines,()=>[{t,close:1,fn:()=>{if(stage!==chapter())return;if(extra)extra();nextChapter(to);}}],'dialog',e);
-  if(id==='wolf' && stage==='wolf')return conclude(['Шустрый на втором этаже ангара. Петруха с Хомяком уже у АТП. Держи ПМ и патроны. Я предупрежу ребят.'],'Забрать оружие','rescue',()=>{
-    const gun=give('w_pm',1,{cond:85,mag:8});give('a9',16);if(gun)mountGear('w_pm',cnt('w_pm')-1,true); S.q.flash=2;
-  });
-  if(id==='fox' && stage==='favour')return storyExchange(e,[
-    ['Погоди, Меченый. Ты ведь всё равно хотел к грузовику сходить? Поищи там мой «Макаров». Пока тебя из кабины вытаскивал, кобурой за что-то зацепился. Уже у Сидоровича хватился.','Как пойму, что пистолет твой?'],
-    ['На рукояти пластинка, на ней фамилия. Наградной он. Отец до самой смерти думал, что я его пропил, когда со службы ушёл. А я его столько лет берёг и вот… Обидно, понимаешь?','Поищу. Что ещё там осталось?'],
-    ['Рюкзак. Серый, лямка оторвана. Когда я тебя по склону тащил, он под ноги попался. Глянь в нём. Может, хоть узнаешь, с кем ехал.','А ты пока посиди здесь. Чтоб я тебя по всему Кордону не искал.'],
-    ['С этой ногой я тебе это твёрдо обещаю.','Идти к грузовику']
-  ],()=>nextChapter('wreck'));
-  if(id==='fox' && stage==='returnGun')return storyExchange(e,[
-    ['Нашёл мой «Макаров»?','Держи. Фамилию прочёл, пока грязь стирал.'],
-    ['Ну и забудь. Я только-только всех отучил меня по отчеству звать.','А вот что в рюкзаке было. Стекло вдребезги. Жму сюда — отзывается.'],
-    ['Дай пощупать… А ну, подержи.','Прижать крышку'],
-    ['Из динамика прорывается голос: «Говорит Стрелок…» Остальное тонет в треске.','Ещё раз можешь?'],
-    ['Он нам то же самое скажет. Найди Шустрого на АТП. Он мне однажды с утопленного наладонника запись вытащил. До сих пор жалею.','Чего так?'],
-    ['Я ему тогда под запись обещал заплатить вдвое.','Убрать КПК']
-  ],()=>{take('engraved_pm');nextChapter('device');});
-  if(id==='shust' && stage==='device')return storyExchange(e,[
-    ['Разбитый КПК? Ты мне жизнь спас, я бы рад взяться. Только этот не починю.','Это ещё почему? Я слышал, ты в этих делах мастер.'],
-    ['Обычный наладонник — да. А этот монолитовский. Внутри всё другое. Сходи к Сидоровичу. Через его руки такие проходили.','Сидор? Эта жаба опять заставит меня за него работать…']
-  ],()=>nextChapter('bargain'));
-  if(id==='wolf' && stage==='muster')return conclude(['Наёмники к северу от деревни. Пятеро наших собрались у костра. А я останусь с новичками, организую оборону.'],'Встретиться с отрядом','ready',()=>{S.campaign.raid=true;});
-  if(e.squadMate && stage==='ready')return conclude(['Там человек шесть. Проверь снаряжение. Как дашь знак — выступаем.'],'Я готов. Выходим','battle');
-  storyRead(e.name,[id==='shust'?shustCampLine():e.squadMate?'Держим этот участок.':id==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.']);
+function beginAssault(){
+  if(chapter()!=='rescue'||S.flags.assault)return;
+  S.flags.assault=1;
+  for(const e of atpCompany()){
+    e.sit=0;e.trip=e.path=null;e.home=locPt('atp',e.sid);e.stay=1;
+  }
+  bulletin('Отряд Петрухи выдвигается на АТП.');save(true);
 }
-function storyExchange(e,pairs,end){
-  let i=0;const stage=chapter();
-  function line(){const [speech,reply]=pairs[i];dialog(cardOf(e),[speech],()=>[{t:reply,fn:()=>{
-    if(++i<pairs.length){line();return;}closePanel();if(chapter()===stage)end();
-  }}],'dialog',e);}
-  line();
+function petrBriefing(e){
+  const decline={t:'Пока не готов. Ждите здесь.',close:1,fn:()=>{S.campaign.atpWait=true;save(true);}};
+  playConversation(e,'petr','Готов. Пошли за ним.',beginAssault,decline);
+}
+// A scene owns only the reply buttons. The conversation panel owns its transcript.
+function playConversation(e,key,finishLabel,finish,alternative){
+  const trader=!e, stage=chapter(), script=CORDON_SCRIPT[key];
+  if(!panel || (trader ? panel.kind!=='trader' : panel.e!==e))
+    dialog(trader?SIDCARD():cardOf(e),[],()=>[],trader?'trader':'dialog',e);
+  let index=0;
+  function advance(){
+    while(index<script.length && script[index][0]!=='Меченый'){
+      const [name,text]=script[index++];
+      const speech=key==='free' && index===script.length && !atpCompany().length?shustCampLine():text;
+      panel.lines.push({s:name?'npc':'sys',name:name==='Сталкер'?e?.name:name,t:speech});
+    }
+    if(index<script.length){
+      const reply=script[index++][1];
+      panel.opts=()=>[{t:reply,fn:advance}];
+    }else{
+      panel.opts=()=>[{t:finishLabel,k:'key',fn:()=>{
+        if(chapter()!==stage)return;
+        if(finish)finish();
+        if(trader){panel.opts=traderOpts;refresh();}else closePanel();
+      }},...(alternative?[alternative]:[])];
+    }
+    refresh();
+  }
+  advance();
+}
+function storyTalk(e){
+  const stage=chapter();
+  const scene=(key,label,to,effect)=>playConversation(e,key,label,()=>{effect?.();nextChapter(to);});
+  if(e.sid==='wolf' && stage==='wolf')return scene('wolf','Забрать оружие','rescue',()=>{
+    const gun=give('w_pm',1,{cond:85,mag:8});give('a9',16);
+    if(gun)mountGear('w_pm',cnt('w_pm')-1,true);S.q.flash=2;
+  });
+  if(e.sid==='fox' && stage==='favour')return scene('favour','Идти к грузовику','wreck');
+  if(e.sid==='fox' && stage==='returnGun')return scene('returnGun','Убрать КПК','device',()=>take('engraved_pm'));
+  if(e.sid==='shust' && stage==='device')return scene('device','К Сидоровичу','bargain');
+  if(e.sid==='wolf' && stage==='muster')return scene('muster','Встретиться с отрядом','ready',()=>{S.campaign.raid=true;});
+  if(e.squadMate && stage==='ready')return playConversation(e,'ready','Я готов. Выходим',()=>nextChapter('battle'),{t:'Ещё подготовлюсь',close:1});
+  const line=e.sid==='shust'?shustCampLine():e.squadMate?(S.campaign.northHeld?raidDebrief():'Держим этот участок.'):e.sid==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.';
+  dialog(cardOf(e),[line],()=>[{t:'До встречи',close:1}],'dialog',e);
+}
+function raidDebrief(){
+  const n=raidAllies().length;
+  return n===5?CORDON_SCRIPT.held[0][1]:n?'Не всех уберегли… Я останусь здесь, проверю округу. А ты возвращайся к Волку.':'Волк по КПК: «Меченый, возвращайся. Есть раненые».';
 }
 function storyTraderOptions(){
   const stage=chapter(), opts=[];
-  const offer=(at,t,lines,to,effect)=>{if(stage===at)opts.push({t,k:'key',fn:()=>{
-    if(chapter()!==at)return;
-    if(effect)effect();nextChapter(to);lines.forEach(say);
-  }});};
-  offer('wake','Кто меня нашёл?',['Лис вытащил тебя из грузовика. В твоём КПК одна запись — «Убить Стрелка». Хочешь узнать о нём? Помоги моему курьеру. У Шустрого флешка, а самого бандиты держат на АТП. Сначала зайди к Волку.'],'wolf');
-  if(has('flash'))offer('flash','Передать флешку Шустрого',['Уговор есть уговор. О Стрелке спроси Лиса. Ищи его у фермы за насыпью.'], 'fox',()=>{take('flash',1);S.flags.flashDone=1;S.q.flash=4;});
-  offer('bargain','Показать монолитовский КПК',['Шустрый уже отписался. Починить могу. А ты принеси кейс с южного КПП. Днём там весь гарнизон. Поднимешь шум — отвечать придётся всей деревне.',
-    'Ночной караул заступает в девять вечера и до пяти утра держит пост вдвоём. Слева от дороги в ограде есть пролом. Войди и выйди тихо. Если поднимут тревогу, отступай и жди следующей ночи.'],'case',()=>take('damaged_pda'));
-  if(stage==='case')opts.push({t:'Переждать до следующей ночной смены',fn:()=>{
-    const block=restBlock();if(block){sys(block);return;}
-    const minutes=(shiftNumber()+1)*1440+1260-S.min;
-    const r=advanceWorldTime(minutes,'rest');save(true);sys(r.stop || 'Смена заступила. '+clockStr(S.min));
-  }});
-  offer('deliver','Отдать кейс',['Вот их маршрут. Видишь отметку к северу от деревни? Наёмники собираются ударить по новичкам. Ступай к Волку, я передам ему координаты. Вернёшься — получишь свой КПК и комбез.'],'muster',()=>take('post_case'));
-  offer('reward','Получить награду и КПК',['Меченый, цел, собака! Держи «Зарю» и пять тысяч. А вот твой наладонник. Запись уцелела — включай.'],'listen',()=>{S.inv.restored_pda=1;S.money+=5000;give('ar_zarya',1);});
-  offer('listen','Включить восстановленную запись',['«Говорит Стрелок. Отправляюсь в Залесье, пополню припасы, разведаю несколько мест. Дальше пойду к центру… на север».',
-    'Сидорович: Залесье к западу отсюда, в Малой Зоне. Будь осторожен, Меченый. Удачной охоты.'],'west');
+  function offer(at,title,end,to,effect){
+    if(stage===at)opts.push({t:title,k:'key',fn:()=>playConversation(null,at,end,()=>{effect?.();nextChapter(to);})});
+  }
+  offer('wake','Кто меня нашёл?','Найти Волка','wolf');
+  if(has('flash'))offer('flash','Передать флешку Шустрого','Забрать медикаменты','fox',()=>{
+    take('flash',1);S.flags.flashDone=1;S.q.flash=4;give('medkit',2);give('bandage',3);
+  });
+  offer('bargain','Показать монолитовский КПК','Договорились','case',()=>take('damaged_pda'));
+  if(stage==='case')opts.push({t:'Что делать до следующей смены?',fn:()=>say('Костёр в деревне ещё горит. Передохни там или возьми у меня заказ, пока ждёшь. После тревоги раньше следующей ночи делать там нечего.')});
+  offer('deliver','Отдать кейс','К Волку','muster',()=>take('post_case'));
+  offer('reward','Получить награду и КПК','Забрать награду','listen',()=>{S.inv.restored_pda=1;S.money+=5000;give('ar_zarya',1);});
+  offer('listen','Включить восстановленную запись','Отправиться в Залесье','west');
   return opts;
 }
 function alarmPost(){
@@ -263,7 +283,7 @@ function campaignTick(){
   if(chapter()==='battle' && !ents.some(e=>e.alive && e.assailant)){
     c.northHeld=true;const alive=raidAllies();
     for(const e of alive){e.home={x:e.x,y:e.y};e.trip=e.path=null;e.stay=1;}
-    const line=alive.length===5?'Все наши целы. Мы тут останемся.':alive.length?'Не все вышли из боя. Мы останемся здесь.':'Волк по КПК: «Меченый, возвращайся. Есть раненые».';
+    const line=raidDebrief();
     bulletin(line);if(alive.length)sayLine(alive[0],line);
     const wolf=byS('wolf'), village=locPt('village','wolf');
     wolf.x=village.x;wolf.y=village.y;wolf.home=village;woundKey(wolf);
@@ -310,17 +330,15 @@ function drawCordonTrail(inView){
 // Day shift has four additional guards. They leave the playable post at 21:00.
 let lastShiftState=null;
 function updatePostShift(){
-  const day=!night(), enabled=['case','escape'].includes(chapter());
-  const key=enabled+':'+day+':'+shiftNumber();
+  const day=!night();
+  const key=day+':'+shiftNumber();
   if(lastShiftState===key)return;
   lastShiftState=key;
   ents=ents.filter(e=>!e.dayGuard && !e.reliefGuard);
-  if(enabled && !day){
-    for(const id of ['a4','a5'])if(!byS(id)){
-      const def=NPCDEF.find(e=>e.sid===id);
-      addCast('relief'+id+'_'+shiftNumber(),{x:def.x*T,y:def.y*T},def,'reliefGuard');
-    }
+  for(const id of ['a4','a5'])if(!byS(id)){
+    const def=NPCDEF.find(e=>e.sid===id);
+    addCast('relief'+id+'_'+shiftNumber(),{x:def.x*T,y:def.y*T},def,'reliefGuard');
   }
-  if(!enabled || !day)return;
-  for(let i=0;i<4;i++)addCast('postDay'+i,walkPoint(worldPoint(124+i*2,204+i%2)),{name:'Дневной караул',fac:'army',wpn:'w_aksu',guard:'south'},'dayGuard');
+  if(!day)return;
+  for(let i=0;i<4;i++)addCast('postDay'+shiftNumber()+'_'+i,walkPoint(worldPoint(123+i*2,201+i%2)),{name:'Дневной караул',fac:'army',wpn:'w_aksu',guard:'south'},'dayGuard');
 }

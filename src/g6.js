@@ -269,7 +269,7 @@ function blowout(dt) {
     radioNews(BLOW_WARNING, true);
   }
   if (B.stage === 1) {
-    B.t -= dt; WX.red = lerp(WX.red, 0.5, dt * 0.05);
+    B.t -= dt; WX.red = lerp(WX.red, 0.5, Math.min(1,dt * 0.05));
     sirenT -= dt; if (sirenT <= 0) { sirenT = 4; play('siren'); }
     if (B.t <= 0) {
       B.stage = 2; B.t = 26; play('blow');
@@ -279,7 +279,7 @@ function blowout(dt) {
       });
     }
   } else if (B.stage === 2) {
-    B.t -= dt; WX.red = lerp(WX.red, 1, dt * 2);
+    B.t -= dt; WX.red = lerp(WX.red, 1, Math.min(1,dt * 2));
     if (chance(dt * 1.5)) WX.flash = 0.8;
     if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
     if (B.t <= 0) {

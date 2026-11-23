@@ -239,9 +239,23 @@ function restBlock(h) {
 }
 function advanceWorldTime(minutes, ctx) {
   const before = S.min;
-  const r = simRest(minutes, ctx, { food: S.food, hp: P.hp, bleed: S.bleed });
+  const blow=S.blow, safe=sheltered(P.x,P.y);
+  if(blow && !blow.stage && blow.next<=before)blowout(0);
+  const limit=!safe && blow?(blow.stage?0:Math.max(0,blow.next-before)):minutes;
+  const r = simRest(Math.min(limit,minutes), ctx, { food: S.food, hp: P.hp, bleed: S.bleed });
   S.food = r.food; P.hp = r.hp; if (r.minutes > 0) P.st = 100;
-  S.min += r.minutes;
+  const end=before+r.minutes;
+  while(blow && S.min<end){
+    if(!blow.stage){
+      S.min=Math.min(end,Math.max(S.min,blow.next));
+      if(S.min>=blow.next)blowout(0);
+    }else{
+      const elapsed=Math.min(end-S.min,Math.max(0,blow.t));
+      S.min+=elapsed;blowout(elapsed);
+      if(!blow.stage)WX.red=0;
+    }
+  }
+  S.min=end;
   cleanExpiredCrates();
   renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
@@ -250,7 +264,7 @@ function advanceWorldTime(minutes, ctx) {
   plusDefaults();
   if (S.sos.act && S.min > S.sos.act.until) finishEncounter('timeout');
   ents.forEach(e => { if (e.alive && e.follow && S.min > e.hireEnd) { endHire(e); news('Контракт с напарником ' + e.name + ' закончился, пока ты отдыхал.'); } });
-  if (S.blow && S.blow.stage === 0 && S.blow.next < S.min) S.blow.next = S.min + 5;   // выброс не пропускается целиком
+  if(r.minutes<minutes && !stop && !safe && blow?.stage)return {from:before,to:S.min,minutes:done,stop:'Надвигается выброс. Найди укрытие.'};
   return { from: before, to: S.min, minutes: done, stop: stop };
 }
 
@@ -471,8 +485,8 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.flags.mutantBodies = objs.filter(o => o.k==='body' && o.loot[MUTANT_TROPHIES[o.kind]])
-    .map(({k,kind,fac,name,x,y,ang,seed,t,loot}) => ({k,kind,fac,name,x,y,ang,seed,t,loot:{...loot}}));
+  S.flags.fieldBodies=objs.filter(o=>o.k==='body' && !o.raidBody).map(o=>({...o}));
+  delete S.flags.mutantBodies;
   S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
@@ -487,7 +501,7 @@ function dynRestore() {
   plusDefaults();
   const v = S.dyn.v || 0;
   remapToMap();
-  for (const body of S.flags.mutantBodies || []) objs.push({...body,loot:{...body.loot}});
+  for (const body of S.flags.fieldBodies || S.flags.mutantBodies || []) objs.push({...body,loot:{...body.loot}});
   // миграция старых сохранений (0.6): заказ без id, SOS без участников
   if (v < DYN_VER) {
     const j = S.jobs.act;

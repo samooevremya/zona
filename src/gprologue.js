@@ -18,19 +18,28 @@ function intro(){
     c1Draw(b,'c1_bush'+(i%4),x,y,22+rng()*70,rng()*6);
   }
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fox={...byS('fox'),captive:0,wounded:0,sit:0,wpn:'hands'};
+  const speech=CORDON_SCRIPT.crash;
+  const beats=[], arrival=8;
+  let clock=arrival;
+  for(const [speaker,text] of speech){
+    const end=clock+Math.max(2,text.length/17);
+    beats.push({end,caption:speaker+' · '+text});clock=end;
+  }
+  const bunker=clock+.7, duration=bunker+3.6;
   let raf,lastStamp,elapsed=0,thunder=false,ended=false;
   function finish(){
     if(ended)return;ended=true;cancelAnimationFrame(raf);scene.remove();title.open=false;
-    resetInput();save(true);msg('Ты очнулся в бункере. Поговори с Сидоровичем.','say');
+    P.y=SID_SPAWN_Y*T;P.ang=-Math.PI/2;resetInput();save(true);msg('Ты очнулся в бункере. Поговори с Сидоровичем.','say');
   }
   function draw(now){
     if(ended)return;
     if(lastStamp && !document.hidden)elapsed+=Math.min(.1,(now-lastStamp)/1000);lastStamp=now;
-    const t=elapsed, seconds=reduced?6:12;
+    const t=elapsed, seconds=duration;
     if(t>=seconds){finish();return;}
     const w=Math.max(1,Math.min(1200,scene.clientWidth)),h=Math.max(1,Math.round(w*scene.clientHeight/scene.clientWidth));
     if(canvas.width!==w || canvas.height!==h){canvas.width=w;canvas.height=h;}
-    const s=Math.max(w/840,h/510),time=t*12/seconds,drive=Math.min(time,6.5),roll=clamp((time-5)/1.5,0,1);
+    const s=Math.max(w/840,h/510),time=t,drive=Math.min(time,6.5),roll=clamp((time-5)/1.5,0,1);
     g.setTransform(s,0,0,s,w/2,h/2);g.fillStyle='#211f1c';g.fillRect(-w/s/2,-h/s/2,w/s,h/s);
     g.drawImage(strip,-465-drive*59,-254);
     const x=-83+drive*13,y=5+roll*46;
@@ -50,12 +59,26 @@ function intro(){
     if(ART && C1)c1Draw(g,'c1_army0',0,0,116,0);else {g.fillStyle='#625d46';g.fillRect(-51,-19,102,38);}
     if(roll>.6){g.fillStyle='#302d29';g.fillRect(-42,-9,80,18);g.fillStyle='#181917';for(const dx of [-36,30])for(const dy of [-14,7])g.fillRect(dx,dy,12,7);}
     g.restore();
+    if(time>6.6){
+      const approach=clamp((time-6.6)/2.2,0,1);
+      fox.x=x+94-approach*66;fox.y=y+55-approach*22;fox.ang=-2.6;
+      fox.step=approach*60;fox.crouch=approach===1;drawHuman(fox,g);
+    }
     g.setTransform(1,0,0,1,0,0);g.strokeStyle='rgba(199,210,216,.22)';g.beginPath();
     for(let i=0;i<55;i++){const xx=(i*151+t*63)%w, yy=(i*71+t*340)%h;g.moveTo(xx,yy);g.lineTo(xx-4,yy+11);}g.stroke();
     if(time>=5 && !thunder){thunder=true;play('thunder');}
     if(!reduced && time>4.9 && time<5.45){g.fillStyle='rgba(205,218,224,'+(.41*(1-(time-4.9)/.55))+')';g.fillRect(0,0,w,h);}
-    const shade=clamp((time-7)/2,0,1);g.fillStyle='rgba(8,9,8,'+shade+')';g.fillRect(0,0,w,h);
-    caption.textContent=time<3?'Последний пассажир':time<8?'':time<10?'Лис: «Живой… Держись. До бункера недалеко».':'Кордон · Бункер Сидоровича';
+    if(time>=bunker){
+      const u=clamp((time-bunker)/2.7,0,1);
+      P.y=(SID_SPAWN_Y+(1-u)*.85)*T;P.ang=-Math.PI/2;P.step=u*28;
+      render();g.drawImage(cv,0,0,w,h);
+      g.fillStyle='rgba(8,9,8,'+(1-u)+')';g.fillRect(0,0,w,h);
+      caption.textContent='Четыре часа спустя · Бункер Сидоровича';
+    }else{
+      const shade=clamp((time-clock+.6)/1.3,0,1);
+      g.fillStyle='rgba(8,9,8,'+shade+')';g.fillRect(0,0,w,h);
+      caption.textContent=time<3?'Последний пассажир':time<arrival?'':beats.find(b=>time<b.end)?.caption || '';
+    }
     raf=requestAnimationFrame(draw);
   }
   raf=requestAnimationFrame(draw);

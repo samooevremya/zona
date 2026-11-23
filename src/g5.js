@@ -221,6 +221,7 @@ function talk(e) {
     {t:'Что слышно про маки?',fn:()=>say('Начнут слипаться глаза — выпей энергетик или выбирайся на дорогу. Кто лёг среди цветов, уже не встаёт.')},
     {t:'До встречи',close:1}
   ],'dialog',e);
+  if(chapter()==='rescue' && !S.flags.assault && (e.sid==='petr' || e.sid==='petr2' && !byS('petr')))return petrBriefing(e);
   if (STORY_KEYS.includes(e.sid) || e.squadMate)return storyTalk(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
@@ -276,7 +277,7 @@ function robNpc(e) {
   }
 }
 function talkTrader() {
-  dialog(SIDCARD(),[chapter()==='wake'?'Очнулся? У тебя на руке метка. Меченым и будем звать.':'Слушаю тебя, Меченый.'],traderOpts,'trader');
+  dialog(SIDCARD(),[chapter()==='wake'?'Очнулся? Садись ближе.':'Слушаю тебя, Меченый.'],traderOpts,'trader');
 }
 function traderOpts(){
   const o=storyTraderOptions().concat([{t:'Торговать',fn:()=>openTrade(null)}]);
@@ -286,12 +287,6 @@ function traderOpts(){
   } });
   o.push(...jobOpts());
   const repair=repairOffer(); if(repair) o.push(repair);
-  { const till = Math.ceil((S.min - 360 + 1) / 1440) * 1440 + 360 - S.min, blk = !!restBlock();
-    o.push({ t: restLabel('Отоспаться до утра:', till, 'sleep'), d: blk, fn: () => {
-      const b = restBlock(); if (b) { sys(b); return; }
-      const r = advanceWorldTime(till, 'sleep'); save(true);
-      if (r.stop) { say('Не спится на пустой желудок, а?'); sys(r.stop + ' Сейчас ' + clockStr(S.min) + '.'); }
-      else { say('Ложись вон на ящики. Утро вечера мудренее.'); sys('Наступило утро, ' + clockStr(S.min) + '. Игра сохранена.'); } } }); }
   o.push({ t: 'Закончить разговор', close: 1 });
   return o;
 }
@@ -564,7 +559,7 @@ function updateFog() {
   g.putImageData(id,x0,y0);
 }
 const MAP_INK = {
-  shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
+  body:'#a9a7a0', shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
   cache: '#e7bd79', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
 };
 function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
@@ -582,6 +577,8 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
     g.rect(-5,-3.8,10,7.6); g.fill(); g.stroke();
     g.beginPath(); g.moveTo(-4,-1); g.lineTo(4,-1); g.stroke();
     g.fillStyle='#242a28'; g.fillRect(-1,-1,2,3); g.restore(); return;
+  } else if(kind==='body'){
+    g.arc(0,0,2.25,0,2*Math.PI);
   } else if (kind === 'hatch' || kind === 'cache') {
     g.rect(-2.8, -2.8, 5.6, 5.6);
   } else {
@@ -599,7 +596,7 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
 }
 function mapLegend() {
   const legend = el('div', 'legend map-key');
-  for (const [kind, name] of [['player','Вы'], ['neutral','Нейтрал'], ['enemy','Враг'], ['friend','Друг'],
+  for (const [kind, name] of [['player','Вы'], ['neutral','Нейтрал'], ['enemy','Враг'], ['friend','Друг'], ['body','Погибшие'],
       ['target','Цель'], ['sos','SOS'], ['locker','Личный ящик'], ['cache','Тайник'], ['hatch','Бункер'], ...(S.blow?.stage ? [['shelter','Укрытие']] : [])]) {
     const item = el('span'), icon = el('canvas'); icon.width = icon.height = 32;
     mapSymbol(icon.getContext('2d'), kind, 16, 16, 2);
@@ -625,6 +622,15 @@ function drawDetectorContacts(g, s, u) {
   }
   g.restore();
 }
+function drawBodyContacts(g,s,u,nearOnly=false){
+
+  for(const body of objs){
+    if(body.k!=='body' || body.kind==='sack' || (nearOnly && dE(P,body)>24*T))continue;
+    const point=worldMapPoint(body), x=point.x/T,y=point.y/T;
+    if(!fog[Math.floor(y)*MW+Math.floor(x)])continue;
+    mapSymbol(g,'body',x*s,y*s,u);
+  }
+}
 function drawMapTo(g, s, full, o) {
   o = o || { ppl: 1, cache: 1 };
   const u = o.u || 1;
@@ -641,6 +647,7 @@ function drawMapTo(g, s, full, o) {
     const x=(c.x+c.w/2)/T*s, y=(c.y+c.h/2)/T*s;
     mapSymbol(g,'locker',x,y,u); mark(x,y,6*u);
   }
+  if(o.ppl)drawBodyContacts(g,s,u);
   if (o.ppl) ents.forEach(e => {
     if (visibleContact(e)) mapSymbol(g, playerRelation(e), e.x / T * s, e.y / T * s, u);
   });
@@ -732,6 +739,7 @@ function drawMini() {
     mctx.fillRect(P.x / T * s - size / 2, P.y / T * s - size / 2, size, size);
   }
   drawDetectorContacts(mctx, s, 1.65);
+  drawBodyContacts(mctx,s,1.65,true);
   mapSymbol(mctx, 'hatch', HATCH.x / T * s, HATCH.y / T * s, 1.65);
   objs.forEach(o => {
     if(o.k==='locker') mapSymbol(mctx,'locker',(o.x+o.w/2)/T*s,(o.y+o.h/2)/T*s,1.65);
@@ -881,7 +889,7 @@ function interact() {
     if(n.e.sid!=='shust' || chapter()!=='rescue'){msg('Пока рано.','say');return;}
     if(ATP_BANDITS.some(id=>byS(id))){msg('Сначала обезопась АТП.','say');return;}
     occupyATP();S.inv.flash=1;S.q.flash=3;nextChapter('flash');
-    storyRead('Шустрый',['Флешка у меня в подкладке. Отнеси Сидоровичу. '+shustCampLine()]);
+    playConversation(n.e,'free','Убрать флешку');
   }
 }
 const KEYS = {};
