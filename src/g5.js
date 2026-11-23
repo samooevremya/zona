@@ -277,7 +277,10 @@ function robNpc(e) {
   }
 }
 function talkTrader() {
-  dialog(SIDCARD(),[chapter()==='wake'?'Очнулся? Садись ближе.':'Слушаю тебя, Меченый.'],traderOpts,'trader');
+  let greeting=chapter()==='wake'?'Очнулся? Садись ближе.':'Слушаю тебя, Меченый.';
+  if(chapter()==='case' && S.campaign.failedShift===shiftNumber())
+    greeting='Слышал, на посту подняли тревогу. До следующей ночи туда ходу нет. Передохни у костра в деревне. А захочешь занять руки — у меня есть работа.';
+  dialog(SIDCARD(),[greeting],traderOpts,'trader');
 }
 function traderOpts(){
   const o=storyTraderOptions().concat([{t:'Торговать',fn:()=>openTrade(null)}]);
