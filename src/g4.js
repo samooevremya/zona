@@ -348,6 +348,13 @@ function* paintGroundWin(g, R) {
   yield;
   objs.forEach(o => { if (o.x + o.w >= (GW.x0 - 2) * T && o.x <= (GW.x1 + 3) * T && o.y + o.h >= (GW.y0 - 2) * T && o.y <= (GW.y1 + 3) * T) drawStaticObj(g, o); });
   if (ART) artDecor(g);
+  // Beyond the playable grid the woodland continues on the ground cache only.
+  if(BIG && ART && C1){
+    for(let y=GW.y0;y<=GW.y1;y++)for(let x=GW.x0;x<=GW.x1;x++){
+      if(x>=PW || map[y*MW+x]!==VO)continue;
+      artFill(g,'grass_dry',x*T,y*T,T,T);
+    }
+  }
   // Upper floors have a separate camera. Hide their working tiles beyond the outdoor boundary.
   if(BIG && GWP.x1>PW*T) for(const r of lofts){
     g.fillStyle='#080a07';g.fillRect(r.x*T-3,r.y*T-3,r.w*T+14,r.h*T+16);
@@ -1026,7 +1033,9 @@ function render() {
   const tx0 = Math.max(0, Math.floor(vx / T) - margin), tx1 = Math.min(MW - 1, Math.ceil((vx + vw) / T) + margin);
   const ty0 = Math.max(0, Math.floor(vy / T) - margin), ty1 = Math.min(MH - 1, Math.ceil((vy + vh) / T) + margin);
   for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
-    if (map[y * MW + x] !== TR) continue;
+    const tile=map[y*MW+x];
+    const backdrop=BIG && x<PW && tile===VO && !shopVisible && !loft && hash2(x+17,y)>.73;
+    if (tile!==TR && !backdrop) continue;
     // в глубине леса каждая вторая крона всё равно закрыта соседями: не рисуем её (меньше перерисовки на телефоне)
     if (CAN_SZ > 72 && (x + y) & 1 && map[y * MW + x - 1] === TR && map[y * MW + x + 1] === TR && map[(y - 1) * MW + x] === TR && map[(y + 1) * MW + x] === TR) continue;
     const h = hash2(x, y), cx = x * T + 16 + (h - 0.5) * 8, cy = y * T + 12 + (hash2(y, x) - 0.5) * 8;
@@ -1051,7 +1060,7 @@ function render() {
     }
   }
   ctx.globalAlpha = 1;
-  for (const c of crows) {
+  if(!inBunker(P.x,P.y) && !loftAt(P))for (const c of crows) {
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(c.x + 40, c.y + 60, 3, 0, 6.28); ctx.fill();
     const w = Math.sin(c.ph) * 5; ctx.strokeStyle = '#141412'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x - 7, c.y - w); ctx.lineTo(c.x, c.y); ctx.lineTo(c.x + 7, c.y - w); ctx.stroke(); ctx.lineWidth = 1;
   }
@@ -1077,6 +1086,16 @@ function render() {
     if (HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) continue;
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillText(e.name, e.x + 1, e.y - 18);
     ctx.fillStyle = e.fac === 'army' ? '#a9c79a' : '#e6dcb4'; ctx.fillText(e.name, e.x, e.y - 19);
+  }
+  if(BIG && ART && !shopVisible && !loft && vx+vw>PW*T){
+    // Screen space reserved for detached interiors is concealed from the outdoor camera.
+    const edge=PW*T;
+    artFill(ctx,'grass_dry',edge,vy,vx+vw-edge+1,vh);
+    for(let y=Math.floor(vy/64)-1;y<=Math.ceil((vy+vh)/64)+1;y++)
+      for(let x=Math.floor(edge/64);x<=Math.ceil((vx+vw)/64);x++){
+        const h=hash2(x,y),c=CANOPY[Math.floor(h*forestCrowns.length)];
+        if(c && Math.abs(y*64/T-BIG_EXITS.east.y)>2)ctx.drawImage(c,x*64-25+h*20,y*64-28,90,96);
+      }
   }
   drawBubbles(inView);
   if (P?.alive) drawPlayerAim();

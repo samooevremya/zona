@@ -235,14 +235,14 @@ Tt('K14_break_loot_search', () => {
   const search = {};
   for (const kind of ['safe','hiding']) {
     const o = M.objs.find(o => o.k === kind && !o.anomalyId);
-    left(o); attack('knife'); z.interact();
+    const initialTypes=Object.keys(o.loot).length;left(o); attack('knife'); z.interact();
     const opens = z.panel?.kind === 'loot' && z.panel.o === o;
     const take = [...document.querySelectorAll('button')].find(b => b.textContent === 'Взять' && b.offsetWidth);
     if (opens && take) take.click();
     z.closePanel();
     const remaining = JSON.stringify(o.loot);
     z.save(true); z.applyState(z.loadSave());
-    search[kind] = !!(opens && take && !o.broken && Object.keys(o.loot).length === 1 && JSON.stringify(o.loot) === remaining);
+    search[kind] = !!(opens && take && !o.broken && Object.keys(o.loot).length === initialTypes-1 && JSON.stringify(o.loot) === remaining);
   }
   return {ok: sealed && knife && takenOnce && emptyOnLoad && bullet && search.safe && search.hiding, sealed, knife, takenOnce, emptyOnLoad, bullet, search};
 });
@@ -255,13 +255,13 @@ Tt('K14_individual_items_and_capacity', () => {
   const layout=S().flags.groundItems[box.stash];
   const ammo=layout.find(d=>d.id==='a9'), kit=layout.find(d=>d.id==='medkit');
   S().inv={ar_jacket:1,cans:60,bandage:4,a9:7}; // 34,97 кг: ещё три патрона.
-  const n=box.loot.a9;
+  const n=box.loot.a9, cash=box.loot.money;
   const aimed=approachDrop(box,ammo); z.interact();
   const partial=aimed && S().inv.a9===10 && box.loot.a9===n-3 && layout.includes(ammo);
   const blocked=approachDrop(box,kit); z.interact();
   const kept=blocked && box.loot.medkit===1 && !S().inv.medkit && layout.includes(kit);
   S().inv.cans=50; z.interact();
-  const selectedOnly=!box.loot.medkit && box.loot.a9===n-3 && box.loot.money===250;
+  const selectedOnly=!box.loot.medkit && box.loot.a9===n-3 && box.loot.money===cash;
   S().inv.w_pm=1; S().cond.w_pm=62; S().mag.w_pm=4;
   z.openPanel('inv','Рюкзак'); z.panel.sel='w_pm'; z.refresh();
   [...document.querySelectorAll('.inv-detail button')].find(b=>b.textContent==='Выбросить').click(); z.closePanel();
@@ -506,13 +506,16 @@ function playChapter(losses){
   trader('Кто меня нашёл');expect('wolf');use(sid('wolf'),'talk');finishSpeech();expect('rescue');
   use(sid('petr'),'talk');click('Где Шустрого');click(losses?'Пока не готов':'Готов.');
   if(!!S().flags.assault===!!losses)throw Error('Решение Петрухи');
-  if(losses){z.rc.hurt(sid('b1'),1,P());if(!S().flags.assault)throw Error('Отряд не поддержал игрока');}
-  ['b1','b2','b3','b4','b5','b6','boss'].forEach(id=>damage(sid(id)));
+  if(losses){
+    approach(sid('b1'));z.rc.hurt(sid('b1'),999,P());
+    if(S().flags.assault)throw Error('Тихая атака запустила штурм');
+    approach(sid('b2'));z.rc.hurt(sid('b2'),1,P());step(2);if(!S().flags.assault)throw Error('Отряд не поддержал игрока');}
+  ['b1','b2','b3','b4','b5','b6','boss'].forEach(id=>{if(sid(id))damage(sid(id));});
   if(losses)damage(sid('petr2'));
   use(sid('shust'),'free');expect('flash');reload();
   if(!sid('shust') || sid('shust').captive || !S().campaign.liberated || (!!sid('petr2')===!!losses))throw Error('Гарнизон АТП после загрузки');
   trader('Передать флешку');expect('fox');S().inv.medkit=0;
-  use(sid('fox'),'heal');expect('fox');S().inv.medkit=3;use(sid('fox'),'heal');expect('dogs');reload();
+  use(sid('fox'),'heal');expect('fox');S().inv.medkit=3;use(sid('fox'),'heal');click('Держи аптечку');expect('dogs');reload();
   z.ents.filter(e=>e.trailDog && e.alive).forEach(damage);step(40);expect('favour');
   use(sid('fox'),'talk');finishSpeech();
   expect('wreck');use(target(),'story');z.closePanel();reload();use(target(),'story');expect('returnGun');z.closePanel();
@@ -527,12 +530,12 @@ function playChapter(losses){
     use(target(),'story');expect('case');S().min=1440+1290;use(target(),'story');expect('escape');
   }
   approach(target());step(40);expect('deliver');trader('Отдать кейс');expect('muster');
-  use(sid('wolf'),'talk');click('Встретиться');expect('ready');use(target(),'talk');click('Я готов');expect('battle');reload();
+  use(sid('wolf'),'talk');finishSpeech();expect('ready');use(target(),'talk');click('Я готов');expect('battle');reload();
   const allies=z.ents.filter(e=>e.alive && e.squadMate),enemy=z.ents.filter(e=>e.alive && e.assailant);
   if(allies.length!==5 || enemy.length!==6)throw Error('Состав отрядов');
   allies.slice(0,losses).forEach(damage);enemy.forEach(damage);step(45);expect('aid');reload();
   if(!sid('wolf').wounded || z.ents.filter(e=>e.alive && e.squadMate).length!==5-losses)throw Error('Потери после загрузки');
-  use(sid('wolf'),'heal');expect('reward');z.closePanel();const money=S().money;
+  use(sid('wolf'),'heal');click('Держи аптечку');expect('reward');z.closePanel();const money=S().money;
   trader('Получить награду');expect('listen');reload();const paid=S().money-money;
   trader('Включить восстановленную');expect('west');approach(target());step(45);expect('done');
   return {ok:paid===5000 && !!S().inv.ar_zarya && z.plus.qList().filter(q=>q.id.startsWith('chapter') && q.st==='d').length===9,losses,paid};
@@ -593,8 +596,8 @@ Tt('K25_bridge_toll', () => {
 
 Tt('D1_detectors_purchase_range_and_pickup', () => {
   reset();
-  S().money = 6800;
-  const [x,y] = RM.p(60.2*T,18.6*T);
+  S().money = 7616;
+  const {x,y}=z.gfxSnap().arts.find(a=>a.key==='a4');
   const stand = metres => { P().x=x-metres*T/1.5; P().y=y; step(1); };
   const signal = () => Number.isFinite(P().detD) && P().detT > 0;
   const key = digit => window.dispatchEvent(new KeyboardEvent('keydown',{code:'Digit'+digit}));
@@ -634,7 +637,7 @@ Tt('L1_carried_mass_and_energy', () => {
   const light=drain(), normal=regen();
   S().inv.cans=35;
   const heavy=drain();
-  S().money=300;z.openTrade(null);
+  S().money=400;z.openTrade(null);
   const buy=document.querySelector('.their button[aria-label^="Энергетик"]');
   buy.click();buy.click();document.querySelector('.deal').click();z.closePanel();
   const drink=()=>{z.openPanel('inv','Рюкзак');z.panel.sel='energy';z.refresh();
@@ -1098,7 +1101,7 @@ Tt('G2_wagon_footprints',()=>{
 });
 Tt('D1_campaign_difficulty',()=>{
   const rows=[];
-  for (const [level,price,hit] of [['rookie',240,11.7],['normal',300,18],['hard',375,22.5],['master',465,27.9]]) {
+  for (const [level,price,hit] of [['rookie',240,11.7],['normal',336,18],['hard',375,22.5],['master',465,27.9]]) {
     z.closePanel(); z.applyState(z.freshS(level));
     const p=P(),s=S();
     z.rc.hurt(p,20,z.ents.find(e=>e.fac==='bandit'));

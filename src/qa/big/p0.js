@@ -117,7 +117,7 @@ T('7_rest_vs_hunger_bleed', () => {
 T('8_trophy_text_vs_pay', () => {
   reset();
   const offs = []; for (let d = 0; d < 40; d++) { S().jobs.day = -9; S().min = 360 + d * 1440; X.jobOffers().filter(o => o.k === 'trophy').forEach(o => offs.push(o)); }
-  const bad = offs.filter(o => o.pay !== z.S.inv && o.pay !== (o.item === 'tail' ? 80 : 150) * 2 * o.n);
+  const bad = offs.filter(o => o.pay !== (o.item === 'tail' ? 70 : 132) * 2 * o.n);
   return { ok: offs.length > 0 && bad.length === 0, checked: offs.length, mismatched: bad.length, example: offs[0] && (offs[0].d + ' → ' + offs[0].pay) };
 });
 
@@ -243,7 +243,7 @@ T('19_personal_contacts', () => {
   const neutral = att(bySid('wolf'));
   const wounded = bySid('tolik');
   P().x = wounded.x + 12; P().y = wounded.y;
-  step(1); z.interact(); z.closePanel(); saveLoad();
+  step(1); z.interact(); document.querySelector('.dlg-opts button').click(); z.closePanel(); saveLoad();
   const healed = att(bySid('tolik'));
   bySid('tolik').angry = 1;
   const angry = att(bySid('tolik'));

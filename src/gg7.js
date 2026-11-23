@@ -124,7 +124,8 @@ function drawWeaponLocal(c2, w) {
     const shape = HELD_SPRITES[w.id], sprite = packImage(shape.file);
     if (sprite) {
       const length = W.toss ? 6.4 : W.len / (1-shape.grip);
-      c2.drawImage(sprite,x-shape.width/2,y-length*shape.grip,shape.width,length);
+      c2.save();c2.filter='saturate(.65) sepia(.14) contrast(.94) brightness(.93)';
+      c2.drawImage(sprite,x-shape.width/2,y-length*shape.grip,shape.width,length);c2.restore();
       return;
     }
   }

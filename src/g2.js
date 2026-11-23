@@ -25,8 +25,6 @@ function darkness() {
 }
 function clockStr(m) { m = Math.floor(m === undefined ? S.min : m); const p = x => (x < 10 ? '0' : '') + x; return p(Math.floor(m / 60) % 24) + ':' + p(m % 60) + ' · день ' + (Math.floor(m / 1440) + 1); }
 const def = () => (ITEMS[S.armor] ? ITEMS[S.armor].armor : 0) + (beltCount('art_bengal') ? 0.05 : 0);
-const score = () => S.stats.kM + S.stats.kS * 2 + S.stats.q * 10 + S.stats.art * 5;
-const rankOf = sc => sc < 15 ? 0 : sc < 45 ? 1 : sc < 90 ? 2 : 3;
 
 let MSGS = [];
 function msg(t, k) { MSGS.push({ t: t, k: k || '', life: 6 }); if (MSGS.length > 5) MSGS.shift(); }
@@ -66,8 +64,8 @@ function radioNews(t, urgent = false) {
 const DIFFICULTIES = {
   rookie: {name:'Новичок', note:'Больше припасов, выгодная торговля. Легче попасть и пережить ранение.',
     buy:.8, income:1.20, loot:1.40, incoming:.65, spread:.75},
-  normal: {name:'Средний', note:'Обычные цены, запасы и урон.',
-    buy:1, income:1, loot:1, incoming:1, spread:1},
+  normal: {name:'Средний', note:'Торговцы берут дороже, патроны приходится экономить. Обычный урон.',
+    buy:1.12, income:.88, loot:.82, incoming:1, spread:1},
   hard: {name:'Сложный', note:'Патронов меньше, снаряжение дороже. Противники бьют сильнее.',
     buy:1.25, income:.80, loot:.75, incoming:1.25, spread:1.10},
   master: {name:'Мастер', note:'Скудная добыча, дорогой ремонт и низкий заработок. Ошибки в бою обходятся дорого.',
@@ -77,7 +75,7 @@ function difficultyKey(id) {
   return Object.prototype.hasOwnProperty.call(DIFFICULTIES,id) ? id : 'normal';
 }
 function rules() { return DIFFICULTIES[difficultyKey(S?.difficulty)]; }
-const purchaseCost = base => Math.ceil(base*rules().buy);
+const purchaseCost = base => Math.ceil(base*rules().buy-1e-8);
 const earnings = base => Math.round(base*rules().income);
 const supplyCount = count => Math.max(1,Math.round(count*rules().loot));
 
@@ -96,21 +94,21 @@ const YARD_SEATS = [
   { sid: 'l4', x: 29.82, y: 86.33, wpn: 'w_pm', log: ['logs', -0.15, 0.35, 0.43] }
 ].map(s => ({ ...s, x: s.x + CAMP_TILE[0] - 30.5, y: s.y + CAMP_TILE[1] - 84.5 }));
 const NPCDEF = [
-  { sid: 'sid', fac: 'trader', name: 'Сидорович', x: SID_DESK_X, y: SID_DESK_Y, wpn: 'knife', hp: 99999, rank: 2, stay: 1, named: 1, ang: Math.PI / 2 },
-  { sid: 'wolf', fac: 'loner', name: 'Волк', x: 20.5, y: 79, wpn: 'w_obrez', hp: 130, rank: 2, stay: 1, named: 1 },
-  { sid: 'petr', fac: 'loner', name: 'Петруха', x: 74, y: 63.5, wpn: 'w_pm', hp: 150, rank: 1, stay: 1, named: 1 },
-  { sid: 'petr2', fac: 'loner', name: 'Хомяк', x: 74, y: 79, wpn: 'w_obrez', hp: 130, rank: 0, stay: 1, named: 1 },
-  { sid: 'shust', fac: 'loner', name: 'Шустрый', x: 94.5, y: 64.6, wpn: 'knife', hp: 60, rank: 0, captive: 1, named: 1 },
-  { sid: 'tolik', fac: 'loner', name: 'Толик', x: 58.6, y: 66.4, wpn: 'w_pm', hp: 70, rank: 0, captive: 1, wounded: 1, named: 1 },
-  { sid: 'fox', fac: 'loner', name: 'Лис', x: 88.5, y: 14.5, wpn: 'w_obrez', hp: 110, rank: 1, captive: 1, wounded: 1, named: 1, stay: 1 },
+  { sid: 'sid', fac: 'trader', name: 'Сидорович', x: SID_DESK_X, y: SID_DESK_Y, wpn: 'knife', hp: 99999, stay: 1, named: 1, ang: Math.PI / 2 },
+  { sid: 'wolf', fac: 'loner', name: 'Волк', x: 20.5, y: 79, wpn: 'w_obrez', hp: 130, stay: 1, named: 1 },
+  { sid: 'petr', fac: 'loner', name: 'Петруха', x: 74, y: 63.5, wpn: 'w_pm', hp: 150, stay: 1, named: 1 },
+  { sid: 'petr2', fac: 'loner', name: 'Хомяк', x: 74, y: 79, wpn: 'w_obrez', hp: 130, stay: 1, named: 1 },
+  { sid: 'shust', fac: 'loner', name: 'Шустрый', x: 94.5, y: 64.6, wpn: 'knife', hp: 60, captive: 1, named: 1 },
+  { sid: 'tolik', fac: 'loner', name: 'Толик', x: 58.6, y: 66.4, wpn: 'w_pm', hp: 70, captive: 1, wounded: 1, named: 1 },
+  { sid: 'fox', fac: 'loner', name: 'Лис', x: 88.5, y: 14.5, wpn: 'w_obrez', hp: 110, captive: 1, wounded: 1, named: 1, stay: 1 },
   { sid: 'b1', fac: 'bandit', x: 90, y: 71, wpn: 'w_pm', stay: 1 }, { sid: 'b2', fac: 'bandit', x: 93, y: 72.5, wpn: 'w_obrez' },
   { sid: 'b3', fac: 'bandit', x: 101, y: 72, wpn: 'w_pm' }, { sid: 'b4', fac: 'bandit', x: 104, y: 79, wpn: 'w_pm' },
   { sid: 'b5', fac: 'bandit', x: 99, y: 64.5, wpn: 'w_obrez' }, { sid: 'b6', fac: 'bandit', x: 93, y: 78.5, wpn: 'w_pm' },
-  { sid: 'boss', fac: 'bandit', name: 'Сиплый', x: 103, y: 64.6, wpn: 'w_aksu', hp: 140, rank: 2, named: 1 },
+  { sid: 'boss', fac: 'bandit', name: 'Сиплый', x: 103, y: 64.6, wpn: 'w_aksu', hp: 140, named: 1 },
   { sid: 'b7', fac: 'bandit', x: 16, y: 11, wpn: 'w_pm' }, { sid: 'b8', fac: 'bandit', x: 20, y: 12.5, wpn: 'w_obrez' }, { sid: 'b9', fac: 'bandit', x: 30, y: 12.5, wpn: 'w_pm' },
   { sid: 'a1', fac: 'army', name: 'Рядовой Ткач', x: 60.5, y: 33.4, wpn: 'w_aksu', guard: 'bridge' },
   { sid: 'a2', fac: 'army', name: 'Рядовой Мазур', x: 66.5, y: 33.4, wpn: 'w_aksu', guard: 'bridge' },
-  { sid: 'a3', fac: 'army', name: 'Прапорщик', x: 63.5, y: 34.2, wpn: 'w_aksu', guard: 'bridge', rank: 1 },
+  { sid: 'a3', fac: 'army', name: 'Прапорщик', x: 63.5, y: 34.2, wpn: 'w_aksu', guard: 'bridge' },
   { sid: 'a4', fac: 'army', name: 'Часовой', x: 60.5, y: 102.6, wpn: 'w_aksu', guard: 'south' },
   { sid: 'a5', fac: 'army', name: 'Часовой', x: 68.5, y: 102.6, wpn: 'w_aksu', guard: 'south' },
   ...YARD_SEATS.map(({ sid, x, y, wpn }) => ({ sid, x, y, wpn, fac: 'loner', sit: 1 })),
@@ -253,15 +251,14 @@ function rollInv(fac) {
 function mkHuman(d) {
   const W = WP[d.wpn || 'w_pm'];
   const base = d.fac === 'army' ? 150 : d.fac === 'bandit' ? 70 : 85;
-  const rank = d.rank !== undefined ? d.rank : (Math.random() < 0.55 ? 0 : Math.random() < 0.75 ? 1 : 2);
   const names = d.fac === 'bandit' ? BANDIT_NAMES : LONER_NAMES;
   const e = { id: nextId++, kind: 'human', sid: d.sid, fac: d.fac, name: d.name || names[(nameI[d.fac === 'bandit' ? 'bandit' : 'loner']++) % names.length],
-    x: d.x * T, y: d.y * T, r: 11, hp: d.hp || base + rank * 10, ang: d.ang !== undefined ? d.ang : rnd(-3, 3), alive: 1,
+    x: d.x * T, y: d.y * T, r: 11, hp: d.hp || base, ang: d.ang !== undefined ? d.ang : rnd(-3, 3), alive: 1,
     wpn: d.wpn || 'w_pm', mag: W.mag || 0, cool: 0, reload: 0, think: Math.random() * 0.3, react: 0.5, mem: 0,
-    home: { x: d.x * T, y: d.y * T }, sit: d.sit, stay: d.stay, guard: d.guard, captive: d.captive, named: d.named, rank: rank,
-    money: earnings((d.fac === 'army' ? ri(100, 300) : ri(50, 300)) + rank * 120), inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
+    home: { x: d.x * T, y: d.y * T }, sit: d.sit, stay: d.stay, guard: d.guard, captive: d.captive, named: d.named,
+    money: earnings((d.fac === 'army' ? ri(100, 300) : ri(50, 300))), inv: rollInv(d.fac), kx: 0, ky: 0, flash: 0, step: 0,
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
-    seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null, score: [ri(2, 14), ri(15, 44), ri(45, 80)][Math.min(rank, 2)] };
+    seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null };
   if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
   if (d.sid==='lz_barman') {e.inv={energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
   e.maxhp = e.hp;
@@ -276,7 +273,7 @@ function mkDog(d) {
 }
 function mkPlayer() {
   return { id: 0, kind: 'human', fac: 'player', name: 'Меченый', x: S.x, y: S.y, r: 11, hp: S.hp, maxhp: 100, ang: -Math.PI / 2, alive: 1,
-    cool: 0, reload: 0, bloom: 0, st: 100, kx: 0, ky: 0, flash: 0, step: 0, medT: 0, seed: 7, rank: 0 };
+    cool: 0, reload: 0, bloom: 0, st: 100, kx: 0, ky: 0, flash: 0, step: 0, medT: 0, seed: 7 };
 }
 const DEN_RECOVERY = 24 * 60;
 let mutantDens = new Map();
@@ -323,6 +320,31 @@ function renewDens() {
     delete deadlines[pack];
   }
 }
+let artifactAccess=null,artifactRevision=-1;
+function reachableArtifact(a){
+  if(artifactRevision!==navRevision){
+    artifactRevision=navRevision;artifactAccess=new Uint8Array(nav.length);
+    const start=nearestNav(Math.floor(FIRE.x/T),Math.floor(FIRE.y/T));
+    if(start>=0){
+      let end=1;bfsQ[0]=start;artifactAccess[start]=1;
+      for(let i=0;i<end;i++){
+        const n=bfsQ[i],x=n%MW,y=Math.floor(n/MW);
+        for(let k=0;k<8;k++){
+          const m=navNeighbor(x,y,k);
+          if(m>=0 && !artifactAccess[m]){artifactAccess[m]=1;bfsQ[end++]=m;}
+        }
+      }
+    }
+  }
+  const original=walkAnchor(a.x,a.y);
+  if(artifactAccess[original] && clearFooting(a.x,a.y,11))return {...a};
+  let best=-1,dist=Infinity;
+  for(let n=0;n<artifactAccess.length;n++)if(artifactAccess[n]){
+    const x=(n%MW+.5)*T,y=(Math.floor(n/MW)+.5)*T,d=(x-a.x)**2+(y-a.y)**2;
+    if(d<dist && clearFooting(x,y,11)){dist=d;best=n;}
+  }
+  return best<0?{...a}:{...a,x:(best%MW+.5)*T,y:(Math.floor(best/MW)+.5)*T};
+}
 function spawnWorld() {
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
@@ -354,7 +376,7 @@ function spawnWorld() {
 
 
   anoms = ANOM0.map(spawnAnomaly);
-  arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(a => Object.assign({}, a));
+  arts = ARTS0.filter(a => !S.flags['art_' + a.key]).map(reachableArtifact);
 }
 const byS = sid => ents.find(e => e.sid === sid && e.alive);
 
@@ -386,23 +408,23 @@ function attWord(e) {
   if (rel === 'friend') return 'друг';
   return e.fac === 'loner' && S.rep < 0 ? 'не доверяет' : 'нейтрал';
 }
-function lonerWitnesses(victim) {
+function lonerWitnesses(victim,loud=false) {
   return ents.filter(o => {
     if (o === victim || o.fac !== 'loner' || !o.alive || o.captive) return false;
     const range = sight(o);
     return [P, victim].every(target =>
       dE(o, target) < range && seesActor(o, target) &&
-      Math.abs(angD(o.ang, Math.atan2(target.y - o.y, target.x - o.x))) < 1.0);
+      ((loud && dE(o,target)<170) || Math.abs(angD(o.ang, Math.atan2(target.y - o.y, target.x - o.x))) < 1.0));
   });
 }
 function rememberAttacker(e) {
   if (!e.sid && !e.uid) e.uid = dynId();
-  e.angry = 1;
+  e.defendUntil=S.min+35;e.angry=1;e.aw=1;e.tgt=P;e.mem=35;e.lastSeen={x:P.x,y:P.y};setCampSeat(e,false);
   markAngry(e);
 }
 function witnessLonerAttack(victim, fatal, witnesses = lonerWitnesses(victim)) {
   witnesses.forEach(rememberAttacker);
-  if (!fatal) { rememberAttacker(victim); return; }
+  if (!fatal) { if(witnesses.length && !victim.angry)S.rep-=10;rememberAttacker(victim); return; }
   if (!witnesses.length) return;
   const reports = S.flags.lonerReports || (S.flags.lonerReports = []);
   reports.push({ victim: victim.name, due: S.min + 3, witnesses: witnesses.map(e => e.sid || e.uid) });
@@ -423,7 +445,7 @@ function deliverLonerReports() {
 }
 function anger(e) {
   if (e.fac === 'loner' && !e.angry) {
-    ents.forEach(o => { if (o.fac === 'loner' && o.alive && !o.captive && dE(o, e) < 450 && los(o.x, o.y, e.x, e.y)) { o.angry = 1; markAngry(o); } });
+    ents.forEach(o => { if (o.fac === 'loner' && o.alive && !o.captive && dE(o, e) < 450 && los(o.x, o.y, e.x, e.y)) { rememberAttacker(o); } });
     e.angry = 1; markAngry(e);
     S.rep -= 10;
     msg('Ты напал на своего. Одиночки этого не простят.', 'bad');
@@ -697,7 +719,7 @@ function seesActor(observer, target, openRay=false) {
 }
 function shotBarrier(sh, ca, sa, reach, target=sh.tgt) {
   if(sh!==P && sh.kind==='human')return npcBarrier(sh,ca,sa,reach,target);
-  const wall = rayWall(sh.x, sh.y, ca, sa, reach);
+  const wall = Math.min(rayWall(sh.x, sh.y, ca, sa, reach),npcBarrier(sh,ca,sa,reach,target));
   return sh.crouch ? Math.min(wall, rayFence(sh.x, sh.y, ca, sa, 0, Math.min(wall, FENCE_REACH))) : wall;
 }
 const ballOff = sh => (sh.r || 11) + 8;
@@ -820,8 +842,7 @@ function melee(sh, W) {
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang, shot) {
-  if(BIG && src===P && chapter()==='rescue' && S.campaign.atpWait && ATP_BANDITS.includes(e.sid))beginAssault();
-  if(BIG && src===P && e.guard==='south')alarmPost();
+  if(BIG && src===P && e.guard==='south' && !(e.quiet && dmg>=e.hp))alarmPost();
   if (!e.alive || e.sid === 'sid') return;
   if (src && (src === P || src.follow)) {
     e.hitByP = 1;
@@ -845,25 +866,33 @@ function hurt(e, dmg, src, ang, shot) {
           (!fight.warningShot || fight.warningShot===shot.id)) {
         if (!fight.warningShot) sayLine(e,'Свои!');
         fight.warningShot=shot.id;
-      } else witnessLonerAttack(e, false);
+      } else witnessLonerAttack(e, false,lonerWitnesses(e,!!shot || e.blastAt===S.min));
     }
-    if (src === P && e.fac === 'army' && !hostile(e, P)) anger(e);
-    if (hostile(e, src)) { e.tgt = src; e.lastSeen = { x: src.x, y: src.y }; e.mem = 6; e.react = Math.min(e.react, 0.15); }
+    if(src===P && e.fac==='army' && !(e.quiet && e.hp<=0)){
+      anger(e);
+      for(const guard of ents)if(guard.alive && guard.fac==='army' && guard.guard===e.guard && dE(guard,e)<330)rememberAttacker(guard);
+    }
+    if (hostile(e, src)) {
+      if(src===P && e.kind==='human')e.defendUntil=S.min+35;
+      e.tgt = src; e.lastSeen = { x: src.x, y: src.y }; e.mem = e.angry?35:6; e.react = Math.min(e.react, 0.15); }
   }
-  if (e.hp <= 0) kill(e, src);
+  if (e.hp <= 0) kill(e, src,!!shot || e.blastAt===S.min);
 }
-function kill(e, src) {
+function kill(e, src,loud=false) {
   if (e.sid === 'sid') return;
-  if(BIG && STORY_KEYS.includes(e.sid)){woundKey(e);return;}
+  if(BIG && STORY_KEYS.includes(e.sid)){
+    if(src===P && e.fac==='loner')witnessLonerAttack(e,false,lonerWitnesses(e,loud));
+    woundKey(e);return;
+  }
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
   if (e.sid) S.dead[e.sid] = 1;
   if (e.den) clearedDen(e.den);
-  const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e) : null;
+  const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e,loud) : null;
   (witnesses || ents).forEach(o => { if (o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && dE(o, e) < 420) o.morale = (o.morale === undefined ? 1 : o.morale) - 0.3; });
   decals.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), r: rnd(10, 16), a: 0.75 });
   if (decals.length > 140) decals.shift();
-  dropBody(e);
+  dropBody(e,!!witnesses?.length);
   const byPlayer = src === P;
   if (byPlayer) {
     if (e.kind !== 'human') S.stats.kM++; else S.stats.kS++;
@@ -878,7 +907,7 @@ function kill(e, src) {
   plusKill(e, src);
 }
 const MUTANT_TROPHIES = {dog:'tail', boar:'hoof', sucker:'tentacle'};
-function dropBody(e) {
+function dropBody(e,identified=false) {
   const loot = {};
   const trophy = MUTANT_TROPHIES[e.kind];
   if (trophy) loot[trophy] = 1;
@@ -894,6 +923,7 @@ function dropBody(e) {
   const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
   // Младший остаток визуального seed хранит расцветку и после загрузки тела.
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
+  body.deathKnown=identified || !e.hitByP;
   objs.push(body); g7Fresh(body);   // визуальный переход падения (только в памяти, не в сейве)
   const bodies = objs.filter(o => o.k === 'body');
   if (bodies.length > 30) objs.splice(objs.indexOf(bodies[0]), 1);
@@ -916,6 +946,7 @@ function stealthTick(e, dt) {
   let gain = 0;
   if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && seesActor(e, P)) gain = 0.45 + 2.4 * (1 - d / range);
 
+  if(d<68 && Math.abs(angD(e.ang,aP))<1.15 && seesActor(e,P))gain=12;
   const was = e.aw || 0;
   e.aw = gain ? Math.min(1, was + gain * dt) : Math.max(0, was - 0.25 * dt);
   if (gain && e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
@@ -946,6 +977,10 @@ function aiHuman(e, dt) {
     return;
   }
   if (e.captive) return;
+  if(e.robberyAlarm && e.fac==='loner'){
+    const responders=ents.filter(o=>o!==e && o.fac==='loner' && o.alive && !o.captive && !o.angry && dE(o,e)<170 && los(o.x,o.y,e.x,e.y));
+    if(responders.length){responders.forEach(rememberAttacker);sayLine(e,'Мужики, он меня грабить хотел!');e.robberyAlarm=false;}
+  }
   if((e.sid==='petr' || e.sid==='petr2') && !S.flags.assault && !S.flags.atpClear){
     e.tgt=null;e.path=null;return;
   }
@@ -955,9 +990,13 @@ function aiHuman(e, dt) {
   if (e.think <= 0) {
     e.think = 0.25 + Math.random() * 0.15;
     const t = findTarget(e);
-    if (t && t !== e.tgt) { e.tgt = t; e.react = rnd(0.35, 0.8) - (e.rank || 0) * 0.08; if (chance(0.6)) callout(e, 'combat'); }
+    if (t && t !== e.tgt) { e.tgt = t; e.react = rnd(0.35, 0.8); if (chance(0.6)) callout(e, 'combat'); }
     if (!t && e.tgt && (!e.tgt.alive || !hostile(e, e.tgt))) e.tgt = null;
     // охрана южного блокпоста
+    if(e.guard==='bridge' && bridgeBarrier?.solid && !S.flags.bridgePaid && !hostile(e,P) &&
+       dE(P,bridgeBarrier)<120 && dE(e,P)<170 && seesActor(e,P) && warnT<=0){
+      warnT=12;sayLine(e,'Стой у шлагбаума. За проход — пятьсот.');
+    }
     if (e.guard === 'south' && BIG && ['case','escape'].includes(chapter()) && storyArea() && e.aw>=1)alarmPost();
     if (e.guard === 'south' && !(BIG && ['case','escape'].includes(chapter())) && P.alive && dE(e, P) < 300 && seesActor(e, P)) {
       const d = dE(e, P);
@@ -1001,7 +1040,8 @@ function aiHuman(e, dt) {
 function pickRole(e, t) {
   const mates = ents.filter(o => o.alive && o !== e && o.kind === 'human' && o.fac === e.fac && o.tgt === t);
   const has = r => mates.some(o => o.role === r);
-  if (e.guard && e.guard!=='south') return 'hold';
+  if (e.guard && e.guard!=='south' && e.guard!=='bridge') return 'hold';
+  if(e.squadMate)return !has('flank')?'flank':'hold';
   if (WP[e.wpn].pellets && !has('push')) return 'push';
   if (mates.length >= 1 && !has('flank')) return 'flank';
   if (!has('push') && mates.length >= 2) return 'push';
@@ -1066,9 +1106,24 @@ function combatHuman(e, t, W, dt) {
   const d=dE(e,t), inRange=d<sight(e)*1.45;
   const openRay=inRange && clearNPCShot(e,t);
   const visible=inRange && seesActor(e,t,openRay), see=visible && openRay;
-  if (visible) { e.lastSeen = { x: t.x, y: t.y }; e.mem = 8; e.react -= dt; e.unseen = 0; }
+  if (visible) { e.lastSeen = { x: t.x, y: t.y }; e.mem = t===P && e.angry?35:8; e.react -= dt; e.unseen = 0; }
   else { e.mem -= dt; e.unseen = (e.unseen || 0) + dt; }
   const want = Math.atan2(t.y - e.y, t.x - e.x);
+  // Step out of a friendly firing lane while there is still room to move sideways.
+  if(e.fac==='loner' && !e.guard && t!==P && P.alive && S.weapon!=='knife' && S.weapon!=='hands' &&
+      (IN.btnFire || IN.aimStick?.active) && dE(e,P)<250){
+    const dx=e.x-P.x,dy=e.y-P.y,fx=Math.cos(P.ang),fy=Math.sin(P.ang);
+    const across=dy*fx-dx*fy,along=dx*fx+dy*fy;
+    if(along>10 && along<dE(P,t) && Math.abs(across)<22){
+      const side=Math.sign(across)||1,x=e.x-fy*side*48,y=e.y+fx*side*48;
+      if(clearWalk(e.x,e.y,x,y,e.r)){goTo(e,x,y,110,dt);return;}
+    }
+  }
+  const danger=nades.find(n=>n.t>0 && dE(e,n)<130 && los(e.x,e.y,n.x,n.y));
+  if(danger){
+    const away=Math.atan2(e.y-danger.y,e.x-danger.x);
+    goTo(e,e.x+Math.cos(away)*135,e.y+Math.sin(away)*135,139,dt);return;
+  }
   if (!e.role) { e.tacT=0; e.role = pickRole(e, t); e.morale = e.morale === undefined ? 1 : e.morale; if (e.nade === undefined) e.nade = (e.fac === 'army' ? 0.6 : e.fac === 'bandit' ? 0.35 : 0.2) > Math.random() ? 1 : 0; }
   e.tacT = (e.tacT || 0) - dt;
   // бегство при потере духа
@@ -1100,13 +1155,15 @@ function combatHuman(e, t, W, dt) {
   // цель не видна
   if (!see) {
     e.crouch = 0; e.inCover = 0;
-    if(e.lastSeen && (!e.guard || e.guard==='south') && e.mem>0){
+    if(e.lastSeen && (!e.guard || e.guard==='south' || e.guard==='bridge') && e.mem>0){
       e.peekTime=(e.peekTime||0)-dt;
       if(e.peekTime<=0){
         e.peekTime=1.5;e.firingSpot=battlePosition(e,e.lastSeen,28,W.range||300,false);
       }
       const dest=e.firingSpot||e.lastSeen;
-      e.cover=null;goTo(e,dest.x,dest.y,90,dt);
+      if(e.guard==='bridge' && dE(dest,e.home)>260){
+        goTo(e,e.home.x,e.home.y,75,dt);
+      }else{e.cover=null;goTo(e,dest.x,dest.y,90,dt);}
     }
     if (e.mem <= 0) { e.tgt = null; e.role = null; }
     return;
@@ -1115,7 +1172,7 @@ function combatHuman(e, t, W, dt) {
   const pref = W.pref || 20;
   // движение по роли
   if (W.melee) { e.crouch = 0; goTo(e, t.x, t.y, 110, dt); }
-  else if (e.guard && e.guard!=='south') { e.crouch = d > 160 ? 1 : 0; }
+  else if (e.guard && (d<W.range*.92 && lineClear(e,t) || e.guard!=='south' && e.guard!=='bridge')) { e.crouch = d > 160 ? 1 : 0; }
   else if (e.role === 'hold') {
     if (e.tacT <= 0) { e.tacT = rnd(4, 8); e.cover = findCover(e, t, Math.max(120, pref - 60), pref + 160); }
     if (e.cover && dst(e.x, e.y, e.cover.x, e.cover.y) > 10) { e.crouch = 0; e.inCover = 0; goTo(e, e.cover.x, e.cover.y, 105, dt); }
@@ -1136,7 +1193,7 @@ function combatHuman(e, t, W, dt) {
   if (W.melee) { if (d < e.r + t.r + W.range && e.cool <= 0) { e.cool = W.rate * 1.6; melee(e, W); } return; }
   if (e.react <= 0 && e.cool <= 0 && e.reload <= 0 && d < W.range * 0.92 && Math.abs(angD(e.ang, want)) < 0.25) {
     if (!lineClear(e,t)) {
-      if(!e.guard || e.guard==='south'){
+      if(!e.guard || e.guard==='south' || e.guard==='bridge'){
         e.peekTime=(e.peekTime||0)-dt;
         if(e.peekTime<=0){e.peekTime=1;e.firingSpot=battlePosition(e,t,28,W.range,false);}
         if(e.firingSpot)goTo(e,e.firingSpot.x,e.firingSpot.y,86,dt);
@@ -1144,7 +1201,7 @@ function combatHuman(e, t, W, dt) {
       return;
     }
     const moving = !e.inCover && e.role !== 'hold';
-    const acc = { bandit: 0.12, loner: 0.1, army: 0.07 }[e.fac] - (e.rank || 0) * 0.015 + (night() && d > 200 ? 0.05 : 0) + (moving ? 0.04 : 0) + (t === P && P.crouch ? 0.03 : 0);
+    const acc = { bandit: 0.12, loner: 0.1, army: 0.07 }[e.fac] + (night() && d > 200 ? 0.05 : 0) + (moving ? 0.04 : 0) + (t === P && P.crouch ? 0.03 : 0);
     e.crouch = 0;
     if(!fire(e,e.ang,W,W.spread+acc))return;
     e.mag--;
@@ -1187,9 +1244,22 @@ function helpCompanion(e,dt){
   return true;
 }
 function idleHuman(e, dt) {
+  if(chapter()==='aid' && S.campaign.villageMedic && e.sid===S.campaign.villageMedic){
+    const wolf=byS('wolf');
+    if(wolf?.wounded){
+      setCampSeat(e,false);
+      if(dE(e,wolf)>44)goTo(e,wolf.x,wolf.y,84,dt);
+      else {e.crouch=1;e.ang=Math.atan2(wolf.y-e.y,wolf.x-e.x);}
+      return;
+    }
+  }
   if(e.squadMate && chapter()==='battle'){
-    const destination=dE(P,northCamp())<340?northCamp():P;
-    if(dE(e,destination)>90)goTo(e,destination.x,destination.y,90,dt);
+    const i=Math.max(0,RAIDERS.indexOf(e.name)), site=northCamp();
+    const a=Math.atan2(site.y-P.y,site.x-P.x), lateral=(i-2)*48;
+    const forward=Math.min(82,dE(P,site)-122)-Math.abs(i-2)*20;
+    const x=P.x+Math.cos(a)*forward-Math.sin(a)*lateral;
+    const y=P.y+Math.sin(a)*forward+Math.cos(a)*lateral;
+    if(dst(e.x,e.y,x,y)>40)goTo(e,x,y,90,dt);
     return;
   }
   if((e.sid==='petr' || e.sid==='petr2') && S.flags.assault && !S.flags.atpClear){

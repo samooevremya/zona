@@ -32,12 +32,27 @@ function prepareCampaign(){
   }
   for(const id of STORY_KEYS) delete S.dead[id];
 }
+function fieldNotice(title,text){
+  const host=document.getElementById('field-notices');
+  const note=el('div','field-notice');
+  note.append(el('b','',title),el('span','',text));
+  host.appendChild(note);
+  while(host.children.length>3)host.firstChild.remove();
+  setTimeout(()=>note.remove(),5000);
+}
+function rewardReceipt(reason,contents){
+  const text=contents.join(', ');
+  const history=S.flags.rewards ||= [];
+  history.unshift({time:S.min,reason,text});
+  history.splice(10);
+  fieldNotice('Награда · '+reason,text);
+}
 function nextChapter(stage){
   if(chapter()===stage)return;
   const prev=STORY[chapter()][0], curr=STORY[stage][0];
   if(curr>prev && prev>0)S.stats.q++;
   S.campaign.stage=stage; S.trackedQuestId='chapter'+curr;
-  campaignCast(); bulletin(STORY[stage][2]); save(true);
+  campaignCast();bulletin(campaignLabel());fieldNotice(stage==='done'?'Глава завершена':'Новое задание',campaignLabel());save(true);
 }
 const chapterReports=[
   ['sid','Лис вытащил тебя из разбитого грузовика и довёз до бункера.'],
@@ -188,10 +203,13 @@ function beginAssault(){
   for(const e of atpCompany()){
     e.sit=0;e.trip=e.path=null;e.home=locPt('atp',e.sid);e.stay=1;
   }
-  bulletin('Отряд Петрухи выдвигается на АТП.');save(true);
+  bulletin('Отряд Петрухи выдвигается на АТП.');
 }
 function petrBriefing(e){
   const decline={t:'Пока не готов. Ждите здесь.',close:1,fn:()=>{S.campaign.atpWait=true;save(true);}};
+  if(S.campaign.atpWait)return dialog(cardOf(e),['Ну что, Меченый, подготовился?'],()=>[
+    {t:'Готов. Выходим.',close:1,fn:beginAssault},decline
+  ],'dialog',e);
   playConversation(e,'petr','Готов. Пошли за ним.',beginAssault,decline);
 }
 // A scene owns only the reply buttons. The conversation panel owns its transcript.
@@ -209,6 +227,9 @@ function playConversation(e,key,finishLabel,finish,alternative){
     if(index<script.length){
       const reply=script[index++][1];
       panel.opts=()=>[{t:reply,fn:advance}];
+    }else if(!alternative){
+      if(finish && chapter()===stage)finish();
+      panel.opts=trader?traderOpts:()=>[{t:'До встречи',close:1}];
     }else{
       panel.opts=()=>[{t:finishLabel,k:'key',fn:()=>{
         if(chapter()!==stage)return;
@@ -224,7 +245,7 @@ function storyTalk(e){
   const stage=chapter();
   const scene=(key,label,to,effect)=>playConversation(e,key,label,()=>{effect?.();nextChapter(to);});
   if(e.sid==='wolf' && stage==='wolf')return scene('wolf','Забрать оружие','rescue',()=>{
-    const gun=give('w_pm',1,{cond:85,mag:8});give('a9',16);
+    const gun=give('w_pm',1,{cond:85,mag:8});give('a9',16);rewardReceipt('Снаряжение от Волка',['ПМ','9×18 мм ×16']);
     if(gun)mountGear('w_pm',cnt('w_pm')-1,true);S.q.flash=2;
   });
   if(e.sid==='fox' && stage==='favour')return scene('favour','Идти к грузовику','wreck');
@@ -246,12 +267,12 @@ function storyTraderOptions(){
   }
   offer('wake','Кто меня нашёл?','Найти Волка','wolf');
   if(has('flash'))offer('flash','Передать флешку Шустрого','Забрать медикаменты','fox',()=>{
-    take('flash',1);S.flags.flashDone=1;S.q.flash=4;give('medkit',2);give('bandage',3);
+    take('flash',1);S.flags.flashDone=1;S.q.flash=4;give('medkit',2);give('bandage',3);rewardReceipt('Флешка Шустрого',['Аптечка ×2','Бинт ×3']);
   });
   offer('bargain','Показать монолитовский КПК','Договорились','case',()=>take('damaged_pda'));
   if(stage==='case')opts.push({t:'Что делать до следующей смены?',fn:()=>say('Костёр в деревне ещё горит. Передохни там или возьми у меня заказ, пока ждёшь. После тревоги раньше следующей ночи делать там нечего.')});
   offer('deliver','Отдать кейс','К Волку','muster',()=>take('post_case'));
-  offer('reward','Получить награду и КПК','Забрать награду','listen',()=>{S.inv.restored_pda=1;S.money+=5000;give('ar_zarya',1);});
+  offer('reward','Получить награду и КПК','Забрать награду','listen',()=>{S.inv.restored_pda=1;S.money+=5000;give('ar_zarya',1);rewardReceipt('Защита деревни',['5000 RU','Заря','Восстановленный КПК']);});
   offer('listen','Включить восстановленную запись','Отправиться в Залесье','west');
   return opts;
 }
@@ -292,9 +313,16 @@ function campaignTick(){
   if(chapter()==='west' && dE(P,LESSER_FIRE)<145)nextChapter('done');
 }
 function villageAftermath(){
-  if(S.campaign.raidAftermath==null || S.min-S.campaign.raidAftermath>720 || objs.some(o=>o.raidBody))return;
+  if(S.campaign.raidAftermath!=null && !S.campaign.villageMedic){
+    const wolf=byS('wolf');
+    const helper=wolf && ents.filter(e=>e.fac==='loner' && e.sid && !e.named && !e.squadMate && !e.captive && e.alive && dE(e,wolf)<510)
+      .sort((a,b)=>dE(a,wolf)-dE(b,wolf))[0];
+    if(helper){S.campaign.villageMedic=helper.sid;helper.sit=0;helper.campRise=null;}
+  }
+  if(S.campaign.raidAftermath==null || S.min-S.campaign.raidAftermath>720 || S.campaign.bodiesPlaced || objs.some(o=>o.raidBody))return;
+  S.campaign.bodiesPlaced=true;
   for(let i=0;i<4;i++){const p=walkPoint(FIRE,i%2?4:-3,2+i);
-    objs.push({k:'body',...p,raidBody:true,fac:i<2?'bandit':'loner',name:i<2?'Наёмник':'Защитник деревни',kind:'human',seed:17+i,ang:i*2.3,loot:{},t:S.campaign.raidAftermath});}
+    objs.push({k:'body',...p,raidBody:true,fac:i<2?'bandit':'loner',name:i<2?'Наёмник':'Защитник деревни',kind:'human',seed:17+i,ang:i*2.3,loot:i%2?{a9:4,bandage:1}:{a545:6,money:25},t:S.campaign.raidAftermath});}
 }
 function storyPrompt(cand){
   const c=S.campaign;
