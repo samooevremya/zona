@@ -179,6 +179,90 @@ function trailPrint(wet, variant) {
   g.putImageData(image, 0, 0); trailPrints.set(key, c); return c;
 }
 
+// The yard is painted in world coordinates, including the overlap of neighbouring chunks.
+const villageAtmosphere = BIG && !location.hash.includes('yard-off');
+function nearGroundChunk(x, y, margin) {
+  return x >= GWP.x0-margin && x <= GWP.x1+margin && y >= GWP.y0-margin && y <= GWP.y1+margin;
+}
+function paintVillageHearth(g) {
+  if (!nearGroundChunk(FIRE.x, FIRE.y, 112)) return;
+  const r = mulberry32(9182);
+  g.save(); g.translate(FIRE.x, FIRE.y);
+  for (let i=0; i<28; i++) {
+    const a=r()*Math.PI*2, radius=r()*32, w=18+r()*33;
+    g.globalAlpha=.54;
+    g.drawImage(trailPrint(true,i%4),Math.cos(a)*radius-w/2,Math.sin(a)*radius*.76-11,w,23);
+  }
+  g.globalAlpha=1;
+  for (let i=0; i<130; i++) {
+    const a=r()*Math.PI*2, radius=9+r()*36;
+    g.fillStyle=i%4===0?'rgba(176,166,145,.57)':'rgba(44,36,30,.67)';
+    g.fillRect(Math.cos(a)*radius,Math.sin(a)*radius*.8,1+r()*2,.6+r());
+  }
+  // Split birch and bark chips beside the seating circle.
+  g.translate(54,25); g.rotate(-.35);
+  groundShadow(g,0,0,17,8,0,2);
+  for (let i=0; i<6; i++) {
+    const x=(r()-.5)*8, y=(i%4)*3.2-5;
+    c1Draw(g,'c1_log'+(i%3),x,y,24+r()*8,(r()-.5)*.25,1,1);
+    g.fillStyle='#a88c65'; g.fillRect(x-10+r()*3,y,2.2,1.3);
+  }
+  for (let i=0; i<16; i++) {
+    g.fillStyle=i%3?'#776449':'#a18e71'; g.fillRect((r()-.5)*41,(r()-.5)*23,1+r()*2,.8);
+  }
+  g.restore();
+}
+function paintVillageHouseFeet(g) {
+  for (const h of HOUSES) {
+    const x=h.x*T, y=(h.y+h.h)*T, w=h.w*T;
+    if (!nearGroundChunk(x+w/2,y,w/2+30) || Math.abs(x+w/2-FIRE.x)>350 || Math.abs(y-FIRE.y)>410) continue;
+    const r=mulberry32(137*h.x+h.y);
+    g.save();
+    for (let along=4; along<w-4; along+=8) {
+      const atDoor=h.entrances.some(d=>d.ny===1 && Math.abs(d.x-along)<d.width*.54);
+      if (atDoor) continue;
+      const wet=trailPrint(true,Math.floor(r()*4));
+      g.globalAlpha=.76; g.drawImage(wet,x+along-12,y-5,27,12+r()*6);
+      if(r()<.38){
+        g.strokeStyle='#665f42'; g.lineWidth=.9; g.beginPath();
+        for(let i=0;i<4;i++){
+          const u=x+along+r()*6,v=y+2+r()*3;
+          g.moveTo(u,v);g.lineTo(u-4+r()*7,v-2-r()*5);
+        }
+        g.stroke();
+      }
+    }
+    g.restore();
+  }
+}
+// Short paired depressions at the bend above the hatch. Their damp sheen follows local weather.
+const hatchRuts = [[69,-25,45,6,-.64],[90,-18,57,7,-.70],[127,-74,62,6,-.76],[144,-64,44,5,-.80]];
+function paintHatchRuts(g, sheen) {
+  for (const [dx,dy,w,h,a] of hatchRuts) {
+    g.save(); g.translate(HATCH.x+dx,HATCH.y+dy); g.rotate(a);
+    if(sheen){
+      g.globalAlpha=.35*WX.rain;
+      g.drawImage(yardReflection(),-w*.42,-h*.42,w*.84,h*.84);
+    } else {
+      g.globalAlpha=.87;
+      g.drawImage(trailPrint(true,Math.floor(w)%4),-w*.64,-h,w*1.28,h*2);
+    }
+    g.restore();
+  }
+}
+let rutReflection;
+function yardReflection() {
+  if(rutReflection)return rutReflection;
+  const c=document.createElement('canvas');c.width=96;c.height=18;
+  const g=c.getContext('2d'),r=mulberry32(456);
+  g.drawImage(trailPrint(true,1),0,0,96,18);g.globalCompositeOperation='source-atop';
+  const sky=g.createLinearGradient(0,0,0,18);
+  sky.addColorStop(0,'#4c5048');sky.addColorStop(.57,'#a0a6a3');sky.addColorStop(1,'#777968');
+  g.fillStyle=sky;g.fillRect(0,0,96,18);g.fillStyle='rgba(50,45,39,.5)';
+  for(let i=0;i<28;i++)g.fillRect(r()*95,r()*18,1+r()*7,1);
+  return rutReflection=c;
+}
+
 function drawVillageLanes(g) {
   if (GWP.x1 < (WEST+40)*T || GWP.x0 > (WEST+86)*T || GWP.y1 < (NORTH_ROWS+159)*T || GWP.y0 > (NORTH_ROWS+184)*T) return;
   g.save();
@@ -192,7 +276,17 @@ function drawVillageLanes(g) {
         const n = hash2(l * 13 + i, j);
         g.save(); g.translate(x, y); g.rotate(Math.atan2(dy, dx) + (n - .5) * .23);
         const w = 56 + n * 16, h = (l === 0 || l === 3 || l === 6 ? 42 : 29) + n * 7;
-        g.globalAlpha = .65; g.drawImage(trailPrint(false, j % 4), -w/2, -h/2, w, h); g.restore();
+        g.globalAlpha = .65; g.drawImage(trailPrint(false, j % 4), -w/2, -h/2, w, h);
+        if (villageAtmosphere && (l === 0 || l === 1 || l === 3)) {
+          // Narrow polished centre and occasional heel scuffs, following the walkable lane.
+          g.globalAlpha=.47; g.drawImage(trailPrint(false,(j+i)%4),-21,-8+n*3,42,16);
+          if(n>.4){
+            const side=j%2?1:-1;
+            g.rotate(side*.13); g.globalAlpha=.55;
+            g.drawImage(trailPrint(true,j%4),-4,side*6-2,8,4);
+          }
+        }
+        g.restore();
       }
     }
   });
@@ -448,6 +542,11 @@ function* artGround(g) {
       g.clip('evenodd'); ART.draw(g, 'camp_yard', FIRE.x, FIRE.y, w, h); g.restore();
     }
     if (BIG) drawVillageLanes(g);
+    if (villageAtmosphere) {
+      paintVillageHearth(g);
+      if (nearGroundChunk(HATCH.x,HATCH.y,190)) paintHatchRuts(g,false);
+      if (nearGroundChunk(FIRE.x,FIRE.y,720)) paintVillageHouseFeet(g);
+    }
   }
   // 4. Растительность группами: у стен, заборов, деревьев и насыпи; середина проходов свободна
 
@@ -655,12 +754,17 @@ function drawThresholds(g) {
         g.fillStyle = '#9d876c'; g.fillRect(left+1, 19, w-2, 1);
       }
       // Косяки остаются видны изнутри при прозрачной крыше.
-      if (door.approach === 'earth' && seed % 3 !== 0) {
+      const wolfDoor = villageAtmosphere && h.ok==='15,72' && door.ny===1;
+      if (door.approach === 'earth' && (seed % 3 !== 0 || wolfDoor)) {
         const stone = concrete || h.ruin;
         g.fillStyle = stone ? '#635e50' : '#534638';
         g.fillRect(left+2,-3,w-4,5);
         g.fillStyle = stone ? '#918777' : '#8a775e';
         g.fillRect(left+3,0,w-7,1.4);
+        if(wolfDoor){
+          g.fillStyle='#40382f';g.fillRect(left+2,2,w-4,3);
+          g.fillStyle='#a28a6b';g.fillRect(-w*.23,1,w*.41,1.4);
+        }
       }
       g.fillStyle = concrete ? '#807d70' : '#785e46';
       g.fillRect(left - 2, -T / 2 - 5, 3, 10); g.fillRect(-left - 1, -T / 2 - 5, 3, 10);

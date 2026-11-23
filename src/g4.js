@@ -94,6 +94,21 @@ function drawLitHuman(e) {
   g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
+let hearthSmokeImage;
+function drawHearthSmoke(p, age) {
+  if (!hearthSmokeImage) {
+    const c=document.createElement('canvas'); c.width=c.height=40;
+    const g=c.getContext('2d');
+    for (const [x,y,r] of [[17,19,15],[25,16,12],[22,23,13]]) {
+      const haze=g.createRadialGradient(x,y,0,x,y,r);
+      haze.addColorStop(0,'rgba(170,167,157,.83)'); haze.addColorStop(1,'rgba(139,137,130,0)');
+      g.fillStyle=haze;g.fillRect(x-r,y-r,r*2,r*2);
+    }
+    hearthSmokeImage=c;
+  }
+  const size=p.s*(2.5+age*6);
+  ctx.drawImage(hearthSmokeImage,p.x-size,p.y-size,size*2,size*2);
+}
 function fireGroundLight(fire) {
   const r = FIRE_REACH;
   const glow = ctx.createRadialGradient(fire.x, fire.y, 5, fire.x, fire.y, r);
@@ -382,6 +397,15 @@ async function prepareShopGate() {
   const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
   const g=c.getContext('2d'); g.drawImage(im,0,0);
   g.scale(c.width/2,c.height/2);
+  if(villageAtmosphere){
+    // The lamp is painted directly onto the hatch, so it follows the sloped stair texture.
+    g.save();g.translate(1.06,.85);g.scale(.32,.55);
+    const lamp=g.createRadialGradient(.18,-.26,0,0,0,1);
+    lamp.addColorStop(0,'rgba(255,183,91,.58)');lamp.addColorStop(.48,'rgba(226,146,65,.28)');
+    lamp.addColorStop(1,'rgba(198,125,54,0)');g.fillStyle=lamp;g.fillRect(-1,-1,2,2);g.restore();
+    g.fillStyle='#544438';g.fillRect(1.17,.66,.055,.067);
+    g.fillStyle='#ebbe81';g.fillRect(1.178,.68,.036,.025);
+  }
   const fade=g.createRadialGradient(1,1,.74,1,1,1.04);
   fade.addColorStop(0,'#fff'); fade.addColorStop(.85,'rgba(255,255,255,.15)'); fade.addColorStop(1,'transparent');
   g.globalCompositeOperation='destination-in'; g.fillStyle=fade; g.fillRect(0,0,2,2);
@@ -843,6 +867,8 @@ function render() {
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
+  if(villageAtmosphere && ART && WX.rain>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
+    paintHatchRuts(ctx,true);
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -913,7 +939,7 @@ function render() {
     ctx.fillStyle = 'rgba(255,220,120,0.95)'; ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(12, 0); ctx.lineTo(0, 3); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,220,0.9)'; ctx.beginPath(); ctx.arc(1, 0, 3, 0, 6.28); ctx.fill(); ctx.restore();
   }
-  for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
+  for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.hearth) { drawHearthSmoke(p, 1-k); } else if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
   ctx.globalAlpha = 1;
   // крыши: скрывают дом, пока ты не внутри
   HOUSES.forEach((h, i) => {
@@ -1060,6 +1086,14 @@ function render() {
       ctx.fillStyle = 'rgba(255,240,200,' + (0.9 * dk) + ')'; ctx.beginPath(); ctx.arc(s2[0] * 2, s2[1] * 2, 3 * Z, 0, 6.28); ctx.fill(); });
   }
   for (const f of flashes) if (f.big) { const s = toS(f.x, f.y); const g = ctx.createRadialGradient(s[0] * 2, s[1] * 2, 0, s[0] * 2, s[1] * 2, 140 * Z); g.addColorStop(0, f.blue ? 'rgba(180,220,255,0.6)' : 'rgba(255,200,120,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
+  if (villageAtmosphere && !bunk) {
+    const dawn=clamp(1-Math.abs((S.min%1440)-420)/110,0,1);
+    const local=clamp((1080-Math.hypot(cam.x-(FIRE.x+HATCH.x)/2,cam.y-(FIRE.y+HATCH.y)/2))/400,0,1);
+    if (dawn*local>.001) {
+      ctx.save();ctx.globalAlpha=.16*dawn*local;ctx.fillStyle='#526471';
+      ctx.fillRect(0,0,VW,VH);ctx.restore();
+    }
+  }
   drawWeatherScreen();
   // откуда стреляют: красные дуги по краю экрана
   if (P && P.alive) HURTDIR.forEach(h => {
