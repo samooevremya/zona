@@ -48,7 +48,13 @@ for weapon in ('w_pm', 'w_obrez', 'grenade'):
 field_items = {}
 field_images = {}
 for file in sorted(_os.listdir('art/field')):
-    if file.endswith('.svg'):
+    if file.endswith('.png'):
+        key = 'assets/field/' + file
+        data = open('art/field/' + file, 'rb').read()
+        field_images[key] = 'data:image/png;base64,' + _b64.b64encode(data).decode()
+        width, height = __import__('struct').unpack('>II', data[16:24])
+        field_items[file[5:-4]] = dict(file=key, width=width, height=height)
+    elif file.endswith('.svg'):
         key = 'assets/field/' + file
         with open('art/field/' + file, 'rb') as sprite:
             field_images[key] = 'data:image/svg+xml;base64,' + _b64.b64encode(sprite.read()).decode()

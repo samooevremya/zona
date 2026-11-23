@@ -123,7 +123,7 @@ const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-ak
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo', a762: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash', damaged_pda: 'i-map', restored_pda: 'i-map', post_case: 'i-pack' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { if(id==='engraved_pm')id='w_pm'; if (id === 'energy') return icon('i-energy'); if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if(id==='engraved_pm')id='w_pm'; if(id==='energy' && lesserSprites.energy){const im=lesserSprites.energy.cloneNode(false);im.className='b1ic tall';im.alt='';return im;} if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
 /*AVATAR*/
 function person(c) {
@@ -131,15 +131,15 @@ function person(c) {
   p.appendChild(portraitFor(c));
   const d = el('div', 'grow');
   d.appendChild(el('div', 'pn', c.n));
-  if (c.rank || c.grp) d.appendChild(el('div', 'pm', [c.rank, c.grp].filter(Boolean).join(' · ')));
+  if (c.grp) d.appendChild(el('div', 'pm', c.grp));
   if (c.att) d.appendChild(el('div', 'pa' + (/враг/.test(c.att) ? ' foe' : /друг/.test(c.att) ? ' pal' : ''), c.att));
   if (c.money !== undefined) d.appendChild(el('div', 'price', c.money + ' RU'));
   p.appendChild(d);
   return p;
 }
-const cardOf = e => ({ ent: e, n: e.name, rank: RANKS[e.rank || 0], grp: FAC_N[e.fac], fac: e.fac, att: attWord(e) });
-const SIDCARD = () => ({ ent: byS('sid') || { sid: 'sid', name: 'Сидорович', fac: 'trader' }, n: 'Сидорович', rank: 'ветеран', grp: 'Торговцы', fac: 'trader', att: 'нейтрал' });
-const meCard = () => ({ isPlayer: 1, n: 'Меченый', rank: RANKS[rankOf(score())], grp: 'Одиночки', fac: 'loner', att: S.rep >= 20 ? 'свой среди одиночек' : S.rep <= -30 ? 'враг одиночек' : 'нейтрал', money: S.money });
+const cardOf = e => ({ ent: e, n: e.name, grp: FAC_N[e.fac], fac: e.fac, att: attWord(e) });
+const SIDCARD = () => ({ ent: byS('sid') || { sid: 'sid', name: 'Сидорович', fac: 'trader' }, n: 'Сидорович', grp: 'Торговцы', fac: 'trader', att: 'нейтрал' });
+const meCard = () => ({ isPlayer: 1, n: 'Меченый', grp: 'Одиночки', fac: 'loner', att: S.rep >= 20 ? 'свой среди одиночек' : S.rep <= -30 ? 'враг одиночек' : 'нейтрал', money: S.money });
 
 /* ===================== панели ===================== */
 let panel = null;
@@ -219,6 +219,7 @@ function repairOffer() {
   }};
 }
 function talk(e) {
+  if(chapter()==='aid' && S.campaign.villageMedic && e.sid===S.campaign.villageMedic)return dialog(cardOf(e),['Я ему рану прижал. Меченый, есть чем перевязать? Подойди к Волку.'],()=>[{t:'Понял.',close:1}],'dialog',e);
   if(e.sid==='lz_tech') return dialog(cardOf(e),['Клемма, местный техник. Давай посмотрим, с чем пришёл.'],()=>[
     repairOffer() || {t:'Оружие в порядке',d:true},{t:'До встречи',close:1}
   ],'dialog',e);
@@ -231,7 +232,7 @@ function talk(e) {
   if (STORY_KEYS.includes(e.sid) || e.squadMate)return storyTalk(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
-    if(e.guard!=='bridge' && e.guard!=='south'){
+    if((e.guard!=='bridge' || !bridgeBarrier || dE(e,bridgeBarrier)>270) && e.guard!=='south'){
       const line=e.guard==='sphere'?SPHERE_WARNING:'Военный патруль. Проходи мимо.';
       return dialog(cardOf(e),[line],()=>[{t:'Уйти',close:1}],'dialog',e);
     }
@@ -253,17 +254,18 @@ function talk(e) {
   const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
   dialog(cardOf(e), lines, () => {
     const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
-    if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
+    if(S.rep<=-15)o.push({t:'Насчёт торговли…',fn:()=>say('После того, что про тебя рассказали, лучше иди к торговцу.')});
+    else if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
-    if (!e.robbed && !e.follow && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
+    if (!e.robbed && !e.follow && S.weapon!=='hands' && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
     o.push({ t: 'Бывай', close: 1 });
     return o;
   }, 'dialog', e);
 }
 function robNpc(e) {
   const tier = { knife: 0, w_pm: 1, w_aps: 1, w_obrez: 2, w_toz34: 2, w_aksu: 3, w_akms: 3 };
-  const p = clamp(0.45 + (tier[S.weapon] - tier[e.wpn]) * 0.18 + (P.hp > 60 ? 0.1 : -0.1) - (e.rank || 0) * 0.08, 0.1, 0.9);
-  const crowd = ents.filter(o => o.alive && o.fac === 'loner' && o !== e && dE(o, e) < 300).length;
+  const p = clamp(0.45 + (tier[S.weapon] - tier[e.wpn]) * 0.18 + (P.hp > 60 ? 0.1 : -0.1), 0.1, 0.9);
+  const crowd = ents.filter(o => o.alive && o.fac === 'loner' && o !== e && dE(o, e) < 300 && seesActor(o,e)).length;
   S.rep -= crowd ? 25 : 15;
   if (chance(p) && !crowd) {
     const got = [];
@@ -274,18 +276,19 @@ function robNpc(e) {
       if(n) got.push(ITEMS[id].n+' ×'+n);
     }
     e.traded=1;
-    e.robbed = 1;
+    e.robbed = 1;e.robberyAlarm=true;
     say('Ладно, ладно! Подавись. Зона всё видит, Меченый.');
     sys(got.length ? 'Отобрано: ' + got.join(', ') + '. Одиночки об этом узнают.' : 'У него ничего не было. Одиночки об этом узнают.');
   } else {
     say(crowd ? 'Мужики, гляньте! Этот на своих ствол наставил!' : 'Ах ты гнида! Ну давай!');
-    anger(e); closePanel();
+    e.robberyAlarm=true;anger(e); closePanel();
   }
 }
 function talkTrader() {
   let greeting=chapter()==='wake'?'Очнулся? Садись ближе.':'Слушаю тебя, Меченый.';
   if(chapter()==='case' && S.campaign.failedShift===shiftNumber())
     greeting='Слышал, на посту подняли тревогу. До следующей ночи туда ходу нет. Передохни у костра в деревне. А захочешь занять руки — у меня есть работа.';
+  if(merchantRisk()>1 && !['wake','case'].includes(chapter()))greeting+=' С поставками сейчас риск. Цены поднялись.';
   dialog(SIDCARD(),[greeting],traderOpts,'trader');
 }
 function traderOpts(){
@@ -295,13 +298,14 @@ function traderOpts(){
     say('Ладно, замолвлю слово. Второй раз не возьмусь.');
   } });
   o.push(...jobOpts());
-  const repair=repairOffer(); if(repair) o.push(repair);
+
   o.push({ t: 'Закончить разговор', close: 1 });
   return o;
 }
 
 /* ---------- торговля ---------- */
 function openTrade(e) {
+  if(e?.fac==='loner' && S.rep<=-15){say('За товаром иди к торговцу. Я с тобой дел не веду.');return;}
   openPanel('trade', e ? 'Торг: ' + e.name : 'Торг: Сидорович');
   panel.e = e; refresh(); pbody.scrollTop = 0;
 }
@@ -321,6 +325,12 @@ function openLoot(o) {
 }
 function drawLoot() {
   const o = panel.o, keys = Object.keys(o.loot).filter(k => k !== '__tip');
+  if(o.kind==='human' && o.k==='body'){
+    pbody.appendChild(btn('chip',draggedBody===o?'Оставить тело':'Тащить тело',()=>{
+      draggedBody=draggedBody===o?null:o;closePanel();
+      if(draggedBody)msg('Тащишь тело. Открой обыск ещё раз, чтобы оставить его.');
+    }));
+  }
   if (!keys.length) { pbody.appendChild(el('p', 'note', 'Пусто.')); return; }
   keys.forEach(k => {
     const r = el('div', 'row'), t = el('div', 'tile'); t.appendChild(k === 'money' ? icon('i-pack') : itemIcon(k)); r.appendChild(t);
@@ -358,6 +368,14 @@ function drawPda() {
       g.appendChild(el('div', 'nm', q.n + (q.st === 'd' ? ' · выполнено' : q.st === 'f' ? ' · провалено' : ''))); g.appendChild(el('div', 'ds', q.d));
       r.appendChild(g); pbody.appendChild(r);
     });
+  } else if(panel.tab==='rewards'){
+    const list=S.flags.rewards || [];
+    if(!list.length)pbody.appendChild(el('p','note','Здесь появятся последние десять наград.'));
+    for(const r of list){
+      const row=el('div','row'),entry=el('div','grow');
+      entry.append(el('div','tm',clockStr(r.time)),el('div','nm',r.reason),el('div','ds lite',r.text));
+      row.appendChild(entry);pbody.appendChild(row);
+    }
   } else if (panel.tab === 'log') {
     for(const q of qList().filter(q=>q.st==='a')){
       const row=el('div','row'),entry=el('div','grow');
@@ -372,7 +390,7 @@ function drawPda() {
     pbody.appendChild(el('p','note','Электра гаснет ненадолго от болта. Первые искры предупреждают о возврате заряда.' + (MAP_ID==='rc1'?' Так можно пройти Восточную канаву справа от военного моста.':'')));
     pbody.appendChild(el('p','note','Воронку выдаёт пыль: кружащийся мусор тянет к центру, осевший оставляет время пройти. Болт показывает границу.' + (BIG?' У разбитой колонны путеец спрятал вещи прямо под воронкой.':'')));
     const st = el('div', 'stat');
-    [['Убито людей', S.stats.kS], ['Убито мутантов', S.stats.kM], ['Выполнено заданий', S.stats.q], ['Найдено артефактов', S.stats.art], ['Очки рейтинга', score()], ['Отношение одиночек', S.rep]].forEach(x => { st.appendChild(el('span', '', x[0])); st.appendChild(el('b', '', String(x[1]))); });
+    [['Убито людей', S.stats.kS], ['Убито мутантов', S.stats.kM], ['Выполнено заданий', S.stats.q], ['Найдено артефактов', S.stats.art], ['Отношение одиночек', S.rep]].forEach(x => { st.appendChild(el('span', '', x[0])); st.appendChild(el('b', '', String(x[1]))); });
     pbody.appendChild(st);
   }
 }
@@ -534,7 +552,16 @@ async function buildMini() {
       await photo.decode();
       if (photo.width === PW * 4 && photo.height === MH * 4) {
         miniC.width=photo.width; miniC.height=photo.height;
-        miniC.getContext('2d').drawImage(photo,0,0);
+        const g=miniC.getContext('2d');
+        g.drawImage(photo,0,0);
+        g.save();g.scale(4,4);
+        for(const [i,h] of HOUSES.entries()){
+          if(h.x<WEST+112 || h.x>WEST+143 || h.y<NORTH_ROWS+197 || h.y>NORTH_ROWS+215)continue;
+          g.fillStyle='#3d3931';g.fillRect(h.x-.15,h.y-.15,h.w+.4,h.h+.5);
+          g.fillStyle='#8a7c67';g.fillRect(h.x,h.y,h.w,h.h);
+          if(ROOFS[i])drawHouseRoof(g,h,i,1/T);
+        }
+        g.restore();
         return;
       }
     } catch (e) { /* Старый браузер использует карту из клеток мира. */ }
@@ -569,7 +596,7 @@ function updateFog() {
 }
 const MAP_INK = {
   body:'#a9a7a0', shelter: '#ffe1a1', player: '#68d1da', target: '#6ad2dc', sos: '#f07560', hatch: '#9bbdc8',
-  cache: '#e7bd79', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
+  cache: '#ffcc43', neutral: '#efd168', enemy: '#f16e59', friend: '#95d677'
 };
 function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
   const color = kind==='locker' ? '#8ccac4' : MAP_INK[kind];
@@ -587,7 +614,8 @@ function mapSymbol(g, kind, x, y, u, angle = 0, ringOnly = false) {
     g.beginPath(); g.moveTo(-4,-1); g.lineTo(4,-1); g.stroke();
     g.fillStyle='#242a28'; g.fillRect(-1,-1,2,3); g.restore(); return;
   } else if(kind==='body'){
-    g.arc(0,0,2.25,0,2*Math.PI);
+    g.moveTo(-2.5,-2.5);g.lineTo(2.5,2.5);g.moveTo(2.5,-2.5);g.lineTo(-2.5,2.5);
+    g.strokeStyle=color;g.lineWidth=1.5;g.stroke();g.restore();return;
   } else if (kind === 'hatch' || kind === 'cache') {
     g.rect(-2.8, -2.8, 5.6, 5.6);
   } else {
@@ -880,8 +908,20 @@ function interact() {
   else if (n.k === 'up') goThrough(false);
   else if (n.k === 'heal') {
     const e = n.e;
-    if(STORY_KEYS.includes(e.sid))return helpStory(e);
-    if (healWounded(e)) dialog(cardOf(e), [e.sid === 'tolik' ? 'Живой… Спасибо, братишка. Держи деньги и антирад. Я твой должник.' : 'Спасибо, брат. Выручил.'], () => [{ t: 'Береги себя', close: 1 }], 'dialog', e);
+    const request={tolik:'Эй… Брат, сюда! Ногу зацепило. Бинт весь промок. Аптечка найдётся?',
+      wolf:'Меченый, сюда. Ребята кровь остановили, а перевязать уже нечем. У тебя осталось что-нибудь?',
+      fox:'Слышь, не уходи… Собаки потрепали. Можешь перевязать ногу?'};
+    dialog(cardOf(e),[request[e.sid] || 'Меня задело. Помоги с перевязкой.'],()=>[
+      {t:'Держи аптечку. Давай перевяжу.',d:!has('medkit'),fn:()=>{
+        if(!e.wounded)return;
+        if(STORY_KEYS.includes(e.sid)){helpStory(e);return;}
+        if(healWounded(e)){
+          say(e.sid==='tolik'?'Полегче стало… За мной теперь должок. Держи антирад и деньги, больше при себе ничего.':'Спасибо, брат. Выручил.');
+          panel.opts=()=>[{t:'Береги себя',close:1}];
+        }
+      }},
+      {t:'Вернусь позже.',close:1}
+    ],'dialog',e);
   }
   else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'groundItem') pickGroundItem(n);
@@ -1214,5 +1254,5 @@ window.__zRender = render;
 window.__bigTiles = () => map;
 window.__zRM = { t: RMt, p: RMp, BIG: BIG };
 window.__zBig = { railLayout: () => ({sidings, lesserMainTrack, freightDecks}), aq: () => ({ can: CAN_SZ, lowered: AQ.lowered || 0, done: AQ.done }), gStat: gStat, cache: () => GCACHE.size, GMAX: GMAX, mini: () => [miniC.width, miniC.height], fogLen: () => fog.length, PW: () => PW, MH: () => MH, msgs: () => [...radioQueue, ...MSGS].map(m => m.t) };
-window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, moveE, goTo, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
+window.__z = { resetInput: resetInput, rc: { mk: { mkHuman, mkDog, mkBoar, mkSucker }, g3: () => ({ ready: G3_READY(), skin: P ? g3Skin(P) : null }), q5, q3c, gensetUse, pickUp, wolfRC1Opts, exitUse, benchOpts, sosFoeAI, muzzlePoint, actorPose, hurt, sheltered, GFX, g7: { G3, portraitFor, itemIcon, G7, GAIT, RIGS, BODYFX, weaponLocal, localToWorld, g7Muzzle, rayWall, rayCircle, shotTrace, fire, rigActive, g7Fresh, g7Tick, qaRig, ballOff, WP, get tracers() { return tracers; }, get flashes() { return flashes; }, opq, T } }, seed: n => { Math.random = mulberry32(n); }, gfxSnap: () => ({ arts, ANOM0, NPCDEF, DOGDEF, CACHES, HOUSES }), map: { fieldProps, collide, moveE, goTo, los, LOC, LOCATIONS, ANOM0, objs, nav, MW, openBarrier, buildGrids, MAP_ID, MAP_VERSION, drawMapTo }, openLoot: openLoot, clearMsgs: () => { MSGS.length = 0; radioQueue.length = 0; }, reveal: reveal, get WX() { return WX; }, cam: cam, openTrade: openTrade, openPanel: openPanel, refresh: refresh, PDA_TABS2: PDA_TABS2, dialog: dialog, cardOf: cardOf, save: save, loadSave: loadSave, loc: { LOCATIONS, locAnchors, locPt, MAP_VERSION }, plus: { simRest, restLabel, trackedTarget, restBlock, REST, freeTile, get SOS_SPOTS() { return SOS_SPOTS; }, jobCancel, finishEncounter, advanceWorldTime, restPreview, jobOpts, dynSnapshot, jobOffers, jobTake, jobTurnIn, jobReady, hireOpts, restAtFire, sosTick, mkSucker, traderOpts, wolfPlusOpts, qTargets, qList }, get art() { return !!ART; }, goThrough: goThrough, get S() { return S; }, get P() { return P; }, get ents() { return ents; }, IN: IN, update: update, interact: interact, talkTrader: talkTrader, applyState: applyState, freshS: freshS, hideTitle: hideTitle, get panel() { return panel; }, closePanel: closePanel, findPath: findPath, get near() { return G.near; } };
 boot();

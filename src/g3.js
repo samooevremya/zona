@@ -175,11 +175,39 @@ function explode(n) {
   ents.forEach(e => {
     if (!e.alive) return;
     const d = dE(e, n);
-    if (d < 130 && los(n.x, n.y, e.x, e.y) && (n.owner===P || clearNPCShot(n,e))) hurt(e, 100 * (1 - d / 130) + 10, n.owner, Math.atan2(e.y - n.y, e.x - n.x));
+    if (d<130 && los(n.x,n.y,e.x,e.y) && (n.owner===P || clearNPCShot(n,e))){
+      e.blastAt=S.min;hurt(e,100*(1-d/130)+10,n.owner,Math.atan2(e.y-n.y,e.x-n.x));
+    }
   });
-  ents.forEach(e => { if (e !== P && e.alive && dE(e, n) < 600 && hostile(e, P)) { e.lastSeen = { x: P.x, y: P.y }; e.mem = 6; } });
+  ents.forEach(e => { if (e !== P && e.alive && dE(e, n) < 600 && hostile(e, P) && (e.tgt===P || seesActor(e,P))) { e.lastSeen = { x: P.x, y: P.y }; e.mem = Math.max(e.mem || 0,e.angry?35:6); } });
 }
 
+let draggedBody=null, bodyCheck=0;
+function updateBodies(dt){
+  if(draggedBody){
+    const b=draggedBody,d=dE(b,P);
+    if(!P.alive || !objs.includes(b) || P.sprinting || d>70)draggedBody=null;
+    else if(d>23){
+      const x=P.x+(b.x-P.x)*23/d,y=P.y+(b.y-P.y)*23/d;
+      if(clearWalk(b.x,b.y,x,y,5)){b.x=x;b.y=y;b.ang=Math.atan2(P.y-y,P.x-x);}
+      else draggedBody=null;
+    }
+  }
+  bodyCheck-=dt;if(bodyCheck>0)return;bodyCheck=2;
+  for(const b of objs){
+    if(b.k!=='body' || b.fac!=='loner' || b.discovered || b.raidBody || dE(b,P)>900)continue;
+    const witness=ents.find(e=>e.alive && e.fac==='loner' && !e.captive && dE(e,b)<120 && seesActor(e,b));
+    if(!witness)continue;
+    b.discovered=true;
+    if(!b.deathKnown){
+      const discoveries=S.flags.unsolvedDeaths ||= [];
+      S.flags.unsolvedDeaths=discoveries.filter(t=>t>S.min-1440).concat(S.min).slice(-5);
+    }
+    sayLine(witness,'Человек лежит! Кто-нибудь видел, что случилось?');
+    witness.sit=0;witness.lastSeen={x:b.x,y:b.y};witness.mem=15;
+    if(b===draggedBody && seesActor(witness,P)){S.rep-=18;rememberAttacker(witness);}
+  }
+}
 function resolveActorContacts(dt){
   // толкотня и отдача
   for (let i = 0; i < ents.length; i++) {
@@ -229,7 +257,8 @@ function update(dt) {
   if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x < PW*T && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
-  else if (deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
+  updateBodies(dt);
+  if (!P.alive && deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
   if(BIG) {
     checkSpherePerimeter();
     if(P.alive && !S.flags.visitedDump && inGarbage(P.x/T,P.y/T)){
@@ -413,13 +442,14 @@ function updatePlayer(dt) {
   }
   updatePlayerAim(dt, mx, my);
   // радиация и артефакты
-  radRate = 0;
+  const previousRate=radRate; radRate = 0;
   rads.forEach(z => { const d = dst(P.x, P.y, z.x, z.y); if (d < z.r) radRate += z.p * (1 - d / z.r); });
   if (beltCount('art_blood')) { radRate += 0.15 * beltCount('art_blood'); P.hp = Math.min(100, P.hp + 0.3 * beltCount('art_blood') * dt); }
   if (beltCount('art_medusa')) { radRate *= 0.5; S.rad = Math.max(0, S.rad - 0.35 * dt); }
   S.rad = clamp(S.rad + radRate * dt, 0, 100);
   if (S.rad > 15) P.hp -= (S.rad - 10) * 0.007 * dt;
-  geigerAcc += (radRate * 2.2 + (S.rad > 40 ? 0.4 : 0)) * dt;
+  if(radRate>0 && previousRate<=0){play('geiger');geigerAcc=0;}
+  geigerAcc += (radRate>0?Math.min(12,1.4+radRate*3):0)*dt;
   while (geigerAcc > 1) { geigerAcc -= 1 + Math.random() * 0.6; play('geiger'); }
   if (P.hp <= 0 && P.alive) kill(P, 'rad');
   // подсветка тайника/артефакта
@@ -471,7 +501,7 @@ function findInteract() {
         cand(d,{k:'carve',o,label:S.weapon==='knife'?'Срезать трофей · '+ITEMS[trophy].n:'Для разделки нужен нож'});
       continue;
     }
-    if (o.k === 'body' && Object.keys(o.loot).length) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
+    if (o.k === 'body' && (o.kind==='human' || Object.keys(o.loot).length)) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
     if(o.stash && !o.looted && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
@@ -525,7 +555,7 @@ function healWounded(e) {
   if (!has('medkit')) { msg('Нужна аптечка. Купи у Сидоровича.', 'bad'); return false; }
   take('medkit', 1); e.captive = 0; e.wounded = 0; e.hp = e.maxhp * 0.7;
   if (e.sid === 'tolik') {
-    S.flags.tolikBlood={x:e.x,y:e.y,t:S.min};S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);
+    S.flags.tolikBlood={x:e.x,y:e.y,t:S.min};S.flags.tolikUp = 1; S.rep += 10; S.money += 300; give('antirad', 1);rewardReceipt('Помощь Толику',['300 RU','Антирад']);
     e.home = (h => ({ x: h[0], y: h[1] }))(RMp(35 * T, 81 * T)); e.trip = { x: e.home.x, y: e.home.y, stage: 2 };
     news('Толик получил помощь и вернулся в деревню.');
   }
@@ -537,6 +567,8 @@ const KEY = /qa/.test(location.hash) ? 'zona2d-kordon-qa' : 'zona2d-kordon-v2'; 
 const SAVE_VERSION = 3;
 function save(quiet,slot=0) {
   if (!P || !P.alive) return false;
+  if(!slot && BIG && chapter()==='rescue' && !S.flags.atpClear &&
+      ATP_BANDITS.some(id=>{const e=byS(id);return e && dE(e,P)<380;}))return false;
   S.x = P.x; S.y = P.y; S.hp = P.hp;
   let f = ''; for (let i = 0; i < fog.length; i += 6) { let v = 0; for (let b = 0; b < 6; b++) v |= (fog[i + b] ? 1 : 0) << b; f += String.fromCharCode(48 + v); }
   S.fog = f;
@@ -548,7 +580,8 @@ function loadSave(slot=0) {
   try { const raw = localStorage.getItem(slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
 }
 function applyState(d) {
-  S = d; S.difficulty=difficultyKey(d.difficulty); prepareCampaign(); lastShiftState=null;
+  document.getElementById('field-notices')?.replaceChildren();
+  draggedBody=null;bodyCheck=geigerAcc=radRate=0; S = d; S.difficulty=difficultyKey(d.difficulty); prepareCampaign(); lastShiftState=null;
   if (BIG && (S.mapVersion==='kordon-big' || S.mapVersion==='kordon-west')) migrateNorthernWorld(S);
   restoreKit();
   fog.fill(0);

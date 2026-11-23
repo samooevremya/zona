@@ -114,6 +114,7 @@ function g3Icon(id) {
   const src = G3.pack.images[it.file]; if (!src) return null;
   const im = document.createElement('img'); im.src = src; im.alt = ''; im.draggable = false;
   im.className = 'b1ic g3ic' + (it.height > it.width ? ' tall' : '') + (/\.svg$/.test(it.file) ? ' tmp' : '');
+  if(id.startsWith('w_'))im.style.filter='saturate(.65) sepia(.14) contrast(.94) brightness(.93)';
   im.onerror = function () { this.onerror = null; const f = b1Icon(id) || icon(ICON[id] || 'i-pack'); if (!f.classList.contains('b1ic') && ICOL[id]) f.style.color = ICOL[id]; this.replaceWith(f); };   // реальная ошибка загрузки → B1/SVG
   return im;
 }

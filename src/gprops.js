@@ -258,7 +258,7 @@ function containerOnRay(sh,ca,sa,limit){
   for(const box of objs){
     if(!(box.stash && box.solid)) continue;
     const t=rayBox(box,sh.x,sh.y,ca,sa,0,d);
-    if(t<d){o=box;d=t;}
+    if(Number.isFinite(t) && t<=d){o=box;d=t;}
   }
   return {o,d};
 }

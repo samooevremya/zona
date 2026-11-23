@@ -109,7 +109,7 @@ function jobTurnIn(artId) {
   S.money += pay; S.jobs.done = (S.jobs.done || 0) + 1; S.rep += 4; S.stats.q++;
   if (S.jobs.done % 5 === 0) { give('medkit', 2); give('grenade', 1); sys('Премия за постоянство: аптечка ×2, граната.'); }
   say(['Вот это я понимаю, работа. Держи.', 'Без обмана. Деньги твои.', 'Нормально. Заходи ещё, заказы будут.'][S.jobs.done % 3]);
-  sys('Получено: ' + pay + ' RU. Заказ выполнен.'); bulletin('Заказ выполнен, получено ' + pay + ' RU.'); save(true);
+  rewardReceipt(j.n_,[pay+' RU',...(S.jobs.done%5===0?['Аптечка ×2','Граната']:[])]); save(true);
   return true;
 }
 const artPay = id => Math.round(sellPrice(id) * 1.5 / 10) * 10;
@@ -165,7 +165,7 @@ function hireOpts(e) {
     o.push({ t: e.wait ? 'Пошли дальше' : 'Жди здесь', fn: () => { e.wait = !e.wait; e.waitAt = e.wait ? { x: e.x, y: e.y } : null; say(e.wait ? 'Понял, держу место.' : 'Иду за тобой.'); } });
     o.push({ t: 'Свободен, спасибо', fn: () => { endHire(e, 'Бывай. Если что, я у костра.'); } });
   } else if (!ents.some(x => x.alive && x.follow)) {
-    const price = 350 + (e.rank || 0) * 200;
+    const price = 350;
     o.push({ t: 'Пойдёшь со мной? · ' + price + ' RU на сутки', k: 'key', d: S.money < price || S.rep < 0, fn: () => {
       S.money -= price; e.follow = 1; e.wait = 0; e.hireEnd = S.min + 1440; e.hirePaid = price; setCampSeat(e, false); e.trip = null; if (!e.uid) e.uid = dynId();
       say(['Деньги вперёд, это правильно. Веди, только под пули зря не подставляй.', 'Сутки мои. Спину прикрою, но в аномалии за тобой не полезу.', 'Договорились. Скажешь ждать — буду ждать.'][e.seed % 3]);
@@ -272,9 +272,8 @@ function advanceWorldTime(minutes, ctx) {
 /* ---------- костёр ---------- */
 function fireTeller() {
   const camp = campOf(P);
-  let b = null, bd = 200;
-  for (const e of ents) if (e.alive && e.kind === 'human' && e.fac === 'loner' && !e.follow && !e.sos && dE(e,camp) < bd) { bd = dE(e,camp); b = e; }
-  return b;
+  const people=ents.filter(e=>e.alive && !e.wounded && !e.captive && !e.angry && e.fac==='loner' && !e.follow && !e.sos && dE(e,camp)<200);
+  return people.length?people[(S.flags.tale||0)%people.length]:null;
 }
 function nearestFreeCache(x, y) {
   let b = -1, bd = 1e12;
@@ -287,7 +286,10 @@ function restOpts(te) {
     o.push({ t: restLabel('Отдохнуть', h * 60, 'rest'), d: !!blk, fn: () => {
       const b2 = restBlock(); if (b2) { sys(b2); return; }
       const r = advanceWorldTime(h * 60, 'rest');
-      if (r.minutes > 0) say(te ? TALES[(S.flags.tale * 7 + h) % TALES.length] : 'Огонь греет, руки перестали дрожать.');
+      if(te && r.minutes>0 && S.min>=(S.flags.nextCampTale||0)){
+        const ti=((S.flags.lastTale||0)+1)%TALES.length;
+        say(TALES[ti]);S.flags.lastTale=ti;S.flags.nextCampTale=S.min+240;
+      }
       sys((r.minutes > 0 ? 'Прошло ' + fmtH(r.minutes) + '. Сейчас ' + clockStr(S.min) + '. ' : '') + (r.stop || '')); save(true);
     } });
   });
@@ -338,7 +340,7 @@ function finishEncounter(reason) {
     const pay = a.pay, gift = a.gift;
     S.money += pay; give(gift, gift === 'a545' ? 30 : 1); S.rep += 8;
     if (allies[0]) msg(allies[0].name + ': — Спасибо, брат! Без тебя бы не выбрались.', 'say');
-    msg('Благодарность: ' + pay + ' RU, ' + ITEMS[gift].n + '.', 'good');
+    rewardReceipt('Сигнал SOS · '+a.where,[pay+' RU',ITEMS[gift].n+(gift==='a545'?' ×30':'')]);
     bulletin('Отбили группу ' + lead + ' у ' + a.where + '. Одиночки это запомнят.');
     S.sos.saved = (S.sos.saved || []).concat([{ name: lead, t: S.min, where: a.where }]).slice(-10);
   } else if (reason === 'self') bulletin('Группа ' + lead + ' у ' + a.where + ' отбилась сама.');
@@ -486,13 +488,14 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.flags.fieldBodies=objs.filter(o=>o.k==='body' && !o.raidBody).map(o=>({...o}));
+  S.flags.fieldBodies=objs.filter(o=>o.k==='body').map(o=>({...o}));
   delete S.flags.mutantBodies;
   S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
-    uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn, rank: e.rank,
+    uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
     ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip, shelterOrigin:e.shelterOrigin, shelterSpot:e.shelterSpot } } : {}),
     ...((e.inBattle && e.trip) || e.trip?.returnTo ? {returnTrip:e.trip, seat:e.seat} : {}),
+    robberyAlarm:e.robberyAlarm || undefined,defendUntil:e.defendUntil>S.min?e.defendUntil:undefined,
     follow: e.follow ? 1 : 0, wait: e.wait ? 1 : 0, waitAt: e.waitAt || null, hireEnd: e.hireEnd || 0, hirePaid: e.hirePaid || 0,
     sos: e.sos || 0, sosFoe: e.sosFoe || 0, jobTag: e.jobTag || 0, stay: e.stay ? 1 : 0, home: e.home,
     sosPhase: e.sosPhase || null, retreatTo: e.sosPhase==='retreat'?e.retreatTo:undefined, ringPt: e.ringPt || null, traded: e.traded ? 1 : 0, resident: e.resident ? 1 : 0, assisted: e.assisted || undefined, inv: e.traded || e.assisted ? e.inv : undefined, money: e.traded ? e.money : undefined, wcond: e.traded ? e.wcond : undefined, guns:e.traded?e.guns:undefined, rescuedAt: e.rescuedAt
@@ -518,11 +521,13 @@ function dynRestore() {
     if (r.sid && !e) return;                                   // базовый NPC мёртв — не воскрешаем
     if (!e) {
       if (r.kind === 'dog') e = mkDog({ pack: 'sos', x: r.x / T, y: r.y / T });
-      else e = mkHuman({ fac: r.fac, x: r.x / T, y: r.y / T, wpn: r.wpn, rank: r.rank, name: r.name });
+      else e = mkHuman({ fac: r.fac, x: r.x / T, y: r.y / T, wpn: r.wpn, name: r.name });
       ents.push(e);
     }
     Object.assign(e, { uid: r.uid, x: r.x, y: r.y, hp: r.hp, maxhp: r.maxhp || e.maxhp, follow: r.follow, wait: r.wait, waitAt: r.waitAt, hireEnd: r.hireEnd, hirePaid: r.hirePaid,
       sos: r.sos, sosFoe: r.sosFoe, jobTag: r.jobTag, stay: r.stay, home: r.home || { x: r.x, y: r.y }, traded: r.traded, resident: r.resident, rescuedAt: r.rescuedAt, sosPhase: r.sosPhase, retreatTo:r.retreatTo, ringPt: r.ringPt });
+    if(r.robberyAlarm)e.robberyAlarm=true;
+    if(r.defendUntil>S.min)e.defendUntil=r.defendUntil;
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.assisted) e.assisted = true;
     if (r.inv && (r.traded || r.assisted)) e.inv = r.inv;
@@ -685,7 +690,7 @@ function wolfPlusOpts() {
     S.q3.sucker = 1; bulletin('Задание: Ночной гость. Хлев за фермой на северо-востоке.');
   } });
   if (S.q3.sucker === 2) o.push({ t: 'С тварью в хлеву покончено', k: 'key', fn: () => {
-    S.money += 2000; give('medkit', 3); S.q3.sucker = 3; S.stats.q++; S.rep += 15;
+    S.money += 2000; give('medkit', 3);rewardReceipt('Ночной гость',['2000 RU','Аптечка ×3']); S.q3.sucker = 3; S.stats.q++; S.rep += 15;
     say('Сам ходил смотреть: лежит. Ну и мерзость. Держи, как обещали, и спасибо от всей деревни.');
     sys('Получено: 2000 RU, Аптечка ×3. Задание выполнено.'); bulletin('Выполнено: Ночной гость.'); save(true);
   } });

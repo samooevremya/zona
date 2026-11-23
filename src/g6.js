@@ -7,7 +7,7 @@ function pickWeather() {
   const k = r < 0.34 ? 'clear' : r < 0.58 ? 'cloudy' : r < 0.78 ? 'rain' : r < 0.87 ? 'storm' : (h < 9 || h > 18 ? 'fog' : 'cloudy');
   S.wx = { k: k, until: S.min + rnd(120, 300) };
 }
-const sheltered = (x, y) => !!loftAt({x,y}) || inBunker(x, y) || HOUSES.some(h => !h.ruin && x > (h.x + 0.6) * T && x < (h.x + h.w - 0.6) * T && y > (h.y + 0.6) * T && y < (h.y + h.h - 0.6) * T);
+const sheltered = (x, y) => !!loftAt({x,y}) || inBunker(x, y) || HOUSES.some(h => x > h.x*T && x < (h.x+h.w)*T && y > h.y*T && y < (h.y+h.h)*T);
 const safeFromBlow = e => e.guard || ['wolf', 'sid', 'petr', 'petr2', 'fox', 'shust', 'tolik'].indexOf(e.sid) >= 0;
 
 const CALL = {
@@ -131,7 +131,7 @@ function worldFx(dt) {
   }
   guitar(dt);
 }
-const BLOW_WARNING = 'Приближается выброс! Укройтесь в бункере или в доме с целой крышей. Ближайшее укрытие отмечено на карте.';
+const BLOW_WARNING = 'Приближается выброс! Укройтесь в ближайшем здании или бункере. Ближайшее укрытие отмечено на карте.';
 // One flood from all usable doorways gives each reachable tile its closest shelter.
 function shelterRoutes(includeHatch) {
   return { includeHatch, revision: -1, owner: new Int16Array(MW * MH), doors: [] };
@@ -150,7 +150,6 @@ function rebuildShelterRoutes(routes) {
     bfsQ[tail++] = i;
   }
   for (const h of HOUSES) {
-    if (h.ruin) continue;
     for (const d of h.entrances) {
       const lanes = Math.round(d.width / T);
       for (let lane = 0; lane < lanes; lane++) {
@@ -203,6 +202,11 @@ function roomShelterPlace(e,door){
   return best && {...best,house:h.ok};
 }
 function shelterPlace(e,avoid){
+  if(e.guard==='bridge' && bridgeBarrier){
+    // The underpass itself is their assigned covered station on either approach.
+    const post=NPCDEF.find(n=>n.sid===e.sid);
+    if(post)return {x:post.x*T,y:post.y*T,underpass:true};
+  }
   const nearest=routeToShelter(e,lonerShelters);
   if(nearest && nearest.house.ok!==avoid){
     const spot=roomShelterPlace(e,nearest);if(spot)return spot;
@@ -237,7 +241,23 @@ function blowoutHumanAI(e, dt) {
     if(e.trip?.shelter)e.trip=null;
     if(e.sit)e.seat=1;
   }
+  // A sheltered witness can defend the room without running outside after the shooter.
+  if(e.angry && S.min<(e.defendUntil||0) && P.alive && sheltered(e.x,e.y) && sheltered(P.x,P.y) && dE(e,P)<190 && clearNPCShot(e,P)){
+    const w=WP[e.wpn],a=Math.atan2(P.y-e.y,P.x-e.x);
+    e.sit=0;e.ang+=angD(e.ang,a)*Math.min(1,7*dt);e.cool-=dt;
+    if(e.cool<=0 && Math.abs(angD(e.ang,a))<.28 && w.ammo){
+      if(e.mag<=0){e.mag=w.mag;e.cool=w.reload;}
+      else if(fire(e,e.ang,w,w.spread,P)){e.mag--;e.cool=Math.max(.36,w.rate);}
+    }
+    return true;
+  }
   e.tgt=e.lastSeen=null;e.mem=e.aw=0;
+  if(e.guard==='bridge' && e.shelterSpot?.underpass){
+    const post=e.shelterSpot;
+    if(dE(e,post)>9)goTo(e,post.x,post.y,90,dt);
+    else e.path=null;
+    return true;
+  }
   if(sheltered(e.x,e.y)){
     const spot=e.shelterSpot,h=spot && HOUSES.find(h=>h.ok===spot.house);
     if(h && e.x>(h.x+.6)*T && e.x<(h.x+h.w-.6)*T && e.y>(h.y+.6)*T && e.y<(h.y+h.h-.6)*T &&
@@ -289,7 +309,7 @@ function blowout(dt) {
       ARTS0.forEach(a => {
         if (!S.flags['art_' + a.key] || arts.some(x => x.key === a.key)) return;
         delete S.flags['art_' + a.key];
-        arts.push(Object.assign({}, a, { x: a.x + rnd(-10, 10), y: a.y + rnd(-10, 10) })); born++;
+        arts.push(reachableArtifact({...a,x:a.x+rnd(-10,10),y:a.y+rnd(-10,10)})); born++;
       });
       radioNews('Выброс закончился.' + (born ? ' В аномалиях наверняка родились новые артефакты.' : ''), true);
     }

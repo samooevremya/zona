@@ -50,18 +50,15 @@ function wolfRC1Opts() {
 }
 /* верстак после генератора: ремонт до 70%, оплата за каждый процент */
 function benchOpts() {
-  const worn=gunsBelow(70);
-  const cost=worn.reduce((sum,gun)=>sum+Math.ceil((70-gun.cond)*6),0);
-  return worn.length ? [{ t: 'Подлатать оружие до 70% · ' + cost + ' RU', k: 'key', d: S.money < cost, fn: () => { S.money -= cost; repairCopies(worn,70); sys('Оружие подлатано до 70%. Полный ремонт — у Сидоровича.'); } }]
-    : [{ t: 'Оружие в порядке (выше 70%) — верстаку делать нечего', d: true, fn: () => {} }];
+  return [{t:'Осмотреть верстак',fn:()=>sys('Слесарный инструмент разобрали. Оружие чинит Клемма в Залесье.')}];
 }
 function gensetUse() {
   const q = q5();
-  if (q.st === 'completed') { dialog(meCard(), ['Генератор ровно гудит. Рядом верстак: можно подлатать оружие, но не лучше 70%.'], () => benchOpts().concat([{ t: 'Отойти', close: 1 }]), 'dialog'); return; }
+  if (q.st === 'completed') { dialog(meCard(), ['Генератор ровно гудит. У стены старый верстак.'], () => benchOpts().concat([{ t: 'Отойти', close: 1 }]), 'dialog'); return; }
   if (q.st === 'not_started') { msg('Старый генератор. Без предохранителя и топлива не заведётся.', 'say'); return; }
   if (!has('fuse') || !has('fuel')) { msg('Не хватает: ' + [has('fuse') ? '' : 'предохранителя', has('fuel') ? '' : 'топлива'].filter(Boolean).join(' и ') + '.', 'bad'); return; }
   take('fuse', 1); take('fuel', 1); q.st = 'completed';
-  if (!q.rewarded) { q.rewarded = 1; S.money += 600; S.rep += 10; S.stats.q++; }
+  if (!q.rewarded) { q.rewarded = 1; S.money += 600; rewardReceipt('Свет в деревне',['600 RU']); S.rep += 10; S.stats.q++; }
   play('reload'); msg('Генератор заработал. Вечером в деревне будет свет.', 'good');
   bulletin('Выполнено: Свет в деревне. Деревня скинулась 600 RU, верстак у генератора открыт.'); save(true);
 }

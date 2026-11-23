@@ -167,12 +167,12 @@ function bigWorld() {
   // Independent office and barracks flank the checkpoint yard.
   const postRandom=mulberry32(8741);
   reserve(111,197,144,216);
-  house(114,203,7,6,[[3,5]],BR,0,'slate',postRandom);
+  house(114,203,7,6,[[6,2]],BR,0,'slate',postRandom);
   house(132,201,9,5,[[0,2],[5,4]],CO,0,'conc',postRandom);
   for(const [x,y] of [[114,199],[139,211]]){
     house(x,y,3,3,[[x===114?2:0,1]],BR,0,'watchpost',postRandom);
   }
-  bigPath([[111,208],[113,208],[117,210],[117,208]],.85);
+  bigPath([[111,208],[113,210],[122,210],[122,205],[120,205]],.85);
   bigPath([[128,204],[131,203],[132,203]],.9);
   for(const [id,x] of [['a4',124.5],['a5',131.5]]){
     Object.assign(NPCDEF.find(e=>e.sid===id),{x,y:200.5});
@@ -315,6 +315,7 @@ function bigNewObjects(R) {
   CACHES.push({ x: 225.5, y: 99.5, loot: { antirad: 2, a12: 12, money: 160 } });
   // хутор и вышка: тайники
   addObj({ k: 'crate', x: 30 * T + 3, y: 130 * T + 3, w: 26, h: 26, solid: 1, stash: 'st9', loot: { cans: 2, bandage: 2, money: 150 } });
+  addObj({k:'hiding',stash:'post_quarters',x:137*T+4,y:203*T+4,w:22,h:18,solid:false,loot:{w_pm:1,a9:12,bandage:1}});
   CACHES.push({ x: 16.5, y: 29.5, loot: { a9: 24, vodka: 1, money: 220 } });
   // старые свободные объекты могли встать на стену или дорогу при переносе ×2 — сдвинуть на траву рядом
   objs.forEach(o => {

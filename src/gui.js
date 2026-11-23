@@ -30,7 +30,7 @@ function drawDialog2() {
     const side = el('aside', 'dlg-who');
     if (!c.record) side.appendChild(portraitFor(c));
     side.appendChild(el('div', 'pn', c.n));
-    side.appendChild(el('div', 'pm', [c.rank, c.grp].filter(Boolean).join(' · ')));
+    side.appendChild(el('div', 'pm', c.grp));
     if (c.att) side.appendChild(el('div', 'pa' + (/враг/.test(c.att) ? ' foe' : /друг|свой/.test(c.att) ? ' pal' : ''), c.att));
     if (c.money !== undefined) side.appendChild(el('div', 'price', c.money + ' RU'));
     return side;
@@ -59,7 +59,7 @@ function drawDialog2() {
 }
 
 /* ---------- КПК: карта ~65% + выбранное задание ~35%, вкладки снизу ---------- */
-const PDA_TABS2 = [['map', 'Карта и задания'], ['log', 'Журнал'], ['stat', 'Данные']];
+const PDA_TABS2 = [['map', 'Карта и задания'], ['log', 'Журнал'], ['rewards','Награды'], ['stat', 'Данные']];
 // The viewport stores its centre in map tiles. Resizing the panel or opening a
 // quest card therefore keeps the same place under the player's finger.
 function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
@@ -318,11 +318,17 @@ function stockCond(e, id) {
   if (!e) return TRADER_WCOND;
   e.wcond = e.wcond || {}; if (e.wcond[id] == null) e.wcond[id] = ri(55, 85); return e.wcond[id];
 }
+function merchantRisk(){
+  if(S.rep<=-30)return 1.35;
+  if(S.rep<=-15)return 1.18;
+  const recent=(S.flags.unsolvedDeaths||[]).filter(t=>S.min-t<1440);
+  return recent.length>=2?1.10:1;
+}
 function tradeStock(e) {
   if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
     id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
   }));
-  return STOCK.map(s=>({...s,p:purchaseCost(s.p),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+  return STOCK.map(s=>({...s,p:purchaseCost(s.p*merchantRisk()),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
 
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }
@@ -438,7 +444,8 @@ function drawTrade2() {
   const gm = el('div', 'igrid');
   Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0).forEach(id => {
     const left = sellable(id, e) - (o.sell[id] || 0) * (ITEMS[id].ammo ? 10 : 1);
-    gm.appendChild(itemCell(id, { q: cnt(id), cond: isGun(id)?Math.round(gunCopy(id,Math.max(0,cnt(id)-1-(o.sell[id] || 0))).cond):null, price: sellable(id, e) ? tradePrice(id, e,o.sell[id] || 0) * sellUnit(id) : null, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : sellWhy(id, e, o),
+    if(left<=0)return;
+    gm.appendChild(itemCell(id, { q: left, cond: isGun(id)?Math.round(gunCopy(id,Math.max(0,cnt(id)-1-(o.sell[id] || 0))).cond):null, price: sellable(id, e) ? tradePrice(id, e,o.sell[id] || 0) * Math.min(left,sellUnit(id)) : null, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : sellWhy(id, e, o),
       fn: () => { o.sell[id] = (o.sell[id] || 0) + 1; panel.hint = ''; refresh(); } }));
   });
   mine.appendChild(gm);
@@ -529,9 +536,10 @@ function drawLocker() {
           refresh();
         };
         const err=deposit?'':receiveError(id,1,gun);
-        const one=btn('chip',fixed?'При себе':err?'Не влезает':action,()=>move(1),fixed||!!err);
+        const pack=!deposit && ITEMS[id].ammo?Math.min(available,id==='a12'?10:30):1;
+        const one=btn('chip',fixed?'При себе':err?'Не влезает':action+(pack>1?' ×'+pack:''),()=>move(pack),fixed||!!err);
         if(err) one.title=err; row.appendChild(one);
-        if(!gun && available>1) row.appendChild(btn('chip','×'+available,()=>move(available),fixed||!!err));
+        if(!gun && available>pack) row.appendChild(btn('chip','×'+available,()=>move(available),fixed||!!err));
         col.appendChild(row); rows++;
       }
     }

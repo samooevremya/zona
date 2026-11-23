@@ -9,17 +9,17 @@ const reset = () => { z.closePanel(); z.applyState(z.freshS()); const s = S(); s
 const btnT = re => [...document.querySelectorAll('#pbody button')].find(b => re.test(b.getAttribute('aria-label') || b.textContent));
 T('B1_offer_not_applied_until_confirm', () => {
   reset(); z.openTrade(null);
-  btnT(/Аптечка, 300 RU/).click(); btnT(/Хвост слепого пса/).click();
+  btnT(/Аптечка, 336 RU/).click(); btnT(/Хвост слепого пса/).click();
   const midMoney = S().money, midTail = S().inv.tail, midMed = S().inv.medkit;
   z.closePanel(); const afterClose = { money: S().money, tail: S().inv.tail, med: S().inv.medkit };
   z.openTrade(null); const reopenedEmpty = !Object.keys(z.panel.offer.buy).length && !Object.keys(z.panel.offer.sell).length;
-  btnT(/Аптечка, 300 RU/).click(); btnT(/Хвост слепого пса/).click(); btnT(/^Подтвердить$/).click();
-  return { ok: midMoney === 1000 && midTail === 3 && afterClose.money === 1000 && reopenedEmpty && S().inv.medkit === 2 && S().inv.tail === 2 && S().money === 1000 - 300 + 80,
+  btnT(/Аптечка, 336 RU/).click(); btnT(/Хвост слепого пса/).click(); btnT(/^Подтвердить$/).click();
+  return { ok: midMoney === 1000 && midTail === 3 && afterClose.money === 1000 && reopenedEmpty && S().inv.medkit === 2 && S().inv.tail === 2 && S().money === 1000 - 336 + 70,
     duringOffer: { money: midMoney, tail: midTail, med: midMed }, afterClose, reopenedEmpty, afterDeal: { money: S().money, tail: S().inv.tail, med: S().inv.medkit } };
 });
 T('B2_revalidate_on_confirm', () => {
   reset(); z.openTrade(null);
-  btnT(/Аптечка, 300 RU/).click(); btnT(/Аптечка, 300 RU/).click(); btnT(/Аптечка, 300 RU/).click();
+  btnT(/Аптечка, 336 RU/).click(); btnT(/Аптечка, 336 RU/).click(); btnT(/Аптечка, 336 RU/).click();
   S().money = 500; z.refresh();
   const conf = btnT(/^Подтвердить$/), disabled = conf.disabled, err = (document.querySelector('.terr') || {}).textContent;
   conf.disabled = false; conf.click();

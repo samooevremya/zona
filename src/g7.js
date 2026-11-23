@@ -10,7 +10,6 @@ function survDefaults() {
   if (S.bleed === undefined) S.bleed = 0;
   S.cond = S.cond || { w_pm: 85, w_obrez: 75, w_aksu: 80 };
   S.caches = S.caches || {};
-  if (S.rankSeen === undefined) S.rankSeen = rankOf(score());
 }
 function ensureCaches() {
   CACHES.forEach((c, i) => {
@@ -65,9 +64,6 @@ function survival(dt) {
       P.detT = 0.12 + 1.2 * fraction;
     }
   } else P.detT = 0;
-  // ранг
-  const r = rankOf(score());
-  if (r > S.rankSeen) { S.rankSeen = r; news('Ранг повышен: ' + RANKS[r] + '.'); }
   // тайники рядом
 }
 function cacheNear() {
