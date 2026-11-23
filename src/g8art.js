@@ -594,7 +594,7 @@ function c1ForestFloor(g) {
 function scatterAutumnPlants(g, x, y, terrain) {
   // Тот же пучок попадает в оба соседних куска по своим мировым координатам.
   const seed=hash2(x+17,y+83);
-  if(seed<=.32) {
+  if(seed<=.32 && !(livingZone && reactiveTuft(x,y))) {
     const px=(x+.18+seed*2)*T, py=(y+.2+.6*hash2(y+7,x))*T, size=14+seed*24;
     ART.draw(g,'c1_tuft'+Math.floor(seed*18),px,py-2,size,size*.86,seed*5,.86);
   }

@@ -9,9 +9,10 @@ function audioInit() {
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 340;
-    const g = AC.createGain(); g.gain.value = 0.05;
+    const g = AC.createGain(); windGain=g; g.gain.value = 0.05;
     const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain); lfo.start();
     src.connect(f); f.connect(g); g.connect(master); src.start();
+    loadFieldAudio();
   } catch (e) { AC = null; }
 }
 function nz(dur, freq, q, vol, type, when) {
@@ -60,10 +61,13 @@ const SND = {
   blow: () => { nz(3.5, 90, 0.4, 1.2); tn(55, 30, 3, 0.8); }
 };
 function play(name, x, y, mul) {
-  if (!AC || !SND[name]) return;
+  if (!AC || (!SND[name] && !recordings[name])) return;
   let v = mul || 1;
   if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); v *= clamp(1 - d / 950, 0, 1); if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
-  try { SND[name](v); } catch (e) {}
+  try {
+    if(playRecording(name,v,x,y))return;
+    SND[name]?.(v);
+  } catch (e) {}
 }
 
 /* ---------- выстрелы: щелчок, хлопок, низ, хвост с эхом ---------- */

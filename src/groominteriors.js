@@ -10,7 +10,20 @@ const roomFittings={
 function drawRoomFitting(g,o){
   const [rect,w,h]=roomFittings[o.fitting];
   g.save();g.translate(o.x+o.w/2,o.y+o.h/2);
-  spriteShadow(g,2.5,1.7);g.rotate(o.angle);
+  g.rotate(o.angle);
+  if(livingZone && (o.fitting==='bench' || o.fitting==='stool')){
+    const rand=mulberry32(Math.floor(o.x+o.y*17));
+    if(o.fitting==='bench'){
+      const oil=g.createRadialGradient(8,11,1,8,11,21);
+      oil.addColorStop(0,'rgba(32,30,23,.62)');oil.addColorStop(1,'rgba(46,40,31,0)');
+      g.fillStyle=oil;g.fillRect(-14,-11,45,44);
+    }
+    for(let i=0;i<13;i++){
+      const x=(rand()-.5)*w,y=h*.45+rand()*10;
+      beam(g,x,y,x+rand()*7-2,y+rand()*7,1,i%3?'rgba(68,55,40,.57)':'rgba(178,149,112,.45)');
+    }
+  }
+  spriteShadow(g,2.5,1.7);
   if(ART?.images.roomFittings){
     g.drawImage(ART.images.roomFittings,...rect,-w/2,-h/2,w,h);
   }else{
