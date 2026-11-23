@@ -49,12 +49,14 @@ function g7Tick(dt) {
   for (const e of ents) {
     if (!e.alive || e.qaRig) continue;   // qaRig — только для приёмочных кадров: состояние задано вручную
     let g = GAIT.get(e); if (!g) { g = { x: e.x, y: e.y, dist: 0, moveT: 0 }; GAIT.set(e, g); }
-    let d = Math.hypot(e.x - g.x, e.y - g.y); g.x = e.x; g.y = e.y;
+    const dx=e.x-g.x, dy=e.y-g.y;
+    let d = Math.hypot(dx,dy); g.x = e.x; g.y = e.y;
     const tele = d > 40;   // загрузка, перестановка, телепорт, переход: не считать ходьбой
     if (tele) d = 0;
     g.dist += d;
     g.moveT = d > 0.05 && d / Math.max(dt, 1e-3) > 6 ? 0.12 : Math.max(0, g.moveT - dt);
     if (e.kind === 'human') {
+      if(humanMotionOn)updateHumanMotion(e,g,dx,dy,d,dt,tele);
       const r = rigActive(e);
       if (r) CordonRig.update(r.rig, { state: rigState(e, g.moveT > 0), distance: d, teleported: tele }, dt);
     }
@@ -89,6 +91,7 @@ function weaponLocal(e) {
   }
   const seated = e.sit && !(window.CORDON_G8_ON && e.campRise > 0.75);
   if (!G3_READY() || !e.alive || seated || e.wounded || e.captive) return null;
+  if (motionSkin(e)) return motionWeapon(e,id,W,grip);
   if (window.CORDON_G8_ON) return frameWeapon(e,id,W,grip);
   const hand = G3_GRIP;
   const main = [hand[0], hand[1] + (e.crouch ? -1 : 0)];
@@ -101,7 +104,7 @@ function localToWorld(e, ang, lat, fwd) {
 function g7Muzzle(e, ang) {
   const w = weaponLocal(e); if (!w || DETECTORS[w.id] || w.W.blade || w.W.toss) return null;
   const tip = localToWorld(e, ang, w.muzzle[0], w.muzzle[1]);
-  const motion = w.pose && e.campRise == null && actorFrameMotion(e,gaitOf(e).moving);
+  const motion = (w.pose || w.articulated) && e.campRise == null && actorFrameMotion(e,gaitOf(e).moving);
   if (motion) {
     tip.x = e.x + (tip.x-e.x)*motion.k + motion.dx;
     tip.y = e.y + (tip.y-e.y)*motion.k + motion.dy;
@@ -116,6 +119,18 @@ function drawHeldDetector(g, id, x, y) {
     g.drawImage(image,-5,-8,10,10); g.restore();
   }
 }
+const heldSpriteTints=new WeakMap();
+function heldSpriteTint(sprite){
+  let tinted=heldSpriteTints.get(sprite);
+  if(!tinted){
+    tinted=frameCanvas(sprite);
+    const g=tinted.getContext('2d');
+    g.filter='saturate(.65) sepia(.14) contrast(.94) brightness(.93)';
+    g.drawImage(sprite,0,0,tinted.width,tinted.height);
+    heldSpriteTints.set(sprite,tinted);
+  }
+  return tinted;
+}
 function drawWeaponLocal(c2, w) {
   if (!w) return;
   const W = w.W, x = w.main[0], y = w.main[1];
@@ -124,8 +139,7 @@ function drawWeaponLocal(c2, w) {
     const shape = HELD_SPRITES[w.id], sprite = packImage(shape.file);
     if (sprite) {
       const length = W.toss ? 6.4 : W.len / (1-shape.grip);
-      c2.save();c2.filter='saturate(.65) sepia(.14) contrast(.94) brightness(.93)';
-      c2.drawImage(sprite,x-shape.width/2,y-length*shape.grip,shape.width,length);c2.restore();
+      c2.drawImage(heldSpriteTint(sprite),x-shape.width/2,y-length*shape.grip,shape.width,length);
       return;
     }
   }
@@ -188,13 +202,23 @@ function g7Human(e, extra, target) {
       const rise = e.campRise || 0, frame = Math.round(rise * 16);
       const sw = sheet.naturalWidth / 17, sh = 168;
       target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
+      const gesture=humanMotionOn && rise===0 ? campMotion(e) : null;
+      if(gesture){
+        target.translate(0,gesture.lean);target.rotate(gesture.turn);
+      }
       const alpha = target.globalAlpha * opacity;
       const w = rise > 0.75 ? weaponLocal(e) : null;
       const images = jacketFor(e)?.images || G3.images;
       const model = w?.pose && equippedFrame(images,g7PoseFrame('loner',w.pose),w);
       const blend = model ? rise*4-3 : 0;
       target.globalAlpha = alpha*(1-blend);
-      target.drawImage(sheet, frame*sw, 0, sw, sh, -24, -28, 48, 56);
+      if(gesture && gesture.lean>.01){
+        // The forearms occupy the lower rows of the seated painting. Extend
+        // the sleeves from the elbows without duplicating the original hands.
+        const elbowRow=102;
+        target.drawImage(sheet,0,0,sw,elbowRow,-24,-28,48,34);
+        target.drawImage(sheet,0,elbowRow,sw,sh-elbowRow,-24,6,48,22+gesture.lean*1.7);
+      }else target.drawImage(sheet, frame*sw, 0, sw, sh, -24, -28, 48, 56);
       if (model) {
         target.globalAlpha = alpha*blend;
         target.drawImage(model.image,-24,-28,48,model.height);
@@ -212,6 +236,17 @@ function g7Human(e, extra, target) {
       target.restore(); return true;
     }
   }
+  if(humanMotionOn && e.wounded){
+    const f=g7PoseFrame(rigSkin(e),'wounded');
+    if(f){
+      const lift=woundedAttention(e);
+      target.save();target.translate(e.x,e.y);target.rotate(e.ang-Math.PI/2);
+      target.translate(0,-lift);target.rotate(.065*lift);
+      drawFrameAt(0,0,Math.PI/2,f,opacity,1,target,jacketFor(e)?.images);
+      target.restore();return true;
+    }
+  }
+  if(paintMotionHuman(target,e,opacity))return true;
   const r = rigActive(e); if (!r) return false;
   const w = weaponLocal(e), base = window.__g7tap ? target.getTransform() : null, o = { skin: r.skin, x: e.x, y: e.y, angle: e.ang, grip: w ? w.grip : 'none', opacity: opacity,
     deadImage: G7.img[CORDON_RIG.dead[r.skin]], drawEquipment: c2 => { if (base) window.__g7tap(e, base, c2.getTransform(), w); drawWeaponLocal(c2, w); } };

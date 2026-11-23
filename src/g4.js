@@ -851,7 +851,7 @@ function drawDeskTrader(e) {
   const talking = panel && panel.kind === 'trader';
   const trading = panel && panel.kind === 'trade' && !panel.e;
   const pose = trading ? 2 : (talking || e.deskLook > .65 ? 1 : 0);
-  const breath = Math.sin((e.deskTime || 0)*1.8)*.25;
+  const breath = Math.sin((e.deskTime || 0)*1.8)*.25 + (humanMotionOn && talking ? .7 : 0);
   // Общая опора у всех трёх поз. Локти и свёрток заходят на край прилавка.
   ctx.save();
   ctx.translate(e.x-16, e.y-10+breath);
