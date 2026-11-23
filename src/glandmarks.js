@@ -309,7 +309,7 @@ function drawRestingCaptive(e){
   const pose=g7PoseFrame('loner','fall_mid');
   if(!pose){drawLitHuman(e);return;}
   const breath=Math.sin(performance.now()*.0022);
-  ctx.save();ctx.translate(e.x,e.y);ctx.rotate(-1.29);ctx.scale(1+.009*breath,1);
+  ctx.save();ctx.translate(e.x,e.y);ctx.rotate(-1.29+(humanMotionOn?.055*woundedAttention(e):0));ctx.scale(1+.009*breath,1);
   groundShadow(ctx,0,0,12,21,0,1);
   drawFrameAt(0,0,Math.PI/2,pose,1,1,ctx,jacketFor(e)?.images);
   ctx.restore();

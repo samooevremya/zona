@@ -110,7 +110,7 @@ function worldFx(dt) {
     if (!e.alive) continue;
     const mv = (e.step - (e.ps || 0)) / Math.max(dt, 0.001); e.ps = e.step; e.mv = lerp(e.mv || 0, mv, 0.3);
     const stride = e.kind === 'dog' ? 26 : e === P && P.sprinting ? 44 : 36;
-    if (e.step - (e.ls || 0) > stride) {
+    if ((!humanMotionOn || e.kind!=='human') && e.step - (e.ls || 0) > stride) {
       e.ls = e.step;
       if (e === P && !(P.jumpT>0)) {
         if(livingZone)leaveBootMark(e);

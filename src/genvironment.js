@@ -17,14 +17,14 @@ function updateEnvironment(dt){
   while(bootMarks.length && environmentTime-bootMarks[0].time>23)bootMarks.shift();
   for(const [plant,bend] of bentPlants)if(environmentTime-bend.time>1.35)bentPlants.delete(plant);
 }
-function leaveBootMark(e){
+function leaveBootMark(e,foot){
   const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T));
   if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y))){wetBoots=1;muddyBoots=t!==SW;return;}
   if(wetBoots<.08)return;
   if(t===CF || t===FL || t===AS || loftAt(e)){
     footSide*=-1;
-    const a=e.ang,side=4*footSide;
-    bootMarks.push({x:e.x-Math.sin(a)*side,y:e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,mud:muddyBoots,level:loftAt(e)});
+    const a=foot?.a??e.ang,side=4*footSide;
+    bootMarks.push({x:foot?.x??e.x-Math.sin(a)*side,y:foot?.y??e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,mud:muddyBoots,level:loftAt(e)});
     if(bootMarks.length>45)bootMarks.shift();
   }
   wetBoots*=.72;
@@ -128,6 +128,7 @@ function rainErrand(e,dt){
   return true;
 }
 function drawHearthGesture(e){
+  if(humanMotionOn && rigSkin(e)==='loner')return;
   if(!e.sit || e.tgt || e.wounded || !e.fireRef || dE(e,e.fireRef)>76)return;
   const phase=(environmentTime+e.seed%19)%13;if(phase>3.4)return;
   const reach=Math.sin(Math.PI*phase/3.4);
