@@ -5,10 +5,13 @@ const ELECTRA_WINDOW = 3, GRAVITY_PERIOD = 8, GRAVITY_CALM = 3.5, GRAVITY_WARNIN
 function spawnAnomaly(site) {
   const key = site.id || site.k+'_'+Math.round(site.x)+'_'+Math.round(site.y);
   return {...site, key, until:S.flags.anomalyDischarges?.[key] || 0,
+    lastProbe:S.flags.gravityProbes?.[key] ?? null,
     offset:((Math.floor(site.x/T)*17 + Math.floor(site.y/T)*31) % 80)/10,
     hitUntil:new WeakMap(), reveal:0, fx:0, soundAt:0};
 }
-function gravityClock(a) { return (S.min + a.offset) % GRAVITY_PERIOD; }
+function gravityClock(a) {
+  return a.lastProbe==null ? (S.min+a.offset)%GRAVITY_PERIOD : (S.min-a.lastProbe)%GRAVITY_PERIOD;
+}
 function anomalyPhase(a) {
   if (a.k === 'e') {
     const remaining = a.until - S.min;
@@ -57,9 +60,14 @@ function probeAnomaly(a,b,x,y) {
     anomalyBurst(a);
     b.x1=x; b.y1=y;
   } else {
-    // The probe traces the pull and marks the perimeter, without resetting the cycle.
+    // The bolt is drawn inward before the dust settles. A second bolt during the
+    // same recovery period cannot prolong it.
+    const wasActive=anomalyPhase(a)==='active';
+    if(wasActive && (a.lastProbe==null || S.min-a.lastProbe>=GRAVITY_PERIOD)){
+      a.lastProbe=S.min;(S.flags.gravityProbes ||= {})[a.key]=S.min;
+    }
     play('bolt',x,y);
-    const pull=anomalyPhase(a)==='active' ? .9 : .2;
+    const pull=wasActive ? .9 : .2;
     b.x1=lerp(x,a.x,pull); b.y1=lerp(y,a.y,pull);
   }
 }
@@ -121,4 +129,36 @@ function cacheFieldQuiet(o) {
   if (!o.anomalyId) return true;
   const field=anoms.find(a=>a.id===o.anomalyId);
   return !!field && anomalyPhase(field)==='quiet';
+}
+
+// Anchor a discharge to an actual piece of the map. Empty fields only spark on the ground.
+function conductorAt(a){
+  let best=null,reach=a.r+85;
+  for(const o of objs){
+    if(o.k!=='fence' || !['mesh','railMesh','concreteWire','wire'].includes(o.material))continue;
+    const x=clamp(a.x,o.x,o.x+o.w),y=clamp(a.y,o.y,o.y+o.h),d=dst(a.x,a.y,x,y);
+    if(d<reach){reach=d;best={x:x-a.x,y:y-a.y,alongX:o.w>o.h,edge:o};}
+  }
+  return best;
+}
+function drawFieldDebris(a,phase,t){
+  if(phase==='quiet')return;
+  if(a.k==='e'){
+    if(a.conductor===undefined)a.conductor=conductorAt(a);
+    const p=a.conductor;
+    if(!p || ((t+a.offset)*1.65)%1>.18)return;
+    const end=p.alongX ? clamp(a.x+p.x+17,p.edge.x,p.edge.x+p.edge.w)-a.x : p.x;
+    const bottom=p.alongX ? p.y : clamp(a.y+p.y+17,p.edge.y,p.edge.y+p.edge.h)-a.y;
+    ctx.strokeStyle=phase==='warning'?'#9cabb0':'#c4d8d8';ctx.lineWidth=1.3;
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo((p.x+end)*.5+2,(p.y+bottom)*.5-3);
+    ctx.lineTo(end,bottom);ctx.stroke();return;
+  }
+  const age=gravityClock(a)-GRAVITY_CALM;
+  for(let i=0;i<7;i++){
+    const progress=(age*(phase==='warning' ? .19 : .42)+i*.173)%1;
+    const angle=a.offset+i*2.4+progress*1.6,rad=a.r*(1.15-.93*progress);
+    const x=Math.cos(angle)*rad,y=Math.sin(angle)*rad;
+    ctx.fillStyle=i%2?'#7f6747':'#a28b60';
+    ctx.beginPath();ctx.ellipse(x,y-3,3.4,1.2,angle+.8,0,Math.PI*2);ctx.fill();
+  }
 }

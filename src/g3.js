@@ -145,7 +145,7 @@ function canTakeDown(e){
 }
 function takedown(e) {
   if (!canTakeDown(e)) return;
-  const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knife', P.x, P.y);
+  const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knifeHit', e.x, e.y);
   const heavy = e.sid === 'boss' || e.heavyArmor;
   if (!heavy) { e.quiet = 1; hurt(e, e.hp + 5, P, a); msg('Тихо снял: ' + e.name + '.', 'good'); }
   else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
@@ -281,9 +281,14 @@ function update(dt) {
   ambT -= dt;
   if (ambT <= 0) {
     ambT = rnd(25, 60);
-    if (!night()) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6) }); }
+    if (!night() && !inBunker(P.x,P.y) && !loftAt(P)) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6), caller:i===0, callIn:3.5 }); }
   }
-  for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9; if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
+  for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9;
+    if(c.caller && (c.callIn-=dt)<=0){
+      c.callIn=rnd(2.8,5.2);
+      if(!inBunker(P.x,P.y) && !loftAt(P))play('crow',c.x,c.y,sheltered(P.x,P.y) ? .28 : .9);
+    }
+    if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
   [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });
   // тела исчезают через двое суток
   for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.k === 'body' && S.min - o.t > 2880 && dst(o.x, o.y, P.x, P.y) > 600) objs.splice(i, 1); }
@@ -385,7 +390,7 @@ function updatePlayer(dt) {
   const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
-  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
+  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (1-.12*(S.flags.coatWetness||0)) * dt);
   if (BIG) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
@@ -398,7 +403,7 @@ function updatePlayer(dt) {
     } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-5*dt);
   }
   P.jumpCD = (P.jumpCD || 0) - dt;
-  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play(surf(P.x,P.y)); } }
+  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); const ground=surf(P.x,P.y);emitFootfall(ground,1.35);play(ground); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
   P.combatT = Math.max(0,(P.combatT || 0)-dt);
   P.hitT = Math.max(0,(P.hitT || 0)-dt);
@@ -489,7 +494,7 @@ function carveMutant(o) {
   const error = receiveError(id,1);
   if (error) { msg(error,'bad'); return; }
   collectStock(o,id,1);
-  play('knife',P.x,P.y);
+  play('knifeHit',P.x,P.y);
   msg('Получен трофей · '+ITEMS[id].n,'say');
 }
 function lootAll(o) {

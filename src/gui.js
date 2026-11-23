@@ -218,7 +218,7 @@ function drawInv2() {
   st.appendChild(el('div', 'ds', 'Вес ' + showKg(wt) + ' / ' + carryLimit() + ' кг')); st.appendChild(wb);
   st.appendChild(el('div','ds','Пустой рюкзак · '+showKg(PACK_KG)+' кг'));
   st.appendChild(el('div', 'ds', 'Защита ' + Math.round(def() * 100) + '% · Радиация ' + Math.round(S.rad)));
-  st.appendChild(el('div', 'ds', 'Сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '') + ' · ' + S.money + ' RU'));
+  st.appendChild(el('div', 'ds', 'Сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '') + ((S.flags.coatWetness||0)>.55 ? ' · одежда промокла' : '') + ' · ' + S.money + ' RU'));
   eq.appendChild(st);
   box.appendChild(eq);
   // сетка

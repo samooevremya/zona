@@ -13,3 +13,36 @@
 | hearth | [Dynamicell, запись костра](https://freesound.org/people/Dynamicell/sounds/17548/), fire_fire.1 из Minetest Game, обработана для цикла | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | waterStep | [AGFX, шаг по воде](https://freesound.org/people/AGFX/packs/1253/), default_water_footstep.1 | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | gravelStep | Mito551, default_gravel_footstep.1 из [Minetest Game](https://github.com/minetest/minetest_game/blob/master/mods/default/README.md) | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
+
+| Файлы | Автор и исходник | Лицензия |
+| --- | --- | --- |
+| earth1/2, turf1/2 | Mito551, default_dirt_footstep.1/2 и default_grass_footstep.1/2 в [VoxeLibre](https://github.com/VoxeLibre/VoxeLibre/blob/master/mods/CORE/mcl_sounds/README.txt) | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/), включая обработанные фрагменты |
+| wade1/2 | [AGFX, Water footsteps](https://freesound.org/people/AGFX/packs/1253/) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| swing, hit | [kretopi, Arrow002](https://freesound.org/people/kretopi/sounds/406405/) и [YleArkisto, sfx_snowball_hit-03](https://freesound.org/people/YleArkisto/sounds/258144/) | CC0 и CC BY 3.0 соответственно |
+| bark1/2, snarl, throat | Hybrid Dog, dogblocks и [RandomationPictures, исходник для бульканья](https://freesound.org/people/RandomationPictures/sounds/138481/), через [VoxeLibre](https://github.com/VoxeLibre/VoxeLibre/blob/master/mods/ENTITIES/mobs_mc/LICENSE-media.md) | CC0 |
+| grunt, charge | TenPlus1, mobs_pig и mobs_pig_angry из того же пакета | MIT, текст ниже |
+| crow | [inchadney, Craw.WAV](https://freesound.org/people/inchadney/sounds/52450/) через [Ambience](https://content.luanti.org/packages/TenPlus1/ambience/) | Creative Commons Attribution по лицензии исходного пакета |
+| wind | Записи ветра из Ambience, Black Boe (HollowWind), laurent (wind-in-the-trees), felix.blume (drygrassInWind) | CC0, Creative Commons Attribution, CC0 соответственно |
+
+Из записей вырезаны короткие фрагменты. Шаги и удары смягчены фильтром, дыхание замедлено, для ветра сделан плавный стык.
+The MIT License (MIT)
+
+Copyright (c) 2016 TenPlus1
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

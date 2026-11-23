@@ -926,13 +926,15 @@ function canStrike(e,t,reach){
 /* кабан: замечает, роет землю, бросается рывком по прямой; после рывка оглушён — уходи в сторону */
 function aiBoar(e, dt) {
   e.cool -= dt; e.think -= dt; e.st -= dt;
+  e.snortIn=(e.snortIn??(4+e.id%8))-dt;
+  if(e.snortIn<=0){e.snortIn=rnd(7,15);play('boar',e.x,e.y,.65);}
   const t=mutantTarget(e,dt,300,560);
   if(!t){roamDen(e,dt,45);return;}
   const want=Math.atan2(e.trail.y-e.y,e.trail.x-e.x);
   if (e.state === 'idle' || e.state === 'stalk') {
     e.state = 'stalk'; e.ang += angD(e.ang, want) * Math.min(1, dt * 4);
     if (dE(e,e.trail)>240 || !clearWalk(e.x,e.y,e.trail.x,e.trail.y,e.r)) mutantApproach(e,e.trail,90,dt);
-    else if (e.cool <= 0 && canStrike(e,t,241)) { e.state = 'wind'; e.st = 0.6; play('dog', e.x, e.y, 0.7); }
+    else if (e.cool <= 0 && canStrike(e,t,241)) { e.state = 'wind'; e.st = 0.6; play('boarCharge', e.x, e.y, 0.7); }
     else mutantApproach(e,e.trail,50,dt);
   } else if (e.state === 'wind') {
     e.ang += angD(e.ang, want) * Math.min(1, dt * 6);
@@ -1522,6 +1524,7 @@ function melee(sh, W) {
   }
   if(hit && sh===P && canTakeDown(hit)){takedown(hit);return;}
   const sneak = hit && sh === P && hit.kind === 'human' && hit.tgt !== P && (hit.aw || 0) < 1;
+  if(hit && hit.sid!=='sid')play('knifeHit',hit.x,hit.y);
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang, shot) {
@@ -1614,21 +1617,16 @@ function pVis() {
   if (darkness() > 0.3) v *= S.torch === false ? 0.6 : 1.1;   // ночью фонарь выдаёт, без него замечают на 40% позже
   return v;
 }
-function pNoise() {
-  if (P.jumpT > 0) return 150;
-  const m = Math.hypot(IN.moveX, IN.moveY); if (m < 0.1) return 0;
-  return P.crouch ? 34 : P.sprinting ? 175 : 95;
-}
 /* враг ещё не в бою с игроком: копит подозрение (0..1). Видит только перед собой (~115°), сзади — только на слух */
 function stealthTick(e, dt) {
   if (!P.alive || !hostile(e, P) || e.tgt === P || P.cloak > 0.7) { if (e.tgt === P) e.aw = 1; return; }
   const d = dE(e, P), aP = Math.atan2(P.y - e.y, P.x - e.x), range = sight(e) * pVis();
   let gain = 0;
   if (d < range && Math.abs(angD(e.ang, aP)) < 1.0 && seesActor(e, P)) gain = 0.45 + 2.4 * (1 - d / range);
-  const nz = pNoise(); if (nz && d < nz) gain = Math.max(gain, 0.5 + 1.5 * (1 - d / nz));
+
   const was = e.aw || 0;
   e.aw = gain ? Math.min(1, was + gain * dt) : Math.max(0, was - 0.25 * dt);
-  if (e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
+  if (gain && e.aw > 0.4 && !e.sit) e.ang += angD(e.ang, aP) * Math.min(1, dt * 2.2);   // насторожился — поворачивается на звук
   if (e.aw > 0.4 && was <= 0.4 && chance(0.7)) sayLine(e, e.fac === 'army' ? 'Стой, кто там?' : e.fac === 'bandit' ? 'Э, кто там шуршит?' : 'Кто здесь?');
   if (e.aw >= 1 && was < 1) ents.forEach(o => { if (o !== e && o.alive && o.fac === e.fac && o.tgt !== P && dE(o, e) < 220) o.aw = Math.max(o.aw || 0, 0.7); });   // поднял своих
 }
@@ -1676,7 +1674,7 @@ function aiHuman(e, dt) {
     }
   }
   const t = e.tgt;
-  if (t && t.alive && hostile(e, t)) { combatHuman(e, t, W, dt); return; }
+  if (t && t.alive && hostile(e, t)) { e.listen=null;combatHuman(e, t, W, dt); return; }
   if(e.inBattle){
     e.inBattle=false;e.healing=0;e.healT=0;e.firingSpot=null;e.peekTime=0;
     e.path=null;e.routeRetry=0;e.mem=0;e.lastSeen=null;
@@ -1698,6 +1696,7 @@ function aiHuman(e, dt) {
     if (e.campRise === target) e.campRise = null;
     return;
   }
+  if (e.listen && !(e.mem>0) && investigateFootfall(e,dt))return;
   if (e.mem > 0 && e.lastSeen) {
     e.mem -= dt;
     e.crouch = 0; if (goTo(e, e.lastSeen.x, e.lastSeen.y, 68, dt) < 20) e.mem = 0;
@@ -2005,7 +2004,7 @@ function aiDog(e, dt) {
   e.cool -= dt; e.think -= dt; e.barkT -= dt;
   const t=mutantTarget(e,dt,night()?320:280,520);
   if (t) {
-    if (e.barkT <= 0) { e.barkT = rnd(2, 5); play('dog', e.x, e.y); }
+    if (e.barkT <= 0) { e.barkT = rnd(2, 5); play(dE(e,t)<105?'growl':'dog', e.x, e.y); }
     const want=Math.atan2(e.trail.y-e.y,e.trail.x-e.x);
     e.ang+=angD(e.ang,want)*Math.min(1,dt*9);
     if (e.hp < e.maxhp * 0.35 && !e.fled) { e.fleeT = 2; e.fled = 1; }
@@ -2072,10 +2071,13 @@ const ELECTRA_WINDOW = 3, GRAVITY_PERIOD = 8, GRAVITY_CALM = 3.5, GRAVITY_WARNIN
 function spawnAnomaly(site) {
   const key = site.id || site.k+'_'+Math.round(site.x)+'_'+Math.round(site.y);
   return {...site, key, until:S.flags.anomalyDischarges?.[key] || 0,
+    lastProbe:S.flags.gravityProbes?.[key] ?? null,
     offset:((Math.floor(site.x/T)*17 + Math.floor(site.y/T)*31) % 80)/10,
     hitUntil:new WeakMap(), reveal:0, fx:0, soundAt:0};
 }
-function gravityClock(a) { return (S.min + a.offset) % GRAVITY_PERIOD; }
+function gravityClock(a) {
+  return a.lastProbe==null ? (S.min+a.offset)%GRAVITY_PERIOD : (S.min-a.lastProbe)%GRAVITY_PERIOD;
+}
 function anomalyPhase(a) {
   if (a.k === 'e') {
     const remaining = a.until - S.min;
@@ -2124,9 +2126,14 @@ function probeAnomaly(a,b,x,y) {
     anomalyBurst(a);
     b.x1=x; b.y1=y;
   } else {
-    // The probe traces the pull and marks the perimeter, without resetting the cycle.
+    // The bolt is drawn inward before the dust settles. A second bolt during the
+    // same recovery period cannot prolong it.
+    const wasActive=anomalyPhase(a)==='active';
+    if(wasActive && (a.lastProbe==null || S.min-a.lastProbe>=GRAVITY_PERIOD)){
+      a.lastProbe=S.min;(S.flags.gravityProbes ||= {})[a.key]=S.min;
+    }
     play('bolt',x,y);
-    const pull=anomalyPhase(a)==='active' ? .9 : .2;
+    const pull=wasActive ? .9 : .2;
     b.x1=lerp(x,a.x,pull); b.y1=lerp(y,a.y,pull);
   }
 }
@@ -2188,6 +2195,38 @@ function cacheFieldQuiet(o) {
   if (!o.anomalyId) return true;
   const field=anoms.find(a=>a.id===o.anomalyId);
   return !!field && anomalyPhase(field)==='quiet';
+}
+
+// Anchor a discharge to an actual piece of the map. Empty fields only spark on the ground.
+function conductorAt(a){
+  let best=null,reach=a.r+85;
+  for(const o of objs){
+    if(o.k!=='fence' || !['mesh','railMesh','concreteWire','wire'].includes(o.material))continue;
+    const x=clamp(a.x,o.x,o.x+o.w),y=clamp(a.y,o.y,o.y+o.h),d=dst(a.x,a.y,x,y);
+    if(d<reach){reach=d;best={x:x-a.x,y:y-a.y,alongX:o.w>o.h,edge:o};}
+  }
+  return best;
+}
+function drawFieldDebris(a,phase,t){
+  if(phase==='quiet')return;
+  if(a.k==='e'){
+    if(a.conductor===undefined)a.conductor=conductorAt(a);
+    const p=a.conductor;
+    if(!p || ((t+a.offset)*1.65)%1>.18)return;
+    const end=p.alongX ? clamp(a.x+p.x+17,p.edge.x,p.edge.x+p.edge.w)-a.x : p.x;
+    const bottom=p.alongX ? p.y : clamp(a.y+p.y+17,p.edge.y,p.edge.y+p.edge.h)-a.y;
+    ctx.strokeStyle=phase==='warning'?'#9cabb0':'#c4d8d8';ctx.lineWidth=1.3;
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo((p.x+end)*.5+2,(p.y+bottom)*.5-3);
+    ctx.lineTo(end,bottom);ctx.stroke();return;
+  }
+  const age=gravityClock(a)-GRAVITY_CALM;
+  for(let i=0;i<7;i++){
+    const progress=(age*(phase==='warning' ? .19 : .42)+i*.173)%1;
+    const angle=a.offset+i*2.4+progress*1.6,rad=a.r*(1.15-.93*progress);
+    const x=Math.cos(angle)*rad,y=Math.sin(angle)*rad;
+    ctx.fillStyle=i%2?'#7f6747':'#a28b60';
+    ctx.beginPath();ctx.ellipse(x,y-3,3.4,1.2,angle+.8,0,Math.PI*2);ctx.fill();
+  }
 }
 
 /* ===================== игрок и мир за кадр ===================== */
@@ -2337,7 +2376,7 @@ function canTakeDown(e){
 }
 function takedown(e) {
   if (!canTakeDown(e)) return;
-  const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knife', P.x, P.y);
+  const a = Math.atan2(e.y - P.y, e.x - P.x); P.ang = a; P.cool = 0.7; play('knifeHit', e.x, e.y);
   const heavy = e.sid === 'boss' || e.heavyArmor;
   if (!heavy) { e.quiet = 1; hurt(e, e.hp + 5, P, a); msg('Тихо снял: ' + e.name + '.', 'good'); }
   else { hurt(e, 85, P, a); msg('Броня приняла удар. Добивай!', 'bad'); }
@@ -2473,9 +2512,14 @@ function update(dt) {
   ambT -= dt;
   if (ambT <= 0) {
     ambT = rnd(25, 60);
-    if (!night()) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6) }); }
+    if (!night() && !inBunker(P.x,P.y) && !loftAt(P)) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6), caller:i===0, callIn:3.5 }); }
   }
-  for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9; if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
+  for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9;
+    if(c.caller && (c.callIn-=dt)<=0){
+      c.callIn=rnd(2.8,5.2);
+      if(!inBunker(P.x,P.y) && !loftAt(P))play('crow',c.x,c.y,sheltered(P.x,P.y) ? .28 : .9);
+    }
+    if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
   [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });
   // тела исчезают через двое суток
   for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.k === 'body' && S.min - o.t > 2880 && dst(o.x, o.y, P.x, P.y) > 600) objs.splice(i, 1); }
@@ -2577,7 +2621,7 @@ function updatePlayer(dt) {
   const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
-  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * dt);
+  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (1-.12*(S.flags.coatWetness||0)) * dt);
   if (BIG) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
@@ -2590,7 +2634,7 @@ function updatePlayer(dt) {
     } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-5*dt);
   }
   P.jumpCD = (P.jumpCD || 0) - dt;
-  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play(surf(P.x,P.y)); } }
+  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); const ground=surf(P.x,P.y);emitFootfall(ground,1.35);play(ground); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
   P.combatT = Math.max(0,(P.combatT || 0)-dt);
   P.hitT = Math.max(0,(P.hitT || 0)-dt);
@@ -2681,7 +2725,7 @@ function carveMutant(o) {
   const error = receiveError(id,1);
   if (error) { msg(error,'bad'); return; }
   collectStock(o,id,1);
-  play('knife',P.x,P.y);
+  play('knifeHit',P.x,P.y);
   msg('Получен трофей · '+ITEMS[id].n,'say');
 }
 function lootAll(o) {
@@ -2861,13 +2905,15 @@ let canopyCompanion = null;
 const nearCrown = document.createElement('canvas'), nearCtx = nearCrown.getContext('2d');
 function drawAutumnCrown(sprite, x, y, w, h) {
   if (w <= 0 || h <= 0) return;
-  const left = x - w / 2, top = y - h / 2, radius = 30;
+  const left = x - w / 2, top = y - h / 2, radius = 36;
   const nearPlayer = P && Math.abs(x-P.x)<=w/2+radius && Math.abs(y-P.y)<=h/2+radius;
   const e=canopyCompanion, nearNpc=e && Math.abs(x-e.x)<=w/2+radius && Math.abs(y-e.y)<=h/2+radius;
   if (!nearPlayer && !nearNpc) {
     ctx.drawImage(sprite, left, top, w, h); return;
   }
-  if (nearCrown.width !== sprite.width) nearCrown.width = nearCrown.height = sprite.width;
+  if (nearCrown.width!==sprite.width || nearCrown.height!==sprite.height){
+    nearCrown.width=sprite.width;nearCrown.height=sprite.height;
+  }
   nearCtx.globalCompositeOperation = 'copy'; nearCtx.drawImage(sprite, 0, 0);
   nearCtx.globalCompositeOperation = 'destination-out';
   const kx = sprite.width / w, ky = sprite.height / h;
@@ -2904,23 +2950,33 @@ function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
   const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
-  if(!fire){drawHuman(e,ctx);return;}
-  const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
-  if (distance >= FIRE_REACH) { drawHuman(e, ctx); return; }
+  const wet=e===P ? S.flags.coatWetness||0 : 0;
+  if(!fire && wet<.03){drawHuman(e,ctx);return;}
+  const dx = fire ? fire.x-e.x : 0, dy = fire ? fire.y-e.y : 0, distance = Math.hypot(dx, dy);
+  if (distance >= FIRE_REACH && wet<.03) { drawHuman(e, ctx); return; }
 
   // Маска — альфа текущей позы. Градиент ориентирован в мире, даже когда герой поворачивается.
   const g = figureCtx;
   g.setTransform(2, 0, 0, 2, 96, 96);
   g.clearRect(-48, -48, 96, 96);
   g.save(); g.translate(-e.x, -e.y); drawHuman(e, g); g.restore();
-  const k = 12 / Math.max(1, distance);
-  const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
-  tint.addColorStop(0, 'rgba(255,150,65,0)');
-  tint.addColorStop(.48, 'rgba(255,150,65,0)');
-  tint.addColorStop(1, 'rgb(255,166,83)');
-  g.save(); g.globalCompositeOperation = 'source-atop';
-  g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
-  g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+  if(wet>=.03){
+    g.save();g.rotate(e.ang);g.globalCompositeOperation='source-atop';
+    const patch=g.createRadialGradient(-7,0,4,-5,0,20);
+    patch.addColorStop(0,'rgba(26,27,22,.50)');patch.addColorStop(.60,'rgba(33,35,28,.39)');patch.addColorStop(1,'transparent');
+    g.globalAlpha=wet;g.fillStyle=patch;g.fillRect(-26,-22,46,44);
+    g.restore();
+  }
+  if(fire && distance<FIRE_REACH){
+    const k = 12 / Math.max(1, distance);
+    const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
+    tint.addColorStop(0, 'rgba(255,150,65,0)');
+    tint.addColorStop(.48, 'rgba(255,150,65,0)');
+    tint.addColorStop(1, 'rgb(255,166,83)');
+    g.save(); g.globalCompositeOperation = 'source-atop';
+    g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
+    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+  }
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
 let hearthSmokeImage;
@@ -3408,6 +3464,22 @@ function drawPlayerAim() {
   }
   ctx.restore();
 }
+// Keep the ground, actor and baked shadows directly beneath a projecting roof visible.
+const eaveView=document.createElement('canvas');
+eaveView.width=eaveView.height=120;
+const eaveCtx=eaveView.getContext('2d');
+function captureEave(h){
+  const w=h.w*T,d=h.h*T;
+  const gap=Math.max(h.x*T-P.x,P.x-(h.x*T+w),h.y*T-P.y,P.y-(h.y*T+d));
+  if(gap>47 || h.a<.03)return false;
+  const m=ctx.getTransform(),left=P.x-36,top=P.y-36;
+  eaveCtx.clearRect(0,0,120,120);
+  eaveCtx.drawImage(ctx.canvas,m.a*left+m.e,m.d*top+m.f,72*m.a,72*m.d,0,0,120,120);
+  eaveCtx.globalCompositeOperation='destination-in';
+  eaveCtx.drawImage(canopyWindow,0,0,120,120);
+  eaveCtx.globalCompositeOperation='source-over';
+  return true;
+}
 function roofHidden(h) {
   const px = P.x / T, py = P.y / T;
   return px > h.x + 0.6 && px < h.x + h.w - 0.6 && py > h.y + 0.6 && py < h.y + h.h - 0.6;
@@ -3560,6 +3632,7 @@ function drawAnoms() {
     const vis=Math.max(a.reveal>0 ? .92 : 0, clamp(1-(dE(a,P)-a.r)/225,0,.85),a.fx);
     if (!vis) continue;
     ctx.save(); ctx.translate(a.x,a.y); ctx.globalAlpha*=vis;
+    drawFieldDebris(a,phase,t);
     if (electric) {
       const live=phase==='active', warning=phase==='warning';
       const glow=ctx.createRadialGradient(0,0,2,0,0,a.r*1.22);
@@ -3797,8 +3870,12 @@ function render() {
       ctx.globalAlpha = h.a; ctx.drawImage(h.shadow, h.x*T-8, h.y*T-4);
     }
     ctx.globalAlpha = h.a;
+    const underEave=captureEave(h);
     if (perspective && ART) drawRaisedHouse(h, i);
     else drawHouseRoof(ctx, h, i, 1);
+    if(underEave){
+      ctx.globalAlpha=1;ctx.drawImage(eaveView,P.x-36,P.y-36,72,72);
+    }
     ctx.globalAlpha = 1;
   });
   // провода ЛЭП
@@ -3843,8 +3920,7 @@ function render() {
       else drawAutumnCrown(crown, cx + sw, cy, width, height);
     } else {
       const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
-      ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;
-      ctx.drawImage(CANOPY[Math.floor(h * 8)], cx - sp + sw, cy - sp, 2 * sp, 2 * sp);
+      drawAutumnCrown(CANOPY[Math.floor(h*8)],cx+sw,cy,2*sp,2*sp);
     }
   }
   ctx.globalAlpha = 1;
@@ -3988,7 +4064,7 @@ function surf(x, y) {
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
   if (t === AS || t === CF || t === CO) return 'stepHard';
   if (t === FL) return 'stepWood';
-  if (t === SW) return 'stepWet';
+  if (t === SW) return 'stepWater';
   if (t === RA) return Math.floor(x/12)%3 ? 'stepWood' : 'stepGravel';
   const wet=livingZone?surfaceWater:WX.rain;
   if (t === DI) return wet > 0.3 ? 'stepWet' : 'stepDirt';
@@ -4045,6 +4121,7 @@ function worldFx(dt) {
   WX.clouds.forEach(c => { c.x += WX.wind * 40 * dt; c.y += WX.wind * 12 * dt; if (c.x > WW + 700) { c.x = -700; c.y = rnd(0, WH); } if (c.y > WH + 700) c.y = -700; });
   WX.flash = Math.max(0, WX.flash - dt * 3);
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
+  updateCoat(dt);
   if(livingZone)updateEnvironment(dt);
   mixRecordedRain();
   blowout(dt);
@@ -4058,6 +4135,7 @@ function worldFx(dt) {
       if (e === P && !(P.jumpT>0)) {
         if(livingZone)leaveBootMark(e);
         const surface=surf(e.x,e.y);
+        emitFootfall(surface);
         play(surface,undefined,undefined,P.crouch ? .36 : P.sprinting ? 1.3 : 1);
         if(surface==='stepWood' && loftAt(e) && Math.floor(e.step/stride)%4===1)play('creak');
       }
@@ -5975,6 +6053,7 @@ function advanceWorldTime(minutes, ctx) {
     }
   }
   S.min=end;
+  if(r.minutes>0)updateCoat(r.minutes);
   cleanExpiredCrates();
   renewFieldCrates();
   const stop = r.stop === 'hunger' ? 'Отдых прерван через ' + fmtH(r.minutes) + ': голод стал опасным (сытость ' + (Math.round(S.food * 10) / 10) + '). Поешь, потом отдыхай.' : '';
@@ -6630,7 +6709,7 @@ function drawInv2() {
   st.appendChild(el('div', 'ds', 'Вес ' + showKg(wt) + ' / ' + carryLimit() + ' кг')); st.appendChild(wb);
   st.appendChild(el('div','ds','Пустой рюкзак · '+showKg(PACK_KG)+' кг'));
   st.appendChild(el('div', 'ds', 'Защита ' + Math.round(def() * 100) + '% · Радиация ' + Math.round(S.rad)));
-  st.appendChild(el('div', 'ds', 'Сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '') + ' · ' + S.money + ' RU'));
+  st.appendChild(el('div', 'ds', 'Сытость ' + Math.round(S.food) + (S.bleed ? ' · кровотечение' : '') + ((S.flags.coatWetness||0)>.55 ? ' · одежда промокла' : '') + ' · ' + S.money + ' RU'));
   eq.appendChild(st);
   box.appendChild(eq);
   // сетка
@@ -11839,17 +11918,69 @@ function drawHearthGesture(e){
   ctx.restore();
 }
 
+function underRainCover(x,y){
+  if(inBunker(x,y) || loftAt({x,y}))return true;
+  return HOUSES.some(h=>{
+    if(h.ruin)return false;
+    const dx=x-h.x*T,dy=y-h.y*T;
+    if(dx< -3 || dx>h.w*T+3 || dy< -3 || dy>h.h*T+17)return false;
+    if(dy<=h.h*T+3)return true;
+    return h.entrances?.some(door=>door.approach==='porch' && Math.abs(dx-door.x)<door.width/2+8);
+  });
+}
+function updateCoat(dt){
+  const wet=S.flags.coatWetness||0;
+  if(!wet && WX.rain<.12)return;
+  const cover=underRainCover(P.x,P.y);
+  if(!wet && cover)return;
+  const byFire=!inBunker(P.x,P.y) && !loftAt(P) && WORLD_FIRES.some(f=>dE(f,P)<80);
+  const change=byFire ? -1/23 : cover ? -1/85 : WX.rain>.12 ? WX.rain/55 : -1/170;
+  S.flags.coatWetness=clamp(wet+change*dt,0,1);
+}
+
+const stepCarry={stepDirt:.74,stepGrass:.59,stepWet:.76,stepHard:1.05,stepMetal:1.62,stepWood:1.16,stepGravel:1.18,stepWater:1.32};
+function emitFootfall(surface,force=1){
+  const radius=(P.crouch?34:P.sprinting?175:95)*(stepCarry[surface]||1)*force;
+  const indoors=sheltered(P.x,P.y);
+  const reach=radius*(indoors?1:1-.48*WX.rain);
+  for(const e of ents){
+    if(e===P||!e.alive||e.kind!=='human'||e.wounded||e.captive||e.tgt||e.evacuating||e.follow||e.sit)continue;
+    const d=dE(e,P);
+    if(d>reach || (!e.guard && !hostile(e,P)) || loftAt(e)!==loftAt(P) || inBunker(e.x,e.y)!==inBunker(P.x,P.y))continue;
+    if(d>reach*.44 && !los(e.x,e.y,P.x,P.y))continue;
+    if(e.sid==='sid' || (e.named && !e.guard) || e.squadMate || e.captive || e.jobTag)continue;
+    e.listen={x:P.x,y:P.y,expires:S.min+3.2,turn:e.listen?.turn??.45};
+    e.aw=Math.max(e.aw||0,.37);
+  }
+}
+function investigateFootfall(e,dt){
+  const q=e.listen;
+  if(S.min>q.expires || S.blow?.stage){
+    e.listen=null;
+    if(e.guard && !e.trip && dE(e,e.home)>12)e.trip={stage:2,returnTo:{...e.home}};
+    return false;
+  }
+  const a=Math.atan2(q.y-e.y,q.x-e.x);
+  e.ang+=angD(e.ang,a)*Math.min(1,dt*4.8);
+  q.turn-=dt;
+  if(q.turn<=0 && dE(e,q)>25 && dE(e,e.home)<110 && !e.stay)goTo(e,q.x,q.y,50,dt);
+  return true;
+}
+
 // Field recordings are embedded by build.py so saved offline copies sound the same as Pages.
 const fieldBuffers=new Map(),fieldVoices=new Set(),lastTake=new Map();
 const recordings={
   p:[.85,'pistol'],s:[1,'shotgun'],r:[.88,'rifle'],thunder:[.88,'thunder'],
-  stepDirt:[.32,'SandL1','SandR2'],stepGrass:[.30,'leaves01','leaves02'],
-  stepHard:[.32,'StoneL1','StoneR2'],stepWet:[.37,'mud02','waterStep'],stepGravel:[.29,'gravel','gravelStep'],
+  stepDirt:[.30,'earth1','earth2'],stepGrass:[.25,'turf1','turf2'],
+  stepHard:[.32,'StoneL1','StoneR2'],stepWet:[.29,'mud02','earth2'],stepWater:[.38,'wade1','wade2'],stepGravel:[.29,'gravel','gravelStep'],
   stepWood:[.32,'wood01','wood02'],stepMetal:[.35,'impactMetal_heavy_002','impactMetal_medium_001'],
   stepDog:[.15,'leaves01','leaves02'],shell:[.21,'impactMetal_light_000'],bolt:[.29,'impactMetal_medium_001'],
+  knife:[.40,'swing'],knifeHit:[.59,'hit'],crow:[.37,'crow'],
+  dog:[.51,'bark1','bark2'],growl:[.45,'snarl'],boar:[.49,'grunt'],boarCharge:[.65,'charge'],
+  sucker:[.66,'throat'],breath:[.34,'throat'],
   reload:[.46,'metalLatch'],jam:[.36,'metalClick'],click:[.27,'metalClick'],pick:[.32,'clothBelt'],creak:[.15,'creak1']
 };
-let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null;
+let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null,airGain=null;
 function loadFieldAudio(){
   if(!window.ZONE_AUDIO || fieldReady)return;
   fieldReady=true;
@@ -11870,7 +12001,8 @@ function playRecording(name,volume,x,y){
   const src=AC.createBufferSource(),gain=AC.createGain(),filter=AC.createBiquadFilter();
   src.buffer=buffer;src.playbackRate.value=name==='thunder'?1:.97+Math.random()*.06;
   const distance=x===undefined?0:Math.min(1,dst(P.x,P.y,x,y)/950);
-  filter.type='lowpass';filter.frequency.value=16000-13500*distance;
+  const gun=name==='p'||name==='s'||name==='r';
+  filter.type='lowpass';filter.frequency.value=gun ? 700+15300*(1-distance)**2 : 16000-13500*distance;
   gain.gain.value=entry[0]*volume;
   src.connect(filter);filter.connect(gain);
   const stereo=AC.createStereoPanner?.();
@@ -11902,7 +12034,13 @@ function mixRecordedRain(){
     hearthGain=AC.createGain();hearthGain.gain.value=0;fire.connect(hearthGain);hearthGain.connect(master);fire.start();
   }
   hearthGain?.gain.setTargetAtTime(fireVolume,now,.22);
-  windGain?.gain.setTargetAtTime(.048*(1-room.enclosure*.89),now,.27);
+  if(!airGain && fieldBuffers.has('wind')){
+    const air=AC.createBufferSource();air.buffer=fieldBuffers.get('wind');air.loop=true;
+    airGain=AC.createGain();airGain.gain.value=0;air.connect(airGain);airGain.connect(master);air.start();
+  }
+  const wind=(.065+.15*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
+  airGain?.gain.setTargetAtTime(wind,now,.45);
+  windGain?.gain.setTargetAtTime(airGain?0:.045*(1-room.enclosure),now,.27);
   const buffer=fieldBuffers.get('rain');if(!buffer)return;
   if(!rainG){
     const src=AC.createBufferSource();src.buffer=buffer;src.loop=true;
@@ -11931,7 +12069,7 @@ function audioInit() {
     const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 340;
     const g = AC.createGain(); windGain=g; g.gain.value = 0.05;
-    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0; lfo.connect(lg); lg.connect(g.gain); lfo.start();
     src.connect(f); f.connect(g); g.connect(master); src.start();
     loadFieldAudio();
   } catch (e) { AC = null; }
@@ -11984,7 +12122,9 @@ const SND = {
 function play(name, x, y, mul) {
   if (!AC || (!SND[name] && !recordings[name])) return;
   let v = mul || 1;
-  if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); v *= clamp(1 - d / 950, 0, 1); if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
+  if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); const gun=name==='p'||name==='s'||name==='r';
+    const level=gun ? .74*Math.max(0,1-d/800)+.26*Math.max(0,1-d/2700)**1.2 : clamp(1-d/950,0,1);
+    v*=level; if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
   try {
     if(playRecording(name,v,x,y))return;
     SND[name]?.(v);

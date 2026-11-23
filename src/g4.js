@@ -32,13 +32,15 @@ let canopyCompanion = null;
 const nearCrown = document.createElement('canvas'), nearCtx = nearCrown.getContext('2d');
 function drawAutumnCrown(sprite, x, y, w, h) {
   if (w <= 0 || h <= 0) return;
-  const left = x - w / 2, top = y - h / 2, radius = 30;
+  const left = x - w / 2, top = y - h / 2, radius = 36;
   const nearPlayer = P && Math.abs(x-P.x)<=w/2+radius && Math.abs(y-P.y)<=h/2+radius;
   const e=canopyCompanion, nearNpc=e && Math.abs(x-e.x)<=w/2+radius && Math.abs(y-e.y)<=h/2+radius;
   if (!nearPlayer && !nearNpc) {
     ctx.drawImage(sprite, left, top, w, h); return;
   }
-  if (nearCrown.width !== sprite.width) nearCrown.width = nearCrown.height = sprite.width;
+  if (nearCrown.width!==sprite.width || nearCrown.height!==sprite.height){
+    nearCrown.width=sprite.width;nearCrown.height=sprite.height;
+  }
   nearCtx.globalCompositeOperation = 'copy'; nearCtx.drawImage(sprite, 0, 0);
   nearCtx.globalCompositeOperation = 'destination-out';
   const kx = sprite.width / w, ky = sprite.height / h;
@@ -75,23 +77,33 @@ function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
   const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
-  if(!fire){drawHuman(e,ctx);return;}
-  const dx = fire.x - e.x, dy = fire.y - e.y, distance = Math.hypot(dx, dy);
-  if (distance >= FIRE_REACH) { drawHuman(e, ctx); return; }
+  const wet=e===P ? S.flags.coatWetness||0 : 0;
+  if(!fire && wet<.03){drawHuman(e,ctx);return;}
+  const dx = fire ? fire.x-e.x : 0, dy = fire ? fire.y-e.y : 0, distance = Math.hypot(dx, dy);
+  if (distance >= FIRE_REACH && wet<.03) { drawHuman(e, ctx); return; }
 
   // Маска — альфа текущей позы. Градиент ориентирован в мире, даже когда герой поворачивается.
   const g = figureCtx;
   g.setTransform(2, 0, 0, 2, 96, 96);
   g.clearRect(-48, -48, 96, 96);
   g.save(); g.translate(-e.x, -e.y); drawHuman(e, g); g.restore();
-  const k = 12 / Math.max(1, distance);
-  const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
-  tint.addColorStop(0, 'rgba(255,150,65,0)');
-  tint.addColorStop(.48, 'rgba(255,150,65,0)');
-  tint.addColorStop(1, 'rgb(255,166,83)');
-  g.save(); g.globalCompositeOperation = 'source-atop';
-  g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
-  g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+  if(wet>=.03){
+    g.save();g.rotate(e.ang);g.globalCompositeOperation='source-atop';
+    const patch=g.createRadialGradient(-7,0,4,-5,0,20);
+    patch.addColorStop(0,'rgba(26,27,22,.50)');patch.addColorStop(.60,'rgba(33,35,28,.39)');patch.addColorStop(1,'transparent');
+    g.globalAlpha=wet;g.fillStyle=patch;g.fillRect(-26,-22,46,44);
+    g.restore();
+  }
+  if(fire && distance<FIRE_REACH){
+    const k = 12 / Math.max(1, distance);
+    const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
+    tint.addColorStop(0, 'rgba(255,150,65,0)');
+    tint.addColorStop(.48, 'rgba(255,150,65,0)');
+    tint.addColorStop(1, 'rgb(255,166,83)');
+    g.save(); g.globalCompositeOperation = 'source-atop';
+    g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
+    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+  }
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
 let hearthSmokeImage;
@@ -579,6 +591,22 @@ function drawPlayerAim() {
   }
   ctx.restore();
 }
+// Keep the ground, actor and baked shadows directly beneath a projecting roof visible.
+const eaveView=document.createElement('canvas');
+eaveView.width=eaveView.height=120;
+const eaveCtx=eaveView.getContext('2d');
+function captureEave(h){
+  const w=h.w*T,d=h.h*T;
+  const gap=Math.max(h.x*T-P.x,P.x-(h.x*T+w),h.y*T-P.y,P.y-(h.y*T+d));
+  if(gap>47 || h.a<.03)return false;
+  const m=ctx.getTransform(),left=P.x-36,top=P.y-36;
+  eaveCtx.clearRect(0,0,120,120);
+  eaveCtx.drawImage(ctx.canvas,m.a*left+m.e,m.d*top+m.f,72*m.a,72*m.d,0,0,120,120);
+  eaveCtx.globalCompositeOperation='destination-in';
+  eaveCtx.drawImage(canopyWindow,0,0,120,120);
+  eaveCtx.globalCompositeOperation='source-over';
+  return true;
+}
 function roofHidden(h) {
   const px = P.x / T, py = P.y / T;
   return px > h.x + 0.6 && px < h.x + h.w - 0.6 && py > h.y + 0.6 && py < h.y + h.h - 0.6;
@@ -731,6 +759,7 @@ function drawAnoms() {
     const vis=Math.max(a.reveal>0 ? .92 : 0, clamp(1-(dE(a,P)-a.r)/225,0,.85),a.fx);
     if (!vis) continue;
     ctx.save(); ctx.translate(a.x,a.y); ctx.globalAlpha*=vis;
+    drawFieldDebris(a,phase,t);
     if (electric) {
       const live=phase==='active', warning=phase==='warning';
       const glow=ctx.createRadialGradient(0,0,2,0,0,a.r*1.22);
@@ -968,8 +997,12 @@ function render() {
       ctx.globalAlpha = h.a; ctx.drawImage(h.shadow, h.x*T-8, h.y*T-4);
     }
     ctx.globalAlpha = h.a;
+    const underEave=captureEave(h);
     if (perspective && ART) drawRaisedHouse(h, i);
     else drawHouseRoof(ctx, h, i, 1);
+    if(underEave){
+      ctx.globalAlpha=1;ctx.drawImage(eaveView,P.x-36,P.y-36,72,72);
+    }
     ctx.globalAlpha = 1;
   });
   // провода ЛЭП
@@ -1014,8 +1047,7 @@ function render() {
       else drawAutumnCrown(crown, cx + sw, cy, width, height);
     } else {
       const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
-      ctx.globalAlpha = P && dst(cx, cy, P.x, P.y) < 30 ? .45 : 1;
-      ctx.drawImage(CANOPY[Math.floor(h * 8)], cx - sp + sw, cy - sp, 2 * sp, 2 * sp);
+      drawAutumnCrown(CANOPY[Math.floor(h*8)],cx+sw,cy,2*sp,2*sp);
     }
   }
   ctx.globalAlpha = 1;
