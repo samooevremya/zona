@@ -1923,8 +1923,13 @@ function idleHuman(e, dt) {
     }
     return;
   }
-  if(e.sid==='wolf'){if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);return;}
-  if(helpCompanion(e,dt))return;
+  if(e.sid==='wolf'){
+    if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);
+    else if(livingZone && P.alive && !P.crouch && P.mv>4 && dE(P,e)<100 && los(e.x,e.y,P.x,P.y))
+      e.ang+=angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x))*Math.min(1,dt*4);
+    return;
+  }
+  if(helpCompanion(e,dt) || rainErrand(e,dt))return;
   if(e.guard==='south' && BIG && night()){
     if((e.aw||0)>.05 && storyArea() && seesActor(e,P)){
       const direction=Math.atan2(P.y-e.y,P.x-e.x);
@@ -2322,7 +2327,7 @@ function startJump() {
   if (P.st < cost) { msg('Нет сил прыгать: отдышись.'); return; }
   if (swampAt(P.x, P.y)) { msg('В болоте не прыгнешь.'); return; }
   const ml = Math.hypot(IN.moveX, IN.moveY), a = ml > 0.2 ? Math.atan2(IN.moveY, IN.moveX) : P.ang;
-  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play('step');
+  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play(surf(P.x,P.y));
 }
 const JUMP_T = 0.42, JUMP_V = 250;
 /* тихое убийство: сзади, пока враг не заметил. Тяжёлая броня защищает от мгновенного поражения */
@@ -2585,7 +2590,7 @@ function updatePlayer(dt) {
     } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-5*dt);
   }
   P.jumpCD = (P.jumpCD || 0) - dt;
-  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
+  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play(surf(P.x,P.y)); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
   P.combatT = Math.max(0,(P.combatT || 0)-dt);
   P.hitT = Math.max(0,(P.hitT || 0)-dt);
@@ -2753,6 +2758,7 @@ function applyState(d) {
     S.campaign.northSiteUpdated=true;
   }
   if(S.campaign.liberated)occupyATP();
+  resetEnvironment();
   villageAftermath();
   if(BIG){
     // Saves on the former south threshold should load on their own side of the new wall.
@@ -3692,6 +3698,10 @@ function render() {
   if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
   if(villageAtmosphere && ART && WX.rain>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
     paintHatchRuts(ctx,true);
+  if(livingZone){
+    if(ART && C1 && !loft && !shopVisible)drawRunoff(inView);
+    drawBootMarks(loft,inView);
+  }
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -3743,16 +3753,21 @@ function render() {
   }
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
+  const plants=livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
+  let plantIndex=0;
   for (const e of vis) {
+    while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
+    if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
     }
   }
+  while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }
   ctx.lineWidth = 1;
@@ -3968,13 +3983,16 @@ function sayLine(e, t) { e.bub = { t: t, life: 3.6 }; play('voice', e.x, e.y); }
 
 /* ---------- шаги ---------- */
 function surf(x, y) {
+  const loft=loftAt({x,y});
+  if(loft)return loft.id==='depot'?'stepMetal':'stepWood';
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
   if (t === AS || t === CF || t === CO) return 'stepHard';
   if (t === FL) return 'stepWood';
   if (t === SW) return 'stepWet';
-  if (t === RA) return 'stepGravel';
-  if (t === DI) return WX.rain > 0.3 ? 'stepWet' : 'stepDirt';
-  return WX.rain > 0.4 ? 'stepWet' : 'stepGrass';
+  if (t === RA) return Math.floor(x/12)%3 ? 'stepWood' : 'stepGravel';
+  const wet=livingZone?surfaceWater:WX.rain;
+  if (t === DI) return wet > 0.3 ? 'stepWet' : 'stepDirt';
+  return wet > 0.4 ? 'stepWet' : 'stepGrass';
 }
 
 /* ---------- гитара у костра: свои простые переборы ---------- */
@@ -4015,18 +4033,6 @@ function guitar(dt) {
 
 /* ---------- звук дождя ---------- */
 let rainG = null;
-function rainSound() {
-  if (!AC) return;
-  if (!rainG) {
-    const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
-    const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 900;
-    rainG = AC.createGain(); rainG.gain.value = 0;
-    src.connect(f); f.connect(rainG); rainG.connect(master); src.start();
-  }
-  const under = sheltered(P.x, P.y) ? 0.45 : 1;
-  rainG.gain.value = (loftAt(P) || inBunker(P.x, P.y)) ? 0 : WX.rain * 0.16 * under;
-}
-
 /* ---------- главный шаг атмосферы ---------- */
 let chatT = 2, sirenT = 0;
 function worldFx(dt) {
@@ -4039,7 +4045,8 @@ function worldFx(dt) {
   WX.clouds.forEach(c => { c.x += WX.wind * 40 * dt; c.y += WX.wind * 12 * dt; if (c.x > WW + 700) { c.x = -700; c.y = rnd(0, WH); } if (c.y > WH + 700) c.y = -700; });
   WX.flash = Math.max(0, WX.flash - dt * 3);
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
-  rainSound();
+  if(livingZone)updateEnvironment(dt);
+  mixRecordedRain();
   blowout(dt);
   // шаги и анимация ног
   for (const e of ents) {
@@ -4048,8 +4055,13 @@ function worldFx(dt) {
     const stride = e.kind === 'dog' ? 26 : e === P && P.sprinting ? 44 : 36;
     if (e.step - (e.ls || 0) > stride) {
       e.ls = e.step;
-      if (e === P) { if (!P.crouch) play(surf(e.x, e.y), undefined, undefined, P.sprinting ? 1.3 : 1); }
-      else if (dE(e, P) < 380 && e.kind === 'human') play(surf(e.x, e.y), e.x, e.y, 0.6);
+      if (e === P && !(P.jumpT>0)) {
+        if(livingZone)leaveBootMark(e);
+        const surface=surf(e.x,e.y);
+        play(surface,undefined,undefined,P.crouch ? .36 : P.sprinting ? 1.3 : 1);
+        if(surface==='stepWood' && loftAt(e) && Math.floor(e.step/stride)%4===1)play('creak');
+      }
+      else if (e!==P && dE(e, P) < 380 && e.kind === 'human') play(surf(e.x, e.y), e.x, e.y, 0.6);
       else if (dE(e, P) < 320 && e.kind === 'dog') play('stepDog', e.x, e.y);
     }
     if (e.bub) { e.bub.life -= dt; if (e.bub.life <= 0) e.bub = null; }
@@ -4123,7 +4135,7 @@ function roomShelterPlace(e,door){
   const h=door.house,start=Math.floor(door.y/T)*MW+Math.floor(door.x/T);
   const queue=[start],seen=new Set(queue);
   const neighbours=ents.filter(o=>o!==e&&o.alive&&o.kind==='human'&&
-    (o.shelterSpot || sheltered(o.x,o.y))).map(o=>o.shelterSpot||o);
+    (o.shelterSpot || o.rainRest || sheltered(o.x,o.y))).map(o=>o.shelterSpot||o.rainRest||o);
   let best=null,score=Infinity;
   for(let i=0;i<queue.length;i++){
     const n=queue[i],x=n%MW,y=Math.floor(n/MW),p={x:(x+.5)*T,y:(y+.5)*T};
@@ -4271,6 +4283,13 @@ function drawWeatherScreen() {
     while (WX.drops.length < n) WX.drops.push({ x: rnd(0, VW), y: rnd(-VH, VH), l: rnd(10, 22), v: rnd(700, 1000) });
     if (WX.drops.length > n) WX.drops.length = n;
     if (n) {
+      ctx.save();
+      const house=HOUSES.find(h=>!h.ruin && P.x>h.x*T && P.x<(h.x+h.w)*T && P.y>h.y*T && P.y<(h.y+h.h)*T);
+      if(house){
+        ctx.beginPath();ctx.rect(0,0,VW,VH);
+        ctx.rect((house.x*T-cam.x)*Z+VW/2,(house.y*T-cam.y)*Z+VH/2,house.w*T*Z,house.h*T*Z);
+        ctx.clip('evenodd');
+      }
       ctx.strokeStyle = 'rgba(190,200,210,0.32)'; ctx.lineWidth = 1; ctx.beginPath();
       const sx = WX.wind * 0.35;
       for (const d of WX.drops) {
@@ -4281,6 +4300,7 @@ function drawWeatherScreen() {
       ctx.stroke();
       ctx.fillStyle = 'rgba(200,210,220,0.25)';
       for (let i = 0; i < n / 8; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * VW, Math.random() * VH, 3, 1.2, 0, 0, 6.28); ctx.fill(); }
+      ctx.restore();
     }
   }
   const exposed = S.blow?.stage && !sheltered(P.x, P.y);
@@ -4975,7 +4995,7 @@ function c1ForestFloor(g) {
 function scatterAutumnPlants(g, x, y, terrain) {
   // Тот же пучок попадает в оба соседних куска по своим мировым координатам.
   const seed=hash2(x+17,y+83);
-  if(seed<=.32) {
+  if(seed<=.32 && !(livingZone && reactiveTuft(x,y))) {
     const px=(x+.18+seed*2)*T, py=(y+.2+.6*hash2(y+7,x))*T, size=14+seed*24;
     ART.draw(g,'c1_tuft'+Math.floor(seed*18),px,py-2,size,size*.86,seed*5,.86);
   }
@@ -11224,6 +11244,14 @@ function drawTavernTable(g,o){
     }
     return;
   }
+  if(livingZone && o.barRole==='counter'){
+    for(const u of [.24,.52,.78]){
+      const at=x+w*u;
+      beam(g,at-9,y+h-1,at+8,y+h-1,2.5,'#b49b76');
+      g.strokeStyle='rgba(64,46,30,.52)';g.lineWidth=.9;g.beginPath();
+      g.ellipse(at,y+h*.61,3.7,2.6,-.17,.45,5.84);g.stroke();
+    }
+  }
   if(o.barRole==='counter'){
     const lamp=g.createRadialGradient(x+w-16,y+5,0,x+w-16,y+5,43);
     lamp.addColorStop(0,'rgba(249,194,96,.43)');lamp.addColorStop(1,'rgba(249,194,96,0)');
@@ -11259,14 +11287,20 @@ function poppyTuft(i){
   }
   return poppyTufts[i]=c;
 }
-function paintPoppyHeads(g,x,y,actor){
+function eachPoppy(x,y,visit){
   const d=1-poppyBed(x+.5,y+.5);if(d<=0 || tAt(x,LESSER_TOP+y)!==GR)return;
   const rand=mulberry32(x*7321+y*343),n=Math.ceil(Math.sqrt(d)*2.3);
   for(let i=0;i<n;i++){
     const px=(x+rand())*T,py=(LESSER_TOP+y+rand())*T,which=Math.floor(rand()*8);
-    if(actor && (py<actor.y || py>actor.y+21 || Math.abs(px-actor.x)>25))continue;
-    g.drawImage(poppyTuft(which),px-20,py-20);
+    visit(px,py,which,i);
   }
+}
+function paintPoppyHeads(g,x,y,actor){
+  eachPoppy(x,y,(px,py,which,i)=>{
+    if(livingZone && ART && C1 && i===0)return;
+    if(actor && (py<actor.y || py>actor.y+21 || Math.abs(px-actor.x)>25))return;
+    g.drawImage(poppyTuft(which),px-20,py-20);
+  });
 }
 function drawNearPoppies(g,p){
   const x=Math.floor(p.x/T),y=Math.floor(p.y/T)-LESSER_TOP;
@@ -11385,7 +11419,20 @@ const roomFittings={
 function drawRoomFitting(g,o){
   const [rect,w,h]=roomFittings[o.fitting];
   g.save();g.translate(o.x+o.w/2,o.y+o.h/2);
-  spriteShadow(g,2.5,1.7);g.rotate(o.angle);
+  g.rotate(o.angle);
+  if(livingZone && (o.fitting==='bench' || o.fitting==='stool')){
+    const rand=mulberry32(Math.floor(o.x+o.y*17));
+    if(o.fitting==='bench'){
+      const oil=g.createRadialGradient(8,11,1,8,11,21);
+      oil.addColorStop(0,'rgba(32,30,23,.62)');oil.addColorStop(1,'rgba(46,40,31,0)');
+      g.fillStyle=oil;g.fillRect(-14,-11,45,44);
+    }
+    for(let i=0;i<13;i++){
+      const x=(rand()-.5)*w,y=h*.45+rand()*10;
+      beam(g,x,y,x+rand()*7-2,y+rand()*7,1,i%3?'rgba(68,55,40,.57)':'rgba(178,149,112,.45)');
+    }
+  }
+  spriteShadow(g,2.5,1.7);
   if(ART?.images.roomFittings){
     g.drawImage(ART.images.roomFittings,...rect,-w/2,-h/2,w,h);
   }else{
@@ -11657,6 +11704,221 @@ function drawRoomMarks(g,h){
   g.restore();
 }
 
+// Transient world effects use world pixels and simulation time. They never enter the save.
+const livingZone=BIG && !location.hash.includes('living-off');
+let surfaceWater=0,wetBoots=0,footSide=1,environmentTime=0;
+const bootMarks=[],plantBlocks=new Map(),bentPlants=new Map();
+function resetEnvironment(){
+  bootMarks.length=0;bentPlants.clear();
+  surfaceWater=WXT[S.wx?.k]?.[1] || 0; wetBoots=0;environmentTime=0;footSide=1;
+}
+function updateEnvironment(dt){
+  environmentTime+=dt;
+  surfaceWater=lerp(surfaceWater,WX.rain,1-Math.exp(-dt/(WX.rain>surfaceWater?6:55)));
+  while(bootMarks.length && environmentTime-bootMarks[0].time>23)bootMarks.shift();
+  for(const [plant,bend] of bentPlants)if(environmentTime-bend.time>1.35)bentPlants.delete(plant);
+}
+function leaveBootMark(e){
+  const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T));
+  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24)){wetBoots=1;return;}
+  if(wetBoots<.08)return;
+  if(t===CF || t===FL || t===AS || loftAt(e)){
+    footSide*=-1;
+    const a=e.ang,side=4*footSide;
+    bootMarks.push({x:e.x-Math.sin(a)*side,y:e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,level:loftAt(e)});
+    if(bootMarks.length>45)bootMarks.shift();
+  }
+  wetBoots*=.72;
+}
+function drawBootMarks(level,inView){
+  for(const m of bootMarks){
+    if(m.level!==level || !inView(m.x,m.y,12))continue;
+    ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.a);
+    ctx.globalAlpha=.66*m.wet*(1-(environmentTime-m.time)/23);
+    ctx.fillStyle='#3a342a';ctx.beginPath();ctx.ellipse(2,0,4.3,2.4,0,0,6.29);ctx.fill();
+    ctx.fillRect(-5,-1.9,2.7,3.8);ctx.restore();
+  }
+}
+function reactiveTuft(x,y){return hash2(y+9,x+61)<.52;}
+function plantsInBlock(bx,by){
+  const key=by*MW+bx;
+  if(plantBlocks.has(key))return plantBlocks.get(key);
+  const plants=[];
+  for(let y=by*8;y<by*8+8;y++)for(let x=bx*8;x<bx*8+8;x++){
+    const t=tAt(x,y),seed=hash2(x+17,y+83);
+    if(t===GR && seed<=.32 && reactiveTuft(x,y)){
+      plants.push({x:(x+.18+seed*2)*T,y:(y+.2+.6*hash2(y+7,x))*T-2,w:14+seed*24,a:seed*5,id:'c1_tuft'+Math.floor(seed*18)});
+    }
+    if(t===BU && seed<.65)plants.push({x:(x+.53)*T,y:(y+.64)*T,w:24,a:seed*6,id:'c1_bush1'});
+    const py=y-LESSER_TOP;
+    if(t!==GR || x<18 || x>71 || py< -22 || py>35)continue;
+    eachPoppy(x,py,(px,wy,which,i)=>{if(i===0)plants.push({x:px,y:wy,w:40,flower:which});});
+  }
+  if(plantBlocks.size>=128)plantBlocks.delete(plantBlocks.keys().next().value);
+  plantBlocks.set(key,plants);return plants;
+}
+function visiblePlants(vx,vy,vw,vh,actors){
+  const items=[];
+  for(let by=Math.max(0,Math.floor((vy-33)/(8*T)));by<=Math.min(Math.floor((MH-1)/8),Math.floor((vy+vh+33)/(8*T)));by++)
+    for(let bx=Math.max(0,Math.floor((vx-33)/(8*T)));bx<=Math.min(Math.floor((PW-1)/8),Math.floor((vx+vw+33)/(8*T)));bx++)
+      for(const p of plantsInBlock(bx,by)){
+        if(p.x<vx-30||p.y<vy-30||p.x>vx+vw+30||p.y>vy+vh+30)continue;
+        for(const e of actors){
+          const dx=p.x-e.x,dy=p.y-e.y;
+          if(Math.abs(dx)>20 || Math.abs(dy)>18 || (e.mv||0)<2 || e.sit || e.wounded)continue;
+          const contact=1-Math.hypot(dx/21,dy/20);
+          if(contact>0)bentPlants.set(p,{dx:(dx*.19+Math.cos(e.ang)*6)*contact,dy:(dy*.19+Math.sin(e.ang)*5)*contact,time:environmentTime});
+        }
+        items.push(p);
+      }
+  return items.sort((a,b)=>a.y-b.y);
+}
+function drawPlant(p){
+  const bend=bentPlants.get(p),k=bend?Math.exp(-3.6*(environmentTime-bend.time)):0;
+  const dx=bend?bend.dx*k:0,dy=bend?bend.dy*k:0;
+  if(p.flower!==undefined)ctx.drawImage(poppyTuft(p.flower),p.x-20+dx,p.y-20+dy);
+  else ART.draw(ctx,p.id,p.x+dx,p.y+dy,p.w,p.w*.86,p.a+dx*.025,.86);
+}
+function drawRunoff(inView){
+  if(surfaceWater<.035)return;
+  for(const h of HOUSES){
+    if(h.ruin || h.x>=PW)continue;
+    const x=(h.x+h.w-.70)*T,y=(h.y+h.h)*T;
+    if(!inView(x,y,80))continue;
+    const phase=(environmentTime*(.8+WX.rain)+hash2(h.x,h.y))%1;
+    ctx.save();ctx.translate(x,y);
+    // A sheltered strip under the eave and a single depression below its drip edge.
+    ctx.globalAlpha=surfaceWater*.47;
+    ctx.drawImage(trailPrint(false,1),-63,-5,77,12);
+    ctx.drawImage(trailPrint(true,2),-28,3,65,23);
+    ctx.drawImage(yardReflection(),-21,6,48,16);
+    if(WX.rain>.10){
+      if(phase<.42)beam(ctx,3,phase*30-3,3,phase*30,1.1,'#d7d6c6');
+      else{const a=(phase-.42)/.58;ctx.strokeStyle='rgba(202,211,204,'+(.75*(1-a))+')';ctx.lineWidth=1;
+        ctx.beginPath();ctx.ellipse(3,13,1+12*a,.8+4*a,0,0,6.29);ctx.stroke();}
+    }
+    ctx.restore();
+  }
+}
+// Only unassigned residents leave the hearth. Each reserves a separate reachable resting place.
+function rainErrand(e,dt){
+  if(!livingZone || e.fac!=='loner' || e.named || e.sid==='wolf' || e.guard || e.follow || e.squadMate ||
+     e.stay || e.jobTag || e.sos || e.wounded || e.captive || e.evacuating || S.blow?.stage)return false;
+  if(e.rainRest && WX.rain<.2){
+    e.rainRest=null;e.path=null;e.trip={stage:2,returnTo:{...e.home}};return false;
+  }
+  if(!e.rainRest){
+    if(!e.sit || !e.fireRef || dE(e,e.fireRef)>95 || WX.rain<.45)return false;
+    e.rainWait=(e.rainWait??(1+e.seed%9))-dt;if(e.rainWait>0)return false;
+    e.rainWait=5;
+    const door=routeToShelter(e,lonerShelters);
+    if(!door || dE(door,e)>650)return false;
+    const busy=ents.some(o=>o!==e && o.rainRest?.house===door.house.ok);
+    const alternate=busy?shelterPlace(e,door.house.ok):null;
+    const rest=alternate && dE(e,alternate)<650 ? alternate : roomShelterPlace(e,door);
+    if(!rest)return false;
+    e.rainRest=rest;e.seat=1;setCampSeat(e,false);e.wander=null;e.path=null;
+  }
+  if(dE(e,e.rainRest)>8)goTo(e,e.rainRest.x,e.rainRest.y,67,dt);
+  else {
+    e.path=null;e.yielding=false;
+    e.ang+=angD(e.ang,Math.atan2(e.fireRef.y-e.y,e.fireRef.x-e.x))*Math.min(1,dt*2);
+  }
+  return true;
+}
+function drawHearthGesture(e){
+  if(!e.sit || e.tgt || e.wounded || !e.fireRef || dE(e,e.fireRef)>76)return;
+  const phase=(environmentTime+e.seed%19)%13;if(phase>3.4)return;
+  const reach=Math.sin(Math.PI*phase/3.4);
+  ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.ang);
+  for(const sign of [-1,1]){
+    beam(ctx,5,sign*8,9+reach*6,sign*(8-reach*4),3.4,'#655b46');
+    beam(ctx,9+reach*6,sign*(8-reach*4),11+reach*6,sign*(8-reach*4),2.8,'#97836a');
+  }
+  if(e.seed%2 && phase>.65 && phase<2.8)beam(ctx,13+reach*4,4,21+reach*8,1,1.5,'#6e5440');
+  ctx.restore();
+}
+
+// Field recordings are embedded by build.py so saved offline copies sound the same as Pages.
+const fieldBuffers=new Map(),fieldVoices=new Set(),lastTake=new Map();
+const recordings={
+  p:[.85,'pistol'],s:[1,'shotgun'],r:[.88,'rifle'],thunder:[.88,'thunder'],
+  stepDirt:[.32,'SandL1','SandR2'],stepGrass:[.30,'leaves01','leaves02'],
+  stepHard:[.32,'StoneL1','StoneR2'],stepWet:[.37,'mud02','waterStep'],stepGravel:[.29,'gravel','gravelStep'],
+  stepWood:[.32,'wood01','wood02'],stepMetal:[.35,'impactMetal_heavy_002','impactMetal_medium_001'],
+  stepDog:[.15,'leaves01','leaves02'],shell:[.21,'impactMetal_light_000'],bolt:[.29,'impactMetal_medium_001'],
+  reload:[.46,'metalLatch'],jam:[.36,'metalClick'],click:[.27,'metalClick'],pick:[.32,'clothBelt'],creak:[.15,'creak1']
+};
+let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null;
+function loadFieldAudio(){
+  if(!window.ZONE_AUDIO || fieldReady)return;
+  fieldReady=true;
+  for(const [name,encoded] of Object.entries(window.ZONE_AUDIO)){
+    const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+    AC.decodeAudioData(bytes.buffer).then(buffer=>fieldBuffers.set(name,buffer)).catch(()=>{});
+  }
+}
+function playRecording(name,volume,x,y){
+  const entry=recordings[name];
+  if(!entry)return false;
+  const index=(lastTake.get(name)||0)%(entry.length-1)+1;
+  const buffer=fieldBuffers.get(entry[index]);if(!buffer)return false;
+  lastTake.set(name,index);
+  if(fieldVoices.size>=30){
+    const oldest=fieldVoices.values().next().value;fieldVoices.delete(oldest);oldest.stop();
+  }
+  const src=AC.createBufferSource(),gain=AC.createGain(),filter=AC.createBiquadFilter();
+  src.buffer=buffer;src.playbackRate.value=name==='thunder'?1:.97+Math.random()*.06;
+  const distance=x===undefined?0:Math.min(1,dst(P.x,P.y,x,y)/950);
+  filter.type='lowpass';filter.frequency.value=16000-13500*distance;
+  gain.gain.value=entry[0]*volume;
+  src.connect(filter);filter.connect(gain);
+  const stereo=AC.createStereoPanner?.();
+  if(stereo){stereo.pan.value=x===undefined?0:clamp((x-P.x)/480,-.9,.9);gain.connect(stereo);stereo.connect(master);}
+  else gain.connect(master);
+  fieldVoices.add(src);src.onended=()=>{fieldVoices.delete(src);src.disconnect();filter.disconnect();gain.disconnect();stereo?.disconnect();};
+  src.start(AC.currentTime+(name==='shell' ? .21 : 0));
+  return true;
+}
+function roomAcoustics(){
+  if(inBunker(P.x,P.y))return {enclosure:1,metal:0,underground:true};
+  const loft=loftAt(P);if(loft)return {enclosure:1,metal:loft.id==='depot'?1:.55};
+  for(const h of HOUSES){
+    if(h.ruin)continue;
+    const depth=Math.min(P.x-h.x*T,(h.x+h.w)*T-P.x,P.y-h.y*T,(h.y+h.h)*T-P.y);
+    if(depth< -10)continue;
+    return {enclosure:clamp((depth+10)/48,0,1),metal:['conc','depot','tin','rust'].includes(h.mat)?1:.5};
+  }
+  return {enclosure:0,metal:0};
+}
+function mixRecordedRain(){
+  if(!AC)return;
+  const room=roomAcoustics(),now=AC.currentTime;
+  let nearest=290;
+  for(const f of WORLD_FIRES)nearest=Math.min(nearest,dst(f.x,f.y,P.x,P.y));
+  const fireVolume=room.underground?0:.32*(1-nearest/290)**2*(1-.8*room.enclosure);
+  if(!hearthGain && fireVolume>0 && fieldBuffers.has('hearth')){
+    const fire=AC.createBufferSource();fire.buffer=fieldBuffers.get('hearth');fire.loop=true;
+    hearthGain=AC.createGain();hearthGain.gain.value=0;fire.connect(hearthGain);hearthGain.connect(master);fire.start();
+  }
+  hearthGain?.gain.setTargetAtTime(fireVolume,now,.22);
+  windGain?.gain.setTargetAtTime(.048*(1-room.enclosure*.89),now,.27);
+  const buffer=fieldBuffers.get('rain');if(!buffer)return;
+  if(!rainG){
+    const src=AC.createBufferSource();src.buffer=buffer;src.loop=true;
+    rainFilter=AC.createBiquadFilter();rainFilter.type='lowpass';
+    rainG=AC.createGain();rainG.gain.value=0;
+    src.connect(rainFilter);rainFilter.connect(rainG);rainG.connect(master);
+    const sheet=AC.createBiquadFilter();sheet.type='bandpass';sheet.frequency.value=2140;sheet.Q.value=1.65;
+    rainRoof=AC.createGain();rainRoof.gain.value=0;
+    src.connect(sheet);sheet.connect(rainRoof);rainRoof.connect(master);src.start();
+  }
+  const wet=WX.rain*(room.underground?0:1);
+  rainFilter.frequency.setTargetAtTime(14400-12600*room.enclosure,now,.18);
+  rainG.gain.setTargetAtTime(wet*(.56-.26*room.enclosure),now,.18);
+  rainRoof.gain.setTargetAtTime(wet*room.enclosure*room.metal*.78,now,.18);
+}
+
 /* ===================== звук ===================== */
 let AC = null, master = null, noiseBuf = null;
 function audioInit() {
@@ -11668,9 +11930,10 @@ function audioInit() {
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 340;
-    const g = AC.createGain(); g.gain.value = 0.05;
+    const g = AC.createGain(); windGain=g; g.gain.value = 0.05;
     const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain); lfo.start();
     src.connect(f); f.connect(g); g.connect(master); src.start();
+    loadFieldAudio();
   } catch (e) { AC = null; }
 }
 function nz(dur, freq, q, vol, type, when) {
@@ -11719,10 +11982,13 @@ const SND = {
   blow: () => { nz(3.5, 90, 0.4, 1.2); tn(55, 30, 3, 0.8); }
 };
 function play(name, x, y, mul) {
-  if (!AC || !SND[name]) return;
+  if (!AC || (!SND[name] && !recordings[name])) return;
   let v = mul || 1;
   if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); v *= clamp(1 - d / 950, 0, 1); if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
-  try { SND[name](v); } catch (e) {}
+  try {
+    if(playRecording(name,v,x,y))return;
+    SND[name]?.(v);
+  } catch (e) {}
 }
 
 /* ---------- выстрелы: щелчок, хлопок, низ, хвост с эхом ---------- */

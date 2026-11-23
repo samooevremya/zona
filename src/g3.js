@@ -135,7 +135,7 @@ function startJump() {
   if (P.st < cost) { msg('Нет сил прыгать: отдышись.'); return; }
   if (swampAt(P.x, P.y)) { msg('В болоте не прыгнешь.'); return; }
   const ml = Math.hypot(IN.moveX, IN.moveY), a = ml > 0.2 ? Math.atan2(IN.moveY, IN.moveX) : P.ang;
-  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play('step');
+  P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play(surf(P.x,P.y));
 }
 const JUMP_T = 0.42, JUMP_V = 250;
 /* тихое убийство: сзади, пока враг не заметил. Тяжёлая броня защищает от мгновенного поражения */
@@ -398,7 +398,7 @@ function updatePlayer(dt) {
     } else if (exposure) S.flags.poppySleep=Math.max(0,exposure-5*dt);
   }
   P.jumpCD = (P.jumpCD || 0) - dt;
-  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play('step'); } }
+  if (P.jumpT > 0) { P.jumpT -= dt; const ox = P.x, oy = P.y; moveE(P, Math.cos(P.jumpA) * JUMP_V * dt, Math.sin(P.jumpA) * JUMP_V * dt); P.step += dst(ox, oy, P.x, P.y); if (P.jumpT <= 0) { P.jumpT = 0; collide(P); play(surf(P.x,P.y)); } }
   else if (ml > 0.08) { const ox = P.x, oy = P.y; moveE(P, mx * sp * dt, my * sp * dt); P.step += dst(ox, oy, P.x, P.y); }
   P.combatT = Math.max(0,(P.combatT || 0)-dt);
   P.hitT = Math.max(0,(P.hitT || 0)-dt);
@@ -566,6 +566,7 @@ function applyState(d) {
     S.campaign.northSiteUpdated=true;
   }
   if(S.campaign.liberated)occupyATP();
+  resetEnvironment();
   villageAftermath();
   if(BIG){
     // Saves on the former south threshold should load on their own side of the new wall.

@@ -1215,8 +1215,13 @@ function idleHuman(e, dt) {
     }
     return;
   }
-  if(e.sid==='wolf'){if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);return;}
-  if(helpCompanion(e,dt))return;
+  if(e.sid==='wolf'){
+    if(dE(e,e.home)>5)goTo(e,e.home.x,e.home.y,65,dt);
+    else if(livingZone && P.alive && !P.crouch && P.mv>4 && dE(P,e)<100 && los(e.x,e.y,P.x,P.y))
+      e.ang+=angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x))*Math.min(1,dt*4);
+    return;
+  }
+  if(helpCompanion(e,dt) || rainErrand(e,dt))return;
   if(e.guard==='south' && BIG && night()){
     if((e.aw||0)>.05 && storyArea() && seesActor(e,P)){
       const direction=Math.atan2(P.y-e.y,P.x-e.x);

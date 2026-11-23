@@ -152,6 +152,14 @@ function drawTavernTable(g,o){
     }
     return;
   }
+  if(livingZone && o.barRole==='counter'){
+    for(const u of [.24,.52,.78]){
+      const at=x+w*u;
+      beam(g,at-9,y+h-1,at+8,y+h-1,2.5,'#b49b76');
+      g.strokeStyle='rgba(64,46,30,.52)';g.lineWidth=.9;g.beginPath();
+      g.ellipse(at,y+h*.61,3.7,2.6,-.17,.45,5.84);g.stroke();
+    }
+  }
   if(o.barRole==='counter'){
     const lamp=g.createRadialGradient(x+w-16,y+5,0,x+w-16,y+5,43);
     lamp.addColorStop(0,'rgba(249,194,96,.43)');lamp.addColorStop(1,'rgba(249,194,96,0)');
@@ -187,14 +195,20 @@ function poppyTuft(i){
   }
   return poppyTufts[i]=c;
 }
-function paintPoppyHeads(g,x,y,actor){
+function eachPoppy(x,y,visit){
   const d=1-poppyBed(x+.5,y+.5);if(d<=0 || tAt(x,LESSER_TOP+y)!==GR)return;
   const rand=mulberry32(x*7321+y*343),n=Math.ceil(Math.sqrt(d)*2.3);
   for(let i=0;i<n;i++){
     const px=(x+rand())*T,py=(LESSER_TOP+y+rand())*T,which=Math.floor(rand()*8);
-    if(actor && (py<actor.y || py>actor.y+21 || Math.abs(px-actor.x)>25))continue;
-    g.drawImage(poppyTuft(which),px-20,py-20);
+    visit(px,py,which,i);
   }
+}
+function paintPoppyHeads(g,x,y,actor){
+  eachPoppy(x,y,(px,py,which,i)=>{
+    if(livingZone && ART && C1 && i===0)return;
+    if(actor && (py<actor.y || py>actor.y+21 || Math.abs(px-actor.x)>25))return;
+    g.drawImage(poppyTuft(which),px-20,py-20);
+  });
 }
 function drawNearPoppies(g,p){
   const x=Math.floor(p.x/T),y=Math.floor(p.y/T)-LESSER_TOP;

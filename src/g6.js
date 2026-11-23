@@ -32,13 +32,16 @@ function sayLine(e, t) { e.bub = { t: t, life: 3.6 }; play('voice', e.x, e.y); }
 
 /* ---------- шаги ---------- */
 function surf(x, y) {
+  const loft=loftAt({x,y});
+  if(loft)return loft.id==='depot'?'stepMetal':'stepWood';
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
   if (t === AS || t === CF || t === CO) return 'stepHard';
   if (t === FL) return 'stepWood';
   if (t === SW) return 'stepWet';
-  if (t === RA) return 'stepGravel';
-  if (t === DI) return WX.rain > 0.3 ? 'stepWet' : 'stepDirt';
-  return WX.rain > 0.4 ? 'stepWet' : 'stepGrass';
+  if (t === RA) return Math.floor(x/12)%3 ? 'stepWood' : 'stepGravel';
+  const wet=livingZone?surfaceWater:WX.rain;
+  if (t === DI) return wet > 0.3 ? 'stepWet' : 'stepDirt';
+  return wet > 0.4 ? 'stepWet' : 'stepGrass';
 }
 
 /* ---------- гитара у костра: свои простые переборы ---------- */
@@ -79,18 +82,6 @@ function guitar(dt) {
 
 /* ---------- звук дождя ---------- */
 let rainG = null;
-function rainSound() {
-  if (!AC) return;
-  if (!rainG) {
-    const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
-    const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 900;
-    rainG = AC.createGain(); rainG.gain.value = 0;
-    src.connect(f); f.connect(rainG); rainG.connect(master); src.start();
-  }
-  const under = sheltered(P.x, P.y) ? 0.45 : 1;
-  rainG.gain.value = (loftAt(P) || inBunker(P.x, P.y)) ? 0 : WX.rain * 0.16 * under;
-}
-
 /* ---------- главный шаг атмосферы ---------- */
 let chatT = 2, sirenT = 0;
 function worldFx(dt) {
@@ -103,7 +94,8 @@ function worldFx(dt) {
   WX.clouds.forEach(c => { c.x += WX.wind * 40 * dt; c.y += WX.wind * 12 * dt; if (c.x > WW + 700) { c.x = -700; c.y = rnd(0, WH); } if (c.y > WH + 700) c.y = -700; });
   WX.flash = Math.max(0, WX.flash - dt * 3);
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
-  rainSound();
+  if(livingZone)updateEnvironment(dt);
+  mixRecordedRain();
   blowout(dt);
   // шаги и анимация ног
   for (const e of ents) {
@@ -112,8 +104,13 @@ function worldFx(dt) {
     const stride = e.kind === 'dog' ? 26 : e === P && P.sprinting ? 44 : 36;
     if (e.step - (e.ls || 0) > stride) {
       e.ls = e.step;
-      if (e === P) { if (!P.crouch) play(surf(e.x, e.y), undefined, undefined, P.sprinting ? 1.3 : 1); }
-      else if (dE(e, P) < 380 && e.kind === 'human') play(surf(e.x, e.y), e.x, e.y, 0.6);
+      if (e === P && !(P.jumpT>0)) {
+        if(livingZone)leaveBootMark(e);
+        const surface=surf(e.x,e.y);
+        play(surface,undefined,undefined,P.crouch ? .36 : P.sprinting ? 1.3 : 1);
+        if(surface==='stepWood' && loftAt(e) && Math.floor(e.step/stride)%4===1)play('creak');
+      }
+      else if (e!==P && dE(e, P) < 380 && e.kind === 'human') play(surf(e.x, e.y), e.x, e.y, 0.6);
       else if (dE(e, P) < 320 && e.kind === 'dog') play('stepDog', e.x, e.y);
     }
     if (e.bub) { e.bub.life -= dt; if (e.bub.life <= 0) e.bub = null; }
@@ -187,7 +184,7 @@ function roomShelterPlace(e,door){
   const h=door.house,start=Math.floor(door.y/T)*MW+Math.floor(door.x/T);
   const queue=[start],seen=new Set(queue);
   const neighbours=ents.filter(o=>o!==e&&o.alive&&o.kind==='human'&&
-    (o.shelterSpot || sheltered(o.x,o.y))).map(o=>o.shelterSpot||o);
+    (o.shelterSpot || o.rainRest || sheltered(o.x,o.y))).map(o=>o.shelterSpot||o.rainRest||o);
   let best=null,score=Infinity;
   for(let i=0;i<queue.length;i++){
     const n=queue[i],x=n%MW,y=Math.floor(n/MW),p={x:(x+.5)*T,y:(y+.5)*T};
@@ -335,6 +332,13 @@ function drawWeatherScreen() {
     while (WX.drops.length < n) WX.drops.push({ x: rnd(0, VW), y: rnd(-VH, VH), l: rnd(10, 22), v: rnd(700, 1000) });
     if (WX.drops.length > n) WX.drops.length = n;
     if (n) {
+      ctx.save();
+      const house=HOUSES.find(h=>!h.ruin && P.x>h.x*T && P.x<(h.x+h.w)*T && P.y>h.y*T && P.y<(h.y+h.h)*T);
+      if(house){
+        ctx.beginPath();ctx.rect(0,0,VW,VH);
+        ctx.rect((house.x*T-cam.x)*Z+VW/2,(house.y*T-cam.y)*Z+VH/2,house.w*T*Z,house.h*T*Z);
+        ctx.clip('evenodd');
+      }
       ctx.strokeStyle = 'rgba(190,200,210,0.32)'; ctx.lineWidth = 1; ctx.beginPath();
       const sx = WX.wind * 0.35;
       for (const d of WX.drops) {
@@ -345,6 +349,7 @@ function drawWeatherScreen() {
       ctx.stroke();
       ctx.fillStyle = 'rgba(200,210,220,0.25)';
       for (let i = 0; i < n / 8; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * VW, Math.random() * VH, 3, 1.2, 0, 0, 6.28); ctx.fill(); }
+      ctx.restore();
     }
   }
   const exposed = S.blow?.stage && !sheltered(P.x, P.y);
