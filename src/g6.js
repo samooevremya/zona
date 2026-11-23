@@ -1,10 +1,16 @@
 /* ===================== погода, выброс, шаги, голоса, гитара ===================== */
-const WX = { cloud: 0.15, rain: 0, fog: 0, wind: 0.35, flash: 0, red: 0, clouds: [], drops: [] };
-const WXT = { clear: [0.1, 0, 0], cloudy: [0.65, 0, 0], rain: [0.85, 0.6, 0.06], storm: [1, 1, 0.06], fog: [0.45, 0, 0.8] };
+const WX = { cloud: 0.15, rain: 0, fog: 0, gust:0, sleet:0, time:0, wind: 0.35, flash: 0, red: 0, clouds: [], drops: [] };
+// Cloud, rain, fog, mean wind, dry leaves and sleet. The save stores the weather name.
+const WXT = {
+  clear:[.10,0,0,.17],cloudy:[.65,0,0,.32],rain:[.85,.60,.06,.61],storm:[1,1,.06,.98],
+  fog:[.45,0,.8,.10],gust:[.40,0,.04,.92,1],sleet:[.88,.10,.25,.65,0,1]
+};
 for (let i = 0; i < 7; i++) WX.clouds.push({ x: rnd(0, WW), y: rnd(0, WH), r: rnd(350, 700) });
 function pickWeather() {
   const r = Math.random(), h = hour();
-  const k = r < 0.34 ? 'clear' : r < 0.58 ? 'cloudy' : r < 0.78 ? 'rain' : r < 0.87 ? 'storm' : (h < 9 || h > 18 ? 'fog' : 'cloudy');
+  const cold=h<9 || h>18;
+  const k = r<.23?'clear':r<.40?'cloudy':r<.57?'gust':r<.72?'rain':r<.80?'storm':
+    r<.91?(cold?'fog':'cloudy'):(cold?'sleet':'gust');
   S.wx = { k: k, until: S.min + rnd(120, 300) };
 }
 const sheltered = (x, y) => !!loftAt({x,y}) || inBunker(x, y) || HOUSES.some(h => x > h.x*T && x < (h.x+h.w)*T && y > h.y*T && y < (h.y+h.h)*T);
@@ -90,7 +96,8 @@ function worldFx(dt) {
   if (S.min > S.wx.until) pickWeather();
   const tg = WXT[S.wx.k] || WXT.clear, k = Math.min(1, dt * 0.05);
   WX.cloud = lerp(WX.cloud, tg[0], k); WX.rain = lerp(WX.rain, tg[1], k); WX.fog = lerp(WX.fog, tg[2], k);
-  WX.wind = 0.3 + WX.rain * 0.6;
+  WX.time+=dt;WX.gust=lerp(WX.gust,tg[4]||0,k);WX.sleet=lerp(WX.sleet,tg[5]||0,k);
+  WX.wind=lerp(WX.wind,tg[3]+.18*WX.gust*Math.sin(WX.time*.74),Math.min(1,dt*.21));
   WX.clouds.forEach(c => { c.x += WX.wind * 40 * dt; c.y += WX.wind * 12 * dt; if (c.x > WW + 700) { c.x = -700; c.y = rnd(0, WH); } if (c.y > WH + 700) c.y = -700; });
   WX.flash = Math.max(0, WX.flash - dt * 3);
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
@@ -344,23 +351,25 @@ function drawWeatherScreen() {
   const bunk = P && (loftAt(P) || inBunker(P.x, P.y));
   if (!bunk) {
     if (WX.cloud > 0.3 || WX.rain > 0.1) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(' + Math.round(255 - WX.cloud * 45) + ',' + Math.round(255 - WX.cloud * 40) + ',' + Math.round(255 - WX.cloud * 25) + ')'; ctx.fillRect(0, 0, VW, VH); ctx.globalCompositeOperation = 'source-over'; }
+    const room=HOUSES.find(h=>!h.ruin && roofHidden(h));
+    ctx.save();
+    if(room){
+      ctx.beginPath();ctx.rect(0,0,VW,VH);
+      ctx.rect((room.x*T-cam.x)*Z+VW/2,(room.y*T-cam.y)*Z+VH/2,room.w*T*Z,room.h*T*Z);
+      ctx.clip('evenodd');
+    }
     if (WX.fog > 0.05) {
       const s = [(P.x - cam.x) * Z + VW / 2, (P.y - cam.y) * Z + VH / 2];
       const g = ctx.createRadialGradient(s[0], s[1], 60 * Z, s[0], s[1], 460 * Z);
       g.addColorStop(0, 'rgba(170,176,166,' + WX.fog * 0.12 + ')'); g.addColorStop(1, 'rgba(170,176,166,' + WX.fog * 0.72 + ')');
       ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     }
+    drawWeatherFront();
     const n = Math.floor(WX.rain * 240);
     while (WX.drops.length < n) WX.drops.push({ x: rnd(0, VW), y: rnd(-VH, VH), l: rnd(10, 22), v: rnd(700, 1000) });
     if (WX.drops.length > n) WX.drops.length = n;
     if (n) {
       ctx.save();
-      const house=HOUSES.find(h=>!h.ruin && P.x>h.x*T && P.x<(h.x+h.w)*T && P.y>h.y*T && P.y<(h.y+h.h)*T);
-      if(house){
-        ctx.beginPath();ctx.rect(0,0,VW,VH);
-        ctx.rect((house.x*T-cam.x)*Z+VW/2,(house.y*T-cam.y)*Z+VH/2,house.w*T*Z,house.h*T*Z);
-        ctx.clip('evenodd');
-      }
       ctx.strokeStyle = 'rgba(190,200,210,0.32)'; ctx.lineWidth = 1; ctx.beginPath();
       const sx = WX.wind * 0.35;
       for (const d of WX.drops) {
@@ -373,6 +382,7 @@ function drawWeatherScreen() {
       for (let i = 0; i < n / 8; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * VW, Math.random() * VH, 3, 1.2, 0, 0, 6.28); ctx.fill(); }
       ctx.restore();
     }
+    ctx.restore();
   }
   const exposed = S.blow?.stage && !sheltered(P.x, P.y);
   if (WX.red > 0.02 && exposed) {

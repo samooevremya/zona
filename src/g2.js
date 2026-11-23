@@ -683,7 +683,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
   function tileBlocks(i,j){
     if(!inb(i,j))return true;
     const tile=map[j*MW+i];
-    return OPAQ[tile] || tile===RA;
+    return OPAQ[tile] || (tile===RA && vision!=='light');
   }
   while(near<limit){
     if(tileBlocks(i,j))return near;
@@ -692,7 +692,10 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
     const solids=walkSolids.get(cell),props=propCells.get(cell);
     if(solids)for(const o of solids)if(o.solid && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
-    if(props)for(const p of props)hit=Math.min(hit,propRay(p,x,y,dx,dy,near,far));
+    if(props)for(const p of props){
+      if(vision==='light' && p.vaultable)continue;
+      hit=Math.min(hit,propRay(p,x,y,dx,dy,near,far));
+    }
     const mid=(near+far)/2;
     if(terrainLevel(x+dx*mid,y+dy*mid)>base+slope*mid)hit=Math.min(hit,mid);
     else if(terrainLevel(x+dx*far,y+dy*far)>base+slope*far)hit=Math.min(hit,far);
@@ -776,7 +779,7 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
     const a = shots ? shots[k].a : ang + (Math.random() - 0.5) * 2 * spread, r = shots ? shots[k].r : shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
-    if(r.box && sh===P && r.box.k==='crate'){ breakCrate(r.box); continue; }
+    if(r.box && sh===P && r.box.k==='crate'){surfaceImpact(ex,ey,ca,sa,r.box);breakCrate(r.box);continue;}
     if (best && coverBlocks(best, sh.x, sh.y) && chance(best === P ? 0.6 : 0.5)) {
       const cx = best.x - ca * 22, cy = best.y - sa * 22;
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
@@ -786,7 +789,7 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
       if (sh===P) { P.hitT=.2; P.impact={x:ex,y:ey,kill:!best.alive}; }
-    } else if (r.wall) for (let i = 0; i < 3; i++) parts.push({ x: ex - ca * 1.5, y: ey - sa * 1.5, vx: rnd(-80, 80) - ca * 60, vy: rnd(-80, 80) - sa * 60, life: rnd(0.15, 0.3), c: '#e8d9a0', s: 1.5 });
+    } else if (r.wall) surfaceImpact(ex,ey,ca,sa,r.box);
   }
   flashes.push({ x: fx, y: fy, a: ang, life: 0.06 });
   play(W.snd || 'p', sh.x, sh.y);
@@ -936,7 +939,11 @@ function pVis() {
   const moving = Math.hypot(IN.moveX, IN.moveY) > 0.1 || P.jumpT > 0;
   if (P.crouch) v *= 0.55;
   if (!moving) v *= 0.75; else if (P.sprinting) v *= 1.25;
-  if (darkness() > 0.3) v *= S.torch === false ? 0.6 : 1.1;   // ночью фонарь выдаёт, без него замечают на 40% позже
+  if(darkness()>.3){
+    let light=0;
+    for(const lamp of siteLights())light=Math.max(light,lampExposure(lamp,P));
+    v*=S.torch===false ? .6+.46*light : 1.1+.1*light;
+  }   // ночью фонарь выдаёт, без него замечают на 40% позже
   return v;
 }
 /* враг ещё не в бою с игроком: копит подозрение (0..1). Видит только перед собой (~115°), сзади — только на слух */
