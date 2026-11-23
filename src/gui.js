@@ -23,20 +23,27 @@ function itemCell(id, opt) {
 const itemName = id => id === 'knife' ? 'Нож' : ITEMS[id].n;
 const itemW = id => id === 'knife' ? 0.3 : (ITEMS[id].w || 0);
 
-/* ---------- диалог: компактный портрет + реплики + варианты ---------- */
+/* Разговор: карточки участников, история и ответы. */
 function drawDialog2() {
   const box = el('div', 'dlg');
-  const side = el('div', 'dlg-who');
-  const c = panel.card;
-  if (!c.record) side.appendChild(portraitFor(c));
-  side.appendChild(el('div', 'pn', c.n));
-  side.appendChild(el('div', 'pm', [c.rank, c.grp].filter(Boolean).join(' · ')));
-  if (c.att) side.appendChild(el('div', 'pa' + (/враг/.test(c.att) ? ' foe' : /друг|свой/.test(c.att) ? ' pal' : ''), c.att));
-  if (c.money !== undefined) side.appendChild(el('div', 'price', c.money + ' RU'));
-  box.appendChild(side);
+  function identity(c){
+    const side = el('aside', 'dlg-who');
+    if (!c.record) side.appendChild(portraitFor(c));
+    side.appendChild(el('div', 'pn', c.n));
+    side.appendChild(el('div', 'pm', [c.rank, c.grp].filter(Boolean).join(' · ')));
+    if (c.att) side.appendChild(el('div', 'pa' + (/враг/.test(c.att) ? ' foe' : /друг|свой/.test(c.att) ? ' pal' : ''), c.att));
+    if (c.money !== undefined) side.appendChild(el('div', 'price', c.money + ' RU'));
+    return side;
+  }
+  box.appendChild(identity(meCard()));
   const main = el('div', 'dlg-main');
   const L = el('div', 'dlg-lines');
-  panel.lines.slice(-5).forEach(l => L.appendChild(el('p', l.s, (l.s === 'npc' ? '— ' : l.s === 'me' ? '› ' : '') + l.t)));
+  L.setAttribute('role','log');L.setAttribute('aria-label','История разговора');L.tabIndex=0;
+  for(const line of panel.lines){
+    const entry=el('p',line.s);
+    if(line.s!=='sys')entry.append(el('strong','',line.name || (line.s==='me'?'Меченый':panel.card.n)));
+    entry.append(document.createTextNode(line.t));L.append(entry);
+  }
   main.appendChild(L);
   const O = el('div', 'dlg-opts');
   panel.opts().forEach((o, i) => O.appendChild(btn((o.k || '') + ' opt', (i + 1) + '. ' + o.t, () => {
@@ -46,8 +53,9 @@ function drawDialog2() {
     if (panel && (panel.kind === 'dialog' || panel.kind === 'trader')) { refresh(); const ln = pbody.querySelector('.dlg-lines'); if (ln) ln.scrollTop = ln.scrollHeight; }
   }, o.d)));
   main.appendChild(O);
-  box.appendChild(main);
+  box.append(main,identity(panel.card));
   pbody.appendChild(box);
+  L.scrollTop=L.scrollHeight;
 }
 
 /* ---------- КПК: карта ~65% + выбранное задание ~35%, вкладки снизу ---------- */

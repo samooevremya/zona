@@ -175,6 +175,8 @@ const furnitureSets={
   bar:['supper','stool','sack']
 };
 function houseUse(h){
+  if(h.x===WEST+114 && h.y===NORTH_ROWS+203)return 'office';
+  if(h.x===WEST+132 && h.y===NORTH_ROWS+201)return 'home';
   if(h.ruin)return 'ruin';
   const region=locAt(h.x+h.w/2,h.y+h.h/2)?.id;
   if(h.ok==='78,118')return 'bar';

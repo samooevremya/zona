@@ -167,9 +167,16 @@ Tt('K12_sos_radio', () => {
   const journal = S().news.some(n => n.x.startsWith('SOS!')) && S().news.some(n => n.x.includes('потеряна'));
   return { ok: received && priority && closed && journal, received, priority, closed, journal };
 });
+function finishSpeech(){
+  for(let i=0;i<36;i++){
+    const choices=document.querySelectorAll('.dlg-opts button');
+    if(!z.panel || choices.length!==1)break;
+    choices[0].click();
+  }
+}
 Tt('K13_pda_quest_bulletin', () => {
   reset(); z.clearMsgs();
-  z.talkTrader(); z.plus.traderOpts().find(o=>o.t==='Кто меня нашёл?').fn();z.closePanel();
+  z.talkTrader(); z.plus.traderOpts().find(o=>o.t==='Кто меня нашёл?').fn();finishSpeech();z.closePanel();
   const report=S().news.find(n=>n.x.includes('Получить оружие у Волка'));
   const shown = !!report && B.msgs().includes(report.x);
   S().sos.next = S().min;
@@ -492,11 +499,14 @@ function playChapter(losses){
   function freeze(){for(const e of z.ents)if(e!==P())e.qaHold=1;}
   function approach(p){z.closePanel();Object.assign(P(),{x:p.x,y:p.y+6});freeze();step(1);}
   function use(p,k){approach(p);if(z.near?.k!==k)throw Error('Цель '+k+' / '+z.near?.label+' @ '+st());z.interact();}
-  function trader(label){z.closePanel();z.talkTrader();click(label);z.closePanel();}
+  function trader(label){z.closePanel();z.talkTrader();click(label);finishSpeech();z.closePanel();}
   function damage(e){z.rc.hurt(e,999,null);}
   function reload(){z.closePanel();z.save(true);z.applyState(z.loadSave());freeze();}
   const target=()=>z.plus.trackedTarget();
-  trader('Кто меня нашёл');expect('wolf');use(sid('wolf'),'talk');click('оружие');expect('rescue');
+  trader('Кто меня нашёл');expect('wolf');use(sid('wolf'),'talk');finishSpeech();expect('rescue');
+  use(sid('petr'),'talk');click('Где Шустрого');click(losses?'Пока не готов':'Готов.');
+  if(!!S().flags.assault===!!losses)throw Error('Решение Петрухи');
+  if(losses){z.rc.hurt(sid('b1'),1,P());if(!S().flags.assault)throw Error('Отряд не поддержал игрока');}
   ['b1','b2','b3','b4','b5','b6','boss'].forEach(id=>damage(sid(id)));
   if(losses)damage(sid('petr2'));
   use(sid('shust'),'free');expect('flash');reload();
@@ -504,16 +514,16 @@ function playChapter(losses){
   trader('Передать флешку');expect('fox');S().inv.medkit=0;
   use(sid('fox'),'heal');expect('fox');S().inv.medkit=3;use(sid('fox'),'heal');expect('dogs');reload();
   z.ents.filter(e=>e.trailDog && e.alive).forEach(damage);step(40);expect('favour');
-  use(sid('fox'),'talk');for(const t of ['Как пойму','Поищу','А ты','Идти'])click(t);
+  use(sid('fox'),'talk');finishSpeech();
   expect('wreck');use(target(),'story');z.closePanel();reload();use(target(),'story');expect('returnGun');z.closePanel();
-  use(sid('fox'),'talk');for(const t of ['Держи','А вот','Прижать','Ещё раз','Чего так','Убрать'])click(t);
-  expect('device');use(sid('shust'),'talk');click('Это ещё');click('Сидор');expect('bargain');trader('Показать монолитовский');
+  use(sid('fox'),'talk');finishSpeech();
+  expect('device');use(sid('shust'),'talk');finishSpeech();expect('bargain');trader('Показать монолитовский');
   expect('case');S().min=720;use(target(),'story');expect('case');if(z.ents.filter(e=>e.dayGuard).length!==4)throw Error('Дневная смена');
   S().min=1320;use(target(),'story');expect('escape');
   if(z.ents.some(e=>e.dayGuard))throw Error('Ночная смена');
   if(losses){
     z.rc.hurt(sid('a5'),2,P());expect('case');reload();
-    Object.assign(P(),{x:360*T-120,y:(north+207)*T});step(45);S().min=1460;
+    Object.assign(P(),{x:350*T,y:(north+207)*T});step(45);S().min=1460;
     use(target(),'story');expect('case');S().min=1440+1290;use(target(),'story');expect('escape');
   }
   approach(target());step(40);expect('deliver');trader('Отдать кейс');expect('muster');
@@ -530,6 +540,31 @@ function playChapter(losses){
 Tt('K22_full_campaign_no_losses',()=>playChapter(0));
 Tt('K23_alarm_retreat_next_night_and_losses',()=>playChapter(2));
 Tt('K24_all_allies_lost',()=>playChapter(5));
+
+Tt('C1_post_route_transcript_and_rest',()=>{
+  reset();
+  z.talkTrader();
+  const click=t=>[...document.querySelectorAll('.dlg-opts button')].find(b=>b.textContent.includes(t)).click();
+  click('Кто меня нашёл');
+  for(let i=0;i<5;i++)document.querySelector('.dlg-opts button').click();
+  const history=document.querySelectorAll('.dlg-lines p').length>8;
+  z.closePanel();z.talkTrader();
+  const cleared=document.querySelectorAll('.dlg-lines p').length===1;
+  const noRest=!z.panel.opts().some(o=>/Отоспаться|Переждать/.test(o.t));z.closePanel();
+  Object.assign(P(),z.loc.locPt('sid','spawn'));S().blow={stage:1,t:12,next:S().min-1};S().food=90;
+  const waited=z.plus.advanceWorldTime(120,'rest'),calm=waited.minutes===120 && S().blow.stage===0;
+  S().campaign.stage='case';S().min=1320;step(1);
+  const goal=z.plus.trackedTarget(), west=M.LOC.army.bounds[0], ty=M.LOC.army.bounds[1];
+  const path=z.findPath((west-.5)*T,(ty+10)*T,goal.x,goal.y);
+  const inside=z.gfxSnap().HOUSES.some(h=>goal.x/T>h.x+1 && goal.x/T<h.x+h.w-1 && goal.y/T>h.y+1 && goal.y/T<h.y+h.h-1);
+  const guard=z.ents.find(e=>e.alive && e.sid==='a4');
+  Object.assign(P(),{x:guard.x,y:guard.y-35});guard.ang=-Math.PI/2;guard.qaHold=0;
+  for(let i=0;i<120 && !S().campaign.mustLeave;i++)step(1);
+  const alarm=S().campaign.mustLeave===true;
+  S().campaign.stage='muster';S().min=720;step(1);z.save(true);z.applyState(z.loadSave());
+  const guards=z.ents.filter(e=>e.alive && e.guard==='south').length;
+  return {ok:!!(history&&cleared&&noRest&&calm&&path?.length&&inside&&alarm&&guards===6),history,cleared,noRest,calm,inside,alarm,guards};
+});
 
 Tt('K25_bridge_toll', () => {
   const guards=()=>z.ents.filter(e=>e.alive && e.guard==='bridge');
