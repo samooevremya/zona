@@ -281,7 +281,7 @@ function drawInv2() {
     if (slotKey && !mounted) row.appendChild(btn('go','В слот',()=>{
       mountGear(id,copy,false); panel.copy=0; refresh();
     }));
-    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{
+    if ((id==='guitar' || WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{
       if (slotKey) mountGear(id,copy,true); else setWeapon(id);
       panel.copy=0; refresh();
     }));
@@ -372,7 +372,7 @@ function gearRetail(id){
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
   if ((e && it.armor) || refusesTrophy(e,id)) return 0;
-  return Math.max(0,cnt(id)-wornCount(id));
+  return Math.max(0,cnt(id)-wornCount(id)-(id==='guitar' && S.weapon===id?1:0));
 }
 function offerSum(e) {
   const o = panel.offer, st = tradeStock(e);
@@ -433,7 +433,7 @@ function tradeDo(e) {
     if (isGun(id)) for(const gun of incoming.guns[id]) addPacked(id,1,gun);
     else addPacked(id,q);
   }
-  S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1;   // инвентарь и деньги этого NPC теперь сохраняются
+  S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1; if(e?.sid==='lz_barman')S.flags.barGuitarStock=true;   // инвентарь и деньги этого NPC теперь сохраняются
   panel.offer = { buy: {}, sell: {} }; play('pick');
   panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.';
   refresh();

@@ -22,7 +22,7 @@ for file in sorted(_os.listdir('art/detectors')):
     if file.endswith('.svg'):
         with open('art/detectors/' + file, 'rb') as sprite:
             detector_images['det_' + file[:-4]] = 'data:image/svg+xml;base64,' + _b64.b64encode(sprite.read()).decode()
-audio_files = {f[:-4]: base64.b64encode(open('audio/'+f,'rb').read()).decode() for f in sorted(_os.listdir('audio')) if f.endswith('.mp3')}
+audio_files = {f[:-4]: base64.b64encode(open('audio/'+f,'rb').read()).decode() for f in sorted(_os.listdir('audio')) if f.endswith('.mp3') and not f.startswith(('camp0','army0','foe0','ally0'))}
 art += '\n/*\n' + open('audio/CREDITS.md', encoding='utf-8').read() + '\n*/\n'
 art += '\nwindow.ZONE_AUDIO=' + __import__('json').dumps(audio_files) + ';'
 art += '\nwindow.DETECTOR_IMAGES=' + __import__('json').dumps(detector_images) + ';'

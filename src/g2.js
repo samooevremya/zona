@@ -260,7 +260,7 @@ function mkHuman(d) {
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null };
   if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
-  if (d.sid==='lz_barman') {e.inv={energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
+  if (d.sid==='lz_barman') {e.inv={guitar:1,energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
   e.maxhp = e.hp;
   if (e.sit) e.ang = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
   if (e.guard === 'bridge') e.ang = (BIG && e.sid==='a1' ? -1 : 1)*Math.PI/2;

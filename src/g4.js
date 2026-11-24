@@ -689,7 +689,7 @@ function drawHuman(e, g) {
   // оружие и руки
   if (!e.sit) {
     if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
-    else if (e===P && S.weapon==='hands') { /* bare hands below */ }
+    else if (e===P && (S.weapon==='hands' || S.weapon==='guitar')) { /* bare hands below */ }
     else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
@@ -974,7 +974,7 @@ function render() {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
-    if(campAct?.actor===e && campAct.music)drawCampGuitar(e);
+    if((campAct?.actor===e && campAct.music) || (e===P && S.weapon==='guitar'))drawCampGuitar(e);
     else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {

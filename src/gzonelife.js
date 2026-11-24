@@ -1,12 +1,12 @@
 const soundPrefs=(()=>{
   try{
     const saved=JSON.parse(localStorage.getItem('zona-sound')||'{}');
-    return Object.fromEntries(['volume','music','speech'].map(k=>[k,Number.isFinite(saved[k])?clamp(saved[k],0,1):1]));
-  }catch{return {volume:1,music:1,speech:1};}
+    return Object.fromEntries(['volume','music','nature'].map(k=>[k,Number.isFinite(saved[k])?clamp(saved[k],0,1):1]));
+  }catch{return {volume:1,music:1,nature:1};}
 })();
 function soundSettings(nav,back){
   nav.replaceChildren();
-  for(const [key,name] of [['volume','Общая громкость'],['music','Музыка'],['speech','Голоса']]){
+  for(const [key,name] of [['volume','Общая громкость'],['music','Музыка'],['nature','Звуки природы']]){
     const label=el('label','difficulty-label'),input=el('input'),value=el('span');
     input.type='range';input.min=0;input.max=100;input.value=Math.round(soundPrefs[key]*100);
     input.style.cssText='width:100%;min-height:44px';input.setAttribute('aria-label',name);
@@ -116,12 +116,31 @@ function drawFlyingCrow(c){
 function reloadSound(id){return WP[id]?.ammo==='a12'?'loadShell':compatibleRifle(id)?'loadRifle':'loadPistol';}
 
 const campStories=[
-  [['camp01','У кого вчера часы утащили?'],['camp02','У меня. Теперь вор точно знает, сколько ему осталось.']],
-  [['camp03','На насыпи всю ночь кто-то стучал. По три раза.'],['camp04','Я там ночевал. Котелок с ветки снять пытался.']],
-  [['camp05','До дождя успеем дойти?'],['camp06','До первого точно. А их тут сегодня штуки три.']]
+  ['У кого вчера часы утащили?','У меня. Теперь вор точно знает, сколько ему осталось.'],
+  ['На насыпи всю ночь кто-то стучал. По три раза.','Я там ночевал. Котелок с ветки снять пытался.'],
+  ['До дождя успеем дойти?','До первого точно. А их тут сегодня штуки три.']
 ];
-const battleVoice={loner:[['ally01','Вижу его!'],['ally02','Прикрой, меняю магазин!']],bandit:[['foe01','Вот он, мужики!'],['foe02','Пустой! Прикрой!']],army:[['army01','Контакт!'],['army02','Перезаряжаюсь!']]};
-let campAct=null,campDelay=9,campIndex=0,voiceDelay=0,radioAudio=null,voiceAudio=null;
+const songBook=[
+  ['latePicking','Последний перебор'],['riverWaltz','Вальс у переправы'],['emberSong','Дым над золою'],['roadSong','Дремлет дорога']
+];
+let campAct=null,campDelay=18,campIndex=0,radioAudio=null,playerSong=null;
+function stopPlayingGuitar(){
+  if(!playerSong)return;
+  stopScene(playerSong);
+  playerSong=null;P.sit=0;campDelay=35;
+}
+function playerSongOptions(){
+  if(S.weapon!=='guitar' || !has('guitar'))return [];
+  return songBook.map(([track,title])=>({t:'Сыграть · '+title,fn:()=>{
+    const fire=WORLD_FIRES.find(f=>dE(f,P)<52);
+    if(!fire || S.weapon!=='guitar' || !has('guitar') || S.blow?.stage){sys('Сейчас не до песен.');return;}
+    const clip=sceneClip(track,.42,'music',P);
+    if(!clip){sys('Инструмент ещё настраивается. Попробуй через секунду.');return;}
+    stopPlayingGuitar();stopScene(campAct?.clip);campAct=null;
+    closePanel();playerSong=clip;P.sit=1;P.fireRef=fire;P.ang=Math.atan2(fire.y-P.y,fire.x-P.x);
+    msg('Играешь «'+title+'». Двинься, чтобы встать.','say');
+  }}));
+}
 function stopScene(sound){
   if(!sound)return;
   try{sound.source.stop();}catch{}
@@ -140,52 +159,43 @@ function mixScene(s){
   const distance=s.actor?Math.max(0,1-dE(s.actor,P)/270):1;
   s.gain.gain.setTargetAtTime(s.volume*soundPrefs[s.group]*distance*distance,AC.currentTime,.06);
 }
-function syncSceneAudio(){mixScene(voiceAudio);mixScene(radioAudio);mixScene(campAct?.clip);}
+function syncSceneAudio(){mixScene(playerSong);mixScene(radioAudio);mixScene(campAct?.clip);}
 function resetCampAudio(){
-  stopScene(campAct?.clip);stopScene(voiceAudio);stopScene(radioAudio);
-  campAct=radioAudio=voiceAudio=null;campDelay=9;voiceDelay=0;campIndex=0;
-}
-function voiceCallout(e,kind){
-  if(!['combat','reload'].includes(kind)||!battleVoice[e.fac]||voiceDelay>0||dE(e,P)>250||
-    inBunker(e.x,e.y)!==inBunker(P.x,P.y)||loftAt(e)!==loftAt(P))return false;
-  const [clip,line]=battleVoice[e.fac][kind==='reload'?1:0];
-  stopScene(campAct?.clip);campAct=null;campDelay=22;
-  const sound=sceneClip(clip,.52,'speech',e);if(!sound)return false;
-  voiceAudio=sound;voiceDelay=9+(e.seed%6);e.bub={t:line,life:2.7};return true;
+  stopPlayingGuitar();stopScene(campAct?.clip);stopScene(radioAudio);
+  campAct=radioAudio=null;campDelay=18;campIndex=0;
 }
 function atFire(e){
   return e?.alive && e.sit && !e.wounded && !e.captive && !e.tgt && !e.evacuating &&
     e.fireRef && dE(e,e.fireRef)<80 && dE(e,P)<255;
 }
 function campAndRadio(dt){
-  voiceDelay=Math.max(0,voiceDelay-dt);
+  if(playerSong && (playerSong.done || !P.alive || S.weapon!=='guitar' || !has('guitar') ||
+    IN.moveX || IN.moveY || S.blow?.stage || P.flash>0 || dE(P,P.fireRef)>56))stopPlayingGuitar();
   const underground=inBunker(P.x,P.y);
   if(underground && !radioAudio){radioAudio=sceneClip('deskRadio',.22,'music',byS('sid'),true);}
   if(!underground && radioAudio){stopScene(radioAudio);radioAudio=null;}
   syncSceneAudio();
-  const quiet=!underground && !loftAt(P) && !S.blow?.stage && WX.rain<.6 && voiceDelay<=0;
+  const quiet=!underground && !loftAt(P) && !S.blow?.stage && WX.rain<.6 && !playerSong;
   if(campAct){
     const act=campAct;
     if(!quiet || !atFire(act.actor)){stopScene(act.clip);campAct=null;campDelay=16;return;}
-    if(!act.clip.done)return;
-    if(act.reply && atFire(act.reply)){
-      const [name,t]=act.lines[1];act.actor=act.reply;act.reply=null;
-      act.clip=sceneClip(name,.44,'speech',act.actor);
-      if(act.clip){act.actor.bub={t,life:4};return;}
-    }
-    campAct=null;campDelay=25+(campIndex*7)%19;return;
+    if(act.music && !act.clip.done)return;
+    if(!act.music && (act.wait-=dt)>0)return;
+    if(act.reply && atFire(act.reply))act.reply.bub={t:act.lines[1],life:4};
+    campAct=null;campDelay=rnd(38,65);return;
   }
   if(!quiet||!AC||(campDelay-=dt)>0)return;
-  campDelay=4;
-  const seats=ents.filter(atFire).sort((a,b)=>dE(a,P)-dE(b,P));if(!seats.length)return;
-  const actor=seats[campIndex%seats.length], reply=seats.find(e=>e!==actor && dE(e,actor)<105);
+  campDelay=6;
+  const seats=ents.filter(e=>e!==P && atFire(e)).sort((a,b)=>dE(a,P)-dE(b,P));
+  if(!seats.length)return;
+  const actor=seats[campIndex%seats.length],reply=seats.find(e=>e!==actor && dE(e,actor)<105);
   const music=campIndex%2===1 || !reply;
   const lines=campStories[Math.floor(campIndex/2)%campStories.length];
-  const song=['emberSong','roadSong','latePicking'][Math.floor(campIndex/2)%3];
-  const clip=sceneClip(music?song:lines[0][0],music?.29:.48,music?'music':'speech',actor);
-  if(!clip)return;
-  if(!music)actor.bub={t:lines[0][1],life:4};
-  campAct={actor,reply:music?null:reply,music,lines,clip};campIndex++;
+  const clip=music?sceneClip(songBook[Math.floor(campIndex/2)%2][0],.18,'music',actor):null;
+  if(music && !clip)return;
+  if(!music)actor.bub={t:lines[0],life:4};
+  campAct={actor,reply:music?null:reply,music,lines,clip,wait:4.2};campIndex++;
+
 }
 function drawCampGuitar(e){
   const g=ctx;g.save();g.translate(e.x,e.y);g.rotate(e.ang-.95);g.translate(4,1);
