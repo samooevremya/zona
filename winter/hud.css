@@ -131,3 +131,5 @@ kbd{font-family:inherit;font-weight:700;font-size:.73rem;border:1px solid #91877
 @media (prefers-reduced-motion:reduce){*,*::before{transition:none!important}}
 
 .credits-link{margin-left:auto;margin-right:12px;color:#d6c9a9;font-size:0.86rem;text-underline-offset:3px}
+
+.heat-state{margin-top:4px;padding:3px 6px;font-size:clamp(9px,1.6vh,13px);line-height:1.2;color:#e7d6b1;pointer-events:none}
