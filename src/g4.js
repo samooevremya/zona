@@ -98,11 +98,18 @@ function drawLitHuman(e) {
     const k = 12 / Math.max(1, distance);
     const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
     tint.addColorStop(0, 'rgba(255,150,65,0)');
-    tint.addColorStop(.48, 'rgba(255,150,65,0)');
+    tint.addColorStop(.49, 'rgba(255,150,65,0)');
+    tint.addColorStop(.73, 'rgba(255,171,93,.22)');
     tint.addColorStop(1, 'rgb(255,166,83)');
     g.save(); g.globalCompositeOperation = 'source-atop';
     g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
-    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96);
+    if(inhabited){
+      const back=g.createLinearGradient(-dx*k,-dy*k,dx*k,dy*k);
+      back.addColorStop(0,'#1a1c21');back.addColorStop(.54,'transparent');back.addColorStop(1,'transparent');
+      g.globalAlpha=.35*(1-distance/FIRE_REACH)*darkness();g.fillStyle=back;g.fillRect(-48,-48,96,96);
+    }
+    g.restore();
   }
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
@@ -308,6 +315,7 @@ function* paintGroundWin(g, R) {
   ANOM0.forEach(a => { if (a.k === 'g') { g.strokeStyle = 'rgba(150,130,80,0.06)'; g.lineWidth = 2; g.beginPath(); g.arc(a.x, a.y, a.r * 0.7, 0, 6.28); g.stroke(); g.lineWidth = 1; } });
   yield;
   drawWorldTracks(g,GWP);
+  if(ART && C1)paintBuildingFeet(g);
   // стены: верх, южная грань, тень
   if (ART) { for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) { const t = map[y * MW + x]; if (t === CO || t === BR) artWall(g, x, y); } }
   if (!ART) for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
@@ -914,7 +922,7 @@ function render() {
     if(ART && C1 && !loft && !shopVisible){drawRoadWetness(vx,vy,vw,vh);drawRunoff(inView);}
     drawBootMarks(loft,inView);
   }
-  if(!loft && !shopVisible)drawLampShadows(inView);
+  if(!loft && !shopVisible){drawLampShadows(inView);if(ART && C1)drawAtpOccupation(inView);}
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -939,10 +947,12 @@ function render() {
   for (const o of objs) {
     if (BIG && o.x>=PW*T && loftAt(o)!==loft) continue;
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
+      containerContact(o);
       if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
       else containerDraw(o);
     }
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
+      containerContact(o);
       if(perspective) liftContainer(o,crateDraw); else crateDraw(o);
     }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
@@ -971,12 +981,13 @@ function render() {
   let plantIndex=0;
   for (const e of vis) {
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
+    drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
     if((campAct?.actor===e && campAct.music) || (e===P && S.weapon==='guitar'))drawCampGuitar(e);
     else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
-    if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
+    if(e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -1118,6 +1129,7 @@ function render() {
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
   if (dk > 0.02) {
+    const windows=paneSpill(inView);
     lctx.fillStyle = 'rgba(4,7,12,' + dk + ')'; lctx.fillRect(0, 0, LW, LH);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, a) => { const s = toS(x, y), rr = r * Z / 2; if (s[0] < -rr || s[1] < -rr || s[0] > LW + rr || s[1] > LH + rr) return; const g = lctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], rr); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.beginPath(); lctx.arc(s[0], s[1], rr, 0, 6.28); lctx.fill(); };
@@ -1132,7 +1144,8 @@ function render() {
     for(const e of vis)if(e!==P && e.kind==='human' && !e.sit && !e.captive && e.fac!=='bandit' && e.sid!=='sid')
       castLight(lctx,e,e.ang,.35,180,.70);
     if(!loft && !shopVisible){
-      for(const l of siteLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
+      for(const l of sceneLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
+      for(const pane of windows)castLight(lctx,pane,pane.angle,.86,pane.r,.36);
       for(const f of WORLD_FIRES)if(inView(f.x,f.y,200))
         castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120))
@@ -1140,6 +1153,10 @@ function render() {
     }
     lctx.restore();
 
+    for(const pane of windows){
+      const [x,y]=roofPoint(pane.wallX,pane.wallY,.035);
+      hole(x,y,20,.45);
+    }
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
@@ -1153,12 +1170,14 @@ function render() {
     if(!loft && !shopVisible){
       ctx.save();ctx.translate(origin[0]*2,origin[1]*2);ctx.scale(Z,Z);
       clipRoofsFromLight(ctx,vx,vy,vw,vh,inView);
-      for(const l of siteLights())if(inView(l.x,l.y,l.r)){
+      for(const l of sceneLights())if(inView(l.x,l.y,l.r)){
         castLight(ctx,l,l.angle,l.half,l.r,dk*.32,'255,188,103');
         ctx.fillStyle='#3c3932';ctx.fillRect(l.x-4,l.y-2,8,5);
         ctx.fillStyle='#e8c588';ctx.fillRect(l.x-2.5,l.y+1,5,1.6);
       }
-      if(inView(FIRE.x,FIRE.y,205))castLight(ctx,FIRE,0,Math.PI,205,dk*.22,'255,150,60');
+      for(const f of WORLD_FIRES)if(inView(f.x,f.y,205))
+        castLight(ctx,f,0,Math.PI,f===FIRE?205:170,dk*.22,'255,150,60');
+      for(const pane of windows)castLight(ctx,pane,pane.angle,.86,pane.r,dk*.23,'248,194,118');
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120)){
         castLight(ctx,lamp,0,Math.PI,120,dk*.32,'255,203,132');
         ctx.fillStyle='#d8ba86';ctx.beginPath();ctx.arc(lamp.x,lamp.y,2,0,Math.PI*2);ctx.fill();

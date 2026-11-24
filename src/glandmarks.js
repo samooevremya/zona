@@ -173,10 +173,26 @@ function drawTavernTable(g,o){
   }
 }
 function drawDrinkingCup(e){
-  const phase=(performance.now()*.00017+(e.sid==='lz_guest'?0:.43))%1;
-  const reach=10-5*Math.max(0,Math.sin(phase*2*Math.PI));
-  ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.ang);ctx.fillStyle='#b09a79';ctx.fillRect(reach,4,3,3);
-  ctx.fillStyle='#c3b498';ctx.fillRect(reach+2,3.5,3,3.5);ctx.restore();
+  if(!inhabited){
+    if(!e.sit)return;
+    const pos=localToWorld(e,e.ang,4,10);
+    paintTavernCup(pos.x,pos.y);return;
+  }
+  const table=objs.find(o=>o.barRole==='guests' && dE(e,o)<65);
+  if(!table)return;
+  const place={x:clamp(e.x,table.x+7,table.x+table.w-8),y:e.y<table.y?table.y+6:table.y+table.h-6};
+  const reach=tavernSip(e),hand=localToWorld(e,e.ang,6,9);
+  paintTavernCup(lerp(place.x,hand.x,reach),lerp(place.y,hand.y,reach));
+}
+function tavernSip(e){
+  const phase=(G7.vt+(e.sid==='lz_guest'?0:7))%22;
+  return e.sit && !e.tgt?clamp(Math.min(phase-1,5-phase),0,1):0;
+}
+function paintTavernCup(x,y){
+  contactInk(ctx,x+1,y+1,8,6,0,.57);
+  ctx.fillStyle='#786448';ctx.fillRect(x+2,y-1,2.4,2.8);
+  ctx.fillStyle='#b09a79';ctx.fillRect(x-2,y-2,4.5,4.3);
+  ctx.fillStyle='#524336';ctx.fillRect(x-.8,y-.9,2.4,1.8);
 }
 const poppyTufts=[];
 function poppyTuft(i){

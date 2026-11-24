@@ -1,12 +1,13 @@
 // Transient world effects use world pixels and simulation time. They never enter the save.
 const livingZone=BIG && !location.hash.includes('living-off');
-let surfaceWater=0,wetBoots=0,muddyBoots=false,footSide=1,environmentTime=0;
+let surfaceWater=0,environmentTime=0;
+let footwear=new WeakMap();
 const bootMarks=[],plantBlocks=new Map(),bentPlants=new Map();
 function resetEnvironment(){
   bootMarks.length=0;bentPlants.clear();
   const state=WXT[S.wx?.k]||WXT.clear;
   Object.assign(WX,{cloud:state[0],rain:state[1],fog:state[2],wind:state[3],gust:state[4]||0,sleet:state[5]||0,time:0});
-  surfaceWater=Math.max(WX.rain,WX.sleet*.55);roadFilm=ditchWater=surfaceWater;drainage.clear(); wetBoots=0;muddyBoots=false;environmentTime=0;footSide=1;
+  surfaceWater=Math.max(WX.rain,WX.sleet*.55);roadFilm=ditchWater=surfaceWater;drainage.clear(); footwear=new WeakMap();environmentTime=0;
 }
 function updateEnvironment(dt){
   environmentTime+=dt;
@@ -18,16 +19,23 @@ function updateEnvironment(dt){
   for(const [plant,bend] of bentPlants)if(environmentTime-bend.time>1.35)bentPlants.delete(plant);
 }
 function leaveBootMark(e,foot){
-  const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T));
-  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y))){wetBoots=1;muddyBoots=t!==SW;return;}
-  if(wetBoots<.08)return;
-  if(t===CF || t===FL || t===AS || loftAt(e)){
-    footSide*=-1;
-    const a=foot?.a??e.ang,side=4*footSide;
-    bootMarks.push({x:foot?.x??e.x-Math.sin(a)*side,y:foot?.y??e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,mud:muddyBoots,level:loftAt(e)});
-    if(bootMarks.length>45)bootMarks.shift();
+  const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T)),level=loftAt(e);
+  let boots=footwear.get(e);
+  if(!boots)footwear.set(e,boots={wet:0,mud:false,side:1});
+  const soaked=t===SW || (inhabited || t===DI || t===GR || t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y);
+  if(soaked){
+    boots.wet=1;boots.mud=t===DI || t===GR || t===BU;
+    if(boots.mud || t===SW)return;
   }
-  wetBoots*=.72;
+  if(boots.wet<.08)return;
+  const hard=t===CF || t===FL || t===AS || level;
+  if(hard && !soaked){
+    boots.side*=-1;
+    const a=foot?.a??e.ang,side=4*boots.side;
+    bootMarks.push({x:foot?.x??e.x-Math.sin(a)*side,y:foot?.y??e.y+Math.cos(a)*side,a,time:environmentTime,wet:boots.wet,mud:boots.mud,level});
+    if(bootMarks.length>64)bootMarks.shift();
+  }
+  boots.wet*=.72;
 }
 function drawBootMarks(level,inView){
   for(const m of bootMarks){
@@ -84,13 +92,23 @@ function drawRunoff(inView){
   if(surfaceWater<.035)return;
   for(const h of HOUSES){
     if(h.ruin || h.x>=PW)continue;
-    const x=(h.x+h.w-.70)*T,y=(h.y+h.h)*T;
+    const bar=inhabited && h.ok==='78,118', door=bar?h.entrances[0]:null;
+    const x=door?h.x*T+door.x+door.width*.55:(h.x+h.w-.70)*T;
+    const y=door?h.y*T:(h.y+h.h)*T;
     if(!inView(x,y,80))continue;
     const phase=(environmentTime*(.8+WX.rain)+hash2(h.x,h.y))%1;
-    ctx.save();ctx.translate(x,y);
+    ctx.save();ctx.translate(x,y);if(bar)ctx.rotate(Math.PI);
     // A sheltered strip under the eave and a single depression below its drip edge.
     ctx.globalAlpha=surfaceWater*.47;
     ctx.drawImage(trailPrint(false,1),-63,-5,77,12);
+    if(inhabited){
+      const width=bar?door.width+39:Math.min(100,h.w*T*.59);
+      const shade=ctx.createLinearGradient(0,-4,0,24);
+      shade.addColorStop(0,'rgba(124,102,68,.28)');shade.addColorStop(.68,'rgba(139,118,86,.40)');shade.addColorStop(1,'transparent');
+      ctx.fillStyle=shade;ctx.fillRect(-width,0,width+9,24);
+      ctx.globalAlpha=surfaceWater*.72;
+      ctx.drawImage(trailPrint(true,2),-width-3,19,width+16,17);
+    }
     ctx.drawImage(trailPrint(true,2),-28,3,65,23);
     ctx.drawImage(yardReflection(),-21,6,48,16);
     if(WX.rain>.10){

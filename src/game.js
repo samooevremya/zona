@@ -1754,6 +1754,12 @@ function aiHuman(e, dt) {
     e.crouch = 0; if (goTo(e, e.lastSeen.x, e.lastSeen.y, 68, dt) < 20) e.mem = 0;
     return;
   }
+  if(inhabited && atpNewSentry(e)){
+    const post=atpScene().guardPoint;
+    if(dE(e,post)>14)goTo(e,post.x,post.y,65,dt);
+    else e.ang+=angD(e.ang,Math.PI/2+.16*Math.sin(S.min*.09))*Math.min(1,dt*1.5);
+    return;
+  }
   idleHuman(e, dt);
 }
 /* ===== тактика в бою ===== */
@@ -3102,11 +3108,18 @@ function drawLitHuman(e) {
     const k = 12 / Math.max(1, distance);
     const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
     tint.addColorStop(0, 'rgba(255,150,65,0)');
-    tint.addColorStop(.48, 'rgba(255,150,65,0)');
+    tint.addColorStop(.49, 'rgba(255,150,65,0)');
+    tint.addColorStop(.73, 'rgba(255,171,93,.22)');
     tint.addColorStop(1, 'rgb(255,166,83)');
     g.save(); g.globalCompositeOperation = 'source-atop';
     g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
-    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96);
+    if(inhabited){
+      const back=g.createLinearGradient(-dx*k,-dy*k,dx*k,dy*k);
+      back.addColorStop(0,'#1a1c21');back.addColorStop(.54,'transparent');back.addColorStop(1,'transparent');
+      g.globalAlpha=.35*(1-distance/FIRE_REACH)*darkness();g.fillStyle=back;g.fillRect(-48,-48,96,96);
+    }
+    g.restore();
   }
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
@@ -3312,6 +3325,7 @@ function* paintGroundWin(g, R) {
   ANOM0.forEach(a => { if (a.k === 'g') { g.strokeStyle = 'rgba(150,130,80,0.06)'; g.lineWidth = 2; g.beginPath(); g.arc(a.x, a.y, a.r * 0.7, 0, 6.28); g.stroke(); g.lineWidth = 1; } });
   yield;
   drawWorldTracks(g,GWP);
+  if(ART && C1)paintBuildingFeet(g);
   // стены: верх, южная грань, тень
   if (ART) { for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) { const t = map[y * MW + x]; if (t === CO || t === BR) artWall(g, x, y); } }
   if (!ART) for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
@@ -3918,7 +3932,7 @@ function render() {
     if(ART && C1 && !loft && !shopVisible){drawRoadWetness(vx,vy,vw,vh);drawRunoff(inView);}
     drawBootMarks(loft,inView);
   }
-  if(!loft && !shopVisible)drawLampShadows(inView);
+  if(!loft && !shopVisible){drawLampShadows(inView);if(ART && C1)drawAtpOccupation(inView);}
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -3943,10 +3957,12 @@ function render() {
   for (const o of objs) {
     if (BIG && o.x>=PW*T && loftAt(o)!==loft) continue;
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
+      containerContact(o);
       if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
       else containerDraw(o);
     }
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
+      containerContact(o);
       if(perspective) liftContainer(o,crateDraw); else crateDraw(o);
     }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
@@ -3975,12 +3991,13 @@ function render() {
   let plantIndex=0;
   for (const e of vis) {
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
+    drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
     if((campAct?.actor===e && campAct.music) || (e===P && S.weapon==='guitar'))drawCampGuitar(e);
     else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
-    if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
+    if(e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -4122,6 +4139,7 @@ function render() {
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
   if (dk > 0.02) {
+    const windows=paneSpill(inView);
     lctx.fillStyle = 'rgba(4,7,12,' + dk + ')'; lctx.fillRect(0, 0, LW, LH);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, a) => { const s = toS(x, y), rr = r * Z / 2; if (s[0] < -rr || s[1] < -rr || s[0] > LW + rr || s[1] > LH + rr) return; const g = lctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], rr); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.beginPath(); lctx.arc(s[0], s[1], rr, 0, 6.28); lctx.fill(); };
@@ -4136,7 +4154,8 @@ function render() {
     for(const e of vis)if(e!==P && e.kind==='human' && !e.sit && !e.captive && e.fac!=='bandit' && e.sid!=='sid')
       castLight(lctx,e,e.ang,.35,180,.70);
     if(!loft && !shopVisible){
-      for(const l of siteLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
+      for(const l of sceneLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
+      for(const pane of windows)castLight(lctx,pane,pane.angle,.86,pane.r,.36);
       for(const f of WORLD_FIRES)if(inView(f.x,f.y,200))
         castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120))
@@ -4144,6 +4163,10 @@ function render() {
     }
     lctx.restore();
 
+    for(const pane of windows){
+      const [x,y]=roofPoint(pane.wallX,pane.wallY,.035);
+      hole(x,y,20,.45);
+    }
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
@@ -4157,12 +4180,14 @@ function render() {
     if(!loft && !shopVisible){
       ctx.save();ctx.translate(origin[0]*2,origin[1]*2);ctx.scale(Z,Z);
       clipRoofsFromLight(ctx,vx,vy,vw,vh,inView);
-      for(const l of siteLights())if(inView(l.x,l.y,l.r)){
+      for(const l of sceneLights())if(inView(l.x,l.y,l.r)){
         castLight(ctx,l,l.angle,l.half,l.r,dk*.32,'255,188,103');
         ctx.fillStyle='#3c3932';ctx.fillRect(l.x-4,l.y-2,8,5);
         ctx.fillStyle='#e8c588';ctx.fillRect(l.x-2.5,l.y+1,5,1.6);
       }
-      if(inView(FIRE.x,FIRE.y,205))castLight(ctx,FIRE,0,Math.PI,205,dk*.22,'255,150,60');
+      for(const f of WORLD_FIRES)if(inView(f.x,f.y,205))
+        castLight(ctx,f,0,Math.PI,f===FIRE?205:170,dk*.22,'255,150,60');
+      for(const pane of windows)castLight(ctx,pane,pane.angle,.86,pane.r,dk*.23,'248,194,118');
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120)){
         castLight(ctx,lamp,0,Math.PI,120,dk*.32,'255,203,132');
         ctx.fillStyle='#d8ba86';ctx.beginPath();ctx.arc(lamp.x,lamp.y,2,0,Math.PI*2);ctx.fill();
@@ -5605,6 +5630,7 @@ function drawCordonDetails(g) {
     const x = tx * T, y = ty * T;
     // Захватываем и соседний кусок, если повёрнутый рисунок пересекает границу.
     if (x + width < GWP.x0 || x - width > GWP.x1 || y + width < GWP.y0 || y - width > GWP.y1) continue;
+    if(/barrel|drum|reel/.test(id))propGroundTrace(g,id,x,y,width,angle);
     if (perspective && detailHeight(id)) groundShadow(g,x,y,width*.39,width*.18,angle,2);
     else c1Draw(g, id, x, y, width, angle);
   }
@@ -5676,6 +5702,7 @@ function artDecor0(g) {
     if (!C1 && !ART.m.sprites[d[0]]) return;
     if (C1 && d[0] === 'ford') { drawFord(g, x, y); return; }
     if (C1 && C1DECOR[d[0]]) {
+      if(d[0]==='barrel'||d[0]==='yardDrum')propGroundTrace(g,d[0],x,y,C1DECOR[d[0]][1],d[3]);
       const [id, width] = C1DECOR[d[0]], log = d[0] === 'logs' || d[0] === 'bench';
       if (log) groundShadow(g, x, y, width * .48, width * .11, d[3], 1);
       else if (d[0] !== 'fence') {
@@ -7803,6 +7830,7 @@ function spawnAtpRelief(){
 function occupyATP(){
   const first=!S.campaign.liberated;
   S.campaign.liberated=true;S.flags.atpClear=S.flags.shustFree=1;
+  if(first)S.campaign.atpOccupiedAt=S.min;
   ['petr','petr2','shust',...atpVolunteers].forEach((id,i)=>{
     const e=byS(id);if(!e)return;
     const p=walkPoint(locPt('atp',i===1?'petr2':'petr'),i===2?3:0,i===2?2:0);
@@ -10252,9 +10280,9 @@ function updateHumanMotion(e,g,dx,dy,d,dt,tele){
   const step=Math.floor(g.cycle/Math.PI);
   if(walk && step!==old && !(e.jumpT>0)){
     const side=step%2?-1:1,foot=motionFoot(g,side),point=localToWorld(e,e.ang,...foot);
+    point.a=e.ang+g.hips;
+    if(livingZone && (e===P || inhabited && dE(e,P)<320))leaveBootMark(e,point);
     if(e===P){
-      point.a=e.ang+g.hips;
-      if(livingZone)leaveBootMark(e,point);
       const surface=surf(point.x,point.y);emitFootfall(surface);
       play(surface,undefined,undefined,e.crouch?.36:running?1.3:1);
       if(surface==='stepWood' && loftAt(e) && step%4===1)play('creak');
@@ -10293,6 +10321,7 @@ function paintMotionHuman(target,e,opacity){
   target.save();target.globalAlpha*=opacity;
   target.translate(e.x+(sway?.dx||0),e.y+(sway?.dy||0));target.scale(sway?.k||1,sway?.k||1);
   target.rotate(e.ang-Math.PI/2);
+  const weightShift=idleWeight(e)*(1-(g.drive||0));target.translate(weightShift,0);
   const low=g.low||0,lean=(g.run||0)*2-low*2.1;
   const reload=w?motionReload(e,w.id):0;
   const breath=Math.sin(G7.vt*1.85+(e.seed||0))*.21*(1-(g.drive||0));
@@ -10360,6 +10389,8 @@ function campMotion(e){
     const turn=angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x));
     return {lean:.55,turn:clamp(turn,-.19,.19)};
   }
+  const drink=inhabited && e.sid?.startsWith('lz_guest')?tavernSip(e):0;
+  if(drink)return {lean:drink*1.2,turn:.1*drink};
   const phase=(G7.vt+(e.seed||0)%37)%15;
   const warm=e.fireRef && dE(e,e.fireRef)<76 && phase<3.3?Math.sin(Math.PI*phase/3.3):0;
   return {lean:warm*1.4,turn:warm*((e.seed||0)%2?.08:-.08)};
@@ -11169,9 +11200,11 @@ function wallTexture(h, side, len, wood, kind) {
     g.fillStyle = '#a69b7f';
     g.fillRect(l + w * .19, 57, 2, 3);
   }
+  const panes=(h.facadePanes ||= []);panes[side]=[];
   for (let i = 0, n = Math.max(1, Math.floor(len / 65)); i < n; i++) {
     const u = (i + .43 + .14*rand()) * len / n;
     if (ds.some(d => Math.abs(d.u - u) < d.w / 2 + 18)) continue;
+    panes[side].push(u);
     let l = u - 13;
     g.fillStyle = '#252623';
     g.fillRect(l - 3, 19, 32, 36);
@@ -11208,7 +11241,7 @@ function wallTexture(h, side, len, wood, kind) {
   walls.set(key, c);
   return c;
 }
-function texturedFace(a, b, k, tex) {
+function texturedFace(a, b, k, tex, light) {
   // Sample the whole facade once. Narrow independently resampled bands flicker
   // as the camera makes the projected wall a fraction of a pixel taller.
   const u = roofPoint(...a,k), v = roofPoint(...b,k);
@@ -11221,6 +11254,7 @@ function texturedFace(a, b, k, tex) {
   ctx.drawImage(tex,0,0,1,tex.height,-overhang,0,overhang,tex.height);
   ctx.drawImage(tex,tex.width-1,0,1,tex.height,tex.width,0,overhang,tex.height);
   ctx.drawImage(tex,0,0);
+  if(light)light(ctx);
   lampShadowOnWall(a,b,tex);
   ctx.restore();
 }
@@ -11239,13 +11273,17 @@ function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
   const k=roofLift(h), corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
   const ends = [[0, 1], [1, 2], [3, 2], [0, 3]], vis = [cam.y<y, cam.x>x + w, cam.y > y + d, cam.x < x];
+  h.litPanes=[];
   for (let s = 0; s < 4; s++)
     if (vis[s]) {
       const [a, b] = ends[s];
-      texturedFace(
-          corners[a], corners[b], k,
-          wallTexture(h, s, s % 2 ? d : w, h.mat !== 'conc' && h.mat !== 'depot', 'house'));
+      const tex=wallTexture(h,s,s%2?d:w,h.mat!=='conc' && h.mat!=='depot','house');
+      const u=h.facadePanes[s]?.[0], lit=occupiedWindow(h) && u!==undefined;
+      const pane=lit?facadePane(h,s,u,corners[a]):null;
+      if(pane)h.litPanes.push(pane);
+      texturedFace(corners[a],corners[b],k,tex,pane?g=>glowingPane(g,u,pane.wallX,pane.wallY,pane.nx,pane.ny):null);
     }
+  lookoutPosts(h,x,y,w,d,k);
   const porch = h.entrances?.find(e => e.approach === 'porch');
   if (porch && h.porchDepth && cam.y > y + d) {
     const [u, v] = roofPoint(x + porch.x, y + d, k * .62);
@@ -11856,10 +11894,26 @@ function drawTavernTable(g,o){
   }
 }
 function drawDrinkingCup(e){
-  const phase=(performance.now()*.00017+(e.sid==='lz_guest'?0:.43))%1;
-  const reach=10-5*Math.max(0,Math.sin(phase*2*Math.PI));
-  ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.ang);ctx.fillStyle='#b09a79';ctx.fillRect(reach,4,3,3);
-  ctx.fillStyle='#c3b498';ctx.fillRect(reach+2,3.5,3,3.5);ctx.restore();
+  if(!inhabited){
+    if(!e.sit)return;
+    const pos=localToWorld(e,e.ang,4,10);
+    paintTavernCup(pos.x,pos.y);return;
+  }
+  const table=objs.find(o=>o.barRole==='guests' && dE(e,o)<65);
+  if(!table)return;
+  const place={x:clamp(e.x,table.x+7,table.x+table.w-8),y:e.y<table.y?table.y+6:table.y+table.h-6};
+  const reach=tavernSip(e),hand=localToWorld(e,e.ang,6,9);
+  paintTavernCup(lerp(place.x,hand.x,reach),lerp(place.y,hand.y,reach));
+}
+function tavernSip(e){
+  const phase=(G7.vt+(e.sid==='lz_guest'?0:7))%22;
+  return e.sit && !e.tgt?clamp(Math.min(phase-1,5-phase),0,1):0;
+}
+function paintTavernCup(x,y){
+  contactInk(ctx,x+1,y+1,8,6,0,.57);
+  ctx.fillStyle='#786448';ctx.fillRect(x+2,y-1,2.4,2.8);
+  ctx.fillStyle='#b09a79';ctx.fillRect(x-2,y-2,4.5,4.3);
+  ctx.fillStyle='#524336';ctx.fillRect(x-.8,y-.9,2.4,1.8);
 }
 const poppyTufts=[];
 function poppyTuft(i){
@@ -12305,13 +12359,14 @@ function drawRoomMarks(g,h){
 
 // Transient world effects use world pixels and simulation time. They never enter the save.
 const livingZone=BIG && !location.hash.includes('living-off');
-let surfaceWater=0,wetBoots=0,muddyBoots=false,footSide=1,environmentTime=0;
+let surfaceWater=0,environmentTime=0;
+let footwear=new WeakMap();
 const bootMarks=[],plantBlocks=new Map(),bentPlants=new Map();
 function resetEnvironment(){
   bootMarks.length=0;bentPlants.clear();
   const state=WXT[S.wx?.k]||WXT.clear;
   Object.assign(WX,{cloud:state[0],rain:state[1],fog:state[2],wind:state[3],gust:state[4]||0,sleet:state[5]||0,time:0});
-  surfaceWater=Math.max(WX.rain,WX.sleet*.55);roadFilm=ditchWater=surfaceWater;drainage.clear(); wetBoots=0;muddyBoots=false;environmentTime=0;footSide=1;
+  surfaceWater=Math.max(WX.rain,WX.sleet*.55);roadFilm=ditchWater=surfaceWater;drainage.clear(); footwear=new WeakMap();environmentTime=0;
 }
 function updateEnvironment(dt){
   environmentTime+=dt;
@@ -12323,16 +12378,23 @@ function updateEnvironment(dt){
   for(const [plant,bend] of bentPlants)if(environmentTime-bend.time>1.35)bentPlants.delete(plant);
 }
 function leaveBootMark(e,foot){
-  const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T));
-  if(t===SW || ((t===DI||t===GR||t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y))){wetBoots=1;muddyBoots=t!==SW;return;}
-  if(wetBoots<.08)return;
-  if(t===CF || t===FL || t===AS || loftAt(e)){
-    footSide*=-1;
-    const a=foot?.a??e.ang,side=4*footSide;
-    bootMarks.push({x:foot?.x??e.x-Math.sin(a)*side,y:foot?.y??e.y+Math.cos(a)*side,a,time:environmentTime,wet:wetBoots,mud:muddyBoots,level:loftAt(e)});
-    if(bootMarks.length>45)bootMarks.shift();
+  const t=tAt(Math.floor(e.x/T),Math.floor(e.y/T)),level=loftAt(e);
+  let boots=footwear.get(e);
+  if(!boots)footwear.set(e,boots={wet:0,mud:false,side:1});
+  const soaked=t===SW || (inhabited || t===DI || t===GR || t===BU) && surfaceWater>.24 && !underRainCover(e.x,e.y);
+  if(soaked){
+    boots.wet=1;boots.mud=t===DI || t===GR || t===BU;
+    if(boots.mud || t===SW)return;
   }
-  wetBoots*=.72;
+  if(boots.wet<.08)return;
+  const hard=t===CF || t===FL || t===AS || level;
+  if(hard && !soaked){
+    boots.side*=-1;
+    const a=foot?.a??e.ang,side=4*boots.side;
+    bootMarks.push({x:foot?.x??e.x-Math.sin(a)*side,y:foot?.y??e.y+Math.cos(a)*side,a,time:environmentTime,wet:boots.wet,mud:boots.mud,level});
+    if(bootMarks.length>64)bootMarks.shift();
+  }
+  boots.wet*=.72;
 }
 function drawBootMarks(level,inView){
   for(const m of bootMarks){
@@ -12389,13 +12451,23 @@ function drawRunoff(inView){
   if(surfaceWater<.035)return;
   for(const h of HOUSES){
     if(h.ruin || h.x>=PW)continue;
-    const x=(h.x+h.w-.70)*T,y=(h.y+h.h)*T;
+    const bar=inhabited && h.ok==='78,118', door=bar?h.entrances[0]:null;
+    const x=door?h.x*T+door.x+door.width*.55:(h.x+h.w-.70)*T;
+    const y=door?h.y*T:(h.y+h.h)*T;
     if(!inView(x,y,80))continue;
     const phase=(environmentTime*(.8+WX.rain)+hash2(h.x,h.y))%1;
-    ctx.save();ctx.translate(x,y);
+    ctx.save();ctx.translate(x,y);if(bar)ctx.rotate(Math.PI);
     // A sheltered strip under the eave and a single depression below its drip edge.
     ctx.globalAlpha=surfaceWater*.47;
     ctx.drawImage(trailPrint(false,1),-63,-5,77,12);
+    if(inhabited){
+      const width=bar?door.width+39:Math.min(100,h.w*T*.59);
+      const shade=ctx.createLinearGradient(0,-4,0,24);
+      shade.addColorStop(0,'rgba(124,102,68,.28)');shade.addColorStop(.68,'rgba(139,118,86,.40)');shade.addColorStop(1,'transparent');
+      ctx.fillStyle=shade;ctx.fillRect(-width,0,width+9,24);
+      ctx.globalAlpha=surfaceWater*.72;
+      ctx.drawImage(trailPrint(true,2),-width-3,19,width+16,17);
+    }
     ctx.drawImage(trailPrint(true,2),-28,3,65,23);
     ctx.drawImage(yardReflection(),-21,6,48,16);
     if(WX.rain>.10){
@@ -12531,7 +12603,7 @@ function castLight(g,source,angle,half,radius,strength,tint){
   fade.addColorStop(1,'rgba('+color+',0)');
   g.fillStyle=fade;g.fill(path);
 }
-let outdoorLamps, settlementLights;
+let outdoorLamps, settlementLights, activeSiteLamps, litAtp=false;
 function villageBulbs(){
   return settlementLights ||= (LOC.village.anchors.lamps||[]).map(([x,y])=>({x:x*T,y:y*T}));
 }
@@ -12541,6 +12613,15 @@ function siteLights(){
     {...worldPoint(122.5,202.5),angle:1.0,half:1.34,r:167}
   ]:[];
   return outdoorLamps;
+}
+function sceneLights(){
+  const sites=siteLights();
+  if(!inhabited)return sites;
+  const atp=atpAge()>=90;
+  if(!activeSiteLamps || atp!==litAtp){
+    litAtp=atp;activeSiteLamps=[...outdoorLamps,...householdLights()];
+  }
+  return activeSiteLamps;
 }
 function lampExposure(lamp,p){
   const d=dE(lamp,p);
@@ -13067,6 +13148,210 @@ function drawDeskRadio(){
   g.fillStyle='#887a5b';for(let i=0;i<5;i++)g.fillRect(i*2-7,-3,.7,3);
   g.fillStyle='#c5a166';g.fillRect(5,-3,3,1);g.fillStyle='#302e29';g.fillRect(6,0,2,2);
   g.strokeStyle='#777566';g.lineWidth=.75;g.beginPath();g.moveTo(6,-5);g.lineTo(11,-12);g.stroke();g.restore();
+}
+
+// Small visual traces stay in world coordinates. Ground traces are painted once per chunk.
+const inhabited = BIG && !location.hash.includes('inhabited-off');
+function contactInk(g,x,y,w,h,a,opacity=.52){
+  if(!SHADOWS)return;
+  g.save();g.translate(x,y);g.rotate(a);g.globalAlpha*=opacity;
+  g.drawImage(shadowStamp,-w/2,-h/2,w,h);g.restore();
+}
+function paintBuildingFeet(g){
+  if(!inhabited)return;
+  for(const h of HOUSES){
+    const w=h.w*T,d=h.h*T,x=h.x*T,y=h.y*T;
+    if(!nearGroundChunk(x+w/2,y+d/2,Math.max(w,d)/2+65))continue;
+    for(const e of h.entrances){
+      const wx=x+e.x,wy=y+e.y,n=Math.atan2(e.ny,e.nx);
+      g.save();g.translate(wx,wy);g.rotate(n);
+      g.globalAlpha=h.ruin?.30:.52;
+      g.drawImage(trailPrint(false,1),-8,-e.width*.64,54,e.width*1.28);
+      g.globalAlpha=1;
+      const width=e.width-4,style=e.approach;
+      if(!e.breach){
+        contactInk(g,1,0,13,width+8,0);
+        g.fillStyle=style==='slab'?'#706957':'#6f5c45';
+        g.fillRect(-2,-width/2,6,width);
+        g.fillStyle='rgba(184,160,123,.50)';g.fillRect(2,-width/2,1,width);
+        g.fillStyle='rgba(36,30,23,.66)';g.fillRect(-2,-width/2,1.5,width);
+      }
+      g.restore();
+    }
+  }
+  for(const o of fences){
+    if(o.material==='railMesh' || !nearGroundChunk(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)/2+19))continue;
+    const long=o.w>o.h,len=Math.max(o.w,o.h);
+    for(let step=11;step<len-7;step+=14){
+      const x=o.x+(long?step:o.w+3),y=o.y+(long?o.h+3:step);
+      if(tAt(Math.floor(x/T),Math.floor(y/T))!==GR || hash2(x,y)<.38)continue;
+      const size=10+hash2(y,x)*8;
+      ART.draw(g,'c1_tuft'+Math.floor(hash2(y-1,x+1)*6),x,y,size,size,hash2(y,x)*6,.63);
+    }
+  }
+}
+function propGroundTrace(g,kind,x,y,width,a){
+  if(!inhabited || !nearGroundChunk(x,y,width))return;
+  const metal=/barrel|drum|reel/i.test(kind);
+  if(metal){
+    g.save();g.translate(x,y+width*.20);g.rotate(.4);
+    g.globalAlpha=.55;g.drawImage(trailPrint(true,1),-width*.42,-width*.15,width*1.28,width*.7);
+    g.globalAlpha=.73;g.fillStyle='rgba(118,59,31,.38)';
+    g.beginPath();g.ellipse(width*.17,width*.13,width*.33,width*.17,0,0,Math.PI*2);g.fill();g.restore();
+  }
+  contactInk(g,x,y+width*.08,width*.98,width*(metal?.63:.32),a);
+}
+function containerContact(o){
+  if(inhabited && !o.broken)contactInk(ctx,o.x+o.w/2,o.y+o.h*.64,o.w+8,o.h*.72,0,.67);
+}
+
+// The same threshold stays at the base of the wall as the roof shifts.
+function lookoutPosts(h,x,y,w,d,k){
+  if(!inhabited || h.x!==WEST+15 || h.y!==NORTH_ROWS+28)return;
+  for(const dx of [8,w-8])for(const dy of [8,d-8]){
+    if(dy<d/2 && cam.y>y+d)continue;
+    const fx=x+dx,fy=y+dy,[u,v]=roofPoint(fx,fy,k);
+    contactInk(ctx,fx,fy,12,8,0,.78);
+    beam(ctx,fx,fy,u,v,6,'#42372b');
+    beam(ctx,fx-1.4,fy,u-1.4,v,1.8,'#8d7857');
+    const dir=dx<w/2?1:-1;
+    const [ax,ay]=roofPoint(fx+dir*18,fy,k);
+    beam(ctx,lerp(fx,u,.25),lerp(fy,v,.25),ax,ay,3,'#5d4935');
+  }
+}
+
+// Only the newly occupied property has a timed visual state. Legacy saves are already settled.
+const atpRooms=['91,62','104,74'];
+function atpAge(){
+  if(!inhabited || !S || !atpSettled())return -1;
+  return S.campaign?.atpOccupiedAt==null?1440:Math.max(0,S.min-S.campaign.atpOccupiedAt);
+}
+let settlement;
+function atpScene(){
+  if(settlement)return settlement;
+  const garage=HOUSES.find(h=>h.ok===atpRooms[0]), quarters=HOUSES.find(h=>h.ok===atpRooms[1]);
+  if(!garage || !quarters)return null;
+  const floor=(h,x,y)=>({x:(h.x+x)*T,y:(h.y+y)*T});
+  const lamp={...floor(garage,3.18,2.65),angle:0,half:Math.PI,r:112};
+  const doorway=garage.entrances[0];
+  const door={x:garage.x*T+doorway.x,y:garage.y*T+doorway.y+2,angle:Math.PI/2,half:.64,r:90};
+  const guardPoint=walkPoint(door,1.7,.9);
+  return settlement={lamp,door,guardPoint,
+    rolls:[floor(garage,2.02,1.55),floor(garage,3.62,1.55)],
+    bench:floor(quarters,1.18,2.15),
+    marks:[floor(garage,4.2,6.75),floor(garage,8.5,7.45),floor(garage,11.4,6.25)]
+  };
+}
+function drawAtpOccupation(inView){
+  const age=atpAge();
+  if(age<0)return;
+  const s=atpScene();if(!s)return;
+  if(age<1440)for(const [i,p] of s.marks.entries()){
+    if(!inView(p.x,p.y,25))continue;
+    ctx.save();ctx.translate(p.x,p.y);ctx.globalAlpha=1-age/1700;
+    ctx.drawImage(trailPrint(true,i),-21,-9,41,19);
+    for(let k=0;k<8;k++){
+      const x=(hash2(i,k)-.5)*35,y=(hash2(k,i+7)-.5)*18;
+      beam(ctx,x,y,x+2,y-1,1.2,k%3?'#6e5535':'#8b774b');
+    }
+    ctx.restore();
+  }
+  if(age<90)return;
+  for(const [i,p] of s.rolls.entries()){
+    if(!inView(p.x,p.y,36))continue;
+    drawRoomFitting(ctx,{x:p.x-12,y:p.y-12,w:24,h:24,angle:Math.PI/2+(i?.05:-.07),fitting:'bedroll'});
+  }
+  if(age>=720 && inView(s.bench.x,s.bench.y,34)){
+    const {x,y}=s.bench;
+    ctx.save();ctx.translate(x,y);contactInk(ctx,0,1,28,16,0);
+    ART.draw(ctx,'c1_crate_army',0,0,27,17,.05);
+    beam(ctx,-8,1,5,-5,2.2,'#9a9990');
+    beam(ctx,2,3,9,4,2.2,'#927257');ctx.restore();
+  }
+}
+function atpNewSentry(e){
+  if(!['petr','petr2','atpScout','atpRunner','atpRelief0','atpRelief1'].includes(e.sid) || atpAge()<720 || !e.alive || e.wounded || e.captive || e.follow || e.tgt || e.mem>0 ||
+    e.trip || e.evacuating || e.shelterReturn || S.blow?.stage)return false;
+  const guard=atpCompany().find(n=>n.alive && !n.wounded && !n.follow);
+  return guard===e && !!atpScene();
+}
+
+let barLamp;
+function householdLights(){
+  if(!inhabited)return [];
+  const counter=objs.find(o=>o.barRole==='counter');
+  if(counter)barLamp ||= {x:counter.x+counter.w-16,y:counter.y+counter.h+13,angle:Math.PI/2,half:Math.PI,r:142};
+  const stage=atpAge(),s=stage>=90?atpScene():null;
+  return [barLamp,s?.lamp,s?.door].filter(Boolean);
+}
+function occupiedWindow(h){
+  if(!inhabited || h.ruin || darkness()<.14)return false;
+  return ['15,72','26,71','78,118'].includes(h.ok) || atpRooms.includes(h.ok) && atpAge()>=90;
+}
+function windowOcclusion(x,y,nx,ny){
+  for(const e of ents){
+    if(!e.alive || e.kind!=='human' || e.sit)continue;
+    const dx=e.x-x,dy=e.y-y,behind=-(dx*nx+dy*ny),across=dx*ny-dy*nx;
+    if(behind>0 && behind<47 && Math.abs(across)<15)return {offset:across,w:8+behind*.11};
+  }
+  return null;
+}
+function glowingPane(g,u,x,y,nx,ny){
+  g.fillStyle='#e1b773';g.fillRect(u-11,24,22,25);
+  g.fillStyle='#9d7652';g.fillRect(u-11,44,22,5);
+  const shadow=windowOcclusion(x,y,nx,ny);
+  if(shadow){
+    g.save();g.beginPath();g.rect(u-11,24,22,25);g.clip();g.fillStyle='#523e2e';
+    g.beginPath();g.ellipse(u+shadow.offset,40,shadow.w/2,13,0,0,Math.PI*2);g.fill();g.restore();
+  }
+  g.fillStyle='#6d573d';g.fillRect(u-1,23,2,28);g.fillRect(u-11,34,22,1.6);
+}
+function paneSpill(inView){
+  if(!inhabited || darkness()<.14)return [];
+  const lights=[];
+  for(const h of HOUSES){
+    if(h.a<.5 || !occupiedWindow(h) || !inView((h.x+h.w/2)*T,(h.y+h.h/2)*T,Math.max(h.w,h.h)*T/2+80))continue;
+    for(const s of h.litPanes || []){
+      if(inView(s.x,s.y,80))lights.push(s);
+    }
+  }
+  return lights;
+}
+
+function idleWeight(e){
+  if(!inhabited || e===P || (!e.guard && !e.seat && !e.resident) || e.tgt || e.crouch)return 0;
+  const phase=(G7.vt+(e.seed||0)%19)%17;
+  return phase<3?Math.sin(Math.PI*phase/3)*.8:0;
+}
+const campPacks=new WeakMap();
+function restingPack(e){
+  if(!inhabited || e===P || e.fac!=='loner' || (!e.sit && !(e.campRise!=null && e.campRise<.68)) || !e.fireRef || dE(e,e.fireRef)>80 || e.id%2)return null;
+  const old=campPacks.get(e);
+  if(old && dE(e,old.holder)<3)return old;
+  const p=localToWorld(e,e.ang,-19,-6),tile=tAt(Math.floor(p.x/T),Math.floor(p.y/T));
+  if(SOLID[tile])return null;
+  const bag={...p,holder:{x:e.x,y:e.y},a:e.ang+.3};
+  campPacks.set(e,bag);return bag;
+}
+function drawRestingPack(e){
+  const p=restingPack(e);if(!p)return;
+  const roll=packImage('assets/g8/player_bedroll.webp');
+  if(!roll)return;
+  const lift=clamp((e.campRise||0)/.68,0,1),back=localToWorld(e,e.ang,-7,-10);
+  const x=lerp(p.x,back.x,lift),y=lerp(p.y,back.y,lift);
+  if(lift<.7)contactInk(ctx,p.x,p.y,14,10,p.a,.56*(1-lift));
+  ctx.save();ctx.translate(x,y);ctx.rotate(p.a);
+  ctx.fillStyle='#514738';ctx.fillRect(-5,-4,10,9);
+  ctx.drawImage(roll,-6,-5,12,5);
+  beam(ctx,-3,-4,-3,5,1,'#342d23');beam(ctx,3,-4,3,5,1,'#342d23');ctx.restore();
+}
+
+function facadePane(h,side,u,corner){
+  const panes=h.paneSources ||= [];
+  if(panes[side])return panes[side];
+  const [nx,ny]=[[0,-1],[1,0],[0,1],[-1,0]][side];
+  const wallX=corner[0]+(side%2?0:u),wallY=corner[1]+(side%2?u:0);
+  return panes[side]={wallX,wallY,nx,ny,x:wallX+nx*3,y:wallY+ny*3,angle:Math.atan2(ny,nx),r:70};
 }
 
 /* ===================== звук ===================== */

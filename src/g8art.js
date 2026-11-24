@@ -963,6 +963,7 @@ function drawCordonDetails(g) {
     const x = tx * T, y = ty * T;
     // Захватываем и соседний кусок, если повёрнутый рисунок пересекает границу.
     if (x + width < GWP.x0 || x - width > GWP.x1 || y + width < GWP.y0 || y - width > GWP.y1) continue;
+    if(/barrel|drum|reel/.test(id))propGroundTrace(g,id,x,y,width,angle);
     if (perspective && detailHeight(id)) groundShadow(g,x,y,width*.39,width*.18,angle,2);
     else c1Draw(g, id, x, y, width, angle);
   }
@@ -1034,6 +1035,7 @@ function artDecor0(g) {
     if (!C1 && !ART.m.sprites[d[0]]) return;
     if (C1 && d[0] === 'ford') { drawFord(g, x, y); return; }
     if (C1 && C1DECOR[d[0]]) {
+      if(d[0]==='barrel'||d[0]==='yardDrum')propGroundTrace(g,d[0],x,y,C1DECOR[d[0]][1],d[3]);
       const [id, width] = C1DECOR[d[0]], log = d[0] === 'logs' || d[0] === 'bench';
       if (log) groundShadow(g, x, y, width * .48, width * .11, d[3], 1);
       else if (d[0] !== 'fence') {

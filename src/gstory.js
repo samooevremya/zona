@@ -196,6 +196,7 @@ function spawnAtpRelief(){
 function occupyATP(){
   const first=!S.campaign.liberated;
   S.campaign.liberated=true;S.flags.atpClear=S.flags.shustFree=1;
+  if(first)S.campaign.atpOccupiedAt=S.min;
   ['petr','petr2','shust',...atpVolunteers].forEach((id,i)=>{
     const e=byS(id);if(!e)return;
     const p=walkPoint(locPt('atp',i===1?'petr2':'petr'),i===2?3:0,i===2?2:0);

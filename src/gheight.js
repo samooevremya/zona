@@ -74,9 +74,11 @@ function wallTexture(h, side, len, wood, kind) {
     g.fillStyle = '#a69b7f';
     g.fillRect(l + w * .19, 57, 2, 3);
   }
+  const panes=(h.facadePanes ||= []);panes[side]=[];
   for (let i = 0, n = Math.max(1, Math.floor(len / 65)); i < n; i++) {
     const u = (i + .43 + .14*rand()) * len / n;
     if (ds.some(d => Math.abs(d.u - u) < d.w / 2 + 18)) continue;
+    panes[side].push(u);
     let l = u - 13;
     g.fillStyle = '#252623';
     g.fillRect(l - 3, 19, 32, 36);
@@ -113,7 +115,7 @@ function wallTexture(h, side, len, wood, kind) {
   walls.set(key, c);
   return c;
 }
-function texturedFace(a, b, k, tex) {
+function texturedFace(a, b, k, tex, light) {
   // Sample the whole facade once. Narrow independently resampled bands flicker
   // as the camera makes the projected wall a fraction of a pixel taller.
   const u = roofPoint(...a,k), v = roofPoint(...b,k);
@@ -126,6 +128,7 @@ function texturedFace(a, b, k, tex) {
   ctx.drawImage(tex,0,0,1,tex.height,-overhang,0,overhang,tex.height);
   ctx.drawImage(tex,tex.width-1,0,1,tex.height,tex.width,0,overhang,tex.height);
   ctx.drawImage(tex,0,0);
+  if(light)light(ctx);
   lampShadowOnWall(a,b,tex);
   ctx.restore();
 }
@@ -144,13 +147,17 @@ function drawRaisedHouse(h, i) {
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
   const k=roofLift(h), corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
   const ends = [[0, 1], [1, 2], [3, 2], [0, 3]], vis = [cam.y<y, cam.x>x + w, cam.y > y + d, cam.x < x];
+  h.litPanes=[];
   for (let s = 0; s < 4; s++)
     if (vis[s]) {
       const [a, b] = ends[s];
-      texturedFace(
-          corners[a], corners[b], k,
-          wallTexture(h, s, s % 2 ? d : w, h.mat !== 'conc' && h.mat !== 'depot', 'house'));
+      const tex=wallTexture(h,s,s%2?d:w,h.mat!=='conc' && h.mat!=='depot','house');
+      const u=h.facadePanes[s]?.[0], lit=occupiedWindow(h) && u!==undefined;
+      const pane=lit?facadePane(h,s,u,corners[a]):null;
+      if(pane)h.litPanes.push(pane);
+      texturedFace(corners[a],corners[b],k,tex,pane?g=>glowingPane(g,u,pane.wallX,pane.wallY,pane.nx,pane.ny):null);
     }
+  lookoutPosts(h,x,y,w,d,k);
   const porch = h.entrances?.find(e => e.approach === 'porch');
   if (porch && h.porchDepth && cam.y > y + d) {
     const [u, v] = roofPoint(x + porch.x, y + d, k * .62);

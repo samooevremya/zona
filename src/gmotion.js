@@ -71,9 +71,9 @@ function updateHumanMotion(e,g,dx,dy,d,dt,tele){
   const step=Math.floor(g.cycle/Math.PI);
   if(walk && step!==old && !(e.jumpT>0)){
     const side=step%2?-1:1,foot=motionFoot(g,side),point=localToWorld(e,e.ang,...foot);
+    point.a=e.ang+g.hips;
+    if(livingZone && (e===P || inhabited && dE(e,P)<320))leaveBootMark(e,point);
     if(e===P){
-      point.a=e.ang+g.hips;
-      if(livingZone)leaveBootMark(e,point);
       const surface=surf(point.x,point.y);emitFootfall(surface);
       play(surface,undefined,undefined,e.crouch?.36:running?1.3:1);
       if(surface==='stepWood' && loftAt(e) && step%4===1)play('creak');
@@ -112,6 +112,7 @@ function paintMotionHuman(target,e,opacity){
   target.save();target.globalAlpha*=opacity;
   target.translate(e.x+(sway?.dx||0),e.y+(sway?.dy||0));target.scale(sway?.k||1,sway?.k||1);
   target.rotate(e.ang-Math.PI/2);
+  const weightShift=idleWeight(e)*(1-(g.drive||0));target.translate(weightShift,0);
   const low=g.low||0,lean=(g.run||0)*2-low*2.1;
   const reload=w?motionReload(e,w.id):0;
   const breath=Math.sin(G7.vt*1.85+(e.seed||0))*.21*(1-(g.drive||0));
@@ -179,6 +180,8 @@ function campMotion(e){
     const turn=angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x));
     return {lean:.55,turn:clamp(turn,-.19,.19)};
   }
+  const drink=inhabited && e.sid?.startsWith('lz_guest')?tavernSip(e):0;
+  if(drink)return {lean:drink*1.2,turn:.1*drink};
   const phase=(G7.vt+(e.seed||0)%37)%15;
   const warm=e.fireRef && dE(e,e.fireRef)<76 && phase<3.3?Math.sin(Math.PI*phase/3.3):0;
   return {lean:warm*1.4,turn:warm*((e.seed||0)%2?.08:-.08)};
