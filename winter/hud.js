@@ -20,7 +20,7 @@
     return {key, row, fill:row.querySelector('.fill'), value:row.querySelector('b'), last:null};
   });
   const ui = Object.fromEntries([
-    'air-temp','clock','weather','gear','gear-pic','place','route','context','interact','sound','sound-pic',
+    'condition','air-temp','clock','weather','gear','gear-pic','place','route','context','interact','sound','sound-pic',
     'eat','drink','ration-count','water-count','toast','hud','reset','map-toggle','map-close','equip','sprint'
   ].map(id => [id, byId(id)]));
   let toastTimer = 0;
@@ -55,6 +55,7 @@
       previousFocus.focus({preventScroll:true});
     }
   }
+  function clearToast(){clearTimeout(toastTimer);ui.toast.classList.remove('show');write(ui.toast,'');}
   function toast(text) {
     clearTimeout(toastTimer);
     write(ui.toast, text);
@@ -76,6 +77,8 @@
     for (const [key,id] of [['time','clock'],['weather','weather'],['place','place'],['route','route']]) {
       if (key in state) write(ui[id], state[key]);
     }
+    write(ui.condition,state.condition);
+    ui.condition.hidden = !state.condition;
     if ('gear' in state) {
       const gear = String(state.gear || 'Свободно');
       const icon = /нож|knife/i.test(gear) ? 'knife' : /винтов|ружь|карабин|автомат|rifle|дробовик/i.test(gear) ? 'rifle' : 'empty';
@@ -192,5 +195,5 @@
       (wasDead ? ui.reset : document.activeElement===ui['map-close'] ? link : ui['map-close']).focus({preventScroll:true});
     }
   });
-  window.hud = {update, toast, toggleMap, mapOpen:() => !modal.hidden};
+  window.hud = {update, toast, clearToast, toggleMap, mapOpen:() => !modal.hidden};
 })();

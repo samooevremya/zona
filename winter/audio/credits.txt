@@ -24,4 +24,4 @@ https://freesound.org/people/InspectorJ/sounds/376415/
 https://opengameart.org/content/wind-loop
 
 Лицензия CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
-Аудиофайлы переименованы. Звуковые данные сохранены в исходном виде.
+Исходные записи Ogg переименованы. Версии M4A перекодированы в AAC с тех же записей для совместимости с мобильными браузерами. Ветер и костёр в игре звучат с перекрёстным затуханием.

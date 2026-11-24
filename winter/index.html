@@ -34,6 +34,7 @@
         <span class="map-foot"><strong id="clock">08:00</strong><span id="weather">Облачно</span><svg><use href="#i-map"/></svg></span>
       </button>
       <div id="vitals" class="plate vitals" aria-label="Состояние героя"></div>
+      <div class="plate heat-state" id="condition" hidden></div>
     </section>
     <section class="upper-right" aria-label="Экипировка и припасы">
       <button id="equip" class="plate equip" title="Сменить предмет (Q)" aria-label="Сменить предмет в руках">
@@ -60,13 +61,13 @@
   </main>
   <div id="map-overlay" class="overlay" hidden>
     <section id="map-panel" class="plate dialog map-panel" role="dialog" aria-modal="true" aria-labelledby="map-title" tabindex="-1">
-      <header class="dialog-head"><div><svg><use href="#i-map"/></svg><h1 id="map-title">Карта местности</h1></div><a class="credits-link" href="audio/credits.txt" target="_blank" rel="noopener">Звук</a><button class="close" id="map-close" aria-label="Закрыть карту"><svg><use href="#i-close"/></svg></button></header>
+      <header class="dialog-head"><div><svg><use href="#i-map"/></svg><h1 id="map-title">Карта местности · 0.2</h1></div><a class="credits-link" href="audio/credits.txt" target="_blank" rel="noopener">Звук</a><button class="close" id="map-close" aria-label="Закрыть карту"><svg><use href="#i-close"/></svg></button></header>
       <canvas id="map" width="1000" height="720" aria-label="Карта первой локации с отметкой героя и названиями мест"></canvas>
       <footer class="map-help"><span><b>WASD</b> ходьба</span><span><b>Shift</b> бег</span><span><b>Пробел</b> прыжок</span><span><b>E</b> действие</span><span><b>Q</b> предмет</span><span><b>M</b> карта</span></footer>
       <footer class="map-touch">Левый стик — ходьба. Правый — поворот.</footer>
     </section>
   </div>
   <div id="dead-overlay" class="overlay" hidden><section class="plate dialog defeat" role="dialog" aria-modal="true" aria-labelledby="defeat-title"><h2 id="defeat-title">Герой потерял сознание</h2><button id="reset" class="plate reset">Начать заново</button></section></div>
-  <script src="worker.js"></script><script src="world.js"></script><script src="hud.js"></script><script src="game.js"></script>
+  <script src="worker.js"></script><script src="world.js"></script><script src="hud.js"></script><script src="weather.js"></script><script src="interiors.js"></script><script src="sound.js"></script><script src="game.js"></script>
 </body>
 </html>

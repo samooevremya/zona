@@ -41,13 +41,18 @@
     if (!(scale > 0)) return;
     const heading=state.heading || 0, phase=state.phase || 0, time=state.time || 0;
     const speed=Math.max(0,state.speed || 0), jump=Math.max(0,state.jump || 0);
-    const cs=Math.cos(heading), sn=Math.sin(heading);
+    const legs=state.legHeading??heading, travelAngle=(state.travelHeading??legs)-legs;
+    let cs, sn, view, light;
     const moving=clamp(speed/.7,0,1), run=clamp((speed-1.7)/1.9,0,1);
     const airborne=clamp(jump/.27,0,1), stride=blend(.32,.52,run);
     const bob=moving*(.017+run*.02)*Math.cos(phase*2) + .004*Math.sin(time*2.3);
     const sway=moving*.018*Math.sin(phase), lean=.018+run*.08;
     const faces=[];
-    const view=[.75*cs,.75*sn,.70], light=[.52*sn-.30*cs,-.52*cs-.30*sn,.80];
+    function orient(angle){
+      cs=Math.cos(angle);sn=Math.sin(angle);
+      view=[.75*cs,.75*sn,.70];light=[.52*sn-.30*cs,-.52*cs-.30*sn,.80];
+    }
+    orient(legs);
     function project(p) {
       const wy=cs*p[0]+sn*p[1];
       return [cs*p[1]-sn*p[0],.70*wy-.75*p[2],.75*wy+.70*p[2]];
@@ -91,7 +96,8 @@
       const swing=clamp((cycle-.5)*2,0,1);
       const travel=cycle<.5 ? 1-4*cycle : -Math.cos(Math.PI*swing);
       const swingLift=Math.sin(Math.PI*swing);
-      const ankle=[side*.123,side*.037*(1-moving)+travel*stride*moving+airborne*(side<0?.12:-.09),.105+swingLift*(.14+run*.12)*moving+airborne*(side<0?.17:.09)];
+      const step=travel*stride*moving;
+      const ankle=[side*.123+Math.sin(travelAngle)*step,side*.037*(1-moving)+Math.cos(travelAngle)*step+airborne*(side<0?.12:-.09),.105+swingLift*(.14+run*.12)*moving+airborne*(side<0?.17:.09)];
       const hip=add(hips,[side*.112,0,0]);
       const knee=elbowOrKnee(hip,ankle,[side*.09,1,0],.428);
       limb(hip,knee,.126,.108,colours.pants);
@@ -101,6 +107,7 @@
       body(ankle,[[-.103,.086,.151,.06],[-.067,.094,.164,.06]],colours.sole,8);
       body(ankle,[[-.068,.096,.157,.058],[-.005,.089,.135,.048],[.055+roll,.079,.087],[.14,.082,.076,-.011]],colours.boot,8);
     }
+    orient(heading);
     // Layered sill, quilting, shoulder yoke and crossed canvas webbing keep the figure legible from above.
     const coat=[sway,0,hips[2]-.13];
     body(coat,[[0,.195,.154],[.055,.235,.177],[.21,.230,.166,.012],[.44,.25,.178,lean*.55],[.60,.262,.145,lean],[.66,.127,.122,lean]],colours.coat,12);
@@ -163,7 +170,14 @@
     ctx.fillStyle=`rgba(40,47,54,${.12-.035*airborne})`;
     ctx.beginPath();ctx.ellipse(.045,.018,.39,.157,-.17,0,TAU);ctx.fill();
     ctx.beginPath();ctx.ellipse(.012,.008,.251,.111,-.17,0,TAU);ctx.fill();
-    ctx.translate(0,-jump*.75);
+    const sink=clamp(state.sink||0,0,.6);
+    if(sink>.025){
+      const ripple=.5+.5*Math.sin(phase*2);
+      ctx.beginPath();ctx.ellipse(0,0,.25+.18*ripple,.09+.07*ripple,0,0,TAU);
+      ctx.lineWidth=.022;ctx.strokeStyle='rgba(66,76,70,'+(.55*sink)+')';ctx.stroke();
+      ctx.beginPath();ctx.rect(-2,-4,4,4.05);ctx.clip();
+    }
+    ctx.translate(0,(sink-jump)*.75);
     faces.sort((a,b)=>a.depth-b.depth);
     ctx.lineJoin='round';ctx.lineWidth=.003;
     for(const {points,fill} of faces) {
