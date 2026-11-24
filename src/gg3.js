@@ -12,6 +12,7 @@ const G3_READY = () => G3.on && G3.ready;
 /* кожа тела: игрок в «Заре» — zarya, иначе базовое тело своей группировки; Сидорович — временно loner */
 function g3Skin(e) {
   if (e.kind === 'dog' || e.kind === 'boar' || e.kind === 'sucker') return e.kind;
+  if(e.sid==='wolf')return 'zarya';
   if (e === P) return S.armor === 'ar_zarya' ? 'zarya' : S.armor === 'ar_bandit' ? 'bandit' : 'loner';
   return { loner: 'loner', bandit: 'bandit', army: 'army', trader: 'loner' }[e.fac] || 'loner';
 }

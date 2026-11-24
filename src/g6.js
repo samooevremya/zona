@@ -28,9 +28,11 @@ const CALL = {
 };
 function callout(e, kind, force) {
   if (!e.alive || e === P || e.kind !== 'human' || e.wounded || e.captive) return;
+  if(kind==='idle' && campAct?.actor===e)return;
   const bank = CALL[e.fac] && CALL[e.fac][kind]; if (!bank) return;
   if (!force && e.bub && e.bub.life > 1) return;
   if (dE(e, P) > 520) return;
+  if(voiceCallout(e,kind))return;
   e.bub = { t: bank[(e.seed + Math.floor(S.min * 7)) % bank.length], life: 3.2 };
   if (e.fac === 'army' && kind === 'idle') play('radio', e.x, e.y); else play('voice', e.x, e.y);
 }
@@ -41,7 +43,8 @@ function surf(x, y) {
   const loft=loftAt({x,y});
   if(loft)return loft.id==='depot'?'stepMetal':'stepWood';
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
-  if (t === AS || t === CF || t === CO) return 'stepHard';
+  if (t===AS)return 'stepAsphalt';
+  if (t === CF || t === CO) return 'stepHard';
   if (t === FL) return 'stepWood';
   if (t === SW) return 'stepWater';
   if (t === RA) return Math.floor(x/12)%3 ? 'stepWood' : 'stepGravel';
@@ -50,46 +53,10 @@ function surf(x, y) {
   return wet > 0.4 ? 'stepWet' : 'stepGrass';
 }
 
-/* ---------- гитара у костра: свои простые переборы ---------- */
-const GTR = { t: 0, i: 0, buf: {} };
-const CHORDS = [[110, 164.8, 220, 261.6, 329.6], [146.8, 220, 293.7, 349.2, 440], [82.4, 164.8, 207.7, 246.9, 329.6], [110, 164.8, 220, 261.6, 329.6],
-  [130.8, 196, 261.6, 329.6, 392], [98, 196, 246.9, 293.7, 392], [110, 164.8, 220, 261.6, 329.6], [82.4, 164.8, 207.7, 246.9, 329.6]];
-const PICK = [0, 2, 3, 4, 3, 2, 1, 2];
-function pluckBuf(f) {
-  if (GTR.buf[f]) return GTR.buf[f];
-  const sr = AC.sampleRate, len = Math.floor(sr * 1.6), b = AC.createBuffer(1, len, sr), d = b.getChannelData(0);
-  const N = Math.max(2, Math.round(sr / f)), ring = new Float32Array(N);
-  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
-  let p = 0;
-  for (let i = 0; i < len; i++) { const n = (p + 1) % N; const v = 0.497 * (ring[p] + ring[n]); d[i] = ring[p]; ring[p] = v; p = n; }
-  GTR.buf[f] = b; return b;
-}
-function pluck(f, vol) {
-  if (!AC) return;
-  const s = AC.createBufferSource(); s.buffer = pluckBuf(f);
-  const g = AC.createGain(); g.gain.value = vol; const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
-  s.connect(lp); lp.connect(g); g.connect(master); s.start();
-}
-function guitar(dt) {
-  if (!AC || loftAt(P) || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow?.stage) return;
-  const d = dst(P.x, P.y, FIRE.x, FIRE.y);
-  if (d > 520) return;
-  const player = ents.find(e => e.alive && e.sit && e.fireRef === FIRE && e.fac === 'loner');
-  if (!player) return;
-  GTR.t -= dt;
-  if (GTR.t > 0) return;
-  GTR.t = 0.34 + (GTR.i % 8 === 7 ? 0.25 : 0);
-  const ch = CHORDS[Math.floor(GTR.i / 8) % CHORDS.length], note = ch[PICK[GTR.i % 8]];
-  const v = clamp(1 - d / 520, 0, 1) * 0.22;
-  pluck(note, v);
-  if (GTR.i % 8 === 0) pluck(ch[0] / 2 > 60 ? ch[0] : ch[0], v * 0.8);
-  GTR.i++;
-}
-
 /* ---------- звук дождя ---------- */
 let rainG = null;
 /* ---------- главный шаг атмосферы ---------- */
-let chatT = 2, sirenT = 0;
+let chatT = 2;
 function worldFx(dt) {
   if (!S.wx) S.wx = { k: 'clear', until: S.min + 180 };
   if (!S.blow) S.blow = { stage: 0, next: S.min + rnd(900, 1500), t: 0 };
@@ -133,10 +100,10 @@ function worldFx(dt) {
       const d = dE(e, P);
       if (e.fac === 'loner' && !hostile(e, P) && d < 90 && !e.greeted) { e.greeted = 1; callout(e, S.rep < 0 ? 'bad' : 'greet', true); return; }
       if (d > 140) e.greeted = 0;
-      if (chance(0.08)) callout(e, 'idle');
+      if (!e.sit && chance(0.045)) callout(e, 'idle');
     });
   }
-  guitar(dt);
+  campAndRadio(dt);
 }
 const BLOW_WARNING = 'Приближается выброс! Укройтесь в ближайшем здании или бункере. Ближайшее укрытие отмечено на карте.';
 // One flood from all usable doorways gives each reachable tile its closest shelter.
@@ -291,12 +258,12 @@ function blowoutHumanAI(e, dt) {
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
-    B.stage = 1; B.t = 80;
+    B.stage = 1; B.t = 42; play('warning');
     radioNews(BLOW_WARNING, true);
   }
   if (B.stage === 1) {
     B.t -= dt; WX.red = lerp(WX.red, 0.5, Math.min(1,dt * 0.05));
-    sirenT -= dt; if (sirenT <= 0) { sirenT = 4; play('siren'); }
+
     if (B.t <= 0) {
       B.stage = 2; B.t = 26; play('blow');
       ents.forEach(e => {

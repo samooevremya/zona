@@ -4,7 +4,7 @@ function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = 0.55; master.connect(AC.destination);
+    master = AC.createGain(); master.gain.value = soundPrefs.volume*.55; master.connect(AC.destination);
     noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
@@ -221,14 +221,14 @@ function repairOffer() {
 function talk(e) {
   if(chapter()==='aid' && S.campaign.villageMedic && e.sid===S.campaign.villageMedic)return dialog(cardOf(e),['Я ему рану прижал. Меченый, есть чем перевязать? Подойди к Волку.'],()=>[{t:'Понял.',close:1}],'dialog',e);
   if(e.sid==='lz_tech') return dialog(cardOf(e),['Клемма, местный техник. Давай посмотрим, с чем пришёл.'],()=>[
-    repairOffer() || {t:'Оружие в порядке',d:true},{t:'До встречи',close:1}
+    ...moduleOffers(), repairOffer() || {t:'Оружие в порядке',d:true},{t:'До встречи',close:1}
   ],'dialog',e);
   if (e.sid==='lz_barman') return dialog(cardOf(e),['Бар «Под стрехой». С дороги? Горячее кончилось, банка бодрящего найдётся.'],()=>[
     {t:'Покажи припасы',k:'key',fn:()=>openTrade(e)},
     {t:'Что слышно про маки?',fn:()=>say('Начнут слипаться глаза — выпей энергетик или выбирайся на дорогу. Кто лёг среди цветов, уже не встаёт.')},
     {t:'До встречи',close:1}
   ],'dialog',e);
-  if(chapter()==='rescue' && !S.flags.assault && (e.sid==='petr' || e.sid==='petr2' && !byS('petr')))return petrBriefing(e);
+  if(chapter()==='rescue' && !S.flags.assault && e===atpCompany()[0])return petrBriefing(e);
   if (STORY_KEYS.includes(e.sid) || e.squadMate)return storyTalk(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
@@ -239,10 +239,10 @@ function talk(e) {
     const south = e.guard === 'south';
     return dialog(cardOf(e), [south ? 'Назад. Здесь граница Зоны, проход закрыт.' : S.flags.bridgePaid ? 'А, это ты. Проходи.' : 'Стоять. Пятьсот за проход в обе стороны. Пересечёшь шлагбаум без оплаты — откроем огонь.'], () => [
       south ? { t: 'А если договоримся?', fn: () => say('Не договоримся. Свободен.') }
-        : S.flags.bridgePaid ? { t: 'Я уже платил', fn: () => say('Помню. Проходи, не задерживай.') }
+        : S.flags.bridgePaid ? null
         : { t: 'Пропусти за 500 RU', k: 'key', d: S.money < 500, fn: () => { S.money -= 500; S.flags.bridgePaid = 1; openBarrier(); say('Другой разговор. Проходи, шлагбаум поднят. Туда и обратно, сколько хочешь.'); sys('Мост открыт.'); news('Заплатил военным 500 RU за проход под мостом.'); } },
       { t: 'Уйти', close: 1 }
-    ], 'dialog', e);
+    ].filter(Boolean), 'dialog', e);
   }
   if (e.sid === 'petr' || e.sid === 'petr2') {
     return dialog(cardOf(e), [S.flags.atpClear ? 'Ну ты дал! АТП теперь наше. Тут пока и осядем.' : 'Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
@@ -412,12 +412,7 @@ function drawMenu() {
     heading.textContent='Настройки';
     nav.appendChild(btn('','Настроить управление',openControlEditor));
     nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,drawMenu)));
-    const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
-    const sound=btn('',soundLabel(),()=>{
-      audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
-      sound.textContent=soundLabel();
-    });
-    nav.appendChild(sound);
+    nav.appendChild(btn('','Звук',()=>soundSettings(nav,drawMenu)));
     nav.appendChild(btn('','Назад',leavePauseSettings));
     return;
   }
@@ -926,6 +921,7 @@ function interact() {
   else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'groundItem') pickGroundItem(n);
   else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
+  else if(n.k==='sleep')sleepAtBed(n.o);
   else if (n.k === 'carve') carveMutant(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
@@ -1193,6 +1189,7 @@ function showTitle(kind) {
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
   nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));
+  nav.appendChild(btn('','Звук',()=>soundSettings(nav,()=>showTitle())));
   c.append(title.name,nav);
 }
 function goFull() {   // на весь экран там, где браузер это умеет (Android, iPad, компьютер); на iPhone — через «На экран Домой»

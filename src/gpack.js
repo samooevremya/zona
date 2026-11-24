@@ -76,11 +76,11 @@ function packCells(inv, stowing, incoming) {
     return total + w*h*Math.ceil(Math.max(0,n-wornCount(id)+(id===stowing?1:0)-(incoming?.has(id)?1:0))/stackLimit(id));
   },0);
 }
-function primaryGun(id) { return {cond:S.cond?.[id] ?? 80, mag:S.mag[id] || 0}; }
+function primaryGun(id) { return {cond:S.cond?.[id] ?? 80, mag:S.mag[id] || 0, sights:S.flags.sights?.[id]||0}; }
 function gunCopy(id,index) {
   return index ? S.flags.spareGuns?.[id]?.[index-1] || {cond:80,mag:0} : primaryGun(id);
 }
-function setPrimary(id,gun) { S.cond[id]=gun.cond; S.mag[id]=gun.mag; }
+function setPrimary(id,gun) { S.cond[id]=gun.cond; S.mag[id]=gun.mag; (S.flags.sights ||= {})[id]=gun.sights||0; }
 function spareList(id) {
   const lists=S.flags.spareGuns ||= {};
   const guns=lists[id] ||= [];
@@ -103,7 +103,7 @@ function repairCopies(copies,condition) {
     else S.cond[id]=condition;
   }
 }
-function loadedMass(id,gun) { return gun ? (ITEMS[WP[id].ammo]?.w || 0)*gun.mag : 0; }
+function loadedMass(id,gun) { return gun ? (ITEMS[WP[id].ammo]?.w || 0)*gun.mag + ((gun.sights&1?1:0)+(gun.sights&2?1:0))*.18 : 0; }
 function weight() {
   let kg=PACK_KG+KNIFE_KG;
   for (const [id,n] of Object.entries(S.inv)) {
@@ -140,7 +140,7 @@ function removePacked(id,n=1,index=cnt(id)-1) {
     const spares=spareList(id);
     if (index) spares.splice(index-1,1);
     else if (spares.length) setPrimary(id,spares.pop());
-    if (cnt(id)===1) { delete S.cond[id]; delete S.mag[id]; }
+    if (cnt(id)===1) { delete S.cond[id]; delete S.mag[id]; if(S.flags.sights)delete S.flags.sights[id]; }
   }
   take(id,n); return gun;
 }

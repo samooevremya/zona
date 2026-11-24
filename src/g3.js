@@ -28,7 +28,7 @@ function startReload() {
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
   if (m >= W.mag || !cnt(W.ammo)) return;
-  P.reload = W.reload; play('reload');
+  P.reload = W.reload; play(reloadSound(S.weapon));
 }
 function finishReload() {
   const W = WP[S.weapon]; if (!W || W.melee) return;
@@ -65,7 +65,7 @@ function playerFire() {
   }
 }
 function cycleWeapon(dir) {
-  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean)];
+  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean), 'hands'];
   const i = own.indexOf(S.weapon);
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
@@ -85,6 +85,7 @@ function useItem(id) {
   }
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
   take(id, 1);
+  if(id==='vodka'){S.food=Math.max(0,S.food-8);S.flags.dizzyUntil=S.min+35;}
   if (it.heal) P.hp = clamp(P.hp + it.heal, 1, 100);
   if (it.rad) S.rad = Math.max(0, S.rad - it.rad);
   if (FOOD[id]) { S.food = Math.min(100, S.food + FOOD[id]); play('eat'); } else play('pick');
@@ -193,7 +194,7 @@ function updateBodies(dt){
       else draggedBody=null;
     }
   }
-  bodyCheck-=dt;if(bodyCheck>0)return;bodyCheck=2;
+  bodyCheck-=dt;if(bodyCheck>0)return;bodyCheck=2;ageRemains();
   for(const b of objs){
     if(b.k!=='body' || b.fac!=='loner' || b.discovered || b.raidBody || dE(b,P)>900)continue;
     const witness=ents.find(e=>e.alive && e.fac==='loner' && !e.captive && dE(e,b)<120 && seesActor(e,b));
@@ -320,7 +321,7 @@ function update(dt) {
     if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
   [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });
   // тела исчезают через двое суток
-  for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.k === 'body' && S.min - o.t > 2880 && dst(o.x, o.y, P.x, P.y) > 600) objs.splice(i, 1); }
+
   // таймеры мира
   spawnT -= dt; if (spawnT <= 0) { spawnT = 20; spawnTick(); }
   fogT -= dt; if (fogT <= 0 && P.alive) { fogT = 0.4; reveal(); }
@@ -393,7 +394,7 @@ function updatePlayerAim(dt,mx,my) {
   P.ang+=IN.touch ? clamp(delta,-9*dt,9*dt) : delta;
   const aligned=Math.abs(angD(P.ang,desired))<.025;
   if (aligned) P.ang=desired;
-  if (gun && IN.touch) {
+  if (gun && (IN.touch || sightInstalled(S.weapon))) {
     P.aimRay=shotTrace(P,P.ang,W);
     if (!P.lock && P.aimRay.best && hostile(P,P.aimRay.best) && targetInSight(P.aimRay.best,W)) P.lock=P.aimRay.best;
   }
@@ -488,6 +489,10 @@ function findInteract() {
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
   if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
+    if(o.k==='bed' || o.fitting==='bedroll'){
+      const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(x,y,P.x,P.y);
+      if(d<52 && sameBedroom(o) && los(P.x,P.y,x,y))cand(d-4,{k:'sleep',o,label:'Спать · спальное место'});
+    }
     if (o.k === 'locker') {
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if (d<49 && los(P.x,P.y,x,y)) cand(d,{k:'locker',o,label:'Открыть личный ящик'});
@@ -524,7 +529,7 @@ function carveMutant(o) {
   const error = receiveError(id,1);
   if (error) { msg(error,'bad'); return; }
   collectStock(o,id,1);
-  play('knifeHit',P.x,P.y);
+  play('carve',P.x,P.y);
   msg('Получен трофей · '+ITEMS[id].n,'say');
 }
 function lootAll(o) {
