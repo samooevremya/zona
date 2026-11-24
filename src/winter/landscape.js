@@ -97,6 +97,7 @@ function paintSector(x,y,w,h,scale,maskPixels){
   const cx=c.getContext('2d');cx.setTransform(scale,0,0,scale,-x*scale,-y*scale);
   cx.fillStyle='#c4ccce';cx.fillRect(x,y,w,h);
   materialPatches(cx,surfaceBrushes[4],x,y,w,h,1.9,771);
+  snowRelief(cx,x,y,w,h);
   const layer=document.createElement('canvas');layer.width=c.width;layer.height=c.height;
   const ctx=layer.getContext('2d');
   for(const [mask,id,color,spacing] of [[3,3,'#969e98',1.6],[4,5,'#80939e',2.6],[2,2,'#918e78',1.4],[0,0,'#9a9790',1.6],[1,1,'#7d7b77',1]]){

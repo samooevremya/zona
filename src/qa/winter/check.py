@@ -31,9 +31,19 @@ with sync_playwright() as pw:
     print(page.evaluate('''() => {
       const check=(c,msg)=>{if(!c)throw Error(msg)};
       const at=(p)=>{[player.x,player.y]=p;};
+      const walk=(to)=>{
+        const [sx,sy]=[player.x,player.y],n=Math.ceil(Math.hypot(to[0]-sx,to[1]-sy)/.025);
+        for(let k=1;k<=n;k++){moveAxis(player.x+(to[0]-sx)/n,player.y);moveAxis(player.x,player.y+(to[1]-sy)/n);}
+        check(nearPoint(to,.003),'blocked near '+to+' at '+[player.x,player.y]);
+      };
+      for(const [i,b] of winterMap.buildings.entries()){
+        if(!accessibleBuilding(b))continue;
+        state.room=-1;state.floor=1;at(door(b,true));walk(door(b,false));check(state.room===i,'enter '+i);
+        walk(door(b,true));check(state.room===-1,'exit '+i);
+      }
       for(const [i,b] of winterMap.buildings.entries()){
         if(b[0]!=='flat')continue;
-        state.room=-1;at(door(b,true));actionAt().do();check(state.room===i,'enter');
+        state.room=-1;at(door(b,true));walk(door(b,false));check(state.room===i,'enter');
         for(let level=1;level<=5;level++){
           state.floor=level;
           const w=b[3],h=b[4],step=.10;
@@ -56,12 +66,18 @@ with sync_playwright() as pw:
           }
         }
         state.floor=1;
-        for(const up of [true,false]){
-          for(let n=0;n<4;n++){at(stair(b,up));const f=state.floor;actionAt().do();check(state.floor===f+(up?1:-1),'stairs');}
-          check(state.floor===(up?5:1),'end floor');
-          if(up){saveSlot(2);restoreState(readSlot(2));check(state.room===i&&state.floor===5,'saved floor');}
+        walk(worldPoint(b,0,0));walk(worldPoint(b,-.43,0));
+        const landings=[];
+        for(let n=1;n<5;n++){
+          const x=n%2?-.43:.43,y=n%2?-1.87:-.40;
+          walk(worldPoint(b,x,localPoint(b,player.x,player.y)[1]));landings.push([player.x,player.y]);
+          walk(worldPoint(b,x,y));check(state.floor===n+1,'climb '+n);
         }
-        at(door(b,false));actionAt().do();check(state.room===-1,'leave');
+        saveSlot(2);restoreState(readSlot(2));check(state.floor===5,'save on top floor');
+        for(let n=3;n>=0;n--){
+          const dest=landings[n];walk([dest[0],player.y]);walk(dest);check(state.floor===n+1,'descent');
+        }
+        walk(worldPoint(b,0,0));walk(door(b,true));check(state.room===-1,'leave');
       }
       // Try every quarter-unit across the width, in both directions, including both map edges.
       for(let x=.21;x<W-.20;x+=.25)for(const y of [railNorth,railSouth]){
@@ -69,11 +85,16 @@ with sync_playwright() as pw:
       }
       check(subway.y-subway.length/2-railSouth>.5,'tunnel touches fence');
       state.room=-1;at([subway.x+subway.width/2+.12,subway.y+subway.length/2]);check(!actionAt(),'enter through stair wall');
-      for(let i=0;i<3;i++){
-        const from=stationPortals[i],to=stationPortals[(i+1)%3];
-        state.room=-1;at(from.world);check(outsideFree(...from.world),'bad landing');actionAt().do();
-        check(state.room===stationIndex,'station required');at(to.room);actionAt().do();
-        check(state.room===-1 && nearPoint(to.world,.001),'wrong exit');
+      for(const offset of [-.47,0,.47]){
+        state.room=-1;const x=subway.x+offset,nx=northStairs.x+offset;
+        at([x,subway.y+.91]);walk([x,tunnelBend]);check(state.floor===0,'south flight');
+        walk([nx,tunnelBend]);walk([nx,northStairs.y-.92]);check(state.room===stationIndex&&state.floor===1,'north flight');
+        walk([nx,tunnelBend]);walk([x,tunnelBend]);walk([x,subway.y+.91]);check(state.room===-1,'tunnel return');
+      }
+      for(const side of [0,2]){
+        const portal=stationPortals[side];state.room=-1;at(portal.world);
+        walk(portal.room);check(state.room===stationIndex,'station doorway');
+        walk(portal.world);check(state.room===-1,'station exit');
       }
       let route=[[67,98],[67,87],[67,77],[68,65],[69,52],[70,41],stationPortals[1].world],meters=0;
       route.slice(1).forEach((p,i)=>{const a=route[i],d=Math.hypot(p[0]-a[0],p[1]-a[1]);meters+=d;
@@ -97,11 +118,21 @@ with sync_playwright() as pw:
       selectHand('hands');actorsStep(1);strike();ok(state.rounds.w_pm===7,'empty hands');
       loot('test-shelf');modal.querySelector('section button').click();ok(state.searched['test-shelf'],'loot');
       loot('test-shelf');ok(!modal.querySelector('section button'),'cannot farm cupboard');modal.close();
-      state.room=flatIndex;[player.x,player.y]=worldPoint(winterMap.buildings[flatIndex],-2.8,0);
+      state.room=flatIndex;[player.x,player.y]=worldPoint(winterMap.buildings[flatIndex],-2.12,0);
       const stack=state.inventory.a9;ok(actionAt().name==='Личный ящик','storage');actionAt().do();
       [...modal.querySelectorAll('section button')].find(e=>e.textContent.includes('Патроны')).click();
       ok(state.storage.a9===stack&&!state.inventory.a9,'ammo stack');modal.close();
       state.room=-1;[player.x,player.y]=[23,52];state.stamina=90;jumpNow();ok(jump===0,'bog jumping');
+      state.room=-1;[player.x,player.y]=[95.16,52.9];
+      ok(lowObstacle(95.7,52.9)&&actionAt().name==='Вскрыть ящик','solid crate');
+      actionAt().do();modal.querySelector('section button').click();modal.close();
+      saveSlot(2);restoreState(readSlot(2));
+      ok(state.broken['yard-0']&&state.searched['yard-0']&&!lowObstacle(95.7,52.9),'broken crate after load');
+      for(const [,x,y] of siteDetails)ok(touchesSolid(x,y),'yard solid '+[x,y]);
+      tracksInSnow.length=0;lastMark=null;player.y=73;
+      for(let n=0;n<100;n++){player.x=6+n*.22;fieldExposure(.01);}
+      const mark=tracksInSnow[1].slice();player.x+=.22;fieldExposure(.01);
+      ok(tracksInSnow.length===100&&mark.every((v,k)=>v===tracksInSnow[0][k]),'unchanged planted footprint');
       restoreState(newWinterState());return 'Inventory, reload, fire rate, unarmed mode, cupboards and storage passed';
     }"""))
     # Two-finger layout and the normal interaction button on a small phone viewport.
@@ -118,12 +149,37 @@ with sync_playwright() as pw:
     mobile.evaluate('''() => {
       state.room=-1;[player.x,player.y]=stationPortals[1].world;refreshHud();
     }''')
-    mobile.locator('#act').tap()
+    mobile.keyboard.down('ArrowUp')
+    mobile.wait_for_function('state.room===stationIndex && state.floor===0',timeout=5000)
+    mobile.keyboard.up('ArrowUp')
     assert mobile.evaluate('state.room===stationIndex')
     assert mobile.locator('#stick').is_visible()
     mobile.locator('#menu').tap()
     mobile.get_by_role('button',name='Записать 1').tap()
     assert mobile.evaluate('readSlot(1).room===stationIndex')
+    mobile.locator('#close').tap() if mobile.locator('#close').is_visible() else None
+    mobile.locator('#menu').tap()
+    mobile.get_by_role('button',name='Управление и звук').tap()
+    mobile.get_by_role('button',name='Раскладка кнопок').tap()
+    mobile.locator('.layout-hit[data-id="joy"]').press('ArrowRight')
+    mobile.locator('#layout-save').tap()
+    assert mobile.evaluate("JSON.parse(localStorage.getItem('km100-touch-layout-v1')).landscape.joy.size>=44")
+    mobile.evaluate("restoreState(newWinterState());state.room=-1;player.x=94;player.y=52")
+    cdp=mobile.context.new_cdp_session(mobile)
+    def finger(selector,i):
+        box=mobile.locator(selector).bounding_box()
+        return dict(x=box['x']+box['width']/2,y=box['y']+box['height']/2,id=i)
+    stick=finger('#stick',0);lamp=finger('#lamp',1)
+    def touch(kind,points):
+        cdp.send('Input.dispatchTouchEvent',dict(type=kind,touchPoints=points))
+    touch('touchStart',[stick]);stick['x']+=25;touch('touchMove',[stick])
+    touch('touchStart',[stick,lamp])
+    mobile.wait_for_function('player.x>94.08')
+    touch('touchEnd',[lamp])
+    mobile.wait_for_timeout(180)
+    print('Two-finger controls',mobile.evaluate('({lamp:state.lamp,x:player.x,stick:stick.x})'))
+    mobile.wait_for_function('state.lamp && player.x>94.05',timeout=3500)
+    touch('touchEnd',[])
     mobile.close()
     assert not errors, errors
     browser.close()

@@ -91,6 +91,7 @@ function fieldSettings(){
       label.textContent=name+' ';label.style.display='block';label.style.margin='12px 0';label.append(input);box.append(label);
       input.oninput=()=>{state.controls[k]=Number(input.value);};
     }
+    btn(box,'Раскладка кнопок',()=>{modal.close();editWinterControls();});
     btn(box,state.controls.tap?'Стрельба · тап по противнику':'Стрельба · край стика',()=>{state.controls.tap=!state.controls.tap;fieldSettings();});
   });
 }
@@ -102,7 +103,7 @@ function adjustBodyLocation(){
   }
 }
 function bedsideGlow(v){
-  if(state.room<0||!shelters.has(winterMap.buildings[state.room][0]))return;
+  if(state.floor===0||state.room<0||!shelters.has(winterMap.buildings[state.room][0]))return;
   const b=winterMap.buildings[state.room],[wx,wy]=roomFurniture(b).bed;
   const [x,y]=screen(wx-.15,wy,v),r=v.z*.92;
   const grad=g.createRadialGradient(x,y,0,x,y,r);

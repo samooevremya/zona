@@ -50,6 +50,7 @@ function restoreState(next){
     state.siteRevision=2;
   }
   fieldReset();tracksInSnow.length=0;lastMark=probe=null;player.x=state.x;player.y=state.y;camera.x=player.x;camera.y=player.y;
+  if(ground)settleSavedPosition();
   cooldown=reloadTime=0;reloadWeapon='';traces=[];releaseStick();keys.clear();
 }
 function saveSlot(id){
@@ -80,35 +81,21 @@ function actionAt(){
   const nearby=fieldAction();if(nearby)return nearby;
   if(state.room>=0){
     const i=state.room,b=winterMap.buildings[i],level=state.floor;
-    if(b[0]==='flat'){
-      for(const [up,allowed] of [[true,level<5],[false,level>1]]){
-        if(allowed&&nearPoint(stair(b,up),.57))return {name:up?'Подняться на '+(level+1)+' этаж':'Спуститься на '+(level-1)+' этаж',do(){
-          state.floor+=up?1:-1;[player.x,player.y]=stair(b,!up);
-        }};
-      }
+    if(level===0)return null;
+    const [lx,ly]=localPoint(b,player.x,player.y);
+    const piece=roomLayout(i,level).filter(p=>['bed','cupboard','crate'].includes(p.type))
+      .map(p=>({p,d:Math.hypot(Math.max(0,Math.abs(lx-p.x)-p.rx),Math.max(0,Math.abs(ly-p.y)-p.ry))}))
+      .filter(({p,d})=>d<.38&&wallAccess(i,lx,ly,p.x,p.y))
+      .sort((a,b)=>a.d-b.d)[0]?.p;
+    if(piece){
+      const key=piece.key;
+      if(piece.type==='crate'&&!(state.broken?.[key]&&state.searched[key]))return crateAction(key);
+      if(piece.type==='cupboard')return {name:'Открыть шкаф',do:()=>loot(key)};
+      if(piece.type==='bed')return {name:'Отдохнуть',do:restMenu};
     }
-    if(i===stationIndex){
-      const portal=stationPortals.find(p=>nearPoint(p.room,.61));
-      if(portal)return {name:'Выйти · '+portal.side,do(){[player.x,player.y]=portal.world;state.room=-1;}};
-    }
-    if(i!==stationIndex&&level===1&&nearPoint(door(b,false),.7))return {name:'Выйти на улицу',do(){
-      [player.x,player.y]=door(b,true);state.room=-1;
-    }};
-    const furniture=roomFurniture(b);
-    if(nearPoint(furniture.box,.64))return {name:'Открыть шкаф',do:()=>loot('room-'+i+'-'+level)};
-    if(shelters.has(b[0])&&nearPoint(furniture.bed,.73))return {name:'Отдохнуть',do:restMenu};
     return null;
   }
-  const portal=stationPortals.find(p=>sameRailSide(player.y,p.world[1])&&nearPoint(p.world,.74)&&
-    (p!==stationPortals[1]||Math.abs(player.x-subway.x)<subway.width/2-.075&&player.y>subway.y-.18));
-  if(portal)return {name:'Войти на станцию',do(){state.room=stationIndex;state.floor=1;[player.x,player.y]=portal.room;}};
-  for(let i=0;i<winterMap.buildings.length;i++){
-    if(i===stationIndex)continue;
-    const b=winterMap.buildings[i];if(accessibleBuilding(b)&&nearPoint(door(b,true),.73))
-      return {name:'Войти · '+roomPlace(i,1).replace(' · этаж 1',''),do(){
-        state.room=i;state.floor=1;[player.x,player.y]=door(b,false);
-      }};
-  }
+  for(const [n,p] of lowProps.entries())if(nearPoint(p,.72)&&!(state.broken?.['yard-'+n]&&state.searched['yard-'+n]))return crateAction('yard-'+n);
   const npc=people.find(n=>actorLife(n).hp>0 && nearPoint([n.x,n.y],.85));
   if(npc&&!npc.enemy&&!actorLife(npc).angry)return {name:'Поговорить · '+npc.name,do:()=>greet(npc)};
   const body=people.find(n=>actorLife(n).hp<=0&&state.clock-actorLife(n).died<1440&&nearPoint([n.x,n.y],.7));
@@ -167,7 +154,7 @@ function cycleHand(){
 }
 function menu(){
   panel('Меню',box=>{
-    line(box,'WASD или стрелки — движение, Shift — бег, E — действие, M — карта, F — фонарь, R — перезарядка.');
+    line(box,'WASD или стрелки — движение, Shift — бег, E — действие, M — КПК, L — фонарь, R — перезарядка, V — прыжок, F — грузик, Q — аптечка, B — бинт, X — сменить предмет.');
     for(const slot of [1,2,3,'auto']){
       const s=readSlot(slot),row=document.createElement('p');box.append(row);
       if(slot!=='auto')btn(row,'Записать '+slot,()=>{if(saveSlot(slot))menu();},state.hp<=0);

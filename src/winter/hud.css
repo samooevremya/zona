@@ -1,0 +1,27 @@
+:root{--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#293333;color:#e8e3d3;font:15px system-ui,sans-serif}
+#terrain{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+.hud.zh{position:fixed;inset:0;pointer-events:none;z-index:2}
+.hud.zh button,.touch.zt button{pointer-events:auto;cursor:pointer;touch-action:none}
+.touch{display:none;z-index:3}body.is-touch .touch.zt #stick{pointer-events:auto;touch-action:none}
+body:not(.walking) :is(.touch.zt,.zh-corner,#hand,#lamp,#act,.keys){display:none!important}
+[hidden],.hud.zh .zh-p[hidden],.touch.zt #fire[hidden]{display:none!important}
+.keys{left:12px;bottom:4px;color:#d8d3be;font-size:11px;text-shadow:0 1px 2px #101413;max-width:37vw}
+body.is-touch .keys{display:none}
+#details{position:fixed;bottom:65px;left:50%;transform:translateX(-50%);background:#292824e8;border:1px solid #8a806b;padding:5px 12px;z-index:4}
+#legend{position:fixed;bottom:12px;left:11px;padding:4px 8px;background:#222c2b}
+dialog{width:min(420px,94vw);max-height:84vh;overflow:auto;background:#262824;color:#ebe7d6;border:2px solid #797360;border-radius:4px;padding:15px}dialog::backdrop{background:#14191799}
+dialog button,.medpick button{font:inherit;color:#eee7d6;background:#32352e;border:1px solid #89816b;border-radius:3px;padding:6px 12px;margin:2px;min-height:44px;cursor:pointer}
+button:disabled{opacity:.45}#stats{color:#e5c99b}
+.hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button,.hud.zh #act{min-height:44px}
+body.is-touch .touch.zt #stick b{background-image:var(--knob);background-size:100% 100%}
+.hud.zh .rust{border-image:var(--frame) 15 fill / 6px / 0 stretch;background-color:#282923}
+.zh-w #wico{background-size:contain;background-repeat:no-repeat;background-position:center}
+.medpick{position:absolute;right:66px;top:33%;pointer-events:auto}
+@media(max-height:440px){.hud.zh .zh-corner{gap:1px}.hud.zh .zh-corner .zh-map{width:72px;height:72px}.hud.zh .zh-corner .zh-clock{font-size:12px}.zh-bar{height:17px;margin-bottom:1px;width:104px}.zh-bar .zi{height:11px}.hud.zh .zh-status{font-size:10px}.zh-st{left:107px}.hud.zh .zh-feed{width:125px}.hud.zh .zh-top button,body.is-touch .hud.zh .zh-top button{min-width:55px;padding:0 6px;font-size:12px}.hud.zh .zh-w,body.is-touch .hud.zh .zh-w{height:54px;width:151px}.zh-w #wico{width:50px}.hud.zh .zh-w .am{font-size:16px}body.is-touch .touch.zt .c1{top:75px}body.is-touch .touch.zt .c2{top:122px}body.is-touch .touch.zt .c3{top:169px}body.is-touch .touch.zt .c4{top:216px}body.is-touch .touch.zt .c5{top:263px}}
+
+#b-med .mb{position:absolute;right:-3px;border-radius:50%;min-width:16px;height:16px;padding:1px 3px;color:white;font:bold 11px/14px Arial;pointer-events:none}
+#b-med .mb.m{top:-3px;background:#96382d}#b-med .mb.b{bottom:-3px;background:#c5b698;color:#211f1c}
+body.layout-edit .touch.zt :is(#fire,#reload)[hidden]{display:grid!important}
+#control-editor .layout-hit{min-height:0;margin:0;padding:0;background:transparent}

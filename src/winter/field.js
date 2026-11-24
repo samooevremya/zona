@@ -14,7 +14,7 @@ const caches=[[40.5,68.6],[109.2,24.6],[57,94.8]];
 let grenades=[],jump=0,dragId=null,noiseAt=null,beep=0;
 function fieldReset(){grenades=[];jump=0;dragId=null;noiseAt=null;aim.active=aim.fire=false;}
 function fieldAction(){
-  if(state.room===flatIndex&&state.floor===1&&nearPoint(worldPoint(winterMap.buildings[flatIndex],-2.8,0),.7))
+  if(state.room===flatIndex&&state.floor===1&&nearPoint(worldPoint(winterMap.buildings[flatIndex],-2.12,-.29),.7))
     return {name:'Личный ящик',do:storage};
   if(state.room>=0)return null;
   if(dragId)return {name:'Положить тело',do:()=>{dragId=null;}};
