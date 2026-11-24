@@ -34,18 +34,28 @@ with sync_playwright() as pw:
       for(const [i,b] of winterMap.buildings.entries()){
         if(b[0]!=='flat')continue;
         state.room=-1;at(door(b,true));actionAt().do();check(state.room===i,'enter');
-        const w=b[3],h=b[4],step=.10;
-        const nx=Math.ceil(w/step),ny=Math.ceil(h/step),seen=new Uint8Array(nx*ny);
-        const coords=(k)=>worldPoint(b,(k%nx+.5)*step-w/2,(Math.floor(k/nx)+.5)*step-h/2);
-        const ix=(x,y)=>Math.floor((x+w/2)/step)+nx*Math.floor((y+h/2)/step);
-        const start=ix(0,h/2-.31),q=[start];seen[start]=1;
-        for(let n=0;n<q.length;n++){
-          const k=q[n];for(const v of [k-1,k+1,k-nx,k+nx]){
-            if(v<0||v>=seen.length||seen[v]||!insideFree(i,...coords(v)))continue;
-            seen[v]=1;q.push(v);
+        for(let level=1;level<=5;level++){
+          state.floor=level;
+          const w=b[3],h=b[4],step=.10;
+          const nx=Math.ceil(w/step),ny=Math.ceil(h/step),seen=new Uint8Array(nx*ny);
+          const coords=(k)=>worldPoint(b,(k%nx+.5)*step-w/2,(Math.floor(k/nx)+.5)*step-h/2);
+          const ix=(x,y)=>Math.floor((x+w/2)/step)+nx*Math.floor((y+h/2)/step);
+          const start=ix(0,h/2-.31),q=[start];seen[start]=1;
+          for(let n=0;n<q.length;n++){
+            const k=q[n];for(const v of [k-1,k+1,k-nx,k+nx]){
+              if(v<0||v>=seen.length||seen[v]||!insideFree(i,...coords(v)))continue;
+              seen[v]=1;q.push(v);
+            }
+          }
+          for(const s of [-1,1])for(let a=0;a<4;a++)check(seen[ix(-w/2+(a+.5)*w/4,s*h*.34)],'apartment');
+          const reachable=(pos,r)=>q.some(k=>{const [x,y]=coords(k);return Math.hypot(x-pos[0],y-pos[1])<r;});
+          const furniture=roomFurniture(b);
+          check(reachable(furniture.box,.64)&&reachable(furniture.bed,.73),'bed or cupboard');
+          for(const p of roomLayout(i,level)){
+            if(p.type!=='rug')check(!insideFree(i,...worldPoint(b,p.x,p.y)),'solid furniture');
           }
         }
-        for(const s of [-1,1])for(let a=0;a<4;a++)check(seen[ix(-w/2+(a+.5)*w/4,s*h*.34)],'apartment');
+        state.floor=1;
         for(const up of [true,false]){
           for(let n=0;n<4;n++){at(stair(b,up));const f=state.floor;actionAt().do();check(state.floor===f+(up?1:-1),'stairs');}
           check(state.floor===(up?5:1),'end floor');
@@ -57,6 +67,8 @@ with sync_playwright() as pw:
       for(let x=.21;x<W-.20;x+=.25)for(const y of [railNorth,railSouth]){
         check(!outsideFree(x,y),'fence gap at '+x);check(!sameRailSide(y-.22,y+.22),'tunnelled');
       }
+      check(subway.y-subway.length/2-railSouth>.5,'tunnel touches fence');
+      state.room=-1;at([subway.x+subway.width/2+.12,subway.y+subway.length/2]);check(!actionAt(),'enter through stair wall');
       for(let i=0;i<3;i++){
         const from=stationPortals[i],to=stationPortals[(i+1)%3];
         state.room=-1;at(from.world);check(outsideFree(...from.world),'bad landing');actionAt().do();

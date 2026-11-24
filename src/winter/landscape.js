@@ -58,7 +58,7 @@ function prepareLandscape(){
   surfaceBrushes[5]=createSurfaceBrush(surfaceTiles[3],0,0,256);
   const masks=[
     maskCanvas(paintedRoad),
-    maskCanvas(ctx=>{for(const [a,b] of winterMap.tracks)for(const [width,alpha] of [[1.12,.35],[.87,.86]]){ctx.globalAlpha=alpha;stroke(ctx,[a,b],'#fff',width);}}),
+    maskCanvas(ctx=>{for(const [a,b] of winterMap.tracks)for(const [width,alpha] of [[1.47,.35],[1.20,.86]]){ctx.globalAlpha=alpha;stroke(ctx,[a,b],'#fff',width);}}),
     maskCanvas(ctx=>{pathLine(ctx,winterMap.marsh,true);ctx.fill();}),
     maskCanvas(ctx=>{for(const t of forest){ctx.globalAlpha=.40;ellipse(ctx,t.x+.12,t.y+.18,t.size*1.45,t.size*1.12,'#fff');}}),
     maskCanvas(ctx=>{pathLine(ctx,winterMap.lake,true);ctx.fill();})

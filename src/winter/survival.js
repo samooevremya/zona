@@ -1,5 +1,5 @@
 const flatIndex=winterMap.buildings.findIndex(b=>b[0]==='flat');
-const campfires=[[96,52.4],[72,31],[111,20],[54,95],[42.4,69],[30.8,27]];
+const campfires=[[96,52.4],[72,28.65],[111,20],[54,95],[42.4,69],[30.8,27]];
 const shelters=new Set(['flat','cabin','station','pump','store']);
 const backpack={
   bread:{name:'Хлеб',price:40,weight:.3},cans:{name:'Консервы',price:90,weight:.5},
@@ -12,7 +12,7 @@ for(const [id,price,weight] of [['w_pm',600,.8],['w_obrez',1200,1.9],['w_toz34',
   backpack[id]={name:WP[id].n,price,weight};
 function newWinterState(difficulty='normal'){
   const b=winterMap.buildings[flatIndex];
-  return {version:1,difficulty,x:b[1]-1.4,y:b[2],room:flatIndex,floor:1,clock:510,warmth:100,wet:0,sinking:0,
+  return {version:1,siteRevision:2,difficulty,x:b[1]-1.4,y:b[2],room:flatIndex,floor:1,clock:510,warmth:100,wet:0,sinking:0,
     hp:100,food:89,stamina:100,inventory:{jacket:1,bread:1,bandage:2,medkit:1},money:0,held:'hands',rounds:{},
     searched:{},actors:{},fires:campfires.map(()=>true),crouch:false,lamp:false};
 }
@@ -24,7 +24,32 @@ function notice(text){$('details').textContent=text;$('details').hidden=false;no
 function heldName(){return ({hands:'Пустые руки',knife:'Нож'})[state.held]||backpack[state.held]?.name||'Руки';}
 function nearPoint(pos,r){return Math.hypot(player.x-pos[0],player.y-pos[1])<r;}
 function restoreState(next){
-  fieldReset();tracksInSnow.length=0;lastMark=probe=null;state=next;player.x=state.x;player.y=state.y;camera.x=player.x;camera.y=player.y;
+  state=next;
+  if(state.siteRevision!==2){
+    if(state.room<0){
+      if(state.y>36.65&&state.y<=railSouth+.12)state.y=railSouth+.16;
+      else if(state.y>=31.82&&state.y<=36.65&&state.y<=railNorth+.12)
+        state.y=stationPortals[2].world[1];
+      if(!outsideFree(state.x,state.y)&&Math.abs(state.x-stationBuilding[1])<stationBuilding[3]/2+.2){
+        const portal=stationPortals[state.y<31.82?0:state.y<railSouth?2:1];
+        [state.x,state.y]=portal.world;
+      }
+    }else if(!insideFree(state.room,state.x,state.y)){
+      const b=winterMap.buildings[state.room];
+      let found=false;
+      for(let r=.12;r<=Math.max(b[3],b[4])&&!found;r+=.12){
+        for(let k=0;k<16;k++){
+          const a=k*Math.PI/8,x=state.x+r*Math.cos(a),y=state.y+r*Math.sin(a);
+          if(insideFree(state.room,x,y)){state.x=x;state.y=y;found=true;break;}
+        }
+      }
+    }
+    const walker=state.actors?.walker;
+    if(walker&&walker.hp>0&&overBuilding(walker.x,walker.y,stationBuilding,.12))
+      [walker.x,walker.y]=people.find(n=>n.id==='walker').home;
+    state.siteRevision=2;
+  }
+  fieldReset();tracksInSnow.length=0;lastMark=probe=null;player.x=state.x;player.y=state.y;camera.x=player.x;camera.y=player.y;
   cooldown=reloadTime=0;reloadWeapon='';traces=[];releaseStick();keys.clear();
 }
 function saveSlot(id){
@@ -74,7 +99,8 @@ function actionAt(){
     if(shelters.has(b[0])&&nearPoint(furniture.bed,.73))return {name:'Отдохнуть',do:restMenu};
     return null;
   }
-  const portal=stationPortals.find(p=>sameRailSide(player.y,p.world[1])&&nearPoint(p.world,.74));
+  const portal=stationPortals.find(p=>sameRailSide(player.y,p.world[1])&&nearPoint(p.world,.74)&&
+    (p!==stationPortals[1]||Math.abs(player.x-subway.x)<subway.width/2-.075&&player.y>subway.y-.18));
   if(portal)return {name:'Войти на станцию',do(){state.room=stationIndex;state.floor=1;[player.x,player.y]=portal.room;}};
   for(let i=0;i<winterMap.buildings.length;i++){
     if(i===stationIndex)continue;

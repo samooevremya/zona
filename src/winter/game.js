@@ -23,7 +23,7 @@ function resize(){
   const d=Math.min(devicePixelRatio||1,1.75);cv.width=Math.round(viewW*d);cv.height=Math.round(viewH*d);
   fit=Math.min((viewW-20)/W,(viewH-80)/H);
 }
-function view(){return wide?{x:atlas.x,y:atlas.y,z:fit*atlas.scale}:{x:camera.x,y:camera.y,z:Math.min(83,Math.max(56,viewH/7))*zoom};}
+function view(){return wide?{x:atlas.x,y:atlas.y,z:fit*atlas.scale}:{x:camera.x,y:camera.y,z:Math.min(121,Math.max(79,viewH/5.75))*zoom};}
 function screen(x,y,v){return [(x-v.x)*v.z+viewW/2,(y-v.y)*v.z+viewH/2];}
 function renderBuilding(b,i,v){
   const [kind,x,y,w,h,a]=b,[sx,sy]=screen(x,y,v),p=v.z;
@@ -36,6 +36,8 @@ function renderBuilding(b,i,v){
   contactShade(g,drop,drop*.60,w*.60,h*.60,.58);
   if(kind==='tower' && yardArt.naturalWidth){yardObject(g,0,ox,oy,w*1.10,h*1.46);g.restore();return;}
   if(kind==='tank' && stamp(g,5,l+ox,t+oy,w,h)) {g.restore();return;}
+  if(kind==='platform'){g.restore();return;}
+  if(kind==='station'){stationHouse(g,w,h,ox,oy);g.restore();return;}
   const sprite=({station:0,flat:1,cabin:2,ruin:3,hangar:3,store:4,shed:4,pump:4})[kind];
   if(sprite!==undefined&&objectsImage.complete&&objectsImage.naturalWidth){
     const roofEnd=[.67,.48,.64,.82,.75][sprite];
@@ -190,7 +192,7 @@ function frame(time){
   }
   if(wide){
     for(const [i,x,y] of overviewLabels)mapLabel(winterMap.places[i][1],x,y,v);
-    mapLabel('← Западный путь',13,35.4,v);liveMapPoints(v);
+    mapLabel('← Западный путь',13,35.9,v);liveMapPoints(v);
   }
   requestAnimationFrame(frame);
 }

@@ -72,18 +72,20 @@ function worldScenery(v){
   g.drawImage(ground,left,top,W*v.z,H*v.z);
   if(!wide&&terrainMasks.length)detailGround(v);
   shadowField(v);
-  g.save();g.translate(left,top);g.scale(v.z,v.z);undergrowth(v);paintSites(v);
+  g.save();g.translate(left,top);g.scale(v.z,v.z);undergrowth(v);stationPlatform(g,v);paintSites(v);
   for(const [a] of winterMap.tracks){
-    const lo=Math.max(0,Math.floor((v.x-viewW/(2*v.z))*4)/4),hi=Math.min(W,v.x+viewW/(2*v.z)+.35);
+    const lo=Math.max(0,Math.floor((v.x-viewW/(2*v.z))/sleeperSpacing)*sleeperSpacing),hi=Math.min(W,v.x+viewW/(2*v.z)+.35);
     if(Math.abs(a[1]-v.y)>viewH/(2*v.z)+1)continue;
-    for(let rx=lo;rx<hi;rx+=.25){
-      const tone=lattice(Math.round(rx*4),Math.round(a[1]*10)),offset=(tone-.5)*.045;
-      const x=rx+.06,y=a[1]-.29+offset;
-      g.fillStyle=tone>.54?'#716a5b':'#514e46';g.fillRect(x,y,.094,.58);
+    for(let rx=lo;rx<hi;rx+=sleeperSpacing){
+      const tone=lattice(Math.round(rx/sleeperSpacing),Math.round(a[1]*10)),offset=(tone-.5)*.045;
+      const x=rx+.06,y=a[1]-sleeperLength/2+offset;
+      g.fillStyle=tone>.54?'#716a5b':'#514e46';g.fillRect(x,y,.088,sleeperLength);
+      if(!wide&&furnishingAtlas.naturalWidth)
+        g.drawImage(furnishingAtlas,250+tone*83,7,12,85,x,y,.088,sleeperLength);
       g.fillStyle='rgba(207,213,210,.65)';g.fillRect(x+.006,y+.013,.057,.10+tone*.32);
-      if(!wide){g.fillStyle='#524e43';g.fillRect(x-.012,y+.11,.116,.053);g.fillRect(x-.012,y+.44,.116,.053);}
+      if(!wide){g.fillStyle='#524e43';g.fillRect(x-.012,a[1]-trackGauge/2-.028,.116,.056);g.fillRect(x-.012,a[1]+trackGauge/2-.028,.116,.056);}
     }
-    for(const off of [-.16,.16]){
+    for(const off of [-trackGauge/2,trackGauge/2]){
       stroke(g,[[lo,a[1]+off+.025],[hi,a[1]+off+.025]],'#69594c',.061);
       stroke(g,[[lo,a[1]+off],[hi,a[1]+off]],'#555961',.044);
       stroke(g,[[lo,a[1]+off-.009],[hi,a[1]+off-.009]],'#b6bdba',.017);
@@ -105,8 +107,8 @@ function worldScenery(v){
   }
 }
 
-const yardArt=new Image(),suiteArt=new Image();
-yardArt.src='__YARD_ART__';suiteArt.src='__SUITE_ART__';
+const yardArt=new Image();
+yardArt.src='__YARD_ART__';
 function yardObject(ctx,id,x,y,w,h,angle=0){
   if(!yardArt.naturalWidth)return;
   const cell=yardArt.width/3;
@@ -115,9 +117,9 @@ function yardObject(ctx,id,x,y,w,h,angle=0){
 }
 // Placed beside existing entrances, fence runs, yards and shoreline.
 const siteDetails=[
-  [1,66.6,34.37,1.02,.45],[1,73.2,34.38,1.02,.45],[7,61.9,33.8,.46,.48],
-  [1,56.4,33.42,1.05,.44],[1,84.4,33.42,1.05,.44],[2,68.9,36.96,.28,.86],[2,71.2,36.96,.28,.86],
-  [7,70.94,37.44,.39,.48],[7,65.1,32.1,.37,.41],[1,96.7,51.42,1.02,.45],[1,100.4,65.5,.96,.43],
+  [1,66.6,33.84,1.02,.45],[1,73.2,33.84,1.02,.45],[7,61.9,34.04,.46,.48],
+  [1,56.4,34.08,1.05,.44],[1,84.4,34.08,1.05,.44],[2,68.78,39.49,.34,1.05],[2,71.26,39.49,.34,1.05],
+  [7,71.47,39.77,.39,.48],[7,65.1,33.90,.37,.41],[1,96.7,51.42,1.02,.45],[1,100.4,65.5,.96,.43],
   [3,87.6,51,.88,.52],[7,108.7,50.8,.35,.42],[2,93,51.5,.31,.90],[2,103.7,65,.30,.88],
   [6,101.3,17.2,.92,.48,.34],[6,103.8,20.6,.83,.57,-.64],[3,111.8,15.3,1.18,.57,-.09],
   [7,42.1,66.8,.39,.50],[4,44,68.8,.95,.53,.12],[4,39.7,65.9,.7,.49,-.29],

@@ -96,8 +96,8 @@ function groundArt(){
   }
   for(const [a,b] of winterMap.tracks){
     stroke(g,[a,b],'#949a98',.65);
-    for(let x=.1;x<W;x+=.25){g.fillStyle='#726f62';g.fillRect(x,a[1]-.27,.09,.54);}
-    for(const off of [-.16,.16]){
+    for(let x=.1;x<W;x+=sleeperSpacing){g.fillStyle='#726f62';g.fillRect(x,a[1]-sleeperLength/2,.09,sleeperLength);}
+    for(const off of [-trackGauge/2,trackGauge/2]){
       stroke(g,[[0,a[1]+off],[W,a[1]+off]],'#525c5f',.079);
     }
   }

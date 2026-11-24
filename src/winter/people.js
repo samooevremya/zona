@@ -2,7 +2,7 @@
 const people=[
   {id:'market',name:'Кладовщица',trade:true,x:97.4,y:52.3},
   {id:'fisher',name:'Рыбак',trade:true,x:111.8,y:20.4},
-  {id:'walker',name:'Путевой обходчик',x:72.5,y:30.8},
+  {id:'walker',name:'Путевой обходчик',x:73,y:28.95},
   {id:'first',name:'Дозорный',enemy:true,x:81.2,y:96.4},
   {id:'second',name:'Дозорный',enemy:true,x:49,y:98}
 ].map(n=>({...n,home:[n.x,n.y]}));
@@ -22,7 +22,7 @@ function social(n){
   });
 }
 function outsideFree(x,y){return x>.2&&y>.2&&x<W-.2&&y<H-.2&&Math.abs(y-railNorth)>.105&&Math.abs(y-railSouth)>.105&&
-  !winterMap.buildings.some(b=>b[0]!=='platform'&&overBuilding(x,y,b,.09))&&
+  !tunnelBlocked(x,y)&&!winterMap.buildings.some(b=>b[0]!=='platform'&&overBuilding(x,y,b,.09))&&
   !enclosure.some(line=>line.slice(1).some((p,i)=>clearance(x,y,line[i],p)<.12));}
 function wallDistance(x,y,a,range){
   for(let d=.1;d<range;d+=.1){
@@ -110,8 +110,11 @@ function paintDetails(v){
     stamp(g,8,-p*.16,-p*.16,p*(life.hp<=0?.43:.33),p*.32);
     g.restore();
   }
-  for(const b of winterMap.buildings.filter(accessibleBuilding)){
+  for(const b of winterMap.buildings.filter(b=>accessibleBuilding(b)&&b[0]!=='station')){
     const [x,y]=door(b,true),[sx,sy]=xy(x,y);
-    g.save();g.translate(sx,sy);g.rotate(b[5]);sheetObject(g,3,-.35*v.z,-.21*v.z,.7*v.z,.41*v.z);g.restore();
+    g.save();g.translate(sx,sy);g.rotate(b[5]);g.scale(v.z,v.z);
+    g.fillStyle='#6a675d';g.fillRect(-.29,-.27,.58,.28);
+    if(furnishingAtlas.naturalWidth)g.drawImage(furnishingAtlas,44,420,152,48,-.29,-.27,.58,.28);
+    stroke(g,[[-.29,-.02],[.29,-.02]],'#b1b1a1',.018);g.restore();
   }
 }
