@@ -35,34 +35,83 @@ function roomPlace(i,floor){
     ({cabin:'Жилой дом',store:'Склад',shed:'Сарай',pump:'Водокачка',station:'Вокзал',ruin:'Разбитый корпус',hangar:'Ангар'})[b[0]];
 }
 function paintRoom(v,i,floor){
-  const b=winterMap.buildings[i],w=b[3],h=b[4],[px,py]=screen(b[1],b[2],v);
-  g.save();g.translate(px,py);g.scale(v.z,v.z);g.rotate(b[5]);
-  const l=-w/2,t=-h/2;
-  g.fillStyle=b[0]==='flat'?'#9b8870':'#877968';g.fillRect(l,t,w,h);
-  for(let y=t;y<h/2;y+=.18)stroke(g,[[l,y],[-l,y]],'rgba(64,52,43,.22)',.018);
-  fillMaterial(g,2,l,t,w,h,2.4,.79);
-  const wall=(a,b)=>{stroke(g,[a,b],'#4b4a43',.14);stroke(g,[a,b],'#aaaca0',.065);};
-  wall([l,t],[-l,t]);wall([l,t],[l,-t]);wall([-l,t],[-l,-t]);
-  wall([l,-t],[-.28,-t]);wall([.28,-t],[-l,-t]);
-  for(const [a,c] of roomGeometry[i])wall(a,c);
-  g.fillStyle='#d9caa2';g.fillRect(-.22,-t-.09,.44,.07);
-  if(i===stationIndex){
-    for(const p of stationPortals){const [x,y]=localPoint(b,...p.room);g.fillStyle='#cebf92';g.fillRect(x-.25,y-.10,.50,.20);}
+  const b=winterMap.buildings[i],[kind,bx,by,w,h,angle]=b,[px,py]=screen(bx,by,v);
+  const left=-w/2,top=-h/2;
+  g.save();g.translate(px,py);g.scale(v.z,v.z);g.rotate(angle);
+  g.fillStyle='#655f54';g.fillRect(left-.09,top-.09,w+.18,h+.18);
+  fillMaterial(g,2,left,top,w,h,4.3,.87);
+  function woodObject(id,x,y,ow,oh,rotation=0){
+    g.save();g.translate(x,y);g.rotate(rotation);contactShade(g,.06,.07,ow*.64,oh*.63,.65);
+    sheetObject(g,id,-ow/2,-oh/2,ow,oh);g.restore();
   }
-  if(b[0]==='flat'){
+  function rug(x,y,rw,rh){
+    g.fillStyle='#62584e';g.fillRect(x-rw/2,y-rh/2,rw,rh);
+    g.strokeStyle='#b39474';g.lineWidth=.016;g.strokeRect(x-rw/2+.04,y-rh/2+.04,rw-.08,rh-.08);
+    for(let n=0;n<8;n++)stroke(g,[[x-rw*.42,y-rh*.35+n*rh*.1],[x+rw*.42,y-rh*.35+n*rh*.1]],'#887662',.012);
+  }
+  if(kind==='flat'){
     for(const side of [-1,1])for(let room=0;room<4;room++){
-      const mid=l+(room+.5)*w/4,y=side*(h/2-.24);
-      stroke(g,[[mid-.4,side*h/2],[mid+.4,side*h/2]],'#bfd0c7',.10);
-      g.fillStyle='#615448';g.fillRect(mid+.85,y-.14,.65,.28);
-      g.fillStyle=(room+floor)%2?'#afa58a':'#889488';g.fillRect(mid+.88,y-.12,.57,.2);
+      const mid=left+(room+.5)*w/4,back=side*(h*.5-.43),roomY=side*(h/2+.50)/2;
+      const tint=['rgba(110,93,63,.27)','rgba(71,74,68,.24)','rgba(108,70,52,.26)','rgba(65,81,76,.24)'][(room+floor+(side>0?1:0))%4];
+      g.fillStyle=tint;g.fillRect(mid-w/8,Math.min(side*.5,side*h/2),w/4,h/2-.5);
+      if(suiteArt.naturalWidth){
+        const suite=(room+floor+(side>0?2:0)+i)%4,sw=suiteArt.width/2,sh=suiteArt.height/2;
+        const roomWidth=w/4,depth=h/2-.50;
+        g.save();g.translate(mid,roomY);if(side>0)g.rotate(Math.PI);
+        // Each furnished bay has a clear approach facing the corridor.
+        g.drawImage(suiteArt,(suite%2)*sw+2,Math.floor(suite/2)*sh+2,sw-4,sh-4,-roomWidth/2,-depth/2,roomWidth,depth);g.restore();
+      }else{
+        rug(mid-.38,roomY,1.45,.65);woodObject(1,mid-1.22,back,.66,.58,.08);
+      }
+      const windowY=side*h/2;
+      const light=g.createRadialGradient(mid,windowY,0,mid,windowY,1.25);
+      light.addColorStop(0,'rgba(239,222,179,.40)');light.addColorStop(1,'rgba(235,220,185,0)');
+      g.fillStyle=light;g.fillRect(mid-1.25,side===1?windowY-1.25:windowY,2.5,1.25);
+    }
+    g.fillStyle='#635e54';g.fillRect(left,-.50,w,1);
+    fillMaterial(g,2,left,-.50,w,1,2,.32);
+    for(let x=left;x<w/2;x+=.42){
+      stroke(g,[[x,-.48],[x,.48]],'rgba(42,40,37,.26)',.013);
+      g.fillStyle='rgba(218,204,171,.08)';g.fillRect(x+.018,-.47,.08,.95);
+    }
+  }else{
+    g.fillStyle='rgba(61,59,53,.25)';g.fillRect(left,top,w,h);
+    if(kind==='station'||kind==='store'||kind==='ruin'||kind==='hangar'){
+      for(let x=left+.35;x<w/2-.5;x+=kind==='station'?1.7:2.7){
+        woodObject(kind==='station'?1:4,x+.15,top+.30,.59,.45,.06*Math.sin(x*9+i));
+      }
+    }else if(w>2.4){
+      woodObject(1,.23,.14,.57,.53,-.17);rug(-.22,.04,.87,.64);
+    }
+  }
+  const wall=(a,z)=>{
+    stroke(g,[[a[0]+.08,a[1]+.10],[z[0]+.08,z[1]+.10]],'rgba(30,28,23,.35)',.19);
+    stroke(g,[a,z],'#3b3933',.155);stroke(g,[a,z],'#888579',.095);
+    stroke(g,[[a[0]-.023,a[1]-.027],[z[0]-.023,z[1]-.027]],'#b4aa93',.027);
+  };
+  wall([left,top],[-left,top]);wall([left,top],[left,-top]);wall([-left,top],[-left,-top]);
+  wall([left,-top],[-.28,-top]);wall([.28,-top],[-left,-top]);
+  for(const [a,z] of roomGeometry[i])wall(a,z);
+  g.fillStyle='#a59678';g.fillRect(-.27,-top-.065,.54,.09);
+  if(kind==='flat'){
+    for(const side of [-1,1])for(let room=0;room<4;room++){
+      const mid=left+(room+.5)*w/4,sy=side*h/2;
+      stroke(g,[[mid-.34,sy],[mid+.34,sy]],'#b9c6c2',.08);
+      stroke(g,[[mid,sy-.06],[mid,sy+.07]],'#565a52',.034);
     }
     for(const [up,off] of [[true,.72],[false,-.72]]){
       if(up?floor===5:floor===1)continue;
-      g.fillStyle='#554e46';g.fillRect(off-.38,-.4,.76,.8);
-      for(let n=0;n<7;n++){g.fillStyle='rgb('+[139+n*6,130+n*6,114+n*6].join(',')+')';g.fillRect(off-.35,-.37+n*.106,.70,.084);}
-      g.fillStyle='#242d2d';g.textAlign='center';g.font='.24px sans-serif';g.fillText(up?'▲':'▼',off,.08);
+      woodObject(3,off,0,.62,.94,up?0:Math.PI);
     }
   }
+  if(i===stationIndex){
+    for(const portal of stationPortals){
+      const [x,y]=localPoint(b,...portal.room);rug(x,y,.49,.23);
+    }
+  }
+  const furnishings=roomFurniture(b);
+  const [cx,cy]=localPoint(b,...furnishings.box),[ex,ey]=localPoint(b,...furnishings.bed);
+  woodObject(2,cx,cy,.56,.52);woodObject(shelters.has(kind)?0:4,ex,ey,.74,.49,Math.PI*.5);
   g.restore();
 }
 
@@ -98,8 +147,11 @@ function railwayFence(v){
     }
   }
   const [x,y]=stationPortals[1].world;
-  g.fillStyle='#707b78';g.fillRect(x-.55,y-.20,1.1,.64);
-  for(let i=0;i<6;i++){
-    g.fillStyle=['#5a605d','#71756c','#868a7e','#989d8e','#abb1a3','#bac0b0'][i];g.fillRect(x-.45,y-.16+i*.09,.90,.07);
+  contactShade(g,x+.10,y+.16,.81,.49,.73);
+  g.fillStyle='#62645e';g.fillRect(x-.52,y-.31,1.04,.69);
+  sheetObject(g,3,x-.50,y-.47,1,.91);
+  for(const side of [-1,1]){
+    stroke(g,[[x+side*.48,y-.38],[x+side*.48,y+.35]],'#5a5b56',.055);
+    stroke(g,[[x+side*.48-.014,y-.38],[x+side*.48-.014,y+.35]],'#d3d1bd',.016);
   }
 }

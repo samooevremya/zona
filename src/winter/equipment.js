@@ -52,8 +52,8 @@ function drawLowProps(v){
   if(wide||state.room>=0)return;
   g.save();g.translate(viewW/2-v.x*v.z,viewH/2-v.y*v.z);g.scale(v.z,v.z);
   for(const [x,y,w,h] of lowProps){
-    g.fillStyle='#847b68';g.fillRect(x-w,y-h,w*2,h*2);g.fillStyle='#afb0a1';g.fillRect(x-w,y-h,w*2,h*.28);
-    stroke(g,[[x-w,y-h],[x+w,y+h]],'#645d50',.033);
+    contactShade(g,x+.08,y+.06,w*1.26,h*1.2,.5);
+    sheetObject(g,4,x-w,y-h,w*2,h*2);
   }
   g.restore();
 }

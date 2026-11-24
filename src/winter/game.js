@@ -23,7 +23,7 @@ function resize(){
   const d=Math.min(devicePixelRatio||1,1.75);cv.width=Math.round(viewW*d);cv.height=Math.round(viewH*d);
   fit=Math.min((viewW-20)/W,(viewH-80)/H);
 }
-function view(){return wide?{x:atlas.x,y:atlas.y,z:fit*atlas.scale}:{x:camera.x,y:camera.y,z:Math.min(83,Math.max(46,viewH/7))*zoom};}
+function view(){return wide?{x:atlas.x,y:atlas.y,z:fit*atlas.scale}:{x:camera.x,y:camera.y,z:Math.min(83,Math.max(56,viewH/7))*zoom};}
 function screen(x,y,v){return [(x-v.x)*v.z+viewW/2,(y-v.y)*v.z+viewH/2];}
 function renderBuilding(b,i,v){
   const [kind,x,y,w,h,a]=b,[sx,sy]=screen(x,y,v),p=v.z;
@@ -32,16 +32,25 @@ function renderBuilding(b,i,v){
   const r=randomStream(955+i),height=kind==='flat'?.12:kind==='tower'||kind==='tank'?.17:.05;
   const ox=wide?-.14:clamp((sx-viewW/2)*height/p,-.52,.52),oy=wide?-.22:clamp((sy-viewH/2)*height/p,-.6,.6);
   const l=-w/2,t=-h/2;
-  g.fillStyle='rgba(54,64,68,.22)';g.fillRect(l+.23,t+.3,w+.07,h+.04);
+  const drop=kind==='flat'?.83:kind==='tower'?.65:.37;
+  contactShade(g,drop,drop*.60,w*.60,h*.60,.58);
+  if(kind==='tower' && yardArt.naturalWidth){yardObject(g,0,ox,oy,w*1.10,h*1.46);g.restore();return;}
   if(kind==='tank' && stamp(g,5,l+ox,t+oy,w,h)) {g.restore();return;}
   const sprite=({station:0,flat:1,cabin:2,ruin:3,hangar:3,store:4,shed:4,pump:4})[kind];
   if(sprite!==undefined&&objectsImage.complete&&objectsImage.naturalWidth){
     const roofEnd=[.67,.48,.64,.82,.75][sprite];
-    const raised=wide?(kind==='flat'?.95:.36):Math.max(.12,Math.abs(oy));
-    // Draw a textured wall in the projected extension, then the roof on its footprint.
-    const frontEdge=oy<0||wide?h/2+oy:t+oy-raised;
-    stamp(g,sprite,l+ox,frontEdge,w,raised,roofEnd,1);
-    stamp(g,sprite,l+ox,t+oy,w,h,0,roofEnd);
+    const eave=kind==='station'?h*.24:h*.40;
+    const raised=wide?(kind==='flat'?.66:.28):Math.max(.12,Math.abs(oy));
+    const bottomFace=(oy<=0||wide);
+    const frontEdge=bottomFace?eave+oy:t+oy-raised;
+    const faceDepth=bottomFace?h*.5-eave+raised:raised;
+    g.fillStyle='#686a60';g.fillRect(l+ox+.06,frontEdge,w-.12,faceDepth);
+    const faceStart=kind==='flat'?.54:roofEnd;
+    stamp(g,sprite,l+ox,frontEdge,w,faceDepth,faceStart,.91);
+    if((kind==='flat'||kind==='station')&&roofAtlas.naturalWidth){
+      const band=roofAtlas.height/2;
+      g.drawImage(roofAtlas,0,kind==='flat'?band:0,roofAtlas.width,band,l+ox,t+oy,w,h);
+    }else stamp(g,sprite,l+ox,t+oy,w,h,0,roofEnd);
     g.restore();return;
   }
   if(kind==='tank'||kind==='tower'){
@@ -95,10 +104,10 @@ function renderBuilding(b,i,v){
 const enclosure=[[[44,89],[53,86],[63.5,86]],[[71,86],[83,86],[93,90],[93,108],[70,109]],[[64,109],[43,108],[43.5,92]]];
 function groundObjects(v){
   g.save();g.translate(viewW/2-v.x*v.z,viewH/2-v.y*v.z);g.scale(v.z,v.z);
-  railwayFence(v);
+  railwayFence(v);lakeJetties(g);
   for(const line of enclosure){stroke(g,line,'#787c74',.16);stroke(g,line,'#e0e0d6',.07);}
   for(const [x,y] of [[99,15],[100,15.9],[102,18.8],[95.2,18.2]]){
-    g.save();g.translate(x,y);g.rotate(.4);ellipse(g,0,0,1.05,.25,'#7c7465');ellipse(g,0,0,.84,.14,'#c1c4b9');g.restore();
+    g.save();g.translate(x,y);g.rotate(1.96);sheetObject(g,8,-.26,-1.06,.52,2.12);g.restore();
   }
   g.restore();
 }
@@ -167,42 +176,12 @@ function frame(time){
   if(!ground){requestAnimationFrame(frame);return;}
   const v=view(),d=cv.width/viewW;g.setTransform(d,0,0,d,0,0);
   g.fillStyle='#303b3c';g.fillRect(0,0,viewW,viewH);
+  worldScenery(v);
   if(!wide && state.room>=0){
-    g.fillStyle='#303733';g.fillRect(0,0,viewW,viewH);paintRoom(v,state.room,state.floor);
-    const b=winterMap.buildings[state.room],f=roomFurniture(b);
-    for(const [k,pos] of Object.entries(f)){
-      const [x,y]=screen(...pos,v);g.fillStyle=k==='box'?'#5f6954':'#7a8379';g.fillRect(x-v.z*.21,y-v.z*.14,v.z*.42,v.z*.28);
-    }
-    person(v);
-  }else{
-  const [left,top]=screen(0,0,v);
-  g.drawImage(ground,left,top,W*v.z,H*v.z);
-  if(!wide){
-    g.save();g.translate(left,top);g.scale(v.z,v.z);
-    const x=v.x-viewW/(2*v.z),y=v.y-viewH/(2*v.z),w=viewW/v.z,h=viewH/v.z;
-    fillMaterial(g,0,x,y,w,h,3.4,.24);
-    g.save();pathLine(g,winterMap.lake,true);g.clip();fillMaterial(g,3,x,y,w,h,5,.65);g.restore();
-    for(const [a,b] of winterMap.tracks){
-      if(a[1]<y-.4||a[1]>y+h+.4)continue;
-      for(let rx=Math.max(0,Math.floor(x*4)/4);rx<Math.min(W,x+w+.25);rx+=.25){
-        g.fillStyle='#777565';g.fillRect(rx+.085,a[1]-.26,.093,.52);
-      }
-      for(const offset of [-.16,.16]){stroke(g,[[0,a[1]+offset],[W,a[1]+offset]],'#596064',.06);
-        stroke(g,[[0,a[1]+offset-.014],[W,a[1]+offset-.014]],'#b9bcb2',.018);}
-    }
-    g.restore();
+    g.fillStyle='rgba(29,37,43,.26)';g.fillRect(0,0,viewW,viewH);
+    paintRoom(v,state.room,state.floor);person(v);
   }
-  groundObjects(v);
-  for(const b of winterMap.buildings)renderBuilding(b,winterMap.buildings.indexOf(b),v);
-  if(!wide){renderFieldGear(v);drawLowProps(v);paintDetails(v);}person(v);
-  for(const t of visibleForest(v)){
-    const [x,y]=screen(t.x,t.y,v),size=t.size*v.z*2.55;
-    if(x+size<0||y+size<0||x-size>viewW||y-size>viewH)continue;
-    const near=!wide && Math.hypot(t.x-player.x,t.y-player.y)<t.size;
-    if(near)g.globalAlpha=.54;if(!stamp(g,t.id<14?6:7,x-size*.50,y-size*.50,size,size))g.drawImage(crowns[t.id],x-size/2,y-size/2,size,size);if(near)g.globalAlpha=1;
-  }
-  }
-  fieldRender(v);if(!wide){adjustBodyLocation();bedsideGlow(v);}snow(v);
+  fieldRender(v);if(!wide){adjustBodyLocation();bedsideGlow(v);}snow(v);atmosphereGrade(v);
   if(!wide){
     for(const tr of traces){const [x,y]=screen(tr.x,tr.y,v);stroke(g,[[x,y],[x+Math.cos(tr.a)*tr.d*v.z,y+Math.sin(tr.a)*tr.d*v.z]],'#ead7a0',1);}
     const hr=(state.clock/60)%24,dark=Math.max(0,Math.cos(hr*Math.PI/12))*.62;

@@ -95,7 +95,7 @@ function fieldRender(v){
   if(wide)return;
   if(state.room===flatIndex&&state.floor===1){
     const [x,y]=screen(...worldPoint(winterMap.buildings[flatIndex],-2.8,0),v);
-    g.fillStyle='#565e50';g.fillRect(x-v.z*.22,y-v.z*.16,v.z*.44,v.z*.32);g.fillStyle='#d9c49a';g.fillRect(x-v.z*.05,y,v.z*.10,v.z*.04);
+    sheetObject(g,4,x-v.z*.25,y-v.z*.20,.50*v.z,.40*v.z);
   }
   if(state.room<0){
     for(const n of people.filter(n=>n.animal)){

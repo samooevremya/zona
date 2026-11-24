@@ -58,4 +58,6 @@ window.addEventListener('keydown',e=>{
 document.body.classList.add('walking');$('legend').hidden=true;
 const auto=readSlot('auto');if(auto)restoreState(auto);else saveSlot('auto');
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.hp>0)saveSlot('auto');});
-window.addEventListener('resize',resize);resize();refreshHud();loadMaterials().catch(()=>{}).finally(()=>{ground=groundArt();requestAnimationFrame(frame);});
+window.addEventListener('resize',resize);resize();refreshHud();Promise.all([loadMaterials(),landscapeAtlas.decode(),furnishingAtlas.decode(),roofAtlas.decode(),yardArt.decode(),suiteArt.decode()]).then(()=>{
+  prepareLandscape();prepareScenery();ground=overviewGround();
+}).catch(()=>{ground=groundArt();}).finally(()=>requestAnimationFrame(frame));
