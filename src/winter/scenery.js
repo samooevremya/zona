@@ -102,7 +102,9 @@ function worldScenery(v){
     if(x+size<0||y+size<0||x-size>viewW||y-size>viewH)continue;
     const close=!wide&&state.room<0&&Math.hypot(t.x-player.x,t.y-player.y)<t.size;
     if(close)g.globalAlpha=.54;
-    g.drawImage(crowns[t.id],x-size*.5,y-size*.5,size,size);
+    const canopy=wide?0:.092,top=screen(...liftPoint(t.x,t.y,canopy,v),v);
+    g.drawImage(crowns[t.id],x-size*.39,y-size*.39,size*.78,size*.78);
+    g.drawImage(crowns[t.id],top[0]-size*.5,top[1]-size*.5,size,size);
     if(close)g.globalAlpha=1;
   }
 }
@@ -120,7 +122,7 @@ const siteDetails=[
   [1,66.6,33.84,1.02,.45],[1,73.2,33.84,1.02,.45],[7,61.9,34.04,.46,.48],
   [1,56.4,34.08,1.05,.44],[1,84.4,34.08,1.05,.44],[2,68.78,39.49,.34,1.05],[2,71.26,39.49,.34,1.05],
   [7,71.47,39.77,.39,.48],[7,65.1,33.90,.37,.41],[1,96.7,51.42,1.02,.45],[1,100.4,65.5,.96,.43],
-  [3,87.6,51,.88,.52],[7,108.7,50.8,.35,.42],[2,93,51.5,.31,.90],[2,103.7,65,.30,.88],
+  [3,85.70,47.65,1.06,.48,1.5708],[7,108.7,50.8,.35,.42],[2,93,51.5,.31,.90],[2,103.7,65,.30,.88],
   [6,101.3,17.2,.92,.48,.34],[6,103.8,20.6,.83,.57,-.64],[3,111.8,15.3,1.18,.57,-.09],
   [7,42.1,66.8,.39,.50],[4,44,68.8,.95,.53,.12],[4,39.7,65.9,.7,.49,-.29],
   [3,28.3,25.6,1.28,.61,-.12],[7,33.7,26.15,.35,.43],[3,13.6,18.48,.83,.48],
@@ -130,7 +132,17 @@ const siteDetails=[
 function paintSites(v){
   for(const [id,x,y,w,h,angle] of siteDetails){
     if(Math.abs(x-v.x)>(viewW/2)/v.z+2||Math.abs(y-v.y)>(viewH/2)/v.z+2)continue;
-    contactShade(g,x+.12,y+.11,w*.64,h*.60,.39);yardObject(g,id,x,y,w,h,angle);
+    const high=[.095,.021,.064,.044,.04,.025,.016,.028,.013][id],top=liftPoint(x,y,wide?0:high,v);
+    contactShade(g,x+.12,y+.11,w*.64,h*.60,.39);
+    if(id===3){stackedWood(g,x,y,w,h,angle||0,v);continue;}
+    const base=[[x-w/2,y-h/2],[x+w/2,y-h/2],[x+w/2,y+h/2],[x-w/2,y+h/2]];
+    if(!angle&&[1,4,7].includes(id)){
+      for(let side=0;side<4;side++){
+        const a=base[side],b=base[(side+1)%4];
+        polygon(g,[a,b,liftPoint(...b,high,v),liftPoint(...a,high,v)],side%2?'#57594e':'#737367');
+      }
+    }
+    yardObject(g,id,...top,w,h,angle);
   }
 }
 function roadWear(ctx,scale,x,y,w,h){

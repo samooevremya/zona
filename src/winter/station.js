@@ -15,7 +15,7 @@ function sameRailSide(y,py){
 function tunnelBlocked(x,y){
   const {width,length}=subway,dx=Math.abs(x-subway.x),at=y-subway.y;
   if(at< -length/2-.09||at>length/2+.09||dx>width/2+.09)return false;
-  return dx>width/2-.13||at< -length/2+.32;
+  return dx>width/2-.073||at< -length/2+.18;
 }
 function railFenceRun(v,x0,x1,y){
   const lo=Math.max(x0,v.x-viewW/(2*v.z)-.7),hi=Math.min(x1,v.x+viewW/(2*v.z)+.7);

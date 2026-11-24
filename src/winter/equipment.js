@@ -8,6 +8,7 @@ Object.assign(backpack,{
 const armour={jacket:{warm:1,armor:.1},workcoat:{warm:1.5,armor:.2},vest:{warm:1.16,armor:.4}};
 const contamination=[[85.9,96.4,1.4],[46,102.8,.95]];
 const tracksInSnow=[];
+let footSide=1;
 let nextTick=0,probe=null,lastMark=null;
 function fieldExposure(dt){
   state.radiation??=0;
@@ -18,7 +19,9 @@ function fieldExposure(dt){
   if(probe&&(probe.time+=dt)>1.3)probe=null;
   if(state.room<0&&!isMarsh()&&!polygonContains(winterMap.lake,player.x,player.y)&&
       (!lastMark||Math.hypot(player.x-lastMark[0],player.y-lastMark[1])>.18)){
-    lastMark=[player.x,player.y];tracksInSnow.push([...lastMark,player.a,state.clock]);
+    const direction=lastMark?Math.atan2(player.y-lastMark[1],player.x-lastMark[0]):player.a;
+    lastMark=[player.x,player.y];footSide*=-1;
+    tracksInSnow.push([player.x-Math.sin(direction)*footSide*.07,player.y+Math.cos(direction)*footSide*.07,direction,state.clock]);
     if(tracksInSnow.length>100)tracksInSnow.shift();
   }
 }
@@ -31,10 +34,10 @@ function tossProbe(){
 }
 function renderFieldGear(v){
   if(wide||state.room>=0)return;
-  for(const [i,m] of tracksInSnow.entries()){
+  for(const m of tracksInSnow){
     const age=state.clock-m[3];if(age<0||age>60)continue;
     const [x,y]=screen(m[0],m[1],v);g.save();g.translate(x,y);g.rotate(m[2]);
-    ellipse(g,0,(i%2?.065:-.065)*v.z,.057*v.z,.026*v.z,'rgba(95,110,114,'+(.30*(1-age/60))+')');g.restore();
+    ellipse(g,0,0,.057*v.z,.026*v.z,'rgba(95,110,114,'+(.30*(1-age/60))+')');g.restore();
   }
   for(const [x,y,r] of contamination){
     if(Math.hypot(player.x-x,player.y-y)>10)continue;
@@ -46,12 +49,13 @@ function renderFieldGear(v){
 }
 const lowProps=[[95.7,52.9,.32,.24],[31.6,26.1,.44,.25],[73.8,30.3,.35,.24],[52.3,96.5,.45,.21],[112.3,20.6,.4,.25]];
 function lowObstacle(x,y){
-  return lowProps.some(([px,py,w,h])=>Math.abs(x-px)<w+.08&&Math.abs(y-py)<h+.08);
+  return lowProps.some(([px,py,w,h],n)=>!state.broken?.['yard-'+n]&&Math.abs(x-px)<w+.08&&Math.abs(y-py)<h+.08);
 }
 function drawLowProps(v){
   if(wide||state.room>=0)return;
   g.save();g.translate(viewW/2-v.x*v.z,viewH/2-v.y*v.z);g.scale(v.z,v.z);
-  for(const [x,y,w,h] of lowProps){
+  for(const [n,[x,y,w,h]] of lowProps.entries()){
+    if(state.broken?.['yard-'+n]){brokenPlanks(g,x,y,w*2);continue;}
     contactShade(g,x+.08,y+.06,w*1.26,h*1.2,.5);
     sheetObject(g,4,x-w,y-h,w*2,h*2);
   }

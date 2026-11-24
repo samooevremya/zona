@@ -22,12 +22,12 @@ function social(n){
   });
 }
 function outsideFree(x,y){return x>.2&&y>.2&&x<W-.2&&y<H-.2&&Math.abs(y-railNorth)>.105&&Math.abs(y-railSouth)>.105&&
-  !tunnelBlocked(x,y)&&!winterMap.buildings.some(b=>b[0]!=='platform'&&overBuilding(x,y,b,.09))&&
+  !touchesSolid(x,y)&&!tunnelBlocked(x,y)&&!winterMap.buildings.some(b=>b[0]!=='platform'&&overBuilding(x,y,b,.09))&&
   !enclosure.some(line=>line.slice(1).some((p,i)=>clearance(x,y,line[i],p)<.12));}
 function wallDistance(x,y,a,range){
   for(let d=.1;d<range;d+=.1){
     const px=x+Math.cos(a)*d,py=y+Math.sin(a)*d;
-    if(!(state.room<0?outsideFree(px,py):insideFree(state.room,px,py)))return d;
+    if(!(state.room<0?outsideFree(px,py):state.floor===0?tunnelFree(px,py):insideFree(state.room,px,py)))return d;
   }
   return range;
 }

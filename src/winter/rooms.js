@@ -16,21 +16,30 @@ function flatWalls(b) {
   for(const side of [-1,1]){
     for(let i=0;i<4;i++){
       const a=-w/2+i*w/4,mid=a+w/8,y=side*.5;
-      lines.push([[a,y],[mid-.34,y]],[[mid+.34,y],[a+w/4,y]]);
+      lines.push([[i===2?.91:a,y],[mid-.34,y]],[[mid+.34,y],[i===1?-.91:a+w/4,y]]);
       // Short return wall between the entry and the back of each apartment.
       lines.push([[mid+w*.060,side*h/2],[mid+w*.060,side*(h/2-.57)]]);
-      if(i && !(side===1 && i===2))lines.push([[a,y],[a,side*h/2]]);
+      if(i && i!==2)lines.push([[a,y],[a,side*h/2]]);
     }
   }
+  for(const side of [-1,1]){
+    lines.push([[side*.92,.5],[side*.92,h/2]],[[side*.92,-.5],[side*.92,-h/2]]);
+  }
+  lines.push([[0,-.68],[0,-1.68]]);
   return lines;
 }
-const roomGeometry=winterMap.buildings.map(b=>b[0]==='flat'?flatWalls(b):[]);
+const roomGeometry=winterMap.buildings.map(b=>b[0]==='flat'?flatWalls(b):b[0]==='station'?flightWalls(b[3]/2-.88,0,subwayWidth()+.12,1.62):[]);
 function insideFree(i,x,y){
   const b=winterMap.buildings[i],[lx,ly]=localPoint(b,x,y);
   return Math.abs(lx)<b[3]/2-.12 && Math.abs(ly)<b[4]/2-.12 &&
     fitsFurniture(i,state.floor,lx,ly) && !roomGeometry[i].some(([a,b])=>clearance(lx,ly,a,b)<.12);
 }
-function stair(b,up){return worldPoint(b,up?.72:-.72,0);}
+function subwayWidth(){return 2.9*metre;}
+function wallAccess(i,x,y,tx,ty){
+  const count=Math.max(1,Math.ceil(Math.hypot(tx-x,ty-y)/.06));
+  for(let n=1;n<=count;n++)if(roomGeometry[i].some(([a,b])=>clearance(x+(tx-x)*n/count,y+(ty-y)*n/count,a,b)<.055))return false;
+  return true;
+}
 function roomPlace(i,floor){
   const b=winterMap.buildings[i];
   return b[0]==='flat'?'Берёзки · корпус '+(winterMap.buildings.slice(0,i+1).filter(k=>k[0]==='flat').length)+' · этаж '+floor:
@@ -51,6 +60,9 @@ function roomLayout(i,floor){
     const rx=(turn%2?oh:ow)/2,ry=(turn%2?ow:oh)/2;
     function clear(px,py){
       if(Math.abs(px)+rx>w/2-.065||Math.abs(py)+ry>h/2-.065)return false;
+      if(kind==='flat'&&Math.abs(px)<1.25+rx&&Math.abs(py)>.42)return false;
+      if(kind==='station'&&Math.abs(px-(w/2-.88))<.72+rx)return false;
+      if(Math.abs(px)<.55+rx&&py+ry>h/2-.60)return false;
       if(type==='rug')return true;
       if(roomGeometry[i].some(([[ax,ay],[bx,by]])=>
         px+rx+.07>Math.min(ax,bx)&&px-rx-.07<Math.max(ax,bx)&&
@@ -58,12 +70,12 @@ function roomLayout(i,floor){
       return !layout.some(q=>q.type!=='rug'&&Math.abs(px-q.x)<rx+q.rx+.035&&Math.abs(py-q.y)<ry+q.ry+.035);
     }
     for(const [dx,dy] of [[0,0],[-.19,0],[.19,0],[-.43,0],[.43,0],[0,.28],[0,-.28],[-.60,0],[.60,0]]){
-      if(clear(x+dx,y+dy)){layout.push({type,x:x+dx,y:y+dy,ow,oh,turn,rx,ry});return;}
+      if(clear(x+dx,y+dy)){layout.push({type,x:x+dx,y:y+dy,ow,oh,turn,rx,ry,key:layout.length===0?'room-'+i+'-'+floor:'furniture-'+i+'-'+floor+'-'+layout.length});return;}
     }
   }
   const places=roomFurniture(b),[cx,cy]=localPoint(b,...places.box),[bx,by]=localPoint(b,...places.bed);
   put('cupboard',cx,cy);
-  put(shelters.has(kind)?'bed':'crate',bx,by,1);
+  put(kind==='flat'||kind==='cabin'?'bed':'crate',bx,by,1);
   if(kind==='flat'){
     for(const side of [-1,1])for(let n=0;n<4;n++){
       const mid=(n-1.5)*w/4, back=side*(h/2-.34);
@@ -88,7 +100,7 @@ function roomLayout(i,floor){
         put('cupboard',mid+end,side*.84);
       }
     }
-    if(i===flatIndex&&floor===1)put('crate',-2.8,-.29);
+    if(i===flatIndex&&floor===1)put('crate',-2.12,-.29);
   }else if(kind==='station'){
     for(let x=-w/2+.89;x<w/2-.7;x+=1.65)
       if(Math.abs(x)>1.1)put('bench',x,h/2-.42);
@@ -102,7 +114,7 @@ function roomLayout(i,floor){
   layouts.set(key,layout);return layout;
 }
 function fitsFurniture(i,floor,x,y){
-  return !roomLayout(i,floor).some(p=>p.type!=='rug'&&Math.abs(x-p.x)<p.rx+.075&&Math.abs(y-p.y)<p.ry+.075);
+  return !roomLayout(i,floor).some(p=>p.type!=='rug'&&!state.broken?.[p.key]&&Math.abs(x-p.x)<p.rx+.075&&Math.abs(y-p.y)<p.ry+.075);
 }
 function drawFlight(ctx,x,y,w,h,down){
   ctx.save();ctx.translate(x,y);
@@ -221,9 +233,22 @@ function paintRoom(v,i,floor){
     wall([l,t],[-.28,t]);wall([.28,t],[-l,t]);
   }else wall([l,t],[-l,t]);
   wall([l,t],[l,-t]);wall([-l,t],[-l,-t]);
-  wall([l,-t],[-.28,-t]);wall([.28,-t],[-l,-t]);
+  if(floor===1){wall([l,-t],[-.28,-t]);wall([.28,-t],[-l,-t]);}else wall([l,-t],[-l,-t]);
   for(const [a,z] of roomGeometry[i])wall(a,z);
-  for(const p of pieces)if(p.type!=='rug')drawPiece(g,p);
+  const [camX,camY]=localPoint(b,v.x,v.y);
+  for(const p of pieces){
+    if(p.type==='rug')continue;
+    if(state.broken?.[p.key]){brokenPlanks(g,p.x,p.y,p.ow);continue;}
+    const elevation=p.type==='cupboard'?.048:p.type==='bed'||p.type==='chair'?.012:.023;
+    const ox=(p.x-camX)*elevation,oy=(p.y-camY)*elevation;
+    const corners=[[-p.rx,-p.ry],[p.rx,-p.ry],[p.rx,p.ry],[-p.rx,p.ry]];
+    for(let j=0;j<4;j++){
+      const [x1,y1]=corners[j],[x2,y2]=corners[(j+1)%4];
+      if((x2-x1)*(camY-p.y-y1)-(y2-y1)*(camX-p.x-x1)>=0)continue;
+      polygon(g,[[p.x+x1,p.y+y1],[p.x+x2,p.y+y2],[p.x+x2+ox,p.y+y2+oy],[p.x+x1+ox,p.y+y1+oy]],j%2?'#514d41':'#676252');
+    }
+    g.save();g.translate(ox,oy);drawPiece(g,p);g.restore();
+  }
   if(kind==='flat'){
     for(const side of [-1,1])for(let n=0;n<4;n++){
       const mid=(n-1.5)*w/4,sy=side*h/2;
@@ -237,9 +262,27 @@ function paintRoom(v,i,floor){
       }
       stroke(g,[[mid-.32,side*.51],[mid-.39,side*.77]],'#756957',.045);
     }
-    for(const up of [true,false])if(up?floor<5:floor>1){
-      const [x,y]=localPoint(b,...stair(b,up));drawFlight(g,x,y,.52,.86,!up);
+    g.fillStyle='#79796e';g.fillRect(-.86,-h/2+.07,1.72,h/2-.48);
+    fillMaterial(g,1,-.86,-h/2+.07,1.72,h/2-.48,.77,.17);
+    for(const side of [-1,1]){
+      const up=(side<0)===(floor%2===1);
+      const active=floor!==1||up;
+      if(active&&(floor!==5||!up))drawFlight(g,side*.44,-1.18,.76,1.0,up===(side>0));
     }
-  }else if(kind==='station')drawFlight(g,-3.6,.72,.76,1.05,true);
+    for(let n=0;n<5;n++){
+      const y=-1.68+n*.24;stroke(g,[[0,y],[-.035,y-.08]],'#575d53',.032);
+    }
+    stroke(g,[[-.035,-1.76],[-.035,-.78]],'#c3b8a0',.043);
+    stroke(g,[[-.68,-h/2],[.68,-h/2]],'#b4c4c2',.08);
+  }else if(kind==='station'){
+    g.save();g.translate(b[3]/2-.88,0);g.rotate(Math.PI);
+    drawFlight(g,0,0,northStairs.width,northStairs.length,true);
+    for(const s of [-1,1]){
+      const x=s*northStairs.width/2;
+      stroke(g,[[x,-.84],[x,.83]],'#777869',.12);
+      stroke(g,[[x-.025,-.85],[x-.025,.8]],'#c8c5b3',.039);
+    }
+    stroke(g,[[-.6,-.83],[.6,-.83]],'#5a5c51',.13);g.restore();
+  }
   g.restore();
 }
