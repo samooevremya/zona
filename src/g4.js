@@ -565,7 +565,7 @@ function drawHouseRoof(g, h, i, scale) {
 function drawPlayerAim() {
   const ray=P.aimRay, lock=P.lock;
   ctx.save();
-  if (ray) {
+  if (ray && sightInstalled(S.weapon)) {
     const muzzle=muzzlePoint(P,P.ang);
     const along=(muzzle.x-P.x)*ray.ca+(muzzle.y-P.y)*ray.sa;
     if (along<ray.t) {
@@ -573,12 +573,13 @@ function drawPlayerAim() {
       const length=Math.hypot(dx,dy);
       if (length>0) {
         const visible=rayWall(muzzle.x,muzzle.y,dx/length,dy/length,length);
-        ctx.strokeStyle=P.shotFlash>0 ? '#ff6651' : 'rgba(244,240,224,.84)';
-        ctx.lineWidth=1.35/Z;ctx.beginPath();ctx.moveTo(muzzle.x,muzzle.y);
+        ctx.strokeStyle=(sightInstalled(S.weapon)&2) || P.shotFlash>0 ? '#e66c52' : 'rgba(244,240,224,.84)';
+        ctx.setLineDash([4/Z,4/Z]);ctx.lineWidth=1.35/Z;ctx.beginPath();ctx.moveTo(muzzle.x,muzzle.y);
         ctx.lineTo(muzzle.x+dx*visible/length,muzzle.y+dy*visible/length);ctx.stroke();
       }
     }
   }
+  ctx.setLineDash([]);
   if (lock?.alive) {
     ctx.strokeStyle='rgba(245,181,104,.95)'; ctx.lineWidth=1.65/Z;
     const r=lock.r-(lock.captive ? 4 : 0);
@@ -869,10 +870,13 @@ function drawDeskTrader(e) {
 const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function render() {
   let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
-  if (S && P && S.blow?.stage === 2 && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
+  const dizzy=clamp(((S?.flags.dizzyUntil||0)-(S?.min||0))/10,0,1);
+  if(dizzy && !reducedCameraMotion.matches){sx+=dizzy*2.6*Math.sin(S.min*1.4);sy+=dizzy*1.9*Math.sin(S.min*.89);}
+  if (S && P && S.blow?.stage && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
     const t = S.blow.t;
-    sx += 1.1 * Math.sin(t * 23) + .45 * Math.sin(t * 41);
-    sy += .85 * Math.sin(t * 29);
+    const power=S.blow.stage===2?2.4:.35+.55*clamp(1-t/42,0,1);
+    sx += power*(Math.sin(t*18)+.3*Math.sin(t*27));
+    sy += power*.72*Math.sin(t*22);
   }
   if (P) {
     let tx = P.x, ty = P.y;
@@ -898,6 +902,7 @@ function render() {
     const width=SHOP_ROOM.width*T, height=SHOP_ROOM.height*T, x=STAIRS.x-width/2, y=SHOP_ROOM.top*T;
     ctx.beginPath(); ctx.rect(x,y,width,height); ctx.clip();
     ctx.drawImage(shopImage,x,y,width,height);
+    drawDeskRadio();
   }
   else if(loft){ctx.save();ctx.beginPath();ctx.rect(loft.x*T,loft.y*T,loft.w*T,loft.h*T);ctx.clip();drawLoft(loft);}
   else drawGround(vx, vy, vw, vh);
@@ -942,6 +947,7 @@ function render() {
     }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
+    if(o.k==='bones' && inView(o.x,o.y,28))drawBones(o);
     if (o.k === 'body' && inView(o.x,o.y,48)) {
       if(o.kind==='sack') drawGroundItems(o); else drawBody(o);
     }
@@ -968,7 +974,8 @@ function render() {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
-    if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
+    if(campAct?.actor===e && campAct.music)drawCampGuitar(e);
+    else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
@@ -1062,8 +1069,7 @@ function render() {
   }
   ctx.globalAlpha = 1;
   if(!inBunker(P.x,P.y) && !loftAt(P))for (const c of crows) {
-    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(c.x + 40, c.y + 60, 3, 0, 6.28); ctx.fill();
-    const w = Math.sin(c.ph) * 5; ctx.strokeStyle = '#141412'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x - 7, c.y - w); ctx.lineTo(c.x, c.y); ctx.lineTo(c.x + 7, c.y - w); ctx.stroke(); ctx.lineWidth = 1;
+    drawFlyingCrow(c);
   }
   // имена дружественных рядом
   ctx.textAlign = 'center';
@@ -1178,6 +1184,7 @@ function render() {
   });
   ctx.drawImage(vignetteC, 0, 0, VW, VH);
   if (fadeT > 0) { ctx.fillStyle = 'rgba(0,0,0,' + clamp(1 - Math.abs(fadeT - 0.25) / 0.25, 0, 1) + ')'; ctx.fillRect(0, 0, VW, VH); }
+  if(dizzy){ctx.fillStyle='rgba(255,223,162,'+.12*dizzy+')';ctx.fillRect(0,0,VW,VH);}
   if (radRate > 0.3 || S.rad > 40) { ctx.fillStyle = 'rgba(120,140,40,' + clamp(radRate * 0.03 + (S.rad - 40) * 0.002, 0, 0.18) + ')'; ctx.fillRect(0, 0, VW, VH); }
   if (hurtFlash > 0) { ctx.fillStyle = 'rgba(150,20,10,' + hurtFlash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
   if (P && P.alive && P.hp < 30) { ctx.fillStyle = 'rgba(120,10,5,' + (0.12 + 0.08 * Math.sin(S.min * 6)) + ')'; ctx.fillRect(0, 0, VW, VH); }

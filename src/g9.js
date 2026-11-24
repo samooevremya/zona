@@ -255,7 +255,7 @@ function advanceWorldTime(minutes, ctx) {
       if(!blow.stage)WX.red=0;
     }
   }
-  S.min=end;
+  S.min=end;ageRemains();
   if(r.minutes>0){
     updateCoat(r.minutes);
     if(livingZone)updateEnvironment(r.minutes);
@@ -491,7 +491,7 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.flags.fieldBodies=objs.filter(o=>o.k==='body').map(o=>({...o}));
+  S.flags.fieldBodies=objs.filter(o=>o.k==='body'||o.k==='bones').map(o=>({...o}));
   delete S.flags.mutantBodies;
   S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn,
@@ -509,6 +509,7 @@ function dynRestore() {
   const v = S.dyn.v || 0;
   remapToMap();
   for (const body of S.flags.fieldBodies || S.flags.mutantBodies || []) objs.push({...body,loot:{...body.loot}});
+  ageRemains();
   // миграция старых сохранений (0.6): заказ без id, SOS без участников
   if (v < DYN_VER) {
     const j = S.jobs.act;

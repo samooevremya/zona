@@ -346,6 +346,7 @@ function reachableArtifact(a){
   return best<0?{...a}:{...a,x:(best%MW+.5)*T,y:(Math.floor(best/MW)+.5)*T};
 }
 function spawnWorld() {
+  resetCampAudio();
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
   objs.push(...retiredFixedCrates); retiredFixedCrates.length = 0;
@@ -372,6 +373,7 @@ function spawnWorld() {
     clearedDen(pack); // Also initialise the cooldown for a cleared den in an older save.
   }
   rcSpawnObjs();
+  const fox=byS('fox');if(fox){fox.angry=0;fox.tgt=null;if(S.flags.angry)delete S.flags.angry.fox;}
   campaignCast();
 
 
@@ -383,6 +385,7 @@ const byS = sid => ents.find(e => e.sid === sid && e.alive);
 /* ===================== отношения ===================== */
 function hostile(a, b) {
   if (a === b || !a.alive || !b.alive || a.captive || b.captive) return false;
+  if((a.sid==='fox' && b===P)||(b.sid==='fox' && a===P))return false;
   const fa = a.fac, fb = b.fac;
   if(BIG && (a.guard==='south' && b===P || b.guard==='south' && a===P) && S.campaign && ['case','escape'].includes(chapter()) && storyArea())return true;
   if (fa === 'trader' || fb === 'trader') return false;
@@ -418,6 +421,7 @@ function lonerWitnesses(victim,loud=false) {
   });
 }
 function rememberAttacker(e) {
+  if(e.sid==='fox')return;
   if (!e.sid && !e.uid) e.uid = dynId();
   e.defendUntil=S.min+35;e.angry=1;e.aw=1;e.tgt=P;e.mem=35;e.lastSeen={x:P.x,y:P.y};setCampSeat(e,false);
   markAngry(e);
@@ -444,6 +448,7 @@ function deliverLonerReports() {
   if (!S.flags.lonerReports.length) delete S.flags.lonerReports;
 }
 function anger(e) {
+  if(e.sid==='fox')return;
   if (e.fac === 'loner' && !e.angry) {
     ents.forEach(o => { if (o.fac === 'loner' && o.alive && !o.captive && dE(o, e) < 450 && los(o.x, o.y, e.x, e.y)) { rememberAttacker(o); } });
     e.angry = 1; markAngry(e);
@@ -846,7 +851,7 @@ function melee(sh, W) {
 }
 function hurt(e, dmg, src, ang, shot) {
   if(BIG && src===P && e.guard==='south' && !(e.quiet && dmg>=e.hp))alarmPost();
-  if (!e.alive || e.sid === 'sid') return;
+  if (!e.alive || e.sid === 'sid' || (e.sid==='fox' && src===P)) return;
   if (src && (src === P || src.follow)) {
     e.hitByP = 1;
     if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
@@ -928,8 +933,7 @@ function dropBody(e,identified=false) {
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   body.deathKnown=identified || !e.hitByP;
   objs.push(body); g7Fresh(body);   // визуальный переход падения (только в памяти, не в сейве)
-  const bodies = objs.filter(o => o.k === 'body');
-  if (bodies.length > 30) objs.splice(objs.indexOf(bodies[0]), 1);
+
 }
 
 /* ===================== ИИ ===================== */
@@ -988,7 +992,7 @@ function aiHuman(e, dt) {
     const responders=ents.filter(o=>o!==e && o.fac==='loner' && o.alive && !o.captive && !o.angry && dE(o,e)<170 && los(o.x,o.y,e.x,e.y));
     if(responders.length){responders.forEach(rememberAttacker);sayLine(e,'Мужики, он меня грабить хотел!');e.robberyAlarm=false;}
   }
-  if((e.sid==='petr' || e.sid==='petr2') && !S.flags.assault && !S.flags.atpClear){
+  if((e.sid==='petr' || e.sid==='petr2' || atpVolunteers.includes(e.sid)) && !S.flags.assault && !S.flags.atpClear){
     e.tgt=null;e.path=null;return;
   }
   e.cool -= dt; e.think -= dt; stealthTick(e, dt);
@@ -1213,7 +1217,7 @@ function combatHuman(e, t, W, dt) {
     if(!fire(e,e.ang,W,W.spread+acc))return;
     e.mag--;
     e.cool = W.auto ? (e.burst = (e.burst || 0) + 1) % 4 === 0 ? rnd(0.7, 1.3) : W.rate * 1.3 : W.rate * rnd(2.2, 3.4);
-    if (e.mag <= 0) { e.reload = W.reload * 1.2; e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
+    if (e.mag <= 0) { e.reload = W.reload * 1.2; if(dE(e,P)<210)play(reloadSound(e.wpn),e.x,e.y,.48); e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
   }
 }
 // 0 — сидит у огня, 1 — полностью встал. При смене намерения продолжаем с текущей позы.
@@ -1269,8 +1273,8 @@ function idleHuman(e, dt) {
     if(dst(e.x,e.y,x,y)>40)goTo(e,x,y,90,dt);
     return;
   }
-  if((e.sid==='petr' || e.sid==='petr2') && S.flags.assault && !S.flags.atpClear){
-    const goal=locPt('atp',e.sid);if(dE(e,goal)>12)goTo(e,goal.x,goal.y,82,dt);
+  if((e.sid==='petr' || e.sid==='petr2' || atpVolunteers.includes(e.sid)) && S.flags.assault && !S.flags.atpClear){
+    const goal=atpDestination(e.sid);if(dE(e,goal)>12)goTo(e,goal.x,goal.y,82,dt);
     return;
   }
   if (followTick(e, dt)) return;

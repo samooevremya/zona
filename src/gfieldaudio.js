@@ -9,6 +9,8 @@ const recordings={
   knife:[.40,'swing'],knifeHit:[.59,'hit'],crow:[.37,'crow'],
   dog:[.51,'bark1','bark2'],growl:[.45,'snarl'],boar:[.49,'grunt'],boarCharge:[.65,'charge'],
   sucker:[.66,'throat'],breath:[.34,'throat'],
+  stepAsphalt:[.25,'pavementL','pavementR'],carve:[.46,'carve'],warning:[.51,'warning'],
+  loadRifle:[.53,'loadRifle'],loadPistol:[.56,'loadPistol'],loadShell:[.57,'loadShell'],
   reload:[.46,'metalLatch'],jam:[.36,'metalClick'],click:[.27,'metalClick'],pick:[.32,'clothBelt'],creak:[.15,'creak1']
 };
 let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null,airGain=null;

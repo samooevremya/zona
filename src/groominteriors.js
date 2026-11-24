@@ -270,6 +270,14 @@ function furnishHouses(){
     if(trim.length>12)mounts.push(trim[(mountIndex+Math.floor(trim.length/2))%trim.length]);
     h.interior={use,count,mounts,mark:spots[0] || {x:cx,y:cy,a:0}};
   }
+  // Sleeping rolls lie flat against the wall and leave the aisle walkable.
+  const bunks=[['89,106',1.5,2,0],['104,74',1.5,2,0],['dump_383_23',3.5,2,0]];
+  for(const [key,dx,dy,angle] of bunks){
+    const house=HOUSES.find(h=>h.ok===key);
+    if(!house)continue;
+    const [w,h]=furnitureBounds('bedroll',angle);
+    interiorObject('roomFitting',(house.x+dx)*T,(house.y+dy)*T,w,h,{fitting:'bedroll',angle,home:key,solid:0});
+  }
 }
 function drawRoomMarks(g,h){
   const layout=h.interior;if(!layout)return;

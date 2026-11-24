@@ -22,6 +22,7 @@ const RIGS = new WeakMap(), GAIT = new WeakMap(), BODYFX = new WeakMap();
 /* кожа: броня игрока → костюм; NPC → группировка; Сидорович — отдельные кадры G4 */
 function rigSkin(e) {
   if (e.kind !== 'human' || e.sid === 'sid') return null;
+  if(e.sid==='wolf')return 'zarya';
   if (e === P) return S.armor === 'ar_zarya' ? 'zarya' : S.armor === 'ar_bandit' ? 'bandit' : 'loner';
   return { bandit: 'bandit', army: 'army' }[e.fac] || 'loner';
 }
@@ -164,7 +165,7 @@ function jacketIndex(e) {
   return Array.from(identity).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % JACKET_COLORS.length;
 }
 function jacketFor(e) {
-  if (!window.CORDON_G8_ON || G7.rigOn || e === P || e.fac !== 'loner' || e.kind !== 'human') return null;
+  if (!window.CORDON_G8_ON || G7.rigOn || e.sid==='wolf' || e === P || e.fac !== 'loner' || e.kind !== 'human') return null;
   const index = jacketIndex(e);
   if (jacketSets[index]) return jacketSets[index];
   const sheet = packImage('assets/g8/jacket_' + JACKET_COLORS[index] + '.webp');

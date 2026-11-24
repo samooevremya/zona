@@ -42,8 +42,8 @@ T('B4_tracked_quest', () => {
 T('B5_weapon_cycle_kept', () => {
   reset(); S().inv.w_aksu = 1; S().weapon = 'knife';
   Object.assign(S().flags.kit,{sidearm:'w_pm',primary:'w_aksu'});
-  const seen = [S().weapon]; for (let i = 0; i < 3; i++) { document.getElementById('wpnbox').click(); seen.push(S().weapon); }
-  return { ok: new Set(seen).size === 3 && seen[3] === seen[0], sequence: seen };
+  const seen = [S().weapon]; for (let i = 0; i < 4; i++) { document.getElementById('wpnbox').click(); seen.push(S().weapon); }
+  return { ok: seen.join(',') === 'knife,w_pm,w_aksu,hands,knife', sequence: seen };
 });
 T('B6_touch_targets_44', () => {
   /* для каждой кнопки: зона 44×44 вокруг центра (или сама кнопка, если она больше) прощупывается сеткой точек 5×5.

@@ -48,14 +48,19 @@ function drawDialog2() {
   const O = el('div', 'dlg-opts');
   panel.opts().forEach((o, i) => O.appendChild(btn((o.k || '') + ' opt', (i + 1) + '. ' + o.t, () => {
     if (o.close) { closePanel(); if (o.fn) o.fn(); return; }
+    const session=panel, start=panel.lines.length;
     panel.lines.push({ s: 'me', t: o.t });
     o.fn();
-    if (panel && (panel.kind === 'dialog' || panel.kind === 'trader')) { refresh(); const ln = pbody.querySelector('.dlg-lines'); if (ln) ln.scrollTop = ln.scrollHeight; }
+    if(panel===session){
+      refresh();
+      const log=pbody.querySelector('.dlg-lines'), first=log?.children[start+1] || log?.children[start];
+      if(first)log.scrollTop=first.getBoundingClientRect().top-log.getBoundingClientRect().top+log.scrollTop;
+    }
   }, o.d)));
   main.appendChild(O);
   box.append(main,identity(panel.card));
   pbody.appendChild(box);
-  L.scrollTop=L.scrollHeight;
+  L.scrollTop=0;
 }
 
 /* ---------- КПК: карта ~65% + выбранное задание ~35%, вкладки снизу ---------- */
@@ -272,6 +277,7 @@ function drawInv2() {
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
     const slotKey=kitSlot(id), mounted=slotKey && kitItem(slotKey)===id && !copy;
+    moduleControls(id,copy,row);
     if (slotKey && !mounted) row.appendChild(btn('go','В слот',()=>{
       mountGear(id,copy,false); panel.copy=0; refresh();
     }));
@@ -326,9 +332,9 @@ function merchantRisk(){
 }
 function tradeStock(e) {
   if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
-    id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
+    id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*gearRetail(id)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
   }));
-  return STOCK.map(s=>({...s,p:purchaseCost(s.p*merchantRisk()),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+  return STOCK.map(s=>({...s,p:purchaseCost(s.p*gearRetail(s.id)*merchantRisk()),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
 
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }
@@ -352,12 +358,20 @@ function sellWhy(id, e, o) {
   if (kitSlot(id) && kitItem(kitSlot(id))===id) return id===S.weapon?'в руках':'в слоте';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
+  if (refusesTrophy(e,id)) return 'только торговцам';
   if (e && it.armor) return 'не берёт';
   return null;
 }
+function refusesTrophy(e,id){
+  return e && e.fac!=='trader' && e.sid!=='lz_barman' && Object.values(MUTANT_TROPHIES).includes(id);
+}
+function gearRetail(id){
+  if(!isGun(id) && !ITEMS[id]?.armor)return 1;
+  return {rookie:1.25,normal:1.65,hard:1.85,master:2.1}[difficultyKey(S.difficulty)];
+}
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
-  if (e && it.armor) return 0;
+  if ((e && it.armor) || refusesTrophy(e,id)) return 0;
   return Math.max(0,cnt(id)-wornCount(id));
 }
 function offerSum(e) {

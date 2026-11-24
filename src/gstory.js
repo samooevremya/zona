@@ -161,14 +161,27 @@ function campaignCast(){
     const p=locPt('farm','fox');
     for(let i=0;i<4;i++)addCast('traildog'+i,walkPoint(p,5+i%2,4+i),{pack:'foxdogs'},'trailDog');
   }
+  if(chapter()==='rescue' || c.atpVolunteers){
+    c.atpVolunteers=true;
+    atpVolunteers.forEach((id,i)=>{
+      const base=byS('petr')?.home||locPt('atp','petr');
+      const point=S.flags.assault?atpDestination(id):walkPoint(base,i?2:-2,1);
+      addCast(id,point,{fac:'loner',wpn:i?'w_obrez':'w_pm',name:i?'Сурок':'Клёст'},'volunteer');
+    });
+  }
   if(c.atpReliefSent)spawnAtpRelief();
   if(c.raid){
     RAIDERS.forEach((name,i)=>addCast('northAlly'+i,walkPoint(c.northHeld?northCamp():FIRE,(i-2)*1.8,5),{name,fac:'loner',wpn:i%2?'w_aksu':'w_obrez'},'squadMate'));
     if(chapter()==='battle')for(let i=0;i<6;i++)addCast('northMerc'+i,walkPoint(northCamp(),(i%3-1)*2,-Math.floor(i/3)*2),{name:'Наёмник',fac:'bandit',wpn:i%2?'w_aksu':'w_pm'},'assailant');
   }
 }
+const atpVolunteers=['atpScout','atpRunner'];
+function atpDestination(id){
+  if(!atpVolunteers.includes(id))return locPt('atp',id);
+  return walkPoint(locPt('atp','petr2'),id==='atpScout'?2:-2,1);
+}
 function atpCompany(){
-  return ['petr','petr2','atpRelief0','atpRelief1'].map(byS).filter(Boolean);
+  return ['petr','petr2',...atpVolunteers,'atpRelief0','atpRelief1'].map(byS).filter(Boolean);
 }
 function spawnAtpRelief(){
   const gate=locPt('atp','petr');
@@ -183,7 +196,7 @@ function spawnAtpRelief(){
 function occupyATP(){
   const first=!S.campaign.liberated;
   S.campaign.liberated=true;S.flags.atpClear=S.flags.shustFree=1;
-  ['petr','petr2','shust'].forEach((id,i)=>{
+  ['petr','petr2','shust',...atpVolunteers].forEach((id,i)=>{
     const e=byS(id);if(!e)return;
     const p=walkPoint(locPt('atp',i===1?'petr2':'petr'),i===2?3:0,i===2?2:0);
     e.captive=e.wounded?1:0;e.home=p;e.stay=1;e.resident=1;
@@ -201,7 +214,7 @@ function beginAssault(){
   if(chapter()!=='rescue'||S.flags.assault)return;
   S.flags.assault=1;
   for(const e of atpCompany()){
-    e.sit=0;e.trip=e.path=null;e.home=locPt('atp',e.sid);e.stay=1;
+    e.sit=0;e.trip=e.path=null;e.home=atpDestination(e.sid);e.stay=1;
   }
   bulletin('Отряд Петрухи выдвигается на АТП.');
 }

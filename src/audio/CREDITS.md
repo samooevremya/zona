@@ -46,3 +46,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+## Звуки лагеря и бункера
+
+Реплики одиночек, бандитов и военных, тексты обеих песен, мелодии и партии инструментов написаны для игры. Русская речь синтезирована офлайн голосом [Denis для Piper](https://huggingface.co/rhasspy/piper-voices/blob/main/ru/ru_RU/denis/medium/MODEL_CARD), обученным на записях CC0. Для «Дым над золою» и «Дремлет дорога» высоты вокальных нот и ритм заданы отдельно. В сборку входят готовые звуковые дорожки.
+
+В трёх вариантах перезарядки использованы звуки застёжек и металла Kenney. Дубли шагов по асфальту собраны из камня и песка Fantozzi. Звук разделки сочетает ткань Kenney, взмах и влажный шаг TinyWorlds. Исходные записи и лицензии перечислены выше.

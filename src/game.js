@@ -45,7 +45,7 @@ const ITEMS = {
   bandage: { n: 'Бинт', price: 80, heal: 15, w: 0.1, d: '+15 здоровья' },
   antirad: { n: 'Антирад', price: 250, rad: 60, w: 0.1, d: '−60 радиации' },
   energy: { n: 'Энергетик', price: 150, w: 0.35, d: 'На 60 секунд игры расход сил снижается на 35%, восстановление ускоряется на 50%. Вторая банка обновляет время.' },
-  vodka: { n: 'Водка', price: 100, rad: 20, heal: -3, w: 0.6, d: '−20 радиации, −3 здоровья' },
+  vodka: { n: 'Водка', price: 100, rad: 20, w: 0.6, d: '−20 радиации, −8 сытости. Ненадолго кружится голова.' },
   bread: { n: 'Хлеб', price: 40, heal: 5, w: 0.3, d: '+5 здоровья' },
   sausage: { n: 'Колбаса', price: 60, heal: 8, w: 0.4, d: '+8 здоровья' },
   cans: { n: 'Консервы', price: 90, heal: 12, w: 0.5, d: '+12 здоровья' },
@@ -595,11 +595,11 @@ function packCells(inv, stowing, incoming) {
     return total + w*h*Math.ceil(Math.max(0,n-wornCount(id)+(id===stowing?1:0)-(incoming?.has(id)?1:0))/stackLimit(id));
   },0);
 }
-function primaryGun(id) { return {cond:S.cond?.[id] ?? 80, mag:S.mag[id] || 0}; }
+function primaryGun(id) { return {cond:S.cond?.[id] ?? 80, mag:S.mag[id] || 0, sights:S.flags.sights?.[id]||0}; }
 function gunCopy(id,index) {
   return index ? S.flags.spareGuns?.[id]?.[index-1] || {cond:80,mag:0} : primaryGun(id);
 }
-function setPrimary(id,gun) { S.cond[id]=gun.cond; S.mag[id]=gun.mag; }
+function setPrimary(id,gun) { S.cond[id]=gun.cond; S.mag[id]=gun.mag; (S.flags.sights ||= {})[id]=gun.sights||0; }
 function spareList(id) {
   const lists=S.flags.spareGuns ||= {};
   const guns=lists[id] ||= [];
@@ -622,7 +622,7 @@ function repairCopies(copies,condition) {
     else S.cond[id]=condition;
   }
 }
-function loadedMass(id,gun) { return gun ? (ITEMS[WP[id].ammo]?.w || 0)*gun.mag : 0; }
+function loadedMass(id,gun) { return gun ? (ITEMS[WP[id].ammo]?.w || 0)*gun.mag + ((gun.sights&1?1:0)+(gun.sights&2?1:0))*.18 : 0; }
 function weight() {
   let kg=PACK_KG+KNIFE_KG;
   for (const [id,n] of Object.entries(S.inv)) {
@@ -659,7 +659,7 @@ function removePacked(id,n=1,index=cnt(id)-1) {
     const spares=spareList(id);
     if (index) spares.splice(index-1,1);
     else if (spares.length) setPrimary(id,spares.pop());
-    if (cnt(id)===1) { delete S.cond[id]; delete S.mag[id]; }
+    if (cnt(id)===1) { delete S.cond[id]; delete S.mag[id]; if(S.flags.sights)delete S.flags.sights[id]; }
   }
   take(id,n); return gun;
 }
@@ -1053,6 +1053,7 @@ function reachableArtifact(a){
   return best<0?{...a}:{...a,x:(best%MW+.5)*T,y:(Math.floor(best/MW)+.5)*T};
 }
 function spawnWorld() {
+  resetCampAudio();
   ents = []; decals = []; parts = []; tracers = []; flashes = []; bolts = []; nades = []; crows = [];
   for (let i = objs.length - 1; i >= 0; i--) if (!objs[i].static) objs.splice(i, 1);
   objs.push(...retiredFixedCrates); retiredFixedCrates.length = 0;
@@ -1079,6 +1080,7 @@ function spawnWorld() {
     clearedDen(pack); // Also initialise the cooldown for a cleared den in an older save.
   }
   rcSpawnObjs();
+  const fox=byS('fox');if(fox){fox.angry=0;fox.tgt=null;if(S.flags.angry)delete S.flags.angry.fox;}
   campaignCast();
 
 
@@ -1090,6 +1092,7 @@ const byS = sid => ents.find(e => e.sid === sid && e.alive);
 /* ===================== отношения ===================== */
 function hostile(a, b) {
   if (a === b || !a.alive || !b.alive || a.captive || b.captive) return false;
+  if((a.sid==='fox' && b===P)||(b.sid==='fox' && a===P))return false;
   const fa = a.fac, fb = b.fac;
   if(BIG && (a.guard==='south' && b===P || b.guard==='south' && a===P) && S.campaign && ['case','escape'].includes(chapter()) && storyArea())return true;
   if (fa === 'trader' || fb === 'trader') return false;
@@ -1125,6 +1128,7 @@ function lonerWitnesses(victim,loud=false) {
   });
 }
 function rememberAttacker(e) {
+  if(e.sid==='fox')return;
   if (!e.sid && !e.uid) e.uid = dynId();
   e.defendUntil=S.min+35;e.angry=1;e.aw=1;e.tgt=P;e.mem=35;e.lastSeen={x:P.x,y:P.y};setCampSeat(e,false);
   markAngry(e);
@@ -1151,6 +1155,7 @@ function deliverLonerReports() {
   if (!S.flags.lonerReports.length) delete S.flags.lonerReports;
 }
 function anger(e) {
+  if(e.sid==='fox')return;
   if (e.fac === 'loner' && !e.angry) {
     ents.forEach(o => { if (o.fac === 'loner' && o.alive && !o.captive && dE(o, e) < 450 && los(o.x, o.y, e.x, e.y)) { rememberAttacker(o); } });
     e.angry = 1; markAngry(e);
@@ -1553,7 +1558,7 @@ function melee(sh, W) {
 }
 function hurt(e, dmg, src, ang, shot) {
   if(BIG && src===P && e.guard==='south' && !(e.quiet && dmg>=e.hp))alarmPost();
-  if (!e.alive || e.sid === 'sid') return;
+  if (!e.alive || e.sid === 'sid' || (e.sid==='fox' && src===P)) return;
   if (src && (src === P || src.follow)) {
     e.hitByP = 1;
     if (e.sosFoe && S.sos && S.sos.act && S.sos.act.id === e.sosFoe) S.flags.sosAssist = e.sosFoe;
@@ -1635,8 +1640,7 @@ function dropBody(e,identified=false) {
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   body.deathKnown=identified || !e.hitByP;
   objs.push(body); g7Fresh(body);   // визуальный переход падения (только в памяти, не в сейве)
-  const bodies = objs.filter(o => o.k === 'body');
-  if (bodies.length > 30) objs.splice(objs.indexOf(bodies[0]), 1);
+
 }
 
 /* ===================== ИИ ===================== */
@@ -1695,7 +1699,7 @@ function aiHuman(e, dt) {
     const responders=ents.filter(o=>o!==e && o.fac==='loner' && o.alive && !o.captive && !o.angry && dE(o,e)<170 && los(o.x,o.y,e.x,e.y));
     if(responders.length){responders.forEach(rememberAttacker);sayLine(e,'Мужики, он меня грабить хотел!');e.robberyAlarm=false;}
   }
-  if((e.sid==='petr' || e.sid==='petr2') && !S.flags.assault && !S.flags.atpClear){
+  if((e.sid==='petr' || e.sid==='petr2' || atpVolunteers.includes(e.sid)) && !S.flags.assault && !S.flags.atpClear){
     e.tgt=null;e.path=null;return;
   }
   e.cool -= dt; e.think -= dt; stealthTick(e, dt);
@@ -1920,7 +1924,7 @@ function combatHuman(e, t, W, dt) {
     if(!fire(e,e.ang,W,W.spread+acc))return;
     e.mag--;
     e.cool = W.auto ? (e.burst = (e.burst || 0) + 1) % 4 === 0 ? rnd(0.7, 1.3) : W.rate * 1.3 : W.rate * rnd(2.2, 3.4);
-    if (e.mag <= 0) { e.reload = W.reload * 1.2; e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
+    if (e.mag <= 0) { e.reload = W.reload * 1.2; if(dE(e,P)<210)play(reloadSound(e.wpn),e.x,e.y,.48); e.crouch = 1; if (chance(0.5)) callout(e, 'reload'); }
   }
 }
 // 0 — сидит у огня, 1 — полностью встал. При смене намерения продолжаем с текущей позы.
@@ -1976,8 +1980,8 @@ function idleHuman(e, dt) {
     if(dst(e.x,e.y,x,y)>40)goTo(e,x,y,90,dt);
     return;
   }
-  if((e.sid==='petr' || e.sid==='petr2') && S.flags.assault && !S.flags.atpClear){
-    const goal=locPt('atp',e.sid);if(dE(e,goal)>12)goTo(e,goal.x,goal.y,82,dt);
+  if((e.sid==='petr' || e.sid==='petr2' || atpVolunteers.includes(e.sid)) && S.flags.assault && !S.flags.atpClear){
+    const goal=atpDestination(e.sid);if(dE(e,goal)>12)goTo(e,goal.x,goal.y,82,dt);
     return;
   }
   if (followTick(e, dt)) return;
@@ -2335,7 +2339,7 @@ function startReload() {
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
   if (m >= W.mag || !cnt(W.ammo)) return;
-  P.reload = W.reload; play('reload');
+  P.reload = W.reload; play(reloadSound(S.weapon));
 }
 function finishReload() {
   const W = WP[S.weapon]; if (!W || W.melee) return;
@@ -2372,7 +2376,7 @@ function playerFire() {
   }
 }
 function cycleWeapon(dir) {
-  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean)];
+  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean), 'hands'];
   const i = own.indexOf(S.weapon);
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
@@ -2392,6 +2396,7 @@ function useItem(id) {
   }
   if (!has(id) || (it.heal === undefined && it.rad === undefined)) return false;
   take(id, 1);
+  if(id==='vodka'){S.food=Math.max(0,S.food-8);S.flags.dizzyUntil=S.min+35;}
   if (it.heal) P.hp = clamp(P.hp + it.heal, 1, 100);
   if (it.rad) S.rad = Math.max(0, S.rad - it.rad);
   if (FOOD[id]) { S.food = Math.min(100, S.food + FOOD[id]); play('eat'); } else play('pick');
@@ -2500,7 +2505,7 @@ function updateBodies(dt){
       else draggedBody=null;
     }
   }
-  bodyCheck-=dt;if(bodyCheck>0)return;bodyCheck=2;
+  bodyCheck-=dt;if(bodyCheck>0)return;bodyCheck=2;ageRemains();
   for(const b of objs){
     if(b.k!=='body' || b.fac!=='loner' || b.discovered || b.raidBody || dE(b,P)>900)continue;
     const witness=ents.find(e=>e.alive && e.fac==='loner' && !e.captive && dE(e,b)<120 && seesActor(e,b));
@@ -2627,7 +2632,7 @@ function update(dt) {
     if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
   [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });
   // тела исчезают через двое суток
-  for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.k === 'body' && S.min - o.t > 2880 && dst(o.x, o.y, P.x, P.y) > 600) objs.splice(i, 1); }
+
   // таймеры мира
   spawnT -= dt; if (spawnT <= 0) { spawnT = 20; spawnTick(); }
   fogT -= dt; if (fogT <= 0 && P.alive) { fogT = 0.4; reveal(); }
@@ -2700,7 +2705,7 @@ function updatePlayerAim(dt,mx,my) {
   P.ang+=IN.touch ? clamp(delta,-9*dt,9*dt) : delta;
   const aligned=Math.abs(angD(P.ang,desired))<.025;
   if (aligned) P.ang=desired;
-  if (gun && IN.touch) {
+  if (gun && (IN.touch || sightInstalled(S.weapon))) {
     P.aimRay=shotTrace(P,P.ang,W);
     if (!P.lock && P.aimRay.best && hostile(P,P.aimRay.best) && targetInSight(P.aimRay.best,W)) P.lock=P.aimRay.best;
   }
@@ -2795,6 +2800,10 @@ function findInteract() {
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
   if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
+    if(o.k==='bed' || o.fitting==='bedroll'){
+      const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(x,y,P.x,P.y);
+      if(d<52 && sameBedroom(o) && los(P.x,P.y,x,y))cand(d-4,{k:'sleep',o,label:'Спать · спальное место'});
+    }
     if (o.k === 'locker') {
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if (d<49 && los(P.x,P.y,x,y)) cand(d,{k:'locker',o,label:'Открыть личный ящик'});
@@ -2831,7 +2840,7 @@ function carveMutant(o) {
   const error = receiveError(id,1);
   if (error) { msg(error,'bad'); return; }
   collectStock(o,id,1);
-  play('knifeHit',P.x,P.y);
+  play('carve',P.x,P.y);
   msg('Получен трофей · '+ITEMS[id].n,'say');
 }
 function lootAll(o) {
@@ -3547,7 +3556,7 @@ function drawHouseRoof(g, h, i, scale) {
 function drawPlayerAim() {
   const ray=P.aimRay, lock=P.lock;
   ctx.save();
-  if (ray) {
+  if (ray && sightInstalled(S.weapon)) {
     const muzzle=muzzlePoint(P,P.ang);
     const along=(muzzle.x-P.x)*ray.ca+(muzzle.y-P.y)*ray.sa;
     if (along<ray.t) {
@@ -3555,12 +3564,13 @@ function drawPlayerAim() {
       const length=Math.hypot(dx,dy);
       if (length>0) {
         const visible=rayWall(muzzle.x,muzzle.y,dx/length,dy/length,length);
-        ctx.strokeStyle=P.shotFlash>0 ? '#ff6651' : 'rgba(244,240,224,.84)';
-        ctx.lineWidth=1.35/Z;ctx.beginPath();ctx.moveTo(muzzle.x,muzzle.y);
+        ctx.strokeStyle=(sightInstalled(S.weapon)&2) || P.shotFlash>0 ? '#e66c52' : 'rgba(244,240,224,.84)';
+        ctx.setLineDash([4/Z,4/Z]);ctx.lineWidth=1.35/Z;ctx.beginPath();ctx.moveTo(muzzle.x,muzzle.y);
         ctx.lineTo(muzzle.x+dx*visible/length,muzzle.y+dy*visible/length);ctx.stroke();
       }
     }
   }
+  ctx.setLineDash([]);
   if (lock?.alive) {
     ctx.strokeStyle='rgba(245,181,104,.95)'; ctx.lineWidth=1.65/Z;
     const r=lock.r-(lock.captive ? 4 : 0);
@@ -3851,10 +3861,13 @@ function drawDeskTrader(e) {
 const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function render() {
   let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
-  if (S && P && S.blow?.stage === 2 && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
+  const dizzy=clamp(((S?.flags.dizzyUntil||0)-(S?.min||0))/10,0,1);
+  if(dizzy && !reducedCameraMotion.matches){sx+=dizzy*2.6*Math.sin(S.min*1.4);sy+=dizzy*1.9*Math.sin(S.min*.89);}
+  if (S && P && S.blow?.stage && !sheltered(P.x, P.y) && !reducedCameraMotion.matches) {
     const t = S.blow.t;
-    sx += 1.1 * Math.sin(t * 23) + .45 * Math.sin(t * 41);
-    sy += .85 * Math.sin(t * 29);
+    const power=S.blow.stage===2?2.4:.35+.55*clamp(1-t/42,0,1);
+    sx += power*(Math.sin(t*18)+.3*Math.sin(t*27));
+    sy += power*.72*Math.sin(t*22);
   }
   if (P) {
     let tx = P.x, ty = P.y;
@@ -3880,6 +3893,7 @@ function render() {
     const width=SHOP_ROOM.width*T, height=SHOP_ROOM.height*T, x=STAIRS.x-width/2, y=SHOP_ROOM.top*T;
     ctx.beginPath(); ctx.rect(x,y,width,height); ctx.clip();
     ctx.drawImage(shopImage,x,y,width,height);
+    drawDeskRadio();
   }
   else if(loft){ctx.save();ctx.beginPath();ctx.rect(loft.x*T,loft.y*T,loft.w*T,loft.h*T);ctx.clip();drawLoft(loft);}
   else drawGround(vx, vy, vw, vh);
@@ -3924,6 +3938,7 @@ function render() {
     }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
     if (o.k === 'genset' && G3.on && G3.pack && G3.pack.manifest.props && inView(o.x, o.y, 40) && !g7Prop(o)) gensetProc(ctx, o);
+    if(o.k==='bones' && inView(o.x,o.y,28))drawBones(o);
     if (o.k === 'body' && inView(o.x,o.y,48)) {
       if(o.kind==='sack') drawGroundItems(o); else drawBody(o);
     }
@@ -3950,7 +3965,8 @@ function render() {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
-    if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
+    if(campAct?.actor===e && campAct.music)drawCampGuitar(e);
+    else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
@@ -4044,8 +4060,7 @@ function render() {
   }
   ctx.globalAlpha = 1;
   if(!inBunker(P.x,P.y) && !loftAt(P))for (const c of crows) {
-    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(c.x + 40, c.y + 60, 3, 0, 6.28); ctx.fill();
-    const w = Math.sin(c.ph) * 5; ctx.strokeStyle = '#141412'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x - 7, c.y - w); ctx.lineTo(c.x, c.y); ctx.lineTo(c.x + 7, c.y - w); ctx.stroke(); ctx.lineWidth = 1;
+    drawFlyingCrow(c);
   }
   // имена дружественных рядом
   ctx.textAlign = 'center';
@@ -4160,6 +4175,7 @@ function render() {
   });
   ctx.drawImage(vignetteC, 0, 0, VW, VH);
   if (fadeT > 0) { ctx.fillStyle = 'rgba(0,0,0,' + clamp(1 - Math.abs(fadeT - 0.25) / 0.25, 0, 1) + ')'; ctx.fillRect(0, 0, VW, VH); }
+  if(dizzy){ctx.fillStyle='rgba(255,223,162,'+.12*dizzy+')';ctx.fillRect(0,0,VW,VH);}
   if (radRate > 0.3 || S.rad > 40) { ctx.fillStyle = 'rgba(120,140,40,' + clamp(radRate * 0.03 + (S.rad - 40) * 0.002, 0, 0.18) + ')'; ctx.fillRect(0, 0, VW, VH); }
   if (hurtFlash > 0) { ctx.fillStyle = 'rgba(150,20,10,' + hurtFlash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
   if (P && P.alive && P.hp < 30) { ctx.fillStyle = 'rgba(120,10,5,' + (0.12 + 0.08 * Math.sin(S.min * 6)) + ')'; ctx.fillRect(0, 0, VW, VH); }
@@ -4198,9 +4214,11 @@ const CALL = {
 };
 function callout(e, kind, force) {
   if (!e.alive || e === P || e.kind !== 'human' || e.wounded || e.captive) return;
+  if(kind==='idle' && campAct?.actor===e)return;
   const bank = CALL[e.fac] && CALL[e.fac][kind]; if (!bank) return;
   if (!force && e.bub && e.bub.life > 1) return;
   if (dE(e, P) > 520) return;
+  if(voiceCallout(e,kind))return;
   e.bub = { t: bank[(e.seed + Math.floor(S.min * 7)) % bank.length], life: 3.2 };
   if (e.fac === 'army' && kind === 'idle') play('radio', e.x, e.y); else play('voice', e.x, e.y);
 }
@@ -4211,7 +4229,8 @@ function surf(x, y) {
   const loft=loftAt({x,y});
   if(loft)return loft.id==='depot'?'stepMetal':'stepWood';
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
-  if (t === AS || t === CF || t === CO) return 'stepHard';
+  if (t===AS)return 'stepAsphalt';
+  if (t === CF || t === CO) return 'stepHard';
   if (t === FL) return 'stepWood';
   if (t === SW) return 'stepWater';
   if (t === RA) return Math.floor(x/12)%3 ? 'stepWood' : 'stepGravel';
@@ -4220,46 +4239,10 @@ function surf(x, y) {
   return wet > 0.4 ? 'stepWet' : 'stepGrass';
 }
 
-/* ---------- гитара у костра: свои простые переборы ---------- */
-const GTR = { t: 0, i: 0, buf: {} };
-const CHORDS = [[110, 164.8, 220, 261.6, 329.6], [146.8, 220, 293.7, 349.2, 440], [82.4, 164.8, 207.7, 246.9, 329.6], [110, 164.8, 220, 261.6, 329.6],
-  [130.8, 196, 261.6, 329.6, 392], [98, 196, 246.9, 293.7, 392], [110, 164.8, 220, 261.6, 329.6], [82.4, 164.8, 207.7, 246.9, 329.6]];
-const PICK = [0, 2, 3, 4, 3, 2, 1, 2];
-function pluckBuf(f) {
-  if (GTR.buf[f]) return GTR.buf[f];
-  const sr = AC.sampleRate, len = Math.floor(sr * 1.6), b = AC.createBuffer(1, len, sr), d = b.getChannelData(0);
-  const N = Math.max(2, Math.round(sr / f)), ring = new Float32Array(N);
-  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
-  let p = 0;
-  for (let i = 0; i < len; i++) { const n = (p + 1) % N; const v = 0.497 * (ring[p] + ring[n]); d[i] = ring[p]; ring[p] = v; p = n; }
-  GTR.buf[f] = b; return b;
-}
-function pluck(f, vol) {
-  if (!AC) return;
-  const s = AC.createBufferSource(); s.buffer = pluckBuf(f);
-  const g = AC.createGain(); g.gain.value = vol; const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
-  s.connect(lp); lp.connect(g); g.connect(master); s.start();
-}
-function guitar(dt) {
-  if (!AC || loftAt(P) || inBunker(P.x, P.y) || WX.rain > 0.5 || S.blow?.stage) return;
-  const d = dst(P.x, P.y, FIRE.x, FIRE.y);
-  if (d > 520) return;
-  const player = ents.find(e => e.alive && e.sit && e.fireRef === FIRE && e.fac === 'loner');
-  if (!player) return;
-  GTR.t -= dt;
-  if (GTR.t > 0) return;
-  GTR.t = 0.34 + (GTR.i % 8 === 7 ? 0.25 : 0);
-  const ch = CHORDS[Math.floor(GTR.i / 8) % CHORDS.length], note = ch[PICK[GTR.i % 8]];
-  const v = clamp(1 - d / 520, 0, 1) * 0.22;
-  pluck(note, v);
-  if (GTR.i % 8 === 0) pluck(ch[0] / 2 > 60 ? ch[0] : ch[0], v * 0.8);
-  GTR.i++;
-}
-
 /* ---------- звук дождя ---------- */
 let rainG = null;
 /* ---------- главный шаг атмосферы ---------- */
-let chatT = 2, sirenT = 0;
+let chatT = 2;
 function worldFx(dt) {
   if (!S.wx) S.wx = { k: 'clear', until: S.min + 180 };
   if (!S.blow) S.blow = { stage: 0, next: S.min + rnd(900, 1500), t: 0 };
@@ -4303,10 +4286,10 @@ function worldFx(dt) {
       const d = dE(e, P);
       if (e.fac === 'loner' && !hostile(e, P) && d < 90 && !e.greeted) { e.greeted = 1; callout(e, S.rep < 0 ? 'bad' : 'greet', true); return; }
       if (d > 140) e.greeted = 0;
-      if (chance(0.08)) callout(e, 'idle');
+      if (!e.sit && chance(0.045)) callout(e, 'idle');
     });
   }
-  guitar(dt);
+  campAndRadio(dt);
 }
 const BLOW_WARNING = 'Приближается выброс! Укройтесь в ближайшем здании или бункере. Ближайшее укрытие отмечено на карте.';
 // One flood from all usable doorways gives each reachable tile its closest shelter.
@@ -4461,12 +4444,12 @@ function blowoutHumanAI(e, dt) {
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
-    B.stage = 1; B.t = 80;
+    B.stage = 1; B.t = 42; play('warning');
     radioNews(BLOW_WARNING, true);
   }
   if (B.stage === 1) {
     B.t -= dt; WX.red = lerp(WX.red, 0.5, Math.min(1,dt * 0.05));
-    sirenT -= dt; if (sirenT <= 0) { sirenT = 4; play('siren'); }
+
     if (B.t <= 0) {
       B.stage = 2; B.t = 26; play('blow');
       ents.forEach(e => {
@@ -6221,7 +6204,7 @@ function advanceWorldTime(minutes, ctx) {
       if(!blow.stage)WX.red=0;
     }
   }
-  S.min=end;
+  S.min=end;ageRemains();
   if(r.minutes>0){
     updateCoat(r.minutes);
     if(livingZone)updateEnvironment(r.minutes);
@@ -6457,7 +6440,7 @@ function dynId() { S.dyn = S.dyn || { v: 0, seq: 0, npcs: [] }; return 'u' + (++
 function dynSnapshot() {
   plusDefaults(); S.mapVersion = MAP_VERSION;
   S.dyn.v = DYN_VER;
-  S.flags.fieldBodies=objs.filter(o=>o.k==='body').map(o=>({...o}));
+  S.flags.fieldBodies=objs.filter(o=>o.k==='body'||o.k==='bones').map(o=>({...o}));
   delete S.flags.mutantBodies;
   S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn,
@@ -6475,6 +6458,7 @@ function dynRestore() {
   const v = S.dyn.v || 0;
   remapToMap();
   for (const body of S.flags.fieldBodies || S.flags.mutantBodies || []) objs.push({...body,loot:{...body.loot}});
+  ageRemains();
   // миграция старых сохранений (0.6): заказ без id, SOS без участников
   if (v < DYN_VER) {
     const j = S.jobs.act;
@@ -6716,14 +6700,19 @@ function drawDialog2() {
   const O = el('div', 'dlg-opts');
   panel.opts().forEach((o, i) => O.appendChild(btn((o.k || '') + ' opt', (i + 1) + '. ' + o.t, () => {
     if (o.close) { closePanel(); if (o.fn) o.fn(); return; }
+    const session=panel, start=panel.lines.length;
     panel.lines.push({ s: 'me', t: o.t });
     o.fn();
-    if (panel && (panel.kind === 'dialog' || panel.kind === 'trader')) { refresh(); const ln = pbody.querySelector('.dlg-lines'); if (ln) ln.scrollTop = ln.scrollHeight; }
+    if(panel===session){
+      refresh();
+      const log=pbody.querySelector('.dlg-lines'), first=log?.children[start+1] || log?.children[start];
+      if(first)log.scrollTop=first.getBoundingClientRect().top-log.getBoundingClientRect().top+log.scrollTop;
+    }
   }, o.d)));
   main.appendChild(O);
   box.append(main,identity(panel.card));
   pbody.appendChild(box);
-  L.scrollTop=L.scrollHeight;
+  L.scrollTop=0;
 }
 
 /* ---------- КПК: карта ~65% + выбранное задание ~35%, вкладки снизу ---------- */
@@ -6940,6 +6929,7 @@ function drawInv2() {
     if (it.d) dv.appendChild(el('div', 'ds lite', it.d));
     const row = el('div', 'btnrow');
     const slotKey=kitSlot(id), mounted=slotKey && kitItem(slotKey)===id && !copy;
+    moduleControls(id,copy,row);
     if (slotKey && !mounted) row.appendChild(btn('go','В слот',()=>{
       mountGear(id,copy,false); panel.copy=0; refresh();
     }));
@@ -6994,9 +6984,9 @@ function merchantRisk(){
 }
 function tradeStock(e) {
   if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
-    id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
+    id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*gearRetail(id)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
   }));
-  return STOCK.map(s=>({...s,p:purchaseCost(s.p*merchantRisk()),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
+  return STOCK.map(s=>({...s,p:purchaseCost(s.p*gearRetail(s.id)*merchantRisk()),c:99,cond:isGun(s.id)?TRADER_WCOND:null}));
 
 }
 function sellUnit(id) { return ITEMS[id].ammo ? Math.min(10, cnt(id)) : 1; }
@@ -7020,12 +7010,20 @@ function sellWhy(id, e, o) {
   if (kitSlot(id) && kitItem(kitSlot(id))===id) return id===S.weapon?'в руках':'в слоте';
   if (id === S.armor) return 'надето';
   if (beltCount(id)) return 'пояс';
+  if (refusesTrophy(e,id)) return 'только торговцам';
   if (e && it.armor) return 'не берёт';
   return null;
 }
+function refusesTrophy(e,id){
+  return e && e.fac!=='trader' && e.sid!=='lz_barman' && Object.values(MUTANT_TROPHIES).includes(id);
+}
+function gearRetail(id){
+  if(!isGun(id) && !ITEMS[id]?.armor)return 1;
+  return {rookie:1.25,normal:1.65,hard:1.85,master:2.1}[difficultyKey(S.difficulty)];
+}
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
-  if (e && it.armor) return 0;
+  if ((e && it.armor) || refusesTrophy(e,id)) return 0;
   return Math.max(0,cnt(id)-wornCount(id));
 }
 function offerSum(e) {
@@ -7715,14 +7713,27 @@ function campaignCast(){
     const p=locPt('farm','fox');
     for(let i=0;i<4;i++)addCast('traildog'+i,walkPoint(p,5+i%2,4+i),{pack:'foxdogs'},'trailDog');
   }
+  if(chapter()==='rescue' || c.atpVolunteers){
+    c.atpVolunteers=true;
+    atpVolunteers.forEach((id,i)=>{
+      const base=byS('petr')?.home||locPt('atp','petr');
+      const point=S.flags.assault?atpDestination(id):walkPoint(base,i?2:-2,1);
+      addCast(id,point,{fac:'loner',wpn:i?'w_obrez':'w_pm',name:i?'Сурок':'Клёст'},'volunteer');
+    });
+  }
   if(c.atpReliefSent)spawnAtpRelief();
   if(c.raid){
     RAIDERS.forEach((name,i)=>addCast('northAlly'+i,walkPoint(c.northHeld?northCamp():FIRE,(i-2)*1.8,5),{name,fac:'loner',wpn:i%2?'w_aksu':'w_obrez'},'squadMate'));
     if(chapter()==='battle')for(let i=0;i<6;i++)addCast('northMerc'+i,walkPoint(northCamp(),(i%3-1)*2,-Math.floor(i/3)*2),{name:'Наёмник',fac:'bandit',wpn:i%2?'w_aksu':'w_pm'},'assailant');
   }
 }
+const atpVolunteers=['atpScout','atpRunner'];
+function atpDestination(id){
+  if(!atpVolunteers.includes(id))return locPt('atp',id);
+  return walkPoint(locPt('atp','petr2'),id==='atpScout'?2:-2,1);
+}
 function atpCompany(){
-  return ['petr','petr2','atpRelief0','atpRelief1'].map(byS).filter(Boolean);
+  return ['petr','petr2',...atpVolunteers,'atpRelief0','atpRelief1'].map(byS).filter(Boolean);
 }
 function spawnAtpRelief(){
   const gate=locPt('atp','petr');
@@ -7737,7 +7748,7 @@ function spawnAtpRelief(){
 function occupyATP(){
   const first=!S.campaign.liberated;
   S.campaign.liberated=true;S.flags.atpClear=S.flags.shustFree=1;
-  ['petr','petr2','shust'].forEach((id,i)=>{
+  ['petr','petr2','shust',...atpVolunteers].forEach((id,i)=>{
     const e=byS(id);if(!e)return;
     const p=walkPoint(locPt('atp',i===1?'petr2':'petr'),i===2?3:0,i===2?2:0);
     e.captive=e.wounded?1:0;e.home=p;e.stay=1;e.resident=1;
@@ -7755,7 +7766,7 @@ function beginAssault(){
   if(chapter()!=='rescue'||S.flags.assault)return;
   S.flags.assault=1;
   for(const e of atpCompany()){
-    e.sit=0;e.trip=e.path=null;e.home=locPt('atp',e.sid);e.stay=1;
+    e.sit=0;e.trip=e.path=null;e.home=atpDestination(e.sid);e.stay=1;
   }
   bulletin('Отряд Петрухи выдвигается на АТП.');
 }
@@ -9571,6 +9582,7 @@ const G3_READY = () => G3.on && G3.ready;
 /* кожа тела: игрок в «Заре» — zarya, иначе базовое тело своей группировки; Сидорович — временно loner */
 function g3Skin(e) {
   if (e.kind === 'dog' || e.kind === 'boar' || e.kind === 'sucker') return e.kind;
+  if(e.sid==='wolf')return 'zarya';
   if (e === P) return S.armor === 'ar_zarya' ? 'zarya' : S.armor === 'ar_bandit' ? 'bandit' : 'loner';
   return { loner: 'loner', bandit: 'bandit', army: 'army', trader: 'loner' }[e.fac] || 'loner';
 }
@@ -9793,6 +9805,7 @@ const RIGS = new WeakMap(), GAIT = new WeakMap(), BODYFX = new WeakMap();
 /* кожа: броня игрока → костюм; NPC → группировка; Сидорович — отдельные кадры G4 */
 function rigSkin(e) {
   if (e.kind !== 'human' || e.sid === 'sid') return null;
+  if(e.sid==='wolf')return 'zarya';
   if (e === P) return S.armor === 'ar_zarya' ? 'zarya' : S.armor === 'ar_bandit' ? 'bandit' : 'loner';
   return { bandit: 'bandit', army: 'army' }[e.fac] || 'loner';
 }
@@ -9935,7 +9948,7 @@ function jacketIndex(e) {
   return Array.from(identity).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % JACKET_COLORS.length;
 }
 function jacketFor(e) {
-  if (!window.CORDON_G8_ON || G7.rigOn || e === P || e.fac !== 'loner' || e.kind !== 'human') return null;
+  if (!window.CORDON_G8_ON || G7.rigOn || e.sid==='wolf' || e === P || e.fac !== 'loner' || e.kind !== 'human') return null;
   const index = jacketIndex(e);
   if (jacketSets[index]) return jacketSets[index];
   const sheet = packImage('assets/g8/jacket_' + JACKET_COLORS[index] + '.webp');
@@ -12199,6 +12212,14 @@ function furnishHouses(){
     if(trim.length>12)mounts.push(trim[(mountIndex+Math.floor(trim.length/2))%trim.length]);
     h.interior={use,count,mounts,mark:spots[0] || {x:cx,y:cy,a:0}};
   }
+  // Sleeping rolls lie flat against the wall and leave the aisle walkable.
+  const bunks=[['89,106',1.5,2,0],['104,74',1.5,2,0],['dump_383_23',3.5,2,0]];
+  for(const [key,dx,dy,angle] of bunks){
+    const house=HOUSES.find(h=>h.ok===key);
+    if(!house)continue;
+    const [w,h]=furnitureBounds('bedroll',angle);
+    interiorObject('roomFitting',(house.x+dx)*T,(house.y+dy)*T,w,h,{fitting:'bedroll',angle,home:key,solid:0});
+  }
 }
 function drawRoomMarks(g,h){
   const layout=h.interior;if(!layout)return;
@@ -12690,6 +12711,8 @@ const recordings={
   knife:[.40,'swing'],knifeHit:[.59,'hit'],crow:[.37,'crow'],
   dog:[.51,'bark1','bark2'],growl:[.45,'snarl'],boar:[.49,'grunt'],boarCharge:[.65,'charge'],
   sucker:[.66,'throat'],breath:[.34,'throat'],
+  stepAsphalt:[.25,'pavementL','pavementR'],carve:[.46,'carve'],warning:[.51,'warning'],
+  loadRifle:[.53,'loadRifle'],loadPistol:[.56,'loadPistol'],loadShell:[.57,'loadShell'],
   reload:[.46,'metalLatch'],jam:[.36,'metalClick'],click:[.27,'metalClick'],pick:[.32,'clothBelt'],creak:[.15,'creak1']
 };
 let fieldReady=false,windGain=null,rainFilter=null,rainRoof=null,hearthGain=null,airGain=null;
@@ -12769,13 +12792,222 @@ function mixRecordedRain(){
   rainRoof.gain.setTargetAtTime(wet*room.enclosure*room.metal*.78,now,.18);
 }
 
+const soundPrefs=(()=>{
+  try{
+    const saved=JSON.parse(localStorage.getItem('zona-sound')||'{}');
+    return Object.fromEntries(['volume','music','speech'].map(k=>[k,Number.isFinite(saved[k])?clamp(saved[k],0,1):1]));
+  }catch{return {volume:1,music:1,speech:1};}
+})();
+function soundSettings(nav,back){
+  nav.replaceChildren();
+  for(const [key,name] of [['volume','Общая громкость'],['music','Музыка'],['speech','Голоса']]){
+    const label=el('label','difficulty-label'),input=el('input'),value=el('span');
+    input.type='range';input.min=0;input.max=100;input.value=Math.round(soundPrefs[key]*100);
+    input.style.cssText='width:100%;min-height:44px';input.setAttribute('aria-label',name);
+    const show=()=>{value.textContent=name+' · '+input.value+'%';};show();
+    input.oninput=()=>{
+      soundPrefs[key]=Number(input.value)/100;show();
+      try{localStorage.setItem('zona-sound',JSON.stringify(soundPrefs));}catch{}
+      audioInit();if(master)master.gain.value=.55*soundPrefs.volume;
+      syncSceneAudio();
+    };
+    label.append(value,input);nav.append(label);
+  }
+  nav.append(btn('','Назад',back));
+}
+
+const compatibleRifle=id=>id==='w_aksu'||id==='w_akms';
+const sights=[{bit:1,id:'optic_module',name:'Оптический прицел',price:1200},{bit:2,id:'laser_module',name:'Лазерный целеуказатель',price:1800}];
+for(const mod of sights)ITEMS[mod.id]={n:mod.name,price:mod.price,w:.18,d:'Модуль для АКС-74У и АКМС. Устанавливается в рюкзаке.'};
+function sightInstalled(id){return compatibleRifle(id) && primaryGun(id).sights;}
+function moduleOffers(){
+  return sights.map(mod=>{
+    const price=purchaseCost(mod.price);
+    return {t:mod.name+' · '+price+' RU',d:S.money<price || !!receiveError(mod.id,1),fn:()=>{
+      if(S.money<price || receiveError(mod.id,1))return;
+      S.money-=price;addPacked(mod.id,1);say('Держи. Выбери автомат в рюкзаке и поставь модуль в свободный слот.');
+    }};
+  });
+}
+function moduleControls(id,index,row){
+  if(!compatibleRifle(id))return;
+  for(const mod of sights){
+    const gun=gunCopy(id,index),mounted=!!(gun.sights & mod.bit);
+    const b=btn('wide',mod.name+' · '+(mounted?'снять':has(mod.id)?'установить':'пусто'),()=>{
+      if(!cnt(id) || index>=cnt(id))return;
+      const current=gunCopy(id,index);
+      if(mounted!==!!(current.sights&mod.bit))return;
+      if(mounted){
+        const cells=packCells({...S.inv,[mod.id]:cnt(mod.id)+1});
+        if(cells>PACK_CELLS){panel.hint='Освободи ячейку в рюкзаке.';refresh();return;}
+        addPacked(mod.id,1);
+      }else if(has(mod.id))take(mod.id,1);else return;
+      const changed={...current,sights:(current.sights||0)^mod.bit};
+      if(index)spareList(id)[index-1]=changed;else setPrimary(id,changed);
+      refresh();
+    },!mounted && !has(mod.id));
+    row.appendChild(b);
+  }
+}
+
+function sameBedroom(o){
+  const x=o.x+o.w/2,y=o.y+o.h/2;
+  return HOUSES.some(h=>!h.ruin && x>h.x*T && y>h.y*T && x<(h.x+h.w)*T && y<(h.y+h.h)*T &&
+    P.x>h.x*T && P.y>h.y*T && P.x<(h.x+h.w)*T && P.y<(h.y+h.h)*T);
+}
+function sleepAtBed(o){
+  if(!o || !sameBedroom(o))return;
+  const choices=()=>[...[1,4,8].map(h=>{
+    const why=restBlock();
+    return {t:why||restLabel('Спать',h*60,'sleep'),d:!!why,fn:()=>{
+      if(restBlock()||!sameBedroom(o))return;
+      const r=advanceWorldTime(60*h,'sleep');closePanel();msg('Сон · '+fmtH(r.minutes)+'. Сейчас '+clockStr(S.min)+'. '+(r.stop||''),'say');save(true);
+    }};
+  }),{t:'Встать',close:1}];
+  dialog({n:'Спальное место',grp:'Отдых',record:true},['Здесь можно выспаться.'],choices);
+}
+function ageRemains(){
+  for(let i=objs.length-1;i>=0;i--){
+    const o=objs[i];if((o.k!=='body' && o.k!=='bones') || o.kind==='sack')continue;
+    const age=S.min-o.t;
+    if(age<1440)continue;
+    if(draggedBody===o)draggedBody=null;
+    if(age>=2880){objs.splice(i,1);continue;}
+    if(o.k==='body')objs[i]={k:'bones',kind:o.kind,x:o.x,y:o.y,ang:o.ang||0,seed:o.seed||0,t:o.t};
+  }
+}
+function drawBones(o){
+  const g=ctx;g.save();g.translate(o.x,o.y);g.rotate(o.ang);
+  const length=o.kind==='human'?12:o.kind==='boar'?11:8;
+  g.lineCap='round';g.strokeStyle='#555044';g.lineWidth=2.8;
+  for(const color of ['#514b3e','#a39679']){
+    g.strokeStyle=color;g.lineWidth=color[1]==='5'?2.8:1.35;
+    g.beginPath();g.moveTo(-length,0);g.lineTo(length*.55,.9);
+    for(let i=0;i<5;i++){
+      const x=-3+i*1.7;
+      g.moveTo(x,-.3);g.quadraticCurveTo(x-2,-3.5,x-1,-4.3);
+      g.moveTo(x,.7);g.quadraticCurveTo(x-1,3.3,x-2,4.4);
+    }
+    g.moveTo(-6,4);g.lineTo(-length,7);g.moveTo(5,-6);g.lineTo(10,-8);g.stroke();
+  }
+  g.fillStyle='#a39579';g.beginPath();g.ellipse(length*.88,1.2,3.1,2,0,0,Math.PI*2);g.fill();
+  g.fillStyle='#484238';g.fillRect(length*.9,-.1,1.1,1);g.restore();
+}
+function drawFlyingCrow(c){
+  const g=ctx,flap=Math.sin(c.ph),span=10+2.5*flap;
+  g.save();g.translate(c.x,c.y);g.rotate(Math.atan2(c.vy,c.vx));
+  for(const side of [-1,1]){
+    g.save();g.scale(1,side);g.fillStyle='#2e302c';g.beginPath();g.moveTo(2,0);
+    g.quadraticCurveTo(3.3,4.1,1.3,span*.65);
+    for(let i=0;i<4;i++){g.lineTo(-2.7-i*1.5,span-i*.7);g.lineTo(-2.2-i*1.5,span-2.0-i*.7);}
+    g.quadraticCurveTo(-4.2,3.6,-2,0);g.closePath();g.fill();
+    g.strokeStyle='#44423a';g.lineWidth=.75;g.beginPath();g.moveTo(.6,1.2);g.lineTo(.8,span*.62);g.stroke();g.restore();
+  }
+  g.fillStyle='#222420';g.beginPath();g.moveTo(-2.4,-1);g.lineTo(-8,-2.2);g.lineTo(-8.6,2);g.lineTo(-2,.9);g.fill();
+  g.beginPath();g.ellipse(0,0,4.5,1.8,0,0,7);g.ellipse(3.8,-.2,1.6,1.4,0,0,7);g.fill();
+  g.beginPath();g.moveTo(4.8,-.8);g.lineTo(7,.1);g.lineTo(4.8,.5);g.fill();g.restore();
+}
+function reloadSound(id){return WP[id]?.ammo==='a12'?'loadShell':compatibleRifle(id)?'loadRifle':'loadPistol';}
+
+const campStories=[
+  [['camp01','У кого вчера часы утащили?'],['camp02','У меня. Теперь вор точно знает, сколько ему осталось.']],
+  [['camp03','На насыпи всю ночь кто-то стучал. По три раза.'],['camp04','Я там ночевал. Котелок с ветки снять пытался.']],
+  [['camp05','До дождя успеем дойти?'],['camp06','До первого точно. А их тут сегодня штуки три.']]
+];
+const battleVoice={loner:[['ally01','Вижу его!'],['ally02','Прикрой, меняю магазин!']],bandit:[['foe01','Вот он, мужики!'],['foe02','Пустой! Прикрой!']],army:[['army01','Контакт!'],['army02','Перезаряжаюсь!']]};
+let campAct=null,campDelay=9,campIndex=0,voiceDelay=0,radioAudio=null,voiceAudio=null;
+function stopScene(sound){
+  if(!sound)return;
+  try{sound.source.stop();}catch{}
+}
+function sceneClip(name,volume,group,actor,loop=false){
+  const buffer=fieldBuffers.get(name);
+  if(!AC || !buffer)return null;
+  const source=AC.createBufferSource(),gain=AC.createGain();source.buffer=buffer;source.loop=loop;
+  const clip={source,gain,volume,group,actor,done:false};
+  gain.gain.value=0;source.connect(gain);gain.connect(master);
+  source.onended=()=>{clip.done=true;source.disconnect();gain.disconnect();};
+  source.start();mixScene(clip);return clip;
+}
+function mixScene(s){
+  if(!s||s.done||!P)return;
+  const distance=s.actor?Math.max(0,1-dE(s.actor,P)/270):1;
+  s.gain.gain.setTargetAtTime(s.volume*soundPrefs[s.group]*distance*distance,AC.currentTime,.06);
+}
+function syncSceneAudio(){mixScene(voiceAudio);mixScene(radioAudio);mixScene(campAct?.clip);}
+function resetCampAudio(){
+  stopScene(campAct?.clip);stopScene(voiceAudio);stopScene(radioAudio);
+  campAct=radioAudio=voiceAudio=null;campDelay=9;voiceDelay=0;campIndex=0;
+}
+function voiceCallout(e,kind){
+  if(!['combat','reload'].includes(kind)||!battleVoice[e.fac]||voiceDelay>0||dE(e,P)>250||
+    inBunker(e.x,e.y)!==inBunker(P.x,P.y)||loftAt(e)!==loftAt(P))return false;
+  const [clip,line]=battleVoice[e.fac][kind==='reload'?1:0];
+  stopScene(campAct?.clip);campAct=null;campDelay=22;
+  const sound=sceneClip(clip,.52,'speech',e);if(!sound)return false;
+  voiceAudio=sound;voiceDelay=9+(e.seed%6);e.bub={t:line,life:2.7};return true;
+}
+function atFire(e){
+  return e?.alive && e.sit && !e.wounded && !e.captive && !e.tgt && !e.evacuating &&
+    e.fireRef && dE(e,e.fireRef)<80 && dE(e,P)<255;
+}
+function campAndRadio(dt){
+  voiceDelay=Math.max(0,voiceDelay-dt);
+  const underground=inBunker(P.x,P.y);
+  if(underground && !radioAudio){radioAudio=sceneClip('deskRadio',.22,'music',byS('sid'),true);}
+  if(!underground && radioAudio){stopScene(radioAudio);radioAudio=null;}
+  syncSceneAudio();
+  const quiet=!underground && !loftAt(P) && !S.blow?.stage && WX.rain<.6 && voiceDelay<=0;
+  if(campAct){
+    const act=campAct;
+    if(!quiet || !atFire(act.actor)){stopScene(act.clip);campAct=null;campDelay=16;return;}
+    if(!act.clip.done)return;
+    if(act.reply && atFire(act.reply)){
+      const [name,t]=act.lines[1];act.actor=act.reply;act.reply=null;
+      act.clip=sceneClip(name,.44,'speech',act.actor);
+      if(act.clip){act.actor.bub={t,life:4};return;}
+    }
+    campAct=null;campDelay=25+(campIndex*7)%19;return;
+  }
+  if(!quiet||!AC||(campDelay-=dt)>0)return;
+  campDelay=4;
+  const seats=ents.filter(atFire).sort((a,b)=>dE(a,P)-dE(b,P));if(!seats.length)return;
+  const actor=seats[campIndex%seats.length], reply=seats.find(e=>e!==actor && dE(e,actor)<105);
+  const music=campIndex%2===1 || !reply;
+  const lines=campStories[Math.floor(campIndex/2)%campStories.length];
+  const song=['emberSong','roadSong','latePicking'][Math.floor(campIndex/2)%3];
+  const clip=sceneClip(music?song:lines[0][0],music?.29:.48,music?'music':'speech',actor);
+  if(!clip)return;
+  if(!music)actor.bub={t:lines[0][1],life:4};
+  campAct={actor,reply:music?null:reply,music,lines,clip};campIndex++;
+}
+function drawCampGuitar(e){
+  const g=ctx;g.save();g.translate(e.x,e.y);g.rotate(e.ang-.95);g.translate(4,1);
+  g.fillStyle='#60422b';g.strokeStyle='#362e26';g.lineWidth=1;
+  g.beginPath();g.ellipse(-1,5,4.8,3.8,-.32,0,7);g.ellipse(3.8,3.4,3,2.7,-.32,0,7);g.fill();g.stroke();
+  g.strokeStyle='#866748';g.lineWidth=2.3;g.beginPath();g.moveTo(3,4);g.lineTo(14,-.8);g.stroke();
+  g.fillStyle='#312921';g.beginPath();g.arc(1.8,4,1.4,0,7);g.fill();
+  g.fillStyle='#a38a6a';g.fillRect(-1+Math.sin(G7.vt*6),4,2.4,1.6);g.restore();
+}
+
+
+function drawDeskRadio(){
+  const g=ctx, sid=byS('sid');if(!sid)return;
+  g.save();g.translate(sid.x+35,SHOP_ROOM.counterY*T-4);g.rotate(-.08);
+  g.fillStyle='#302c24';g.fillRect(-10,-5,21,11);g.fillStyle='#66583f';g.fillRect(-10,-6,20,9);
+  g.fillStyle='#35362c';g.fillRect(-8,-4,11,5);
+  g.fillStyle='#887a5b';for(let i=0;i<5;i++)g.fillRect(i*2-7,-3,.7,3);
+  g.fillStyle='#c5a166';g.fillRect(5,-3,3,1);g.fillStyle='#302e29';g.fillRect(6,0,2,2);
+  g.strokeStyle='#777566';g.lineWidth=.75;g.beginPath();g.moveTo(6,-5);g.lineTo(11,-12);g.stroke();g.restore();
+}
+
 /* ===================== звук ===================== */
 let AC = null, master = null, noiseBuf = null;
 function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = 0.55; master.connect(AC.destination);
+    master = AC.createGain(); master.gain.value = soundPrefs.volume*.55; master.connect(AC.destination);
     noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
@@ -13017,14 +13249,14 @@ function repairOffer() {
 function talk(e) {
   if(chapter()==='aid' && S.campaign.villageMedic && e.sid===S.campaign.villageMedic)return dialog(cardOf(e),['Я ему рану прижал. Меченый, есть чем перевязать? Подойди к Волку.'],()=>[{t:'Понял.',close:1}],'dialog',e);
   if(e.sid==='lz_tech') return dialog(cardOf(e),['Клемма, местный техник. Давай посмотрим, с чем пришёл.'],()=>[
-    repairOffer() || {t:'Оружие в порядке',d:true},{t:'До встречи',close:1}
+    ...moduleOffers(), repairOffer() || {t:'Оружие в порядке',d:true},{t:'До встречи',close:1}
   ],'dialog',e);
   if (e.sid==='lz_barman') return dialog(cardOf(e),['Бар «Под стрехой». С дороги? Горячее кончилось, банка бодрящего найдётся.'],()=>[
     {t:'Покажи припасы',k:'key',fn:()=>openTrade(e)},
     {t:'Что слышно про маки?',fn:()=>say('Начнут слипаться глаза — выпей энергетик или выбирайся на дорогу. Кто лёг среди цветов, уже не встаёт.')},
     {t:'До встречи',close:1}
   ],'dialog',e);
-  if(chapter()==='rescue' && !S.flags.assault && (e.sid==='petr' || e.sid==='petr2' && !byS('petr')))return petrBriefing(e);
+  if(chapter()==='rescue' && !S.flags.assault && e===atpCompany()[0])return petrBriefing(e);
   if (STORY_KEYS.includes(e.sid) || e.squadMate)return storyTalk(e);
   if (e.fac === 'army') {
     if (hostile(e,P)) return;
@@ -13035,10 +13267,10 @@ function talk(e) {
     const south = e.guard === 'south';
     return dialog(cardOf(e), [south ? 'Назад. Здесь граница Зоны, проход закрыт.' : S.flags.bridgePaid ? 'А, это ты. Проходи.' : 'Стоять. Пятьсот за проход в обе стороны. Пересечёшь шлагбаум без оплаты — откроем огонь.'], () => [
       south ? { t: 'А если договоримся?', fn: () => say('Не договоримся. Свободен.') }
-        : S.flags.bridgePaid ? { t: 'Я уже платил', fn: () => say('Помню. Проходи, не задерживай.') }
+        : S.flags.bridgePaid ? null
         : { t: 'Пропусти за 500 RU', k: 'key', d: S.money < 500, fn: () => { S.money -= 500; S.flags.bridgePaid = 1; openBarrier(); say('Другой разговор. Проходи, шлагбаум поднят. Туда и обратно, сколько хочешь.'); sys('Мост открыт.'); news('Заплатил военным 500 RU за проход под мостом.'); } },
       { t: 'Уйти', close: 1 }
-    ], 'dialog', e);
+    ].filter(Boolean), 'dialog', e);
   }
   if (e.sid === 'petr' || e.sid === 'petr2') {
     return dialog(cardOf(e), [S.flags.atpClear ? 'Ну ты дал! АТП теперь наше. Тут пока и осядем.' : 'Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
@@ -13208,12 +13440,7 @@ function drawMenu() {
     heading.textContent='Настройки';
     nav.appendChild(btn('','Настроить управление',openControlEditor));
     nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,drawMenu)));
-    const soundLabel=()=>AC && master && master.gain.value===0?'Включить звук':'Выключить звук';
-    const sound=btn('',soundLabel(),()=>{
-      audioInit(); if (master) master.gain.value=master.gain.value?0:0.55;
-      sound.textContent=soundLabel();
-    });
-    nav.appendChild(sound);
+    nav.appendChild(btn('','Звук',()=>soundSettings(nav,drawMenu)));
     nav.appendChild(btn('','Назад',leavePauseSettings));
     return;
   }
@@ -13722,6 +13949,7 @@ function interact() {
   else if (n.k === 'kill') takedown(n.e);
   else if (n.k === 'groundItem') pickGroundItem(n);
   else if (n.k === 'locker') { openPanel('locker','Личный ящик · '+n.o.baseName); refresh(); }
+  else if(n.k==='sleep')sleepAtBed(n.o);
   else if (n.k === 'carve') carveMutant(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
@@ -13989,6 +14217,7 @@ function showTitle(kind) {
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
   nav.appendChild(btn('','Управление',openControlEditor));
   nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));
+  nav.appendChild(btn('','Звук',()=>soundSettings(nav,()=>showTitle())));
   c.append(title.name,nav);
 }
 function goFull() {   // на весь экран там, где браузер это умеет (Android, iPad, компьютер); на iPhone — через «На экран Домой»
