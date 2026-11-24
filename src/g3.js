@@ -65,7 +65,7 @@ function playerFire() {
   }
 }
 function cycleWeapon(dir) {
-  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean), 'hands'];
+  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean), ...(has('guitar')?['guitar']:[]), 'hands'];
   const i = own.indexOf(S.weapon);
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
@@ -73,7 +73,7 @@ function setWeapon(w) {
   if (w !== 'hands' && w !== 'knife' && !has(w)) return;
   const slot = kitSlot(w);
   if (slot) S.flags.kit[slot] = w;
-  if (S.weapon !== w) releaseFireStick();
+  if (S.weapon !== w) {releaseFireStick();stopPlayingGuitar();}
   S.weapon = w;
   P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
@@ -225,6 +225,16 @@ function resolveActorContacts(dt){
       const rr=(a.r+b.r)*(friendly ? .72 : 1);
       if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy);
+      if(other?.kind==='human' && d<rr && (IN.moveX || IN.moveY) &&
+          !other.captive && !other.wounded && other.sid!=='sid' && loftAt(P)===loftAt(other) &&
+          los(P.x,P.y,other.x,other.y) && S.min>=(other.bumpAfter||0)){
+        other.bumpAfter=S.min+4;
+        other.ang=Math.atan2(P.y-other.y,P.x-other.x);
+        if(hostile(other,P)){
+          other.aw=1;other.tgt=P;other.lastSeen={x:P.x,y:P.y};other.mem=8;other.react=.25;
+          if(other.guard==='south' && storyArea())alarmPost();
+        }else if(!other.tgt)sayLine(other,'Осторожнее. Дай пройду.');
+      }
       if (friendly && !other.sit && !other.captive && !other.wounded && d<rr &&
           (IN.moveX || IN.moveY) && !other.tgt) {
         // Give the moving player right of way, including narrow thresholds.
@@ -310,13 +320,13 @@ function update(dt) {
   // атмосфера: вороны, дым костра
   ambT -= dt;
   if (ambT <= 0) {
-    ambT = rnd(25, 60);
-    if (!night() && !inBunker(P.x,P.y) && !loftAt(P)) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6), caller:i===0, callIn:3.5 }); }
+    ambT = rnd(45, 95);
+    if (!night() && !inBunker(P.x,P.y) && !loftAt(P)) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6), caller:i===0 && chance(.5), callIn:3.5 }); }
   }
   for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9;
     if(c.caller && (c.callIn-=dt)<=0){
-      c.callIn=rnd(2.8,5.2);
-      if(!inBunker(P.x,P.y) && !loftAt(P))play('crow',c.x,c.y,sheltered(P.x,P.y) ? .28 : .9);
+      c.caller=false;
+      if(!inBunker(P.x,P.y) && !loftAt(P))play('crow',c.x,c.y,sheltered(P.x,P.y) ? .09 : .38);
     }
     if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
   [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });

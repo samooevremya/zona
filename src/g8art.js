@@ -976,7 +976,7 @@ const DECOR = [
   }),
   ['logs', 46.6, 23.4, -0.3],
   ['bench', 16.7, 76.3, 0], ['barrel', 21.6, 75.2, 0], ['barrel', 31.3, 72.4, 0.5], ['bench', 30.8, 74.8, 0], ['barrel', 43.3, 77.1, 0], ['rubble', 40.5, 76.6, 0.8],
-  ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['barrel', 44.1, 91.2, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
+  ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
   ['rubble', 34.3, 92.4, 0.5], ['rubble', 11.6, 90.4, 2.1], ['rubble', 25.6, 18.6, 1], ['rubble', 94.3, 18.2, 0.3],
   ['fence', 16.5, 70.7, 0], ['fence', 18.5, 70.7, 0], ['fence', 20.5, 70.7, 0.04],
@@ -1136,7 +1136,7 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
   if(h.mat==='watchpost')return 'c1_tower';
-  if (BIG && h.x === WEST+15 && h.y === NORTH_ROWS+28) return 'c1_tower';
+  if (BIG && h.x === WEST+15 && h.y === NORTH_ROWS+28) return 'c1_roof_plank';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (BIG && (h.x<WEST || h.ok?.startsWith('dump_'))) {
@@ -1209,6 +1209,7 @@ function artRoof(h, idx) {
   const W = h.w * T + 10, Hh = h.h * T + 10, c = document.createElement('canvas');
   const home = h.ok || (h.x + ',' + h.y);
   const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
+  const lookout=BIG && h.x===WEST+15 && h.y===NORTH_ROWS+28;
   const porch = h.entrances.find(d => d.approach === 'porch');
   h.porchDepth = porch ? 14 : 0;
   c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
@@ -1272,6 +1273,15 @@ function artRoof(h, idx) {
     }
     g.restore();
     if(BIG && gable && !h.ruin) weatherRoof(g,h,RW,RH);
+    if(lookout){
+      g.shadowColor='transparent';
+      for(const x of [8,RW-13]){
+        g.fillStyle='#423b2e';g.fillRect(x,RH-1,5,wallH);
+        g.fillStyle='#897653';g.fillRect(x+1,RH,1,wallH-1);
+      }
+      beam(g,8,RH+wallH-2,RW*.32,RH+1,2.4,'#554834');
+      beam(g,RW-9,RH+wallH-2,RW*.68,RH+1,2.4,'#554834');
+    }
     if (porch) drawPorch(g, porch, RH, Hh - 7);
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;

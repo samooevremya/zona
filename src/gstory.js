@@ -266,8 +266,11 @@ function storyTalk(e){
   if(e.sid==='shust' && stage==='device')return scene('device','К Сидоровичу','bargain');
   if(e.sid==='wolf' && stage==='muster')return scene('muster','Встретиться с отрядом','ready',()=>{S.campaign.raid=true;});
   if(e.squadMate && stage==='ready')return playConversation(e,'ready','Я готов. Выходим',()=>nextChapter('battle'),{t:'Ещё подготовлюсь',close:1});
-  const line=e.sid==='shust'?shustCampLine():e.squadMate?(S.campaign.northHeld?raidDebrief():'Держим этот участок.'):e.sid==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.';
-  dialog(cardOf(e),[line],()=>[{t:'До встречи',close:1}],'dialog',e);
+  const line=e.sid==='shust'?shustCampLine():e.squadMate?(S.campaign.northHeld?raidDebrief():'Держим этот участок.'):e.sid==='fox'?'С этой ногой далеко не уйдёшь.':fieldGreeting(e);
+  dialog(cardOf(e),[line],()=>[...(e.sid==='wolf' && (stage==='done' || stage==='west')?[
+    {t:'Как дела в деревне?',fn:()=>say(S.campaign.northHeld?'Караулы сменили. Новички опять просятся в ходку. Пусть сперва научатся домой возвращаться.':'Пока тихо. Ушедших пересчитываю, за новичками приглядываю.')},
+    {t:'Что слышно на дорогах?',fn:()=>say(nextCampNews(e))}
+  ]:[]),{t:'До встречи',close:1}],'dialog',e);
 }
 function raidDebrief(){
   const n=raidAllies().length;

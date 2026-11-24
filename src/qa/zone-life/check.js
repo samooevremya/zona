@@ -41,7 +41,7 @@ window.zoneLifeCheck=async()=>{
   S.min+=1440;ageRemains();ok(!objs.some(o=>o.k==='bones'&&o.seed===7),'bones gone');
   S.blow={next:S.min,stage:0,t:0};blowout(0);ok(S.blow.t===42,'warning duration');
   audioInit();for(let t=0;t<100&&!fieldBuffers.has('roadSong');t++)await new Promise(r=>setTimeout(r,50));
-  const names=['loadPistol','loadShell','loadRifle','pavementL','pavementR','carve','warning','deskRadio','emberSong','roadSong','latePicking',...campStories.flat().map(l=>l[0]),...Object.values(battleVoice).flat().map(l=>l[0])];
+  const names=['loadPistol','loadShell','loadRifle','pavementL','pavementR','carve','warning','deskRadio','emberSong','roadSong','latePicking'];
   ok(names.every(n=>fieldBuffers.get(n)?.duration>.12),'decoded audio '+names.length);
   resetCampAudio();P.x=byS('sid').x;P.y=byS('sid').y+32;campAndRadio(.1);ok(radioAudio?.source.loop,'bunker radio');
   Object.assign(P,FIRE);campAndRadio(.1);ok(!radioAudio,'radio fades outside');
@@ -49,5 +49,36 @@ window.zoneLifeCheck=async()=>{
   campDelay=0;campIndex=1;campAndRadio(.1);ok(campAct?.music && atFire(campAct.actor),'seated musician');campAct.actor.sit=0;campAndRadio(.1);ok(!campAct,'music stops when standing');
   const controls=document.createElement('div');soundSettings(controls,()=>{});const slider=controls.querySelector('input');slider.value=35;slider.dispatchEvent(new Event('input'));
   ok(JSON.parse(localStorage.getItem('zona-sound')).volume===.35 && Math.abs(master.gain.value-.1925)<.001,'saved volume');
+  fresh();
+  Object.assign(P,{x:FIRE.x+24,y:FIRE.y});
+  S.inv.vodka=2;S.caches={};
+  restAtFire();
+  const teller=panel.e;
+  const opts=()=>panel.opts(),ask=pattern=>opts().find(o=>pattern.test(o.t));
+  const news=ask(/что слышно/);
+  news.fn();const first=panel.lines.at(-1).t;news.fn();
+  ok(first!==panel.lines.at(-1).t,'different camp replies');
+  ask(/расспросить про/).fn();
+  ok(cnt('vodka')===1 && !ask(/расспросить про/),'one cache per speaker');
+  const witness=teller.sid;
+  closePanel();save(true);applyState(loadSave());
+  ok(talkMemory(byS(witness)).stash,'cache information persists');
+  S.campaign.stage='done';S.campaign.liberated=true;talk(byS('wolf'));
+  ok(ask(/деревне/) && ask(/дорогах/),'Wolf after campaign');
+  closePanel();talk(byS('petr'));ok(!ask(/Что там внутри/) && ask(/Что нового/),'Petr after rescue');closePanel();
+  ok(tradeStock(null).some(s=>s.id==='guitar') && tradeStock(byS('lz_barman')).some(s=>s.id==='guitar'),'guitar vendors');
+  give('guitar',1);setWeapon('guitar');ok(!WP[S.weapon] && sellable('guitar',null)===0,'guitar in hands');
+  for(const track of songBook){
+    Object.assign(P,{x:FIRE.x+24,y:FIRE.y});S.blow={stage:0,next:S.min+200,t:0};
+    restAtFire();const song=opts().find(o=>o.t.endsWith(track[1]));song.fn();
+    ok(playerSong?.source.buffer===fieldBuffers.get(track[0]) && P.sit && !panel,'playing '+track[0]);
+    render();IN.moveX=1;campAndRadio(.05);IN.moveX=0;ok(!P.sit && !playerSong,'leave seat');
+  }
+  const bandit=ents.find(e=>e.alive && e.fac==='bandit');
+  Object.assign(P,{x:bandit.x-16,y:bandit.y,crouch:1});bandit.ang=0;bandit.tgt=null;bandit.aw=0;
+  S.min=23*60;IN.moveX=1;resolveActorContacts(.03);IN.moveX=0;
+  ok(bandit.tgt===P && bandit.aw===1,'contact behind hostile at night');
+  ok(!Object.keys(window.ZONE_AUDIO).some(k=>/^(camp|army|ally|foe)0/.test(k)),'no recorded NPC dialogue');
+  ok(['restored_pda','damaged_pda','guitar'].every(id=>itemIcon(id).tagName==='IMG'),'equipment artwork');
   return {out,prices,places};
 }

@@ -70,6 +70,7 @@ const ITEMS = {
   fuel: { n: 'Канистра с бензином', sell: 0, w: 5, quest: 1, d: 'Топливо для деревенского генератора. Квестовый предмет.' },
   hoof: { n: 'Копыто кабана', sell: 150, w: 0.7, d: 'Трофей, торговец берёт' },
   engraved_pm: {n:'Наградной ПМ Лиса',quest:1,w:0.73,d:'На рукояти пластинка с фамилией. Вернуть Лису.'},
+  guitar:{n:'Акустическая гитара',w:1.8,price:750,d:'Потёртая шестиструнка. Возьми её в руки и сядь у костра, чтобы выбрать песню или перебор.'},
   damaged_pda: {n:'Разбитый КПК',quest:1,w:0.26,d:'Найден в сером рюкзаке у грузовика.'},
   post_case: {n:'Кейс с документами',quest:1,w:1.2,d:'Доставить Сидоровичу.'},
   restored_pda: {n:'Восстановленный КПК',quest:1,w:0.26,d:'В памяти сохранилась запись Стрелка.'},
@@ -88,6 +89,7 @@ const WP = {
 };
 const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS), 'w_aps', 'w_toz34', 'w_akms'];
 const STOCK = [
+  {id:'guitar',q:1,p:ITEMS.guitar.price},
   ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 }, { id: 'energy', q: 1, p: 150 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
@@ -151,7 +153,7 @@ function house(x, y, w, h, doors, wall, broken, roof, random = srnd) {
 function buildEntrances(h) {
   h.entrances = [];
   const home = h.ok || (h.x + ',' + h.y);
-  const hasPorch = BIG && C1 && (home === '26,71' || home === '37,73');
+  const hasPorch = BIG && C1 && (home === '26,71' || home === '37,73' || (h.x===WEST+15 && h.y===NORTH_ROWS+28));
   for (const [nx, ny] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
     const length = nx ? h.h : h.w;
     let start = 0, declared = false;

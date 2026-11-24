@@ -72,6 +72,7 @@ const ITEMS = {
   fuel: { n: 'Канистра с бензином', sell: 0, w: 5, quest: 1, d: 'Топливо для деревенского генератора. Квестовый предмет.' },
   hoof: { n: 'Копыто кабана', sell: 150, w: 0.7, d: 'Трофей, торговец берёт' },
   engraved_pm: {n:'Наградной ПМ Лиса',quest:1,w:0.73,d:'На рукояти пластинка с фамилией. Вернуть Лису.'},
+  guitar:{n:'Акустическая гитара',w:1.8,price:750,d:'Потёртая шестиструнка. Возьми её в руки и сядь у костра, чтобы выбрать песню или перебор.'},
   damaged_pda: {n:'Разбитый КПК',quest:1,w:0.26,d:'Найден в сером рюкзаке у грузовика.'},
   post_case: {n:'Кейс с документами',quest:1,w:1.2,d:'Доставить Сидоровичу.'},
   restored_pda: {n:'Восстановленный КПК',quest:1,w:0.26,d:'В памяти сохранилась запись Стрелка.'},
@@ -90,6 +91,7 @@ const WP = {
 };
 const WORDER = ['knife', 'w_pm', 'w_obrez', 'w_aksu', 'grenade', ...Object.keys(DETECTORS), 'w_aps', 'w_toz34', 'w_akms'];
 const STOCK = [
+  {id:'guitar',q:1,p:ITEMS.guitar.price},
   ...Object.entries(DETECTORS).map(([id, model]) => ({ id, q: 1, p: model.price })),
   { id: 'medkit', q: 1, p: 300 }, { id: 'bandage', q: 1, p: 80 }, { id: 'antirad', q: 1, p: 250 }, { id: 'vodka', q: 1, p: 100 }, { id: 'energy', q: 1, p: 150 },
   { id: 'bread', q: 1, p: 40 }, { id: 'sausage', q: 1, p: 60 }, { id: 'cans', q: 1, p: 90 }, { id: 'grenade', q: 1, p: 350 },
@@ -153,7 +155,7 @@ function house(x, y, w, h, doors, wall, broken, roof, random = srnd) {
 function buildEntrances(h) {
   h.entrances = [];
   const home = h.ok || (h.x + ',' + h.y);
-  const hasPorch = BIG && C1 && (home === '26,71' || home === '37,73');
+  const hasPorch = BIG && C1 && (home === '26,71' || home === '37,73' || (h.x===WEST+15 && h.y===NORTH_ROWS+28));
   for (const [nx, ny] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
     const length = nx ? h.h : h.w;
     let start = 0, declared = false;
@@ -523,12 +525,13 @@ const PACK_CELLS = 48, PACK_KG = 1.2, KNIFE_KG = .3;
 const carryLimit = (armor = S.armor) => armor === 'ar_zarya' ? 50 : 35;
 const isGun = id => !!ITEMS[id]?.weapon;
 function footprint(id) {
+  if(id==='guitar')return [3,1];
   if (id === 'w_aksu' || id === 'w_obrez') return [3,1];
   if (kitSlot(id) === 'sidearm') return [2,1];
   if (id === 'w_toz34' || id === 'w_akms') return [4,1];
   return ITEMS[id]?.armor ? [2,2] : [1,1];
 }
-const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
+const stackLimit = id => ITEMS[id]?.ammo ? 60 : isGun(id) || id==='guitar' || DETECTORS[id] || ITEMS[id]?.armor ? 1 : 5;
 const KIT_LABELS = {sidearm:'Пистолет', primary:'Основное', grenade:'Граната', detector:'Детектор'};
 function kitSlot(id) {
   if (id === 'w_pm' || id === 'w_aps') return 'sidearm';
@@ -967,7 +970,7 @@ function mkHuman(d) {
     wounded: d.wounded, fireRef: d.localFire || (d.fire === 2 ? FIRE2 : FIRE),
     seed: Math.floor(Math.random() * 1e6), path: null, pi: 0, idleT: rnd(1, 5), trip: null };
   if (d.sid==='dump_scale') { e.inv={antirad:4,energy:3,bandage:5,cans:4,a12:14}; e.money=1800; }
-  if (d.sid==='lz_barman') {e.inv={energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
+  if (d.sid==='lz_barman') {e.inv={guitar:1,energy:8,bread:6,cans:5,vodka:4,bandage:3};e.money=2200;}
   e.maxhp = e.hp;
   if (e.sit) e.ang = Math.atan2(e.fireRef.y - e.y, e.fireRef.x - e.x);
   if (e.guard === 'bridge') e.ang = (BIG && e.sid==='a1' ? -1 : 1)*Math.PI/2;
@@ -2376,7 +2379,7 @@ function playerFire() {
   }
 }
 function cycleWeapon(dir) {
-  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean), 'hands'];
+  const own = ['knife', ...Object.keys(KIT_LABELS).map(kitItem).filter(Boolean), ...(has('guitar')?['guitar']:[]), 'hands'];
   const i = own.indexOf(S.weapon);
   setWeapon(own[(i + (dir || 1) + own.length) % own.length]);
 }
@@ -2384,7 +2387,7 @@ function setWeapon(w) {
   if (w !== 'hands' && w !== 'knife' && !has(w)) return;
   const slot = kitSlot(w);
   if (slot) S.flags.kit[slot] = w;
-  if (S.weapon !== w) releaseFireStick();
+  if (S.weapon !== w) {releaseFireStick();stopPlayingGuitar();}
   S.weapon = w;
   P.detD = Infinity; P.detT = 0;
   P.reload = 0; P.cool = 0.25; P.jam = 0;
@@ -2536,6 +2539,16 @@ function resolveActorContacts(dt){
       const rr=(a.r+b.r)*(friendly ? .72 : 1);
       if (Math.abs(dx) > rr || Math.abs(dy) > rr) continue;
       const d = Math.hypot(dx, dy);
+      if(other?.kind==='human' && d<rr && (IN.moveX || IN.moveY) &&
+          !other.captive && !other.wounded && other.sid!=='sid' && loftAt(P)===loftAt(other) &&
+          los(P.x,P.y,other.x,other.y) && S.min>=(other.bumpAfter||0)){
+        other.bumpAfter=S.min+4;
+        other.ang=Math.atan2(P.y-other.y,P.x-other.x);
+        if(hostile(other,P)){
+          other.aw=1;other.tgt=P;other.lastSeen={x:P.x,y:P.y};other.mem=8;other.react=.25;
+          if(other.guard==='south' && storyArea())alarmPost();
+        }else if(!other.tgt)sayLine(other,'Осторожнее. Дай пройду.');
+      }
       if (friendly && !other.sit && !other.captive && !other.wounded && d<rr &&
           (IN.moveX || IN.moveY) && !other.tgt) {
         // Give the moving player right of way, including narrow thresholds.
@@ -2621,13 +2634,13 @@ function update(dt) {
   // атмосфера: вороны, дым костра
   ambT -= dt;
   if (ambT <= 0) {
-    ambT = rnd(25, 60);
-    if (!night() && !inBunker(P.x,P.y) && !loftAt(P)) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6), caller:i===0, callIn:3.5 }); }
+    ambT = rnd(45, 95);
+    if (!night() && !inBunker(P.x,P.y) && !loftAt(P)) { const y0 = P.y + rnd(-300, 300), dir = chance(0.5) ? 1 : -1, n = ri(3, 6); for (let i = 0; i < n; i++) crows.push({ x: P.x - dir * 800 + rnd(-40, 40), y: y0 + rnd(-50, 50), vx: dir * rnd(110, 140), vy: rnd(-12, 12), ph: rnd(0, 6), caller:i===0 && chance(.5), callIn:3.5 }); }
   }
   for (let i = crows.length - 1; i >= 0; i--) { const c = crows[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.ph += dt * 9;
     if(c.caller && (c.callIn-=dt)<=0){
-      c.callIn=rnd(2.8,5.2);
-      if(!inBunker(P.x,P.y) && !loftAt(P))play('crow',c.x,c.y,sheltered(P.x,P.y) ? .28 : .9);
+      c.caller=false;
+      if(!inBunker(P.x,P.y) && !loftAt(P))play('crow',c.x,c.y,sheltered(P.x,P.y) ? .09 : .38);
     }
     if (Math.abs(c.x - P.x) > 1100) crows.splice(i, 1); }
   [FIRE, FIRE2].forEach(F => { if (chance(dt * 7)) { const l = rnd(2.2, 3.6); parts.push({ x: F.x + rnd(-3, 3), y: F.y - 6, vx: rnd(-5, 5) + WX.wind * 8, vy: 0, rise: rnd(14, 22), life: l, ml: l, c: '#8a8a84', s: rnd(1.6, 2.6), smoke: 1, hearth: villageAtmosphere && F===FIRE }); } });
@@ -3680,7 +3693,7 @@ function drawHuman(e, g) {
   // оружие и руки
   if (!e.sit) {
     if (e === P && DETECTORS[S.weapon]) drawHeldDetector(g, S.weapon, 10, 4);
-    else if (e===P && S.weapon==='hands') { /* bare hands below */ }
+    else if (e===P && (S.weapon==='hands' || S.weapon==='guitar')) { /* bare hands below */ }
     else if (W.melee) { g.fillStyle = '#9a9a92'; g.fillRect(10, 4, 9, 2); }
     else { const len = W.auto ? 20 : W.pellets ? 17 : 11; g.fillStyle = '#1e1e1c'; g.fillRect(6, -1.5, len, 3.5); if (W.auto) g.fillRect(10, 1, 3, 5); }
     g.fillStyle = shade(lk.coat, 0.85);
@@ -3965,7 +3978,7 @@ function render() {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
-    if(campAct?.actor===e && campAct.music)drawCampGuitar(e);
+    if((campAct?.actor===e && campAct.music) || (e===P && S.weapon==='guitar'))drawCampGuitar(e);
     else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
@@ -4204,7 +4217,7 @@ const safeFromBlow = e => e.guard || ['wolf', 'sid', 'petr', 'petr2', 'fox', 'sh
 
 const CALL = {
   loner: { combat: ['Контакт!', 'Вижу врага!', 'Прикрой меня!', 'Обходи слева!', 'Получай!'], reload: ['Перезаряжаюсь!', 'Пустой, прикрой!'], hurt: ['Зацепило!', 'Ах ты ж...', 'Ранен!'],
-    nade: ['Граната!', 'Ложись!'], greet: ['Здоров, Меченый.', 'Привет, брат.', 'Удачной охоты.', 'О, живой ещё?', 'Заходи к костру.'], bad: ['Ходят тут всякие...', 'Иди мимо.', 'Глаза б мои не видели.'],
+    nade: ['Граната!', 'Ложись!'], greet: ['Здорово.', 'Как сам?', 'Удачной охоты.', 'О, живой ещё?', 'Заходи к костру.'], bad: ['Ходят тут всякие...', 'Иди мимо.', 'Глаза б мои не видели.'],
     idle: ['Эх, сейчас бы домой...', 'Кто знает, где тут нормальный хабар?', 'Тихо сегодня. Не к добру.', 'Опять погода портится.', 'Говорят, на Свалке опять стреляли.',
       'Дай закурить, а?', 'Слышь, а артефакты правда лечат?', 'Вчера псов у насыпи видел, штук пять.', 'Консервы кончаются, надо к Сидоровичу.', 'Ты гитару-то не ломай, она одна на всю деревню.'] },
   bandit: { combat: ['Вали его!', 'Сюда, пацаны!', 'Ща пришьём!', 'Окружай!', 'Он тут!'], reload: ['Пустой!', 'Прикрой, заряжаю!'], hurt: ['Ай, зацепило!', 'Мать честная!'],
@@ -4218,11 +4231,9 @@ function callout(e, kind, force) {
   const bank = CALL[e.fac] && CALL[e.fac][kind]; if (!bank) return;
   if (!force && e.bub && e.bub.life > 1) return;
   if (dE(e, P) > 520) return;
-  if(voiceCallout(e,kind))return;
   e.bub = { t: bank[(e.seed + Math.floor(S.min * 7)) % bank.length], life: 3.2 };
-  if (e.fac === 'army' && kind === 'idle') play('radio', e.x, e.y); else play('voice', e.x, e.y);
 }
-function sayLine(e, t) { e.bub = { t: t, life: 3.6 }; play('voice', e.x, e.y); }
+function sayLine(e, t) { e.bub = { t: t, life: 3.6 }; }
 
 /* ---------- шаги ---------- */
 function surf(x, y) {
@@ -5607,7 +5618,7 @@ const DECOR = [
   }),
   ['logs', 46.6, 23.4, -0.3],
   ['bench', 16.7, 76.3, 0], ['barrel', 21.6, 75.2, 0], ['barrel', 31.3, 72.4, 0.5], ['bench', 30.8, 74.8, 0], ['barrel', 43.3, 77.1, 0], ['rubble', 40.5, 76.6, 0.8],
-  ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['barrel', 44.1, 91.2, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
+  ['bench', 17.2, 91.3, 0], ['barrel', 19.6, 88.3, 0], ['bench', 42.6, 88.4, 0], ['barrel', 26.3, 96.3, 0], ['rubble', 31.1, 96.2, 1.4],
   ['barrel', 23.7, 77.6, 0], ['barrel', 24.2, 78.1, 1.2], ['barrel', 36.4, 79.5, 0.4], ['barrel', 46.4, 86.3, 0],
   ['rubble', 34.3, 92.4, 0.5], ['rubble', 11.6, 90.4, 2.1], ['rubble', 25.6, 18.6, 1], ['rubble', 94.3, 18.2, 0.3],
   ['fence', 16.5, 70.7, 0], ['fence', 18.5, 70.7, 0], ['fence', 20.5, 70.7, 0.04],
@@ -5767,7 +5778,7 @@ const ROOF_AT = { '15,72': 'roof_slate', '26,71': 'roof_patch', '37,73': 'roof_r
 function c1RoofId(h, idx, old) {
   const big = h.w * h.h, long = Math.max(h.w, h.h) / Math.min(h.w, h.h);
   if(h.mat==='watchpost')return 'c1_tower';
-  if (BIG && h.x === WEST+15 && h.y === NORTH_ROWS+28) return 'c1_tower';
+  if (BIG && h.x === WEST+15 && h.y === NORTH_ROWS+28) return 'c1_roof_plank';
   if (h.ruin) return big <= (BIG ? 32 : 16) ? 'c1_roof_shed' + (idx % 2) : 'c1_roof_barn';
   if (h.mat === 'conc') return big >= 110 || (BIG && big >= 75 && long >= 1.8) ? 'c1_roof_hangar' : big <= 16 ? 'c1_booth' + (idx % 3) : 'c1_roof_office';
   if (BIG && (h.x<WEST || h.ok?.startsWith('dump_'))) {
@@ -5840,6 +5851,7 @@ function artRoof(h, idx) {
   const W = h.w * T + 10, Hh = h.h * T + 10, c = document.createElement('canvas');
   const home = h.ok || (h.x + ',' + h.y);
   const gable = id === 'c1_roof_slate' || id === 'c1_roof_plank';
+  const lookout=BIG && h.x===WEST+15 && h.y===NORTH_ROWS+28;
   const porch = h.entrances.find(d => d.approach === 'porch');
   h.porchDepth = porch ? 14 : 0;
   c.width = W * 2; c.height = (Hh + h.porchDepth) * 2;
@@ -5903,6 +5915,15 @@ function artRoof(h, idx) {
     }
     g.restore();
     if(BIG && gable && !h.ruin) weatherRoof(g,h,RW,RH);
+    if(lookout){
+      g.shadowColor='transparent';
+      for(const x of [8,RW-13]){
+        g.fillStyle='#423b2e';g.fillRect(x,RH-1,5,wallH);
+        g.fillStyle='#897653';g.fillRect(x+1,RH,1,wallH-1);
+      }
+      beam(g,8,RH+wallH-2,RW*.32,RH+1,2.4,'#554834');
+      beam(g,RW-9,RH+wallH-2,RW*.68,RH+1,2.4,'#554834');
+    }
     if (porch) drawPorch(g, porch, RH, Hh - 7);
     g.setTransform(1, 0, 0, 1, 0, 0); c1Grade(c, 0, 0, c.width, c.height);
     return c;
@@ -6223,7 +6244,7 @@ function advanceWorldTime(minutes, ctx) {
 
 /* ---------- костёр ---------- */
 function fireTeller() {
-  const camp = campOf(P);
+  const camp = WORLD_FIRES.reduce((best,f)=>dE(P,f)<dE(P,best)?f:best);
   const people=ents.filter(e=>e.alive && !e.wounded && !e.captive && !e.angry && e.fac==='loner' && !e.follow && !e.sos && dE(e,camp)<200);
   return people.length?people[(S.flags.tale||0)%people.length]:null;
 }
@@ -6248,22 +6269,52 @@ function restOpts(te) {
   if (blk) o.push({ t: blk, d: true, fn: () => {} });
   return o;
 }
+function atpSettled(){return !!(S.flags.atpClear || S.flags.shustFree || S.campaign?.liberated);}
+function talkMemory(e){
+  const notes=S.flags.campContacts ||= {};
+  const key=e.sid || e.uid || (e.name+'_'+e.id);
+  return notes[key] ||= {};
+}
+function rotatingLine(e,key,lines){
+  const note=talkMemory(e);
+  const index=note[key] ?? ((e.id||0)%lines.length);
+  note[key]=index+1;
+  return lines[index%lines.length];
+}
+function fieldGreeting(e){
+  const lines=S.rep<0?['Слушаю. Только без фокусов.','Чего хотел?','Говори, я занят.']:
+    ['Здорово.','Как сам?','Привет. С дороги?','Слушаю тебя.','Проходи, место найдётся.','Ну, как оно?','Доброго пути.'];
+  return rotatingLine(e,'greeting',lines);
+}
+function nextCampNews(e){
+  const lines=LORE.map((s,i)=>i===8 && atpSettled()?'На АТП теперь наши. Зайдёшь во двор — окликни дежурного.':s);
+  if(lesserLore[e.sid])lines.unshift(lesserLore[e.sid]);
+  return rotatingLine(e,'news',lines);
+}
 function restAtFire() {
   if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 520)) { msg('Рядом враги, не до посиделок.', 'bad'); return; }
   const te = fireTeller();
   S.flags.tale = ((S.flags.tale || 0) + 1);
-  let ti = (S.flags.tale * 3 + Math.floor(S.min / 60)) % TALES.length; if (ti === S.flags.lastTale) ti = (ti + 1) % TALES.length; S.flags.lastTale = ti;
-  const tale = TALES[ti];
+  const ti=((S.flags.lastTale ?? -1)+1)%TALES.length;
+  if(te)S.flags.lastTale=ti;
+  const tale=TALES[ti];
   const card = te ? cardOf(te) : meCard();
   dialog(card, [te ? tale : 'У костра никого. Только треск поленьев и далёкий вой за насыпью.'], () => {
-    const o = restOpts(te);
+    const o = [...playerSongOptions(),...restOpts(te)];
     const ci = nearestFreeCache(P.x, P.y);
-    if (te && has('vodka') && ci >= 0) o.push({ t: 'Налить ему водки и расспросить про ближайший схрон', k: 'key', fn: () => {
+    if (te && !talkMemory(te).stash && has('vodka') && ci >= 0) o.push({ t: 'Налить ему водки и расспросить про ближайший схрон', k: 'key', fn: () => {
+      if(talkMemory(te).stash || !has('vodka'))return;
       const i = nearestFreeCache(P.x, P.y); if (i < 0) { say('Да всё уж растащили, брат.'); return; }
-      take('vodka', 1); say(RUMOR_FLAVOR[S.flags.tale % RUMOR_FLAVOR.length]); revealCache(te.name, i);
+      talkMemory(te).stash=true;take('vodka', 1); say(RUMOR_FLAVOR[S.flags.tale % RUMOR_FLAVOR.length]); revealCache(te.name, i);save(true);
     } });
-    else if (te && has('vodka')) o.push({ t: 'Про схроны спрашивать без толку: всё уже открыто', d: true, fn: () => {} });
-    if (te) o.push({ t: 'Спросить, что слышно', fn: () => say(LORE[(S.flags.tale * 5 + 3) % LORE.length]) });
+    if(te){
+      const memory=talkMemory(te),day=Math.floor(S.min/1440);
+      if(memory.newsDay!==day || (memory.heard||0)<3)o.push({t:'Спросить, что слышно',fn:()=>{
+        if(memory.newsDay!==day){memory.newsDay=day;memory.heard=0;}
+        if(memory.heard>=3)return;
+        memory.heard++;say(nextCampNews(te));
+      }});
+    }
     o.push({ t: 'Подняться', close: 1 });
     return o;
   }, 'dialog', te);
@@ -6483,7 +6534,11 @@ function dynRestore() {
     if(r.defendUntil>S.min)e.defendUntil=r.defendUntil;
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.assisted) e.assisted = true;
-    if (r.inv && (r.traded || r.assisted)) e.inv = r.inv;
+    if (r.inv && (r.traded || r.assisted)) {
+      e.inv = r.inv;
+      if(e.sid==='lz_barman' && !S.flags.barGuitarStock && !('guitar' in e.inv))e.inv.guitar=1;
+    }
+    if(e.sid==='lz_barman')S.flags.barGuitarStock=true;
     if (r.traded) { if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; if(r.guns) e.guns=r.guns; }
     if (e.sid === 'sid') {
       const seat = NPCDEF.find(d => d.sid === 'sid');
@@ -6613,7 +6668,7 @@ function plusKill(e, src) {
   if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
-  const d = dE(P, campOf(P));
+  const d = Math.min(...WORLD_FIRES.map(f=>dE(P,f)));
   if (d < 50 && !inBunker(P.x, P.y)) cand(d - 25, { k: 'rest', label: 'Посидеть у костра' });
   interactRC1(cand);
 }
@@ -6933,7 +6988,7 @@ function drawInv2() {
     if (slotKey && !mounted) row.appendChild(btn('go','В слот',()=>{
       mountGear(id,copy,false); panel.copy=0; refresh();
     }));
-    if ((WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{
+    if ((id==='guitar' || WP[id] || DETECTORS[id]) && (S.weapon !== id || copy)) row.appendChild(btn('go','Взять в руки',()=>{
       if (slotKey) mountGear(id,copy,true); else setWeapon(id);
       panel.copy=0; refresh();
     }));
@@ -7024,7 +7079,7 @@ function gearRetail(id){
 function sellable(id, e) {
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
   if ((e && it.armor) || refusesTrophy(e,id)) return 0;
-  return Math.max(0,cnt(id)-wornCount(id));
+  return Math.max(0,cnt(id)-wornCount(id)-(id==='guitar' && S.weapon===id?1:0));
 }
 function offerSum(e) {
   const o = panel.offer, st = tradeStock(e);
@@ -7085,7 +7140,7 @@ function tradeDo(e) {
     if (isGun(id)) for(const gun of incoming.guns[id]) addPacked(id,1,gun);
     else addPacked(id,q);
   }
-  S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1;   // инвентарь и деньги этого NPC теперь сохраняются
+  S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1; if(e?.sid==='lz_barman')S.flags.barGuitarStock=true;   // инвентарь и деньги этого NPC теперь сохраняются
   panel.offer = { buy: {}, sell: {} }; play('pick');
   panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.';
   refresh();
@@ -7818,8 +7873,11 @@ function storyTalk(e){
   if(e.sid==='shust' && stage==='device')return scene('device','К Сидоровичу','bargain');
   if(e.sid==='wolf' && stage==='muster')return scene('muster','Встретиться с отрядом','ready',()=>{S.campaign.raid=true;});
   if(e.squadMate && stage==='ready')return playConversation(e,'ready','Я готов. Выходим',()=>nextChapter('battle'),{t:'Ещё подготовлюсь',close:1});
-  const line=e.sid==='shust'?shustCampLine():e.squadMate?(S.campaign.northHeld?raidDebrief():'Держим этот участок.'):e.sid==='fox'?'С этой ногой далеко не уйдёшь.':'Здорово, Меченый.';
-  dialog(cardOf(e),[line],()=>[{t:'До встречи',close:1}],'dialog',e);
+  const line=e.sid==='shust'?shustCampLine():e.squadMate?(S.campaign.northHeld?raidDebrief():'Держим этот участок.'):e.sid==='fox'?'С этой ногой далеко не уйдёшь.':fieldGreeting(e);
+  dialog(cardOf(e),[line],()=>[...(e.sid==='wolf' && (stage==='done' || stage==='west')?[
+    {t:'Как дела в деревне?',fn:()=>say(S.campaign.northHeld?'Караулы сменили. Новички опять просятся в ходку. Пусть сперва научатся домой возвращаться.':'Пока тихо. Ушедших пересчитываю, за новичками приглядываю.')},
+    {t:'Что слышно на дорогах?',fn:()=>say(nextCampNews(e))}
+  ]:[]),{t:'До встречи',close:1}],'dialog',e);
 }
 function raidDebrief(){
   const n=raidAllies().length;
@@ -12738,7 +12796,7 @@ function playRecording(name,volume,x,y){
   const distance=x===undefined?0:Math.min(1,dst(P.x,P.y,x,y)/950);
   const gun=name==='p'||name==='s'||name==='r';
   filter.type='lowpass';filter.frequency.value=gun ? 700+15300*(1-distance)**2 : 16000-13500*distance;
-  gain.gain.value=entry[0]*volume;
+  gain.gain.value=entry[0]*volume*(name==='crow'?soundPrefs.nature:1);
   src.connect(filter);filter.connect(gain);
   const stereo=AC.createStereoPanner?.();
   if(stereo){stereo.pan.value=x===undefined?0:clamp((x-P.x)/480,-.9,.9);gain.connect(stereo);stereo.connect(master);}
@@ -12763,19 +12821,19 @@ function mixRecordedRain(){
   const room=roomAcoustics(),now=AC.currentTime;
   let nearest=290;
   for(const f of WORLD_FIRES)nearest=Math.min(nearest,dst(f.x,f.y,P.x,P.y));
-  const fireVolume=room.underground?0:.32*(1-nearest/290)**2*(1-.8*room.enclosure);
+  const fireVolume=room.underground?0:.16*soundPrefs.nature*(1-nearest/290)**2*(1-.8*room.enclosure);
   if(!hearthGain && fireVolume>0 && fieldBuffers.has('hearth')){
     const fire=AC.createBufferSource();fire.buffer=fieldBuffers.get('hearth');fire.loop=true;
-    hearthGain=AC.createGain();hearthGain.gain.value=0;fire.connect(hearthGain);hearthGain.connect(master);fire.start();
+    hearthGain=AC.createGain();hearthGain.gain.value=0;const hiss=AC.createBiquadFilter();hiss.type='highpass';hiss.frequency.value=460;fire.connect(hiss);hiss.connect(hearthGain);hearthGain.connect(master);fire.start();
   }
   hearthGain?.gain.setTargetAtTime(fireVolume,now,.22);
   if(!airGain && fieldBuffers.has('wind')){
     const air=AC.createBufferSource();air.buffer=fieldBuffers.get('wind');air.loop=true;
     airGain=AC.createGain();airGain.gain.value=0;air.connect(airGain);airGain.connect(master);air.start();
   }
-  const wind=(.065+.15*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
+  const wind=soundPrefs.nature*(.045+.105*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
   airGain?.gain.setTargetAtTime(wind,now,.45);
-  windGain?.gain.setTargetAtTime(airGain?0:.045*(1-room.enclosure),now,.27);
+  windGain?.gain.setTargetAtTime(airGain?0:.045*soundPrefs.nature*(1-room.enclosure),now,.27);
   const buffer=fieldBuffers.get('rain');if(!buffer)return;
   if(!rainG){
     const src=AC.createBufferSource();src.buffer=buffer;src.loop=true;
@@ -12795,12 +12853,12 @@ function mixRecordedRain(){
 const soundPrefs=(()=>{
   try{
     const saved=JSON.parse(localStorage.getItem('zona-sound')||'{}');
-    return Object.fromEntries(['volume','music','speech'].map(k=>[k,Number.isFinite(saved[k])?clamp(saved[k],0,1):1]));
-  }catch{return {volume:1,music:1,speech:1};}
+    return Object.fromEntries(['volume','music','nature'].map(k=>[k,Number.isFinite(saved[k])?clamp(saved[k],0,1):1]));
+  }catch{return {volume:1,music:1,nature:1};}
 })();
 function soundSettings(nav,back){
   nav.replaceChildren();
-  for(const [key,name] of [['volume','Общая громкость'],['music','Музыка'],['speech','Голоса']]){
+  for(const [key,name] of [['volume','Общая громкость'],['music','Музыка'],['nature','Звуки природы']]){
     const label=el('label','difficulty-label'),input=el('input'),value=el('span');
     input.type='range';input.min=0;input.max=100;input.value=Math.round(soundPrefs[key]*100);
     input.style.cssText='width:100%;min-height:44px';input.setAttribute('aria-label',name);
@@ -12910,12 +12968,31 @@ function drawFlyingCrow(c){
 function reloadSound(id){return WP[id]?.ammo==='a12'?'loadShell':compatibleRifle(id)?'loadRifle':'loadPistol';}
 
 const campStories=[
-  [['camp01','У кого вчера часы утащили?'],['camp02','У меня. Теперь вор точно знает, сколько ему осталось.']],
-  [['camp03','На насыпи всю ночь кто-то стучал. По три раза.'],['camp04','Я там ночевал. Котелок с ветки снять пытался.']],
-  [['camp05','До дождя успеем дойти?'],['camp06','До первого точно. А их тут сегодня штуки три.']]
+  ['У кого вчера часы утащили?','У меня. Теперь вор точно знает, сколько ему осталось.'],
+  ['На насыпи всю ночь кто-то стучал. По три раза.','Я там ночевал. Котелок с ветки снять пытался.'],
+  ['До дождя успеем дойти?','До первого точно. А их тут сегодня штуки три.']
 ];
-const battleVoice={loner:[['ally01','Вижу его!'],['ally02','Прикрой, меняю магазин!']],bandit:[['foe01','Вот он, мужики!'],['foe02','Пустой! Прикрой!']],army:[['army01','Контакт!'],['army02','Перезаряжаюсь!']]};
-let campAct=null,campDelay=9,campIndex=0,voiceDelay=0,radioAudio=null,voiceAudio=null;
+const songBook=[
+  ['latePicking','Последний перебор'],['riverWaltz','Вальс у переправы'],['emberSong','Дым над золою'],['roadSong','Дремлет дорога']
+];
+let campAct=null,campDelay=18,campIndex=0,radioAudio=null,playerSong=null;
+function stopPlayingGuitar(){
+  if(!playerSong)return;
+  stopScene(playerSong);
+  playerSong=null;P.sit=0;campDelay=35;
+}
+function playerSongOptions(){
+  if(S.weapon!=='guitar' || !has('guitar'))return [];
+  return songBook.map(([track,title])=>({t:'Сыграть · '+title,fn:()=>{
+    const fire=WORLD_FIRES.find(f=>dE(f,P)<52);
+    if(!fire || S.weapon!=='guitar' || !has('guitar') || S.blow?.stage){sys('Сейчас не до песен.');return;}
+    const clip=sceneClip(track,.42,'music',P);
+    if(!clip){sys('Инструмент ещё настраивается. Попробуй через секунду.');return;}
+    stopPlayingGuitar();stopScene(campAct?.clip);campAct=null;
+    closePanel();playerSong=clip;P.sit=1;P.fireRef=fire;P.ang=Math.atan2(fire.y-P.y,fire.x-P.x);
+    msg('Играешь «'+title+'». Двинься, чтобы встать.','say');
+  }}));
+}
 function stopScene(sound){
   if(!sound)return;
   try{sound.source.stop();}catch{}
@@ -12934,52 +13011,43 @@ function mixScene(s){
   const distance=s.actor?Math.max(0,1-dE(s.actor,P)/270):1;
   s.gain.gain.setTargetAtTime(s.volume*soundPrefs[s.group]*distance*distance,AC.currentTime,.06);
 }
-function syncSceneAudio(){mixScene(voiceAudio);mixScene(radioAudio);mixScene(campAct?.clip);}
+function syncSceneAudio(){mixScene(playerSong);mixScene(radioAudio);mixScene(campAct?.clip);}
 function resetCampAudio(){
-  stopScene(campAct?.clip);stopScene(voiceAudio);stopScene(radioAudio);
-  campAct=radioAudio=voiceAudio=null;campDelay=9;voiceDelay=0;campIndex=0;
-}
-function voiceCallout(e,kind){
-  if(!['combat','reload'].includes(kind)||!battleVoice[e.fac]||voiceDelay>0||dE(e,P)>250||
-    inBunker(e.x,e.y)!==inBunker(P.x,P.y)||loftAt(e)!==loftAt(P))return false;
-  const [clip,line]=battleVoice[e.fac][kind==='reload'?1:0];
-  stopScene(campAct?.clip);campAct=null;campDelay=22;
-  const sound=sceneClip(clip,.52,'speech',e);if(!sound)return false;
-  voiceAudio=sound;voiceDelay=9+(e.seed%6);e.bub={t:line,life:2.7};return true;
+  stopPlayingGuitar();stopScene(campAct?.clip);stopScene(radioAudio);
+  campAct=radioAudio=null;campDelay=18;campIndex=0;
 }
 function atFire(e){
   return e?.alive && e.sit && !e.wounded && !e.captive && !e.tgt && !e.evacuating &&
     e.fireRef && dE(e,e.fireRef)<80 && dE(e,P)<255;
 }
 function campAndRadio(dt){
-  voiceDelay=Math.max(0,voiceDelay-dt);
+  if(playerSong && (playerSong.done || !P.alive || S.weapon!=='guitar' || !has('guitar') ||
+    IN.moveX || IN.moveY || S.blow?.stage || P.flash>0 || dE(P,P.fireRef)>56))stopPlayingGuitar();
   const underground=inBunker(P.x,P.y);
   if(underground && !radioAudio){radioAudio=sceneClip('deskRadio',.22,'music',byS('sid'),true);}
   if(!underground && radioAudio){stopScene(radioAudio);radioAudio=null;}
   syncSceneAudio();
-  const quiet=!underground && !loftAt(P) && !S.blow?.stage && WX.rain<.6 && voiceDelay<=0;
+  const quiet=!underground && !loftAt(P) && !S.blow?.stage && WX.rain<.6 && !playerSong;
   if(campAct){
     const act=campAct;
     if(!quiet || !atFire(act.actor)){stopScene(act.clip);campAct=null;campDelay=16;return;}
-    if(!act.clip.done)return;
-    if(act.reply && atFire(act.reply)){
-      const [name,t]=act.lines[1];act.actor=act.reply;act.reply=null;
-      act.clip=sceneClip(name,.44,'speech',act.actor);
-      if(act.clip){act.actor.bub={t,life:4};return;}
-    }
-    campAct=null;campDelay=25+(campIndex*7)%19;return;
+    if(act.music && !act.clip.done)return;
+    if(!act.music && (act.wait-=dt)>0)return;
+    if(act.reply && atFire(act.reply))act.reply.bub={t:act.lines[1],life:4};
+    campAct=null;campDelay=rnd(38,65);return;
   }
   if(!quiet||!AC||(campDelay-=dt)>0)return;
-  campDelay=4;
-  const seats=ents.filter(atFire).sort((a,b)=>dE(a,P)-dE(b,P));if(!seats.length)return;
-  const actor=seats[campIndex%seats.length], reply=seats.find(e=>e!==actor && dE(e,actor)<105);
+  campDelay=6;
+  const seats=ents.filter(e=>e!==P && atFire(e)).sort((a,b)=>dE(a,P)-dE(b,P));
+  if(!seats.length)return;
+  const actor=seats[campIndex%seats.length],reply=seats.find(e=>e!==actor && dE(e,actor)<105);
   const music=campIndex%2===1 || !reply;
   const lines=campStories[Math.floor(campIndex/2)%campStories.length];
-  const song=['emberSong','roadSong','latePicking'][Math.floor(campIndex/2)%3];
-  const clip=sceneClip(music?song:lines[0][0],music?.29:.48,music?'music':'speech',actor);
-  if(!clip)return;
-  if(!music)actor.bub={t:lines[0][1],life:4};
-  campAct={actor,reply:music?null:reply,music,lines,clip};campIndex++;
+  const clip=music?sceneClip(songBook[Math.floor(campIndex/2)%2][0],.18,'music',actor):null;
+  if(music && !clip)return;
+  if(!music)actor.bub={t:lines[0],life:4};
+  campAct={actor,reply:music?null:reply,music,lines,clip,wait:4.2};campIndex++;
+
 }
 function drawCampGuitar(e){
   const g=ctx;g.save();g.translate(e.x,e.y);g.rotate(e.ang-.95);g.translate(4,1);
@@ -13057,8 +13125,7 @@ const SND = {
   stepWet: v => { nz(0.09, 1400 + Math.random() * 600, 1.2, 0.12 * v, 'bandpass'); nz(0.05, 400, 1, 0.06 * v); },
   stepGravel: v => { nz(0.08, 3000, 0.8, 0.12 * v, 'highpass'); nz(0.05, 600, 1, 0.07 * v); },
   stepDog: v => nz(0.03, 900, 2, 0.06 * v, 'bandpass'),
-  voice: v => { const n = 3 + Math.floor(Math.random() * 4), f = 95 + Math.random() * 70; for (let i = 0; i < n; i++) { const ff = f * (0.85 + Math.random() * 0.35); tn(ff, ff * 0.92, 0.09, 0.07 * v, 'triangle', i * 0.1); nz(0.03, 2500, 2, 0.03 * v, 'bandpass', i * 0.1 + 0.05); } },
-  radio: v => { nz(0.25, 2500, 1, 0.1 * v, 'bandpass'); SND.voice(v * 0.7); nz(0.08, 3000, 2, 0.12 * v, 'bandpass', 0.6); },
+
   thunder: () => { nz(2.6, 140, 0.4, 0.9); nz(0.5, 500, 0.6, 0.5); },
   siren: () => { tn(380, 760, 1.8, 0.1, 'sawtooth'); tn(760, 380, 1.8, 0.1, 'sawtooth', 1.8); },
   blow: () => { nz(3.5, 90, 0.4, 1.2); tn(55, 30, 3, 0.8); }
@@ -13173,6 +13240,7 @@ const meCard = () => ({ isPlayer: 1, n: 'Меченый', grp: 'Одиночки
 let panel = null;
 const ov = $('ov'), pbody = $('pbody'), ptitle = $('ptitle'), ptabs = $('ptabs');
 function openPanel(kind, title, tabs) {
+  stopPlayingGuitar();
   panel?.unmountMap?.();
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
@@ -13272,20 +13340,20 @@ function talk(e) {
       { t: 'Уйти', close: 1 }
     ].filter(Boolean), 'dialog', e);
   }
-  if (e.sid === 'petr' || e.sid === 'petr2') {
-    return dialog(cardOf(e), [S.flags.atpClear ? 'Ну ты дал! АТП теперь наше. Тут пока и осядем.' : 'Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
+  if ((e.sid === 'petr' || e.sid === 'petr2') && !atpSettled()) {
+    return dialog(cardOf(e), ['Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
       { t: 'Что там внутри?', fn: () => say('Двор, два гаража. Человек семь, главарь с автоматом сидит в большом гараже. Там же и Шустрого держат.') },
       { t: 'Уйти', close: 1 }
     ], 'dialog', e);
   }
   // обычный одиночка
-  const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
+  const lines = [e.sid==='petr' && atpSettled()?'Заходи. Двор теперь наш, в гараже уже устроились.':fieldGreeting(e)];
   dialog(cardOf(e), lines, () => {
-    const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
+    const o = [{ t: 'Что нового?', fn: () => { say(e.robbed?'Нам говорить не о чем.':nextCampNews(e)); } }];
     if(S.rep<=-15)o.push({t:'Насчёт торговли…',fn:()=>say('После того, что про тебя рассказали, лучше иди к торговцу.')});
     else if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
-    if (!e.robbed && !e.follow && S.weapon!=='hands' && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
+    if (!e.robbed && !e.follow && WP[S.weapon] && !WP[S.weapon].toss) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
     o.push({ t: 'Бывай', close: 1 });
     return o;
   }, 'dialog', e);
@@ -13880,7 +13948,7 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const empty=S.weapon==='hands', detector = DETECTORS[S.weapon], W = detector || WP[S.weapon] || {n:'Руки свободны',melee:true};
+  const empty=S.weapon==='hands', detector = DETECTORS[S.weapon], W = detector || (S.weapon==='guitar' && {n:ITEMS.guitar.n,melee:true}) || WP[S.weapon] || {n:'Руки свободны',melee:true};
   if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else if (!empty) H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
@@ -13889,7 +13957,7 @@ function hud(dt) {
   H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
   if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
   else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
-  else if (W.melee) H.am.textContent = empty?'':'∞';
+  else if (W.melee) H.am.textContent = empty || S.weapon==='guitar'?'':'∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); else if (W.pellets) H.am.appendChild(el('div','chambers',(S.mag[S.weapon]||0)===2?'● ●':S.mag[S.weapon]?'● ○':'○ ○')); }
   briefTask();
   const sleep=S.flags.poppySleep||0;

@@ -130,7 +130,7 @@ Tt('K10_walk_through_doors', () => {
       z.resetInput();
     }
   }
-  return {ok: villageHouses === 6 && villageGroups >= 9 && approaches.porch === 2 &&
+  return {ok: villageHouses === 6 && villageGroups >= 9 && approaches.porch === 3 &&
     Object.values(approaches).every(n => n > 0) && !failures.length,
     houses: houses.length, groups, villageHouses, villageGroups, openCells, approaches, failures};
 });

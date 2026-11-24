@@ -274,7 +274,7 @@ function advanceWorldTime(minutes, ctx) {
 
 /* ---------- костёр ---------- */
 function fireTeller() {
-  const camp = campOf(P);
+  const camp = WORLD_FIRES.reduce((best,f)=>dE(P,f)<dE(P,best)?f:best);
   const people=ents.filter(e=>e.alive && !e.wounded && !e.captive && !e.angry && e.fac==='loner' && !e.follow && !e.sos && dE(e,camp)<200);
   return people.length?people[(S.flags.tale||0)%people.length]:null;
 }
@@ -299,22 +299,52 @@ function restOpts(te) {
   if (blk) o.push({ t: blk, d: true, fn: () => {} });
   return o;
 }
+function atpSettled(){return !!(S.flags.atpClear || S.flags.shustFree || S.campaign?.liberated);}
+function talkMemory(e){
+  const notes=S.flags.campContacts ||= {};
+  const key=e.sid || e.uid || (e.name+'_'+e.id);
+  return notes[key] ||= {};
+}
+function rotatingLine(e,key,lines){
+  const note=talkMemory(e);
+  const index=note[key] ?? ((e.id||0)%lines.length);
+  note[key]=index+1;
+  return lines[index%lines.length];
+}
+function fieldGreeting(e){
+  const lines=S.rep<0?['Слушаю. Только без фокусов.','Чего хотел?','Говори, я занят.']:
+    ['Здорово.','Как сам?','Привет. С дороги?','Слушаю тебя.','Проходи, место найдётся.','Ну, как оно?','Доброго пути.'];
+  return rotatingLine(e,'greeting',lines);
+}
+function nextCampNews(e){
+  const lines=LORE.map((s,i)=>i===8 && atpSettled()?'На АТП теперь наши. Зайдёшь во двор — окликни дежурного.':s);
+  if(lesserLore[e.sid])lines.unshift(lesserLore[e.sid]);
+  return rotatingLine(e,'news',lines);
+}
 function restAtFire() {
   if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 520)) { msg('Рядом враги, не до посиделок.', 'bad'); return; }
   const te = fireTeller();
   S.flags.tale = ((S.flags.tale || 0) + 1);
-  let ti = (S.flags.tale * 3 + Math.floor(S.min / 60)) % TALES.length; if (ti === S.flags.lastTale) ti = (ti + 1) % TALES.length; S.flags.lastTale = ti;
-  const tale = TALES[ti];
+  const ti=((S.flags.lastTale ?? -1)+1)%TALES.length;
+  if(te)S.flags.lastTale=ti;
+  const tale=TALES[ti];
   const card = te ? cardOf(te) : meCard();
   dialog(card, [te ? tale : 'У костра никого. Только треск поленьев и далёкий вой за насыпью.'], () => {
-    const o = restOpts(te);
+    const o = [...playerSongOptions(),...restOpts(te)];
     const ci = nearestFreeCache(P.x, P.y);
-    if (te && has('vodka') && ci >= 0) o.push({ t: 'Налить ему водки и расспросить про ближайший схрон', k: 'key', fn: () => {
+    if (te && !talkMemory(te).stash && has('vodka') && ci >= 0) o.push({ t: 'Налить ему водки и расспросить про ближайший схрон', k: 'key', fn: () => {
+      if(talkMemory(te).stash || !has('vodka'))return;
       const i = nearestFreeCache(P.x, P.y); if (i < 0) { say('Да всё уж растащили, брат.'); return; }
-      take('vodka', 1); say(RUMOR_FLAVOR[S.flags.tale % RUMOR_FLAVOR.length]); revealCache(te.name, i);
+      talkMemory(te).stash=true;take('vodka', 1); say(RUMOR_FLAVOR[S.flags.tale % RUMOR_FLAVOR.length]); revealCache(te.name, i);save(true);
     } });
-    else if (te && has('vodka')) o.push({ t: 'Про схроны спрашивать без толку: всё уже открыто', d: true, fn: () => {} });
-    if (te) o.push({ t: 'Спросить, что слышно', fn: () => say(LORE[(S.flags.tale * 5 + 3) % LORE.length]) });
+    if(te){
+      const memory=talkMemory(te),day=Math.floor(S.min/1440);
+      if(memory.newsDay!==day || (memory.heard||0)<3)o.push({t:'Спросить, что слышно',fn:()=>{
+        if(memory.newsDay!==day){memory.newsDay=day;memory.heard=0;}
+        if(memory.heard>=3)return;
+        memory.heard++;say(nextCampNews(te));
+      }});
+    }
     o.push({ t: 'Подняться', close: 1 });
     return o;
   }, 'dialog', te);
@@ -534,7 +564,11 @@ function dynRestore() {
     if(r.defendUntil>S.min)e.defendUntil=r.defendUntil;
     if (S.flags.angry && S.flags.angry[r.sid || r.uid]) e.angry = 1;
     if (r.assisted) e.assisted = true;
-    if (r.inv && (r.traded || r.assisted)) e.inv = r.inv;
+    if (r.inv && (r.traded || r.assisted)) {
+      e.inv = r.inv;
+      if(e.sid==='lz_barman' && !S.flags.barGuitarStock && !('guitar' in e.inv))e.inv.guitar=1;
+    }
+    if(e.sid==='lz_barman')S.flags.barGuitarStock=true;
     if (r.traded) { if (r.money != null) e.money = r.money; if (r.wcond) e.wcond = r.wcond; if(r.guns) e.guns=r.guns; }
     if (e.sid === 'sid') {
       const seat = NPCDEF.find(d => d.sid === 'sid');
@@ -664,7 +698,7 @@ function plusKill(e, src) {
   if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
-  const d = dE(P, campOf(P));
+  const d = Math.min(...WORLD_FIRES.map(f=>dE(P,f)));
   if (d < 50 && !inBunker(P.x, P.y)) cand(d - 25, { k: 'rest', label: 'Посидеть у костра' });
   interactRC1(cand);
 }

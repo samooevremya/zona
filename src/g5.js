@@ -54,8 +54,7 @@ const SND = {
   stepWet: v => { nz(0.09, 1400 + Math.random() * 600, 1.2, 0.12 * v, 'bandpass'); nz(0.05, 400, 1, 0.06 * v); },
   stepGravel: v => { nz(0.08, 3000, 0.8, 0.12 * v, 'highpass'); nz(0.05, 600, 1, 0.07 * v); },
   stepDog: v => nz(0.03, 900, 2, 0.06 * v, 'bandpass'),
-  voice: v => { const n = 3 + Math.floor(Math.random() * 4), f = 95 + Math.random() * 70; for (let i = 0; i < n; i++) { const ff = f * (0.85 + Math.random() * 0.35); tn(ff, ff * 0.92, 0.09, 0.07 * v, 'triangle', i * 0.1); nz(0.03, 2500, 2, 0.03 * v, 'bandpass', i * 0.1 + 0.05); } },
-  radio: v => { nz(0.25, 2500, 1, 0.1 * v, 'bandpass'); SND.voice(v * 0.7); nz(0.08, 3000, 2, 0.12 * v, 'bandpass', 0.6); },
+
   thunder: () => { nz(2.6, 140, 0.4, 0.9); nz(0.5, 500, 0.6, 0.5); },
   siren: () => { tn(380, 760, 1.8, 0.1, 'sawtooth'); tn(760, 380, 1.8, 0.1, 'sawtooth', 1.8); },
   blow: () => { nz(3.5, 90, 0.4, 1.2); tn(55, 30, 3, 0.8); }
@@ -145,6 +144,7 @@ const meCard = () => ({ isPlayer: 1, n: 'Меченый', grp: 'Одиночки
 let panel = null;
 const ov = $('ov'), pbody = $('pbody'), ptitle = $('ptitle'), ptabs = $('ptabs');
 function openPanel(kind, title, tabs) {
+  stopPlayingGuitar();
   panel?.unmountMap?.();
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
@@ -244,20 +244,20 @@ function talk(e) {
       { t: 'Уйти', close: 1 }
     ].filter(Boolean), 'dialog', e);
   }
-  if (e.sid === 'petr' || e.sid === 'petr2') {
-    return dialog(cardOf(e), [S.flags.atpClear ? 'Ну ты дал! АТП теперь наше. Тут пока и осядем.' : 'Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
+  if ((e.sid === 'petr' || e.sid === 'petr2') && !atpSettled()) {
+    return dialog(cardOf(e), ['Тише. Бандиты на АТП, за бетонным забором. Мы тут вторые сутки лежим, ждём подмогу. Пойдёшь первым, мы следом.'], () => [
       { t: 'Что там внутри?', fn: () => say('Двор, два гаража. Человек семь, главарь с автоматом сидит в большом гараже. Там же и Шустрого держат.') },
       { t: 'Уйти', close: 1 }
     ], 'dialog', e);
   }
   // обычный одиночка
-  const lines = [S.rep >= 20 ? 'О, Меченый! Наслышан, наслышан.' : S.rep < 0 ? 'Чего надо? Про тебя тут нехорошее говорят.' : 'Здоров, брат. Чего хотел?'];
+  const lines = [e.sid==='petr' && atpSettled()?'Заходи. Двор теперь наш, в гараже уже устроились.':fieldGreeting(e)];
   dialog(cardOf(e), lines, () => {
-    const o = [{ t: 'Что нового?', fn: () => { e.talked = (e.talked || 0) + 1; say(e.robbed ? 'Нам говорить не о чем.' : (lesserLore[e.sid] && e.talked%2===1 ? lesserLore[e.sid] : LORE[(e.seed + e.talked * 5) % LORE.length])); } }];
+    const o = [{ t: 'Что нового?', fn: () => { say(e.robbed?'Нам говорить не о чем.':nextCampNews(e)); } }];
     if(S.rep<=-15)o.push({t:'Насчёт торговли…',fn:()=>say('После того, что про тебя рассказали, лучше иди к торговцу.')});
     else if (!e.robbed) o.push({ t: 'Давай поторгуем', fn: () => openTrade(e) });
     hireOpts(e).forEach(x => o.push(x));
-    if (!e.robbed && !e.follow && S.weapon!=='hands' && !DETECTORS[S.weapon]) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
+    if (!e.robbed && !e.follow && WP[S.weapon] && !WP[S.weapon].toss) o.push({ t: 'Ствол на него: «Выворачивай карманы»', k: 'bad', fn: () => robNpc(e) });
     o.push({ t: 'Бывай', close: 1 });
     return o;
   }, 'dialog', e);
@@ -852,7 +852,7 @@ function hud(dt) {
   H.clock.textContent = clockStr(); H.money.textContent = S.money + ' RU';
   const bs = S.belt.join(',');
   if (H.belt.dataset.v !== bs) { H.belt.dataset.v = bs; H.belt.textContent = ''; S.belt.forEach(a => { const sp = el('span'); sp.appendChild(itemIcon(a)); H.belt.appendChild(sp); }); }
-  const empty=S.weapon==='hands', detector = DETECTORS[S.weapon], W = detector || WP[S.weapon] || {n:'Руки свободны',melee:true};
+  const empty=S.weapon==='hands', detector = DETECTORS[S.weapon], W = detector || (S.weapon==='guitar' && {n:ITEMS.guitar.n,melee:true}) || WP[S.weapon] || {n:'Руки свободны',melee:true};
   if (lastW !== S.weapon) { lastW = S.weapon; H.wico.textContent = ''; const bi = detector ? itemIcon(S.weapon) : (window.CORDON_G8_ON && g3Icon(S.weapon)) || b1Icon(S.weapon); if (bi) H.wico.appendChild(bi); else if (WSIL[S.weapon]) H.wico.innerHTML = WSIL[S.weapon]; else if (!empty) H.wico.appendChild(icon(ICON[S.weapon])); H.wn.textContent = detector ? W.n.replace('Детектор ', '') : W.n; }
   $('wpnbox').classList.toggle('rel', P.reload > 0);
   H.am.textContent = '';
@@ -861,7 +861,7 @@ function hud(dt) {
   H.wcn.textContent = W.melee || detector ? '' : 'Состояние: ' + cd + '%'; H.wcb.style.width = cd + '%'; H.wcb.parentNode.className = 'cb' + (cd < 35 ? ' bad' : cd < 65 ? ' mid' : '');
   if (detector) H.am.textContent = Number.isFinite(P.detD) ? Math.round(P.detD / T * 1.5) + ' м' : 'Поиск';
   else if (W.toss) H.am.textContent = '× ' + cnt('grenade');
-  else if (W.melee) H.am.textContent = empty?'':'∞';
+  else if (W.melee) H.am.textContent = empty || S.weapon==='guitar'?'':'∞';
   else { H.am.appendChild(document.createTextNode(String(S.mag[S.weapon] || 0))); H.am.appendChild(el('small', '', ' / ' + cnt(W.ammo))); if (P.reload > 0) H.am.appendChild(el('div', 'rl', 'перезарядка')); else if (W.pellets) H.am.appendChild(el('div','chambers',(S.mag[S.weapon]||0)===2?'● ●':S.mag[S.weapon]?'● ○':'○ ○')); }
   briefTask();
   const sleep=S.flags.poppySleep||0;

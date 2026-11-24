@@ -36,7 +36,7 @@ function playRecording(name,volume,x,y){
   const distance=x===undefined?0:Math.min(1,dst(P.x,P.y,x,y)/950);
   const gun=name==='p'||name==='s'||name==='r';
   filter.type='lowpass';filter.frequency.value=gun ? 700+15300*(1-distance)**2 : 16000-13500*distance;
-  gain.gain.value=entry[0]*volume;
+  gain.gain.value=entry[0]*volume*(name==='crow'?soundPrefs.nature:1);
   src.connect(filter);filter.connect(gain);
   const stereo=AC.createStereoPanner?.();
   if(stereo){stereo.pan.value=x===undefined?0:clamp((x-P.x)/480,-.9,.9);gain.connect(stereo);stereo.connect(master);}
@@ -61,19 +61,19 @@ function mixRecordedRain(){
   const room=roomAcoustics(),now=AC.currentTime;
   let nearest=290;
   for(const f of WORLD_FIRES)nearest=Math.min(nearest,dst(f.x,f.y,P.x,P.y));
-  const fireVolume=room.underground?0:.32*(1-nearest/290)**2*(1-.8*room.enclosure);
+  const fireVolume=room.underground?0:.16*soundPrefs.nature*(1-nearest/290)**2*(1-.8*room.enclosure);
   if(!hearthGain && fireVolume>0 && fieldBuffers.has('hearth')){
     const fire=AC.createBufferSource();fire.buffer=fieldBuffers.get('hearth');fire.loop=true;
-    hearthGain=AC.createGain();hearthGain.gain.value=0;fire.connect(hearthGain);hearthGain.connect(master);fire.start();
+    hearthGain=AC.createGain();hearthGain.gain.value=0;const hiss=AC.createBiquadFilter();hiss.type='highpass';hiss.frequency.value=460;fire.connect(hiss);hiss.connect(hearthGain);hearthGain.connect(master);fire.start();
   }
   hearthGain?.gain.setTargetAtTime(fireVolume,now,.22);
   if(!airGain && fieldBuffers.has('wind')){
     const air=AC.createBufferSource();air.buffer=fieldBuffers.get('wind');air.loop=true;
     airGain=AC.createGain();airGain.gain.value=0;air.connect(airGain);airGain.connect(master);air.start();
   }
-  const wind=(.065+.15*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
+  const wind=soundPrefs.nature*(.045+.105*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
   airGain?.gain.setTargetAtTime(wind,now,.45);
-  windGain?.gain.setTargetAtTime(airGain?0:.045*(1-room.enclosure),now,.27);
+  windGain?.gain.setTargetAtTime(airGain?0:.045*soundPrefs.nature*(1-room.enclosure),now,.27);
   const buffer=fieldBuffers.get('rain');if(!buffer)return;
   if(!rainG){
     const src=AC.createBufferSource();src.buffer=buffer;src.loop=true;
