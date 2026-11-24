@@ -76,7 +76,7 @@ const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
-  const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
+  const fire=WORLD_FIRES.find(f=>fireLit(f) && Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
   const wet=e===P ? S.flags.coatWetness||0 : 0;
   if(!fire && wet<.03){drawHuman(e,ctx);return;}
   const dx = fire ? fire.x-e.x : 0, dy = fire ? fire.y-e.y : 0, distance = Math.hypot(dx, dy);
@@ -755,7 +755,6 @@ function drawBoar(e) {
 function drawBody(o) {
   if (g3Body(o)) return;
   ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.ang + 1.2);
-  ctx.fillStyle = 'rgba(80,10,6,0.55)'; ctx.beginPath(); ctx.ellipse(2, 2, 15, 11, 0, 0, 6.28); ctx.fill();
   if (o.kind === 'dog') { ctx.fillStyle = '#4a3c31'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 6, 0, 0, 6.28); ctx.fill(); ctx.beginPath(); ctx.ellipse(13, 2, 5, 4, 0.4, 0, 6.28); ctx.fill(); }
   else {
     const lk = (LOOKS[o.fac] || LOOKS.loner); const c = Array.isArray(lk) ? lk[o.seed % lk.length] : lk;
@@ -923,6 +922,14 @@ function render() {
     drawBootMarks(loft,inView);
   }
   if(!loft && !shopVisible){drawLampShadows(inView);if(ART && C1)drawAtpOccupation(inView);}
+  for(const o of objs){
+    if(o.k!=='body' || o.kind==='sack')continue;
+    const at=o.deathSpot||o;
+    if(inView(at.x,at.y,23)){
+      const fx=BODYFX.get(o);
+      bloodPool(o,fx?clamp((G7.vt-fx.t0)/.38,0,1):1);
+    }
+  }
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -943,7 +950,17 @@ function render() {
   }
   drawCordonTrail(inView);
   // костёр
-  for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
+  for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) {
+    if(fireLit(F)){fireGroundLight(F);drawFlames(F);}
+    else{
+      // Cover the glowing coals in the painted base while its stone ring stays visible.
+      ctx.fillStyle='#34302b';ctx.beginPath();ctx.ellipse(F.x,F.y,11,9,.2,0,Math.PI*2);ctx.fill();
+      for(let i=0;i<6;i++){
+        const x=F.x+(hash2(i,3)-.5)*14,y=F.y+(hash2(i,7)-.5)*9;
+        beam(ctx,x-3,y+3,x+3,y-2,2.5,i%2?'#272521':'#666055');
+      }
+    }
+  }
   for (const o of objs) {
     if (BIG && o.x>=PW*T && loftAt(o)!==loft) continue;
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
@@ -985,8 +1002,7 @@ function render() {
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
-    if((campAct?.actor===e && campAct.music) || (e===P && S.weapon==='guitar'))drawCampGuitar(e);
-    else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
+    if(!holdsGuitar(e) && livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
@@ -1144,9 +1160,10 @@ function render() {
     for(const e of vis)if(e!==P && e.kind==='human' && !e.sit && !e.captive && e.fac!=='bandit' && e.sid!=='sid')
       castLight(lctx,e,e.ang,.35,180,.70);
     if(!loft && !shopVisible){
-      for(const l of sceneLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
-      for(const pane of windows)castLight(lctx,pane,pane.angle,.86,pane.r,.36);
-      for(const f of WORLD_FIRES)if(inView(f.x,f.y,200))
+      for(const l of siteLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
+      drawRoomLights(lctx,inView,false);
+      for(const pane of windows)windowGlow(lctx,pane,false);
+      for(const f of WORLD_FIRES)if(fireLit(f) && inView(f.x,f.y,200))
         castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120))
         castLight(lctx,lamp,0,Math.PI,120,.85);
@@ -1155,7 +1172,7 @@ function render() {
 
     for(const pane of windows){
       const [x,y]=roofPoint(pane.wallX,pane.wallY,.035);
-      hole(x,y,20,.45);
+      hole(x,y,11,.24);
     }
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
@@ -1170,14 +1187,15 @@ function render() {
     if(!loft && !shopVisible){
       ctx.save();ctx.translate(origin[0]*2,origin[1]*2);ctx.scale(Z,Z);
       clipRoofsFromLight(ctx,vx,vy,vw,vh,inView);
-      for(const l of sceneLights())if(inView(l.x,l.y,l.r)){
+      for(const l of siteLights())if(inView(l.x,l.y,l.r)){
         castLight(ctx,l,l.angle,l.half,l.r,dk*.32,'255,188,103');
         ctx.fillStyle='#3c3932';ctx.fillRect(l.x-4,l.y-2,8,5);
         ctx.fillStyle='#e8c588';ctx.fillRect(l.x-2.5,l.y+1,5,1.6);
       }
-      for(const f of WORLD_FIRES)if(inView(f.x,f.y,205))
+      for(const f of WORLD_FIRES)if(fireLit(f) && inView(f.x,f.y,205))
         castLight(ctx,f,0,Math.PI,f===FIRE?205:170,dk*.22,'255,150,60');
-      for(const pane of windows)castLight(ctx,pane,pane.angle,.86,pane.r,dk*.23,'248,194,118');
+      drawRoomLights(ctx,inView,true);
+      for(const pane of windows)windowGlow(ctx,pane,true);
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120)){
         castLight(ctx,lamp,0,Math.PI,120,dk*.32,'255,203,132');
         ctx.fillStyle='#d8ba86';ctx.beginPath();ctx.arc(lamp.x,lamp.y,2,0,Math.PI*2);ctx.fill();

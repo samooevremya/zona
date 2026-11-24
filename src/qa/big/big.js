@@ -284,7 +284,8 @@ Tt('K15_all_prop_colliders_and_containers', () => {
   }
   for (const o of M.objs.filter(o=>o.stash)) {
     const cx=o.x+o.w/2, cy=o.y+o.h/2;
-    const room=o.x>=480*T && (o.stash==='room_atp_up'?[483.5,72.25]:o.stash==='room_depot_up'?[482.72,110.9]:null);
+    const room=(o.home==='atp_up' || o.home==='loft_atp')?[483.5,72.25]:
+      (o.home==='depot_up' || o.home==='loft_depot')?[482.72,110.9]:null;
     const origin=room?room.map(v=>v*T):start;
     let reachable=false;
     for(let i=0;i<16 && !reachable;i++){

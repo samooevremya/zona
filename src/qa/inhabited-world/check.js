@@ -1,13 +1,13 @@
 window.inhabitedWorldCheck=()=>{
   const checked=[];
   const ok=(value,label)=>{if(!value)throw Error(label);checked.push(label);};
-  ok(atpAge()===-1&&!sceneLights().includes(atpScene().lamp),'unoccupied garage dark');
+  ok(atpAge()===-1&&!nightLamps().has(HOUSES.find(h=>h.ok===atpRooms[0])),'unoccupied garage dark');
   const bunkerPos=locPt('atp','garage');
   P.x=bunkerPos.x;P.y=bunkerPos.y;
   occupyATP();
-  ok(atpAge()===0&&!sceneLights().includes(atpScene().lamp),'first hours');
+  ok(atpAge()===0&&!nightLamps().has(HOUSES.find(h=>h.ok===atpRooms[0])),'first hours');
   S.min+=100;
-  ok(atpAge()>=90&&sceneLights().includes(atpScene().lamp),'garage lamp after setup');
+  ok(atpAge()>=90&&nightLamps().has(HOUSES.find(h=>h.ok===atpRooms[0])),'garage lamp after setup');
   S.min+=630;
   save(true);applyState(loadSave());
   ok(atpAge()>=720,'occupation survives load');

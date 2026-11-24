@@ -152,7 +152,8 @@ function drawRaisedHouse(h, i) {
     if (vis[s]) {
       const [a, b] = ends[s];
       const tex=wallTexture(h,s,s%2?d:w,h.mat!=='conc' && h.mat!=='depot','house');
-      const u=h.facadePanes[s]?.[0], lit=occupiedWindow(h) && u!==undefined;
+      const panes=h.facadePanes[s],u=panes?.[Math.floor((panes.length-1)/2)];
+      const lit=u!==undefined && (s===2 || s===(h.x+h.y)%2) && occupiedWindow(h);
       const pane=lit?facadePane(h,s,u,corners[a]):null;
       if(pane)h.litPanes.push(pane);
       texturedFace(corners[a],corners[b],k,tex,pane?g=>glowingPane(g,u,pane.wallX,pane.wallY,pane.nx,pane.ny):null);

@@ -33,7 +33,7 @@ function castLight(g,source,angle,half,radius,strength,tint){
   fade.addColorStop(1,'rgba('+color+',0)');
   g.fillStyle=fade;g.fill(path);
 }
-let outdoorLamps, settlementLights, activeSiteLamps, litAtp=false;
+let outdoorLamps, settlementLights;
 function villageBulbs(){
   return settlementLights ||= (LOC.village.anchors.lamps||[]).map(([x,y])=>({x:x*T,y:y*T}));
 }
@@ -43,15 +43,6 @@ function siteLights(){
     {...worldPoint(122.5,202.5),angle:1.0,half:1.34,r:167}
   ]:[];
   return outdoorLamps;
-}
-function sceneLights(){
-  const sites=siteLights();
-  if(!inhabited)return sites;
-  const atp=atpAge()>=90;
-  if(!activeSiteLamps || atp!==litAtp){
-    litAtp=atp;activeSiteLamps=[...outdoorLamps,...householdLights()];
-  }
-  return activeSiteLamps;
 }
 function lampExposure(lamp,p){
   const d=dE(lamp,p);

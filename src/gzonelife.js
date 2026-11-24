@@ -56,17 +56,17 @@ function moduleControls(id,index,row){
   }
 }
 
-function sameBedroom(o){
+function inFurnishedRoom(o,allowRuin=false){
   const x=o.x+o.w/2,y=o.y+o.h/2;
-  return HOUSES.some(h=>!h.ruin && x>h.x*T && y>h.y*T && x<(h.x+h.w)*T && y<(h.y+h.h)*T &&
+  return HOUSES.some(h=>(allowRuin || !h.ruin) && x>h.x*T && y>h.y*T && x<(h.x+h.w)*T && y<(h.y+h.h)*T &&
     P.x>h.x*T && P.y>h.y*T && P.x<(h.x+h.w)*T && P.y<(h.y+h.h)*T);
 }
 function sleepAtBed(o){
-  if(!o || !sameBedroom(o))return;
+  if(!o || !inFurnishedRoom(o))return;
   const choices=()=>[...[1,4,8].map(h=>{
     const why=restBlock();
     return {t:why||restLabel('Спать',h*60,'sleep'),d:!!why,fn:()=>{
-      if(restBlock()||!sameBedroom(o))return;
+      if(restBlock()||!inFurnishedRoom(o))return;
       const r=advanceWorldTime(60*h,'sleep');closePanel();msg('Сон · '+fmtH(r.minutes)+'. Сейчас '+clockStr(S.min)+'. '+(r.stop||''),'say');save(true);
     }};
   }),{t:'Встать',close:1}];
@@ -133,7 +133,7 @@ function playerSongOptions(){
   if(S.weapon!=='guitar' || !has('guitar'))return [];
   return songBook.map(([track,title])=>({t:'Сыграть · '+title,fn:()=>{
     const fire=WORLD_FIRES.find(f=>dE(f,P)<52);
-    if(!fire || S.weapon!=='guitar' || !has('guitar') || S.blow?.stage){sys('Сейчас не до песен.');return;}
+    if(!fireLit(fire) || S.weapon!=='guitar' || !has('guitar') || S.blow?.stage){sys('Сейчас не до песен.');return;}
     const clip=sceneClip(track,.42,'music',P);
     if(!clip){sys('Инструмент ещё настраивается. Попробуй через секунду.');return;}
     stopPlayingGuitar();stopScene(campAct?.clip);campAct=null;
@@ -166,10 +166,10 @@ function resetCampAudio(){
 }
 function atFire(e){
   return e?.alive && e.sit && !e.wounded && !e.captive && !e.tgt && !e.evacuating &&
-    e.fireRef && dE(e,e.fireRef)<80 && dE(e,P)<255;
+    fireLit(e.fireRef) && dE(e,e.fireRef)<80 && dE(e,P)<255;
 }
 function campAndRadio(dt){
-  if(playerSong && (playerSong.done || !P.alive || S.weapon!=='guitar' || !has('guitar') ||
+  if(playerSong && (!fireLit(P.fireRef) || playerSong.done || !P.alive || S.weapon!=='guitar' || !has('guitar') ||
     IN.moveX || IN.moveY || S.blow?.stage || P.flash>0 || dE(P,P.fireRef)>56))stopPlayingGuitar();
   const underground=inBunker(P.x,P.y);
   if(underground && !radioAudio){radioAudio=sceneClip('deskRadio',.22,'music',byS('sid'),true);}
@@ -197,15 +197,28 @@ function campAndRadio(dt){
   campAct={actor,reply:music?null:reply,music,lines,clip,wait:4.2};campIndex++;
 
 }
-function drawCampGuitar(e){
-  const g=ctx;g.save();g.translate(e.x,e.y);g.rotate(e.ang-.95);g.translate(4,1);
-  g.fillStyle='#60422b';g.strokeStyle='#362e26';g.lineWidth=1;
-  g.beginPath();g.ellipse(-1,5,4.8,3.8,-.32,0,7);g.ellipse(3.8,3.4,3,2.7,-.32,0,7);g.fill();g.stroke();
-  g.strokeStyle='#866748';g.lineWidth=2.3;g.beginPath();g.moveTo(3,4);g.lineTo(14,-.8);g.stroke();
-  g.fillStyle='#312921';g.beginPath();g.arc(1.8,4,1.4,0,7);g.fill();
-  g.fillStyle='#a38a6a';g.fillRect(-1+Math.sin(G7.vt*6),4,2.4,1.6);g.restore();
+function holdsGuitar(e){return e===P?S.weapon==='guitar':campAct?.actor===e && campAct.music;}
+function guitarHands(e){
+  const strum=e.sit?Math.sin(G7.vt*7)*1.25:0;
+  return [[-4.3,9+strum],[8.4,5.3]];
 }
-
+// The player's inventory illustration is rotated to lie across the torso.
+// Its soundhole and frets align with the same two sockets used by the sleeves.
+function paintGuitar(g){
+  const im=packImage('assets/field/item_guitar.svg');
+  if(!im)return;
+  g.save();g.translate(-4.3,9);g.rotate(Math.PI/3-.26);
+  g.scale(.41,.41);g.translate(-27,-48);g.drawImage(im,0,0,76,84);g.restore();
+}
+function seatedGuitar(g,e){
+  paintGuitar(g);
+  const hands=guitarHands(e);
+  for(const [i,[x,y]] of hands.entries()){
+    const side=i?1:-1;
+    beam(g,side*8,5,x,y,3.4,'#5c5443');
+    g.fillStyle='#9c876c';g.beginPath();g.ellipse(x,y,1.9,1.55,-.3,0,Math.PI*2);g.fill();
+  }
+}
 
 function drawDeskRadio(){
   const g=ctx, sid=byS('sid');if(!sid)return;

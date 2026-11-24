@@ -40,7 +40,14 @@ function furnitureBounds(name,angle){
 }
 function putFurniture(name,x,y,angle,home){
   const [w,h]=furnitureBounds(name,angle);
-  return interiorObject('roomFitting',x,y,w,h,{fitting:name,angle,home});
+  const o=interiorObject('roomFitting',x,y,w,h,{fitting:name,angle,home});
+  if(name==='cupboard' || name==='cabinet'){
+    const roll=hash2(Math.floor(x),Math.floor(y));
+    o.stash='cupboard_'+Math.round(x)+'_'+Math.round(y);
+    o.name=name==='cupboard'?'Деревянный шкаф':'Металлический шкаф';
+    o.loot=roll<.63?{}:roll<.81?{bandage:1}:roll<.93?{bread:1}:{a9:3};
+  }
+  return o;
 }
 function supplyBox(x,y,key,loot){
   return interiorObject('crate',x,y,24,22,{stash:'room_'+key,loot,home:key});
@@ -239,19 +246,23 @@ function furnishHouses(){
     let count=0,attempt=0;
     const offset=Math.floor(rand()*items.length);
     for(const p of spots){
-      if(count>=Math.max(1,limit-Math.floor(initial*.5)))break;
-      const type=items[(offset+attempt++)%items.length];
-      const [w,d]=type==='box'?[24,22]:furnitureBounds(type,p.a);
+      const full=count>=Math.max(1,limit-Math.floor(initial*.5));
+      const needsCupboard=use==='home' && !local.some(o=>o.fitting==='cupboard');
+      if(full && !needsCupboard)break;
+      const type=full?'cupboard':items[(offset+attempt++)%items.length];
+      const angle=type==='cupboard'?p.a+Math.PI/2:p.a;
+      const [w,d]=type==='box'?[24,22]:furnitureBounds(type,angle);
       const left=p.x-w/2,top=p.y-d/2,right=left+w,bottom=top+d;
       const near=(x,y,r)=>Math.hypot(x-clamp(x,left,right),y-clamp(y,top,bottom))<r;
       if(h.entrances.some(e=>near(h.x*T+e.x-e.nx*32,h.y*T+e.y-e.ny*32,24+e.width*.30)))continue;
       if(NPCDEF.some(e=>near(e.x*T,e.y*T,24)) || lofts.some(r=>near(r.stair.x,r.stair.y,52)))continue;
+      if(type==='cupboard' && local.some(o=>o.stash && near(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)/2+34)))continue;
       if(local.some(o=>left<o.x+(o.w||0)+10 && right>o.x-10 && top<o.y+(o.h||0)+10 && bottom>o.y-10))continue;
       const taken=[];
       for(let y=Math.floor(top/T);y<=Math.floor((bottom-.1)/T);y++)for(let x=Math.floor(left/T);x<=Math.floor((right-.1)/T);x++)
         taken.push(y*MW+x);
       if(taken.some(n=>!nav[n] || propCells.has(n)) || !roomPassageSurvives(h,taken))continue;
-      const o=type==='box'?supplyBox(p.x,p.y,h.ok+'_'+count,{[use==='shop'?'a9':'bandage']:use==='shop'?6:1}):putFurniture(type,p.x,p.y,p.a,h.ok);
+      const o=type==='box'?supplyBox(p.x,p.y,h.ok+'_'+count,{[use==='shop'?'a9':'bandage']:use==='shop'?6:1}):putFurniture(type,p.x,p.y,angle,h.ok);
       local.push(o);for(const n of taken)nav[n]=0;count++;
     }
     // Ground-level marks can also fit in single-cell huts and ruins with no free furniture footprint.

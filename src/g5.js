@@ -319,6 +319,7 @@ function openLoot(o) {
     msg('Крышку тянет вверх. Дождись, когда пыль осядет.', 'say');
     return;
   }
+  if(o.k==='roomFitting')recordContents(o);
   if (o.loot.__tip) { delete o.loot.__tip; revealCache(o.name); }
   if (o.k === 'crate') return;
   openPanel('loot', o.anomalyId ? 'Схрон путейца' : o.k === 'cache' || o.k === 'hiding' ? 'Тайник' : o.k === 'safe' ? 'Сейф' : 'Обыск: ' + o.name); panel.o = o; refresh(); pbody.scrollTop = 0;
@@ -841,10 +842,11 @@ function hud(dt) {
   H.st.style.width = P.st + '%'; H.stv.textContent = weight() > carryLimit() ? '!' : Math.round(P.st);
   const fol = ents.find(x => x.alive && x.follow);
   const shelter = blowShelterTarget();
-  const shelterStatus = S.blow?.stage ? (sheltered(P.x,P.y) ? (S.blow.stage===1?'Предупреждение · оставайся в укрытии':'Идёт выброс · оставайся в укрытии') : shelter ? 'Укрытие · '+Math.ceil(dE(P,shelter)/T*1.5)+' м' : 'Найдите укрытие') : S.min<(S.flags.blowClearUntil||0)?'Отбой · можно выходить':'';
+  const shelterStatus = S.blow?.stage ? emissionStatus(shelter) : S.min<(S.flags.blowClearUntil||0)?'Отбой · можно выходить':'';
   const stt = [shelterStatus, S.flags.poppySleep>8 ? (S.flags.poppySleep>26?"Засыпаешь":"Слипаются глаза") : "", energyActive() ? 'энергетик · ' + Math.ceil(S.flags.energyUntil-S.min) + ' с' : '', fol ? 'напарник ' + fol.name.split(' ')[0] + (fol.wait ? ' ждёт' : '') + ' до ' + clockStr(fol.hireEnd).replace(/ · день \d+/, '') : '', S.food < 20 ? 'голод' : '', P.jam ? 'заклинило' : '', weight() > carryLimit() ? 'перегруз' : '', anomalyHint()].filter(Boolean).join(' · ');
   { const m = cnt('medkit'), b = cnt('bandage'); $('mb-m').textContent = m || ''; $('mb-b').textContent = b || ''; $('mp-mn').textContent = m; $('mp-bn').textContent = b; $('b-med').classList.toggle('empty', !m && !b); }
   $('b-crouch').classList.toggle('on', !!P.crouch); H.det.setAttribute('aria-pressed', String(S.torch !== false)); $('b-jump').classList.toggle('on', P.jumpT > 0);
+  H.status.classList.toggle('emission',!!S.blow?.stage);
   if (H.status.textContent !== stt) H.status.textContent = stt;
   drawMini();
   if (hudT > 0) return;
@@ -925,6 +927,8 @@ function interact() {
   else if (n.k === 'carve') carveMutant(n.o);
   else if (n.k === 'loot') openLoot(n.o);
   else if (n.k === 'rest') restAtFire();
+  else if(n.k==='relight' && !relightFire(n.fire,P))
+    msg(fireRain()?'Дождь заливает дрова. Подожди, пока он пройдёт.':'Сейчас нужно укрыться.','say');
   else if (n.k === 'pick') pickUp(n.o);
   else if (n.k === 'genset') gensetUse();
   else if (n.k === 'story') cordonUse(n.stage);

@@ -147,7 +147,7 @@ function rainErrand(e,dt){
 }
 function drawHearthGesture(e){
   if(humanMotionOn && rigSkin(e)==='loner')return;
-  if(!e.sit || e.tgt || e.wounded || !e.fireRef || dE(e,e.fireRef)>76)return;
+  if(!e.sit || e.tgt || e.wounded || !fireLit(e.fireRef) || dE(e,e.fireRef)>76)return;
   const phase=(environmentTime+e.seed%19)%13;if(phase>3.4)return;
   const reach=Math.sin(Math.PI*phase/3.4);
   ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.ang);
@@ -175,7 +175,7 @@ function updateCoat(dt){
   if(!wet && precip<.12)return;
   const cover=underRainCover(P.x,P.y);
   if(!wet && cover)return;
-  const byFire=!inBunker(P.x,P.y) && !loftAt(P) && WORLD_FIRES.some(f=>dE(f,P)<80);
+  const byFire=!inBunker(P.x,P.y) && !loftAt(P) && WORLD_FIRES.some(f=>fireLit(f) && dE(f,P)<80);
   const change=byFire ? -1/23 : cover ? -1/85 : precip>.12 ? precip/55 : -1/170;
   S.flags.coatWetness=clamp(wet+change*dt,0,1);
 }

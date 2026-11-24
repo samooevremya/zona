@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 
 folder = Path(__file__).resolve().parent
 url = "http://zona.test/index.html"
-script = (folder / "check.js").read_text()
+script = (folder / "check.js").read_text() + (folder.parent / "camp-interactions" / "check.js").read_text()
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--single-process", "--disable-gpu"])
     page = browser.new_page(viewport={"width": 844, "height": 390}, has_touch=True, is_mobile=True)
@@ -19,5 +19,6 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Новая игра").tap()
     page.get_by_role("button", name="Пропустить").tap()
     print(page.evaluate("inhabitedWorldCheck()"))
+    print(page.evaluate("campChecks()"))
     assert not errors, errors
     browser.close()

@@ -273,6 +273,30 @@ function advanceWorldTime(minutes, ctx) {
 }
 
 /* ---------- костёр ---------- */
+const fireKey=f=>f.x+','+f.y;
+const fireLit=f=>!!f && S.flags.coldHearths?.[fireKey(f)]==null;
+const fireRain=()=>WX.rain>=.16 || ['rain','storm'].includes(S.wx?.k);
+function relightFire(f,actor){
+  if(fireLit(f) || fireRain() || S.blow?.stage || !actor?.alive || dE(actor,f)>80)return false;
+  delete S.flags.coldHearths[fireKey(f)];
+  if(actor===P)msg('Костёр разгорелся.','say');
+  else {actor.ang=Math.atan2(f.y-actor.y,f.x-actor.x);sayLine(actor,'Дрова ещё сухие. Разгорится.');}
+  return true;
+}
+let fireCheckState,fireCheckAt=-Infinity;
+function updateCampFires(){
+  if(fireCheckState===S && S.min>=fireCheckAt && S.min-fireCheckAt<1)return;
+  fireCheckState=S;fireCheckAt=S.min;
+  for(const f of WORLD_FIRES){
+    if(fireRain()){
+      (S.flags.coldHearths ||= {})[fireKey(f)]=S.min;
+    }else if(!fireLit(f) && !S.blow?.stage && S.min-S.flags.coldHearths[fireKey(f)]>=15){
+      const camper=ents.find(e=>e!==P && e.kind==='human' && e.alive && !e.tgt && !e.wounded &&
+        !e.captive && !e.evacuating && !e.angry && dE(e,f)<75);
+      if(camper)relightFire(f,camper);
+    }
+  }
+}
 function fireTeller() {
   const camp = WORLD_FIRES.reduce((best,f)=>dE(P,f)<dE(P,best)?f:best);
   const people=ents.filter(e=>e.alive && !e.wounded && !e.captive && !e.angry && e.fac==='loner' && !e.follow && !e.sos && dE(e,camp)<200);
@@ -698,8 +722,12 @@ function plusKill(e, src) {
   if (e.follow) { bulletin('Погиб напарник ' + e.name + '.'); }
 }
 function plusInteract(cand) {
-  const d = Math.min(...WORLD_FIRES.map(f=>dE(P,f)));
-  if (d < 50 && !inBunker(P.x, P.y)) cand(d - 25, { k: 'rest', label: 'Посидеть у костра' });
+  const fire=WORLD_FIRES.find(f=>dE(P,f)<50);
+  if(fire && !inBunker(P.x,P.y)){
+    const lit=fireLit(fire);
+    cand(dE(P,fire)-25,{k:lit?'rest':'relight',fire,label:lit?'Посидеть у костра':
+      fireRain()?'Мокрое кострище':'Разжечь костёр'});
+  }
   interactRC1(cand);
 }
 function plusTargets(out) {

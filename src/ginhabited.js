@@ -80,11 +80,10 @@ function atpScene(){
   const garage=HOUSES.find(h=>h.ok===atpRooms[0]), quarters=HOUSES.find(h=>h.ok===atpRooms[1]);
   if(!garage || !quarters)return null;
   const floor=(h,x,y)=>({x:(h.x+x)*T,y:(h.y+y)*T});
-  const lamp={...floor(garage,3.18,2.65),angle:0,half:Math.PI,r:112};
   const doorway=garage.entrances[0];
   const door={x:garage.x*T+doorway.x,y:garage.y*T+doorway.y+2,angle:Math.PI/2,half:.64,r:90};
   const guardPoint=walkPoint(door,1.7,.9);
-  return settlement={lamp,door,guardPoint,
+  return settlement={guardPoint,
     rolls:[floor(garage,2.02,1.55),floor(garage,3.62,1.55)],
     bench:floor(quarters,1.18,2.15),
     marks:[floor(garage,4.2,6.75),floor(garage,8.5,7.45),floor(garage,11.4,6.25)]
@@ -124,17 +123,51 @@ function atpNewSentry(e){
   return guard===e && !!atpScene();
 }
 
-let barLamp;
-function householdLights(){
-  if(!inhabited)return [];
-  const counter=objs.find(o=>o.barRole==='counter');
-  if(counter)barLamp ||= {x:counter.x+counter.w-16,y:counter.y+counter.h+13,angle:Math.PI/2,half:Math.PI,r:142};
-  const stage=atpAge(),s=stage>=90?atpScene():null;
-  return [barLamp,s?.lamp,s?.door].filter(Boolean);
+// Night lights belong to the room and its residents, including a resident at their doorstep.
+const nightRooms=new Map();
+let roomState=null,roomScanTime=-Infinity,roomAtp=false;
+function nightLamps(){
+  const settled=atpAge()>=90;
+  if(roomState===S && roomAtp===settled && S.min>=roomScanTime && S.min-roomScanTime<1)return nightRooms;
+  roomState=S;roomScanTime=S.min;roomAtp=settled;nightRooms.clear();
+  const people=ents.filter(e=>e!==P && e.alive && e.kind==='human' && !e.captive);
+  for(const h of HOUSES){
+    if(h.ruin || atpRooms.includes(h.ok) && !settled)continue;
+    const x=h.x*T,y=h.y*T,w=h.w*T,d=h.h*T;
+    const inside=p=>p && p.x>x && p.x<x+w && p.y>y && p.y<y+d;
+    const resident=people.find(e=>inside(e.home) || inside(e) ||
+      (e.sid==='wolf' && h.ok==='15,72' && e.home &&
+       dst(e.home.x,e.home.y,clamp(e.home.x,x,x+w),clamp(e.home.y,y,y+d))<64));
+    if(!resident && !(settled && atpRooms.includes(h.ok) && atpCompany().some(e=>e.alive)))continue;
+    const lamp=h.roomBulb ||= {x:x+w*.48,y:y+d*.55,r:Math.min(140,Math.max(w,d)*.54),house:h};
+    nightRooms.set(h,lamp);
+  }
+  return nightRooms;
 }
 function occupiedWindow(h){
-  if(!inhabited || h.ruin || darkness()<.14)return false;
-  return ['15,72','26,71','78,118'].includes(h.ok) || atpRooms.includes(h.ok) && atpAge()>=90;
+  return inhabited && darkness()>=.14 && nightLamps().has(h);
+}
+function softLamp(g,x,y,rx,ry,strength,color){
+  g.save();g.translate(x,y);g.scale(rx,ry);
+  const fade=g.createRadialGradient(0,0,0,0,0,1);
+  fade.addColorStop(0,'rgba('+color+','+strength+')');
+  fade.addColorStop(.5,'rgba('+color+','+(strength*.48)+')');
+  fade.addColorStop(1,'rgba('+color+',0)');
+  g.fillStyle=fade;g.fillRect(-1,-1,2,2);g.restore();
+}
+function drawRoomLights(g,inView,tint){
+  if(!inhabited || darkness()<.14)return;
+  for(const [h,l] of nightLamps()){
+    if(h.a>.98 || !inView(l.x,l.y,l.r))continue;
+    g.save();g.beginPath();g.rect(h.x*T,h.y*T,h.w*T,h.h*T);g.clip();
+    softLamp(g,l.x,l.y,l.r,l.r*.88,(1-h.a)*(tint?.15:.79),tint?'255,204,142':'0,0,0');
+    g.restore();
+  }
+}
+function windowGlow(g,p,tint){
+  const along=26,depth=17;
+  softLamp(g,p.x+p.nx*3,p.y+p.ny*3,p.nx?depth:along,p.ny?depth:along,
+    tint?.11:.25,tint?'251,204,149':'0,0,0');
 }
 function windowOcclusion(x,y,nx,ny){
   for(const e of ents){
@@ -145,7 +178,7 @@ function windowOcclusion(x,y,nx,ny){
   return null;
 }
 function glowingPane(g,u,x,y,nx,ny){
-  g.fillStyle='#e1b773';g.fillRect(u-11,24,22,25);
+  g.fillStyle='#b69968';g.fillRect(u-11,24,22,25);
   g.fillStyle='#9d7652';g.fillRect(u-11,44,22,5);
   const shadow=windowOcclusion(x,y,nx,ny);
   if(shadow){
