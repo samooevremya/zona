@@ -506,7 +506,7 @@ function findInteract() {
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
   if (!BEREZKI && ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
-    if(o.k==='bed' || o.fitting==='bedroll'){
+    if(!BEREZKI && (o.k==='bed' || o.fitting==='bedroll')){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(x,y,P.x,P.y);
       if(d<52 && inFurnishedRoom(o) && los(P.x,P.y,x,y))cand(d-4,{k:'sleep',o,label:'Спать · спальное место'});
     }

@@ -46,6 +46,7 @@ function makeDistrict(){
     if(n<5)district.stairs.push({room:r,up:true,...tilePoint(x+18.7,y+5.35)});
     if(n>1)district.stairs.push({room:r,up:false,...tilePoint(x+16.9,y+5.7)});
   }
+  makeFishingShore();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE);
   ANOM0.length=CACHES.length=0;
@@ -62,7 +63,8 @@ function winterNew(difficulty){
 }
 const winterResidents=[
   ['warden','Агат',27,32.5,'w_obrez'],['door','Савва',30.7,27.6,'w_pm'],
-  ['cook','Тамара',20.5,24.5,'knife'],['tenant','Глеб',78.4,17.5,'knife']
+  ['cook','Тамара',20.5,24.5,'knife'],['tenant','Глеб',78.4,17.5,'knife'],
+  ['fisher','Егор',...fishingTrack[0],'knife']
 ];
 function winterRestore(d){
   S=d;survDefaults();plusDefaults();restoreKit();resetCampAudio();resetInput();resetEnvironment();
@@ -81,16 +83,16 @@ function winterRestore(d){
     ents.push(e);
   }
   for(const b of S.flags.fieldBodies||[])objs.push({...b,loot:{...b.loot}});
-  ageRemains();buildGrids();cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
+  ageRemains();buildGrids();restoreShoreFooting();cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
   envSteps.length=0;stepDistance=0;winterFootSide=1;deathT=0;hurtFlash=0;armyAngry=false;MSGS=[];radioQueue.length=0;
 }
 function winterInteractChoices(cand){
   for(const s of district.stairs){const d=dE(P,s);if(d<32)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
   const room=winterFloor(P.x,P.y);
-  if(room?.n>1)for(const o of objs){
+  if(room?.n>1 || room===fishingRoom)for(const o of objs){
     if(o.fitting!=='bedroll')continue;
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
-    if(d<44 && los(P.x,P.y,center.x,center.y))cand(d,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
+    if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
   const f=district.heaters.concat(FIRE).find(h=>dE(P,h)<53);
   if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
@@ -109,7 +111,7 @@ function winterUse(n){
         closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
       }})),{t:'Встать',close:1}]);
   }else if(n.k==='talk'){
-    const lines={warden:'Дверь за собой притвори. Нанесёт снегу — к утру её вдвоём не отворишь.',door:'Проходи. Налево столовая, наверх — по дальней лестнице.',cook:'Чайник ещё горячий. Кружки на полке.',tenant:'Окна к ночи войлоком закрываем. От стекла так и тянет.'};
+    const lines={warden:'Дверь за собой притвори. Нанесёт снегу — к утру её вдвоём не отворишь.',door:'Проходи. Налево столовая, наверх — по дальней лестнице.',cook:'Чайник ещё горячий. Кружки на полке.',fisher:'От крыльца держись по следам. У лунки лёд скользкий. Замёрзнешь — возвращайся, печь ещё держит тепло.',tenant:'Окна к ночи войлоком закрываем. От стекла так и тянет.'};
     dialog({ent:n.e,n:n.e.name,fac:'loner',grp:'Выживальщики',att:'житель Берёзок'},[lines[n.e.sid]||'Добрый вечер.'],()=>[{t:'До встречи',close:1}],'dialog',n.e);
   }else return false;
   return true;
@@ -146,7 +148,7 @@ function plantWinterTrees(g){
   for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++){
     if(tAt(x,y)!==TR)continue;
     const h=hash2(x,y), size=76+42*h;
-    const art=crowns[h>.54?0:1][Math.floor(hash2(x+31,y+7)*4)];
+    const art=crowns[(x===42 && y===15 || h>.54)?0:1][Math.floor(hash2(x+31,y+7)*4)];
     const px=(x+.5)*T, py=(y+.5)*T;
     district.trees.push({x:px,y:py,size,art});
     g.save();g.translate(px,py);
@@ -293,9 +295,10 @@ function winterLandscape(){
     else{x=(31+9*u)*T+off;y=(33-1.2*Math.sin(u*3))*T+off;}
     g.fillStyle=i%3?'rgba(95,99,99,.059)':'rgba(76,73,62,.12)';g.beginPath();g.ellipse(x,y,rand()*6+1,rand()*2+1,-.5,0,2*Math.PI);g.fill();
   }
+  shoreGround(g);
   plantWinterTrees(g);
   district.ground=c;
-  district.plans=district.levels.map(winterRoom);
+  district.plans=district.levels.map(r=>r===fishingRoom?fishingInterior(r):winterRoom(r));
   const f=district.fire;for(let j=0;j<12;j++){
     const a=j*Math.PI/6;g.fillStyle=j%2?'#665e50':'#827b6a';g.beginPath();g.ellipse(f.x+14*Math.cos(a),f.y+11*Math.sin(a),4.6,3.8,a,0,7);g.fill();
   }
@@ -317,7 +320,9 @@ function winterGround(vx,vy,vw,vh){
   const upper=winterFloor(P.x,P.y);
   ctx.fillStyle=upper?.n>1?'#202324':'#cad3da';ctx.fillRect(vx,vy,vw,vh);
   if(!upper || upper.n===1)ctx.drawImage(district.ground,0,0);
-  for(const r of district.levels)if(r.n===1 && !upper || r===upper)ctx.drawImage(district.plans[r.n-1],r.x*T,r.y*T);
+  district.levels.forEach((r,i)=>{
+    if(r.n===1 && !upper || r===upper)ctx.drawImage(district.plans[i],r.x*T,r.y*T);
+  });
   for(const p of envSteps){
     ctx.fillStyle='rgba(85,100,115,'+(.28*clamp(1-(S.min-p.t)/70,0,1))+')';
     ctx.beginPath();ctx.ellipse(p.x,p.y,4.5,2,p.a,0,Math.PI*2);ctx.fill();
@@ -330,6 +335,11 @@ function winterRoofOrder(){
 function winterRoofs(){
   district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
+    if(h===fishingHouse){
+      h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
+      h.storeys=1;h.rooftop=[[2*T-5,2.4*T-7,14,15,.035]];
+      h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
+    }
     const occupied=h===HOUSES[0];
     h.rooftop=occupied?[[17.4*T,3.7*T,62,45,.047],[4.9*T,5.9*T,16,15,.029],[11.7*T,2.7*T,16,15,.029]]:
       [[3*T,2*T,32,21,.02],[16*T,6*T,23,18,.02]];
@@ -351,7 +361,7 @@ function winterMap(g,s,_labels,options={}){
   const u=options.u||1;
   if(!floor && options.loc){
     g.save();g.textAlign='center';g.font='bold '+Math.max(11,12*u)+'px Arial';
-    for(const [text,x,y] of [['Жилой корпус',28,26],['Заколоченный корпус',25,11],['Костёр',31,34]]){
+    for(const [text,x,y] of [['Жилой корпус',28,26],['Заколоченный корпус',25,11],['Костёр',31,34],['Дом рыбака',48,16],['Прорубь',48.4,7.4]]){
       g.lineWidth=3*u;g.strokeStyle='#343b3d';g.strokeText(text,x*s,y*s);g.fillStyle='#f2e8cd';g.fillText(text,x*s,y*s);
     }
     g.restore();
@@ -365,7 +375,8 @@ function winterMini(){
   if(mini.width!==size)mini.width=mini.height=size;
   const s=size/30;mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5});
-  $('mini-distance').textContent=winterFloor(P.x,P.y)?.n?'Эт. '+winterFloor(P.x,P.y).n:'Двор';
+  const room=winterFloor(P.x,P.y);
+  $('mini-distance').textContent=room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
 }
 async function bootBerezki(){
@@ -395,7 +406,7 @@ async function bootBerezki(){
   qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const temp=r?(r.n===1?2:4):Math.round(-18-28*darkness()/.8);
-    const text=(r?'Берёзки · этаж '+r.n:'Берёзки · двор')+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const text=(r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:P.x>38*T && P.y<20*T?'Рыбацкий берег':'Берёзки · двор')+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
   intro=()=>{msg('Жилой корпус. У входа дежурит смена.','say');save(true);};
