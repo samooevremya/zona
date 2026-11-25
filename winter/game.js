@@ -28,8 +28,8 @@
   function surface(){return indoor?'wood':p.mud>.02?'marsh':W.lake(p.x,p.y)?'ice':'snow';}
   function reset(){
     hud.clearToast();
-    p={x:W.gate.x,y:W.gate.y,heading:-Math.PI/2,legHeading:-Math.PI/2,travelHeading:-Math.PI/2,vx:0,vy:0,phase:0,speed:0,mud:0,sink:0,wet:0,jump:0,jumpV:0,gear:'empty',health:100,warmth:88,food:87,water:89,rations:2,bottles:2};
-    camera={x:p.x,y:p.y};indoor=null;exitPoint=null;elapsed=0;started=false;finished=false;routeRunning=false;routeTime=0;trail=[];near={};
+    p={x:W.gate.x,y:W.gate.y,heading:-Math.PI/2,legHeading:-Math.PI/2,travelHeading:-Math.PI/2,vx:0,vy:0,phase:0,speed:0,mud:0,sink:0,wet:0,jump:0,jumpV:0,gear:'empty',jacket:'starter',health:100,warmth:88,food:87,water:89,rations:2,bottles:2};
+    window.workerGait.reset(p);camera={x:p.x,y:p.y};indoor=null;exitPoint=null;elapsed=0;started=false;finished=false;routeRunning=false;routeTime=0;trail=[];near={};
     snowX=0;snowY=0;paused=false;clearInputs();climate=window.winterClimate.sample(0);localShelter=0;nextHud=0;
   }
   function clearInputs(){keys.clear();aimHeading=null;axes.x=0;axes.y=0;touchRun=false;if(p){p.speed=0;p.vx=0;p.vy=0;}}
@@ -37,6 +37,11 @@
   function setActive(){if(ready())started=true;}
   function jump(){if(!ready()||p.jump>0||p.jumpV!==0)return;setActive();p.jumpV=3.0*(1-.82*p.mud);}
   function cycleGear(){if(!ready())return;const gears=Object.keys(gearNames);p.gear=gears[(gears.indexOf(p.gear)+1)%gears.length];nextHud=0;}
+  function changeJacket(){
+    if(!ready())return;
+    p.jacket=p.jacket==='starter'?'insulated':'starter';
+    nextHud=0;
+  }
   function consume(kind){
     if(!ready())return;const food=kind==='food',count=food?'rations':'bottles',stat=food?'food':'water';
     if(!p[count]){hud.toast(food?'Паёк закончился':'Вода закончилась');return;}
@@ -52,7 +57,7 @@
     p.x=target.x;p.y=target.y;p.heading=target.heading??p.heading;
     p.legHeading=p.heading;p.travelHeading=p.heading;
     p.vx=0;p.vy=0;p.speed=0;p.jump=0;p.jumpV=0;p.mud=0;p.sink=0;
-    camera={x:p.x,y:p.y};nextHud=0;
+    window.workerGait.reset(p);camera={x:p.x,y:p.y};nextHud=0;
   }
   function interact(){
     if(!ready())return;
@@ -118,22 +123,21 @@
     // While strafing, feet find a comfortable angle relative to the shoulders.
     const twist=aimHeading===null?0:clamp(angleDiff(p.heading,p.travelHeading),-.68,.68)*clamp(p.speed,0,1);
     p.legHeading=faceTowards(p.legHeading,p.heading+twist,8,dt);
+    let landed=false;
     if(p.jump>0||p.jumpV>0){
       p.jumpV-=9.8*dt;p.jump+=p.jumpV*dt;
-      if(p.jump<=0){p.jump=0;p.jumpV=0;if(sound)audio?.step(surface(),p.speed);}
+      if(p.jump<=0){p.jump=0;p.jumpV=0;landed=true;}
     }
-    const last=Math.floor(p.phase/Math.PI);
-    const stride=(.32+.20*clamp((p.speed-1.7)/1.9,0,1))*clamp(p.speed/.7,.30,1);
-    p.phase+=distance*Math.PI/(2*stride);
-    if(Math.floor(p.phase/Math.PI)!==last&&p.jump===0){
+    window.workerGait.advance(p,dt,landed,feet=>{
       const ground=surface();
       if(sound)audio?.step(ground,p.speed);
-      if(ground==='snow'){
-        const side=last%2?.12:-.12;
-        trail.push({x:p.x-Math.sin(p.legHeading)*side,y:p.y+Math.cos(p.legHeading)*side,a:p.legHeading,t:elapsed});
+      if(ground==='snow')for(const foot of feet){
+        const toe=.045;
+        trail.push({x:foot.x+toe*Math.cos(p.legHeading),y:foot.y+toe*Math.sin(p.legHeading),a:p.legHeading,t:elapsed});
         if(trail.length>200)trail.shift();
       }
-    }
+    });
+    p.phase=p.gait.phase;
   }
   function update(dt){
     if(!ready()||!started)return;
@@ -185,7 +189,7 @@
     worldTransform();W.drawGround(c,camera.x,camera.y,width/scale*.52,height/scale/W.squash*.62);
     for(const m of trail){if(Math.abs(m.x-camera.x)>width/scale*.55||Math.abs(m.y-camera.y)>height/scale)continue;c.save();c.translate(m.x,m.y);c.rotate(m.a);W.oval(c,0,0,.14,.063,'rgba(89,100,101,'+clamp(.43-(elapsed-m.t)/140,0,.43)+')');c.restore();}
     const visible=W.points.filter(o=>sx(o.x)>-o.w*scale&&sx(o.x)<width+o.w*scale&&sy(o.y)>-25&&sy(o.y)<height+o.w*scale*2.2);
-    const npcY=100+Math.sin(elapsed*.15)*.4;
+    const npcY=100;
     visible.push({type:'player',x:p.x,y:p.y},{type:'npc',x:149,y:npcY});
     visible.sort((a,b)=>a.y-b.y);
     for(const o of visible){
@@ -241,14 +245,14 @@
     mapDraw(document.getElementById('minimap'),false);if(hud.mapOpen())mapDraw(document.getElementById('map'),true);updateSound();
   }
   window.game={move(x,y){axes.x=x;axes.y=y;if(x||y)setActive();},aim(x,y){if(ready()){aimHeading=Math.hypot(x,y)>.05?Math.atan2(y,x):null;if(aimHeading!==null){setActive();}}},
-    sprint(on){touchRun=on;},jump,interact,cycleGear,consume,toggleSound,reset,pause(on){paused=on;clearInputs();if(on)audio?.mute();else if(sound)audio?.enable();nextHud=0;}};
+    sprint(on){touchRun=on;},jump,interact,cycleGear,changeJacket,consume,toggleSound,reset,pause(on){paused=on;clearInputs();if(on)audio?.mute();else if(sound)audio?.enable();nextHud=0;}};
   screen.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&e.buttons===1&&ready())game.aim(e.clientX-sx(p.x),(e.clientY-sy(p.y))/W.squash);});
   window.addEventListener('pointerup',e=>{if(e.pointerType==='mouse')aimHeading=null;});
   const motion=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'];
   window.addEventListener('keydown',e=>{if(['Space','ArrowDown','ArrowUp','ArrowRight','ArrowLeft'].includes(e.code))e.preventDefault();
     if(e.code==='KeyM'&&!e.repeat){hud.toggleMap();nextHud=0;return;}if(!ready())return;
     if(motion.includes(e.code)){keys.add(e.code);setActive();return;}if(e.repeat)return;
-    if(e.code==='Space')jump();if(e.code==='KeyE')interact();if(e.code==='KeyQ')cycleGear();if(e.code==='Digit1')consume('food');if(e.code==='Digit2')consume('water');});
+    if(e.code==='Space')jump();if(e.code==='KeyE')interact();if(e.code==='KeyQ')cycleGear();if(e.code==='KeyJ')changeJacket();if(e.code==='Digit1')consume('food');if(e.code==='Digit2')consume('water');});
   window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',clearInputs);
   document.addEventListener('visibilitychange',()=>{clearInputs();if(document.hidden)audio?.mute();else if(sound&&!paused)audio?.enable();});
   let previous=performance.now();reset();
