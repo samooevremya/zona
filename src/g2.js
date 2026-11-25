@@ -520,14 +520,19 @@ function collide(e) {
   const x0 = Math.floor((e.x - e.r) / T), x1 = Math.floor((e.x + e.r) / T), y0 = Math.floor((e.y - e.r) / T), y1 = Math.floor((e.y + e.r) / T);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!inb(x, y) || SOLID[map[y * MW + x]]) pushOut(e, x * T, y * T, T, T);
   const hop = e.jumpT > 0;   // в прыжке низкие препятствия не держат
-  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && canVaultObject(o)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
+  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(BEREZKI && e===P && S.flags.stationDeck && o.underDeck) && !(hop && canVaultObject(o)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
   for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
     const nearby=propCells.get(y*MW+x);
     if(nearby) for(const p of nearby) if(!hop || !p.vaultable) touchesProp(p,e,true);
   }
   e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r);
 }
-function moveE(e, dx, dy) { e.x += dx; e.y += dy; collide(e); collide(e); }
+function moveE(e, dx, dy) {
+  const oldY=e.y;
+  e.x+=dx;e.y+=dy;
+  if(BEREZKI && e===P)moveOnStationBridge(e,oldY);
+  collide(e);collide(e);
+}
 const swampAt = (x, y) => tAt(Math.floor(x / T), Math.floor(y / T)) === SW;
 function anomNear(x, y, pad) { for (const a of anoms) if (dst(x, y, a.x, a.y) < a.r + pad) return a; return null; }
 function steer(e, tx, ty, speed, dt) {

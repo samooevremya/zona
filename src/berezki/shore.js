@@ -77,8 +77,9 @@ function shoreGround(g){
   ig.globalCompositeOperation='destination-in';ig.drawImage(mask,left,top);
   g.drawImage(ice,left,top);
   // Stay on the bank until the last few metres. The two soles alternate on bends.
-  const approach=[[33,33],[39.8,30.8],[42.1,23],[45.4,20],[48,18.8]];
-  for(const trail of [approach,fishingTrack.slice(2)]){
+  const approach=[[33,62],[40.7,59.7],[41,46],[40,35],[35.8,32.9],[29,32.7]];
+  const lakeside=[[39,17.5],[40.8,16.8],[43.4,18.9],[48,18.8]];
+  for(const trail of [approach,lakeside,fishingTrack.slice(2)]){
     let step=0;
     for(let i=1;i<trail.length;i++){
       const [x,y]=trail[i-1],[tx,ty]=trail[i],dx=(tx-x)*T,dy=(ty-y)*T;

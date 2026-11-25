@@ -26,9 +26,9 @@ async () => {
     if (z.near?.k !== 'winterStairs' || z.near.s.up !== up) throw Error('Wrong stair landing');
     z.interact();
   }
-  walk(29, 27);
-  walk(23, 25.3);
-  for (const [x, y] of [[17,19], [70,12], [110,12], [70,49]]) {
+  walk(29, 56);
+  walk(23, 54.3);
+  for (const [x, y] of [[17,48], [70,12], [110,12], [70,49]]) {
     walk(x + 18.7, y + 5.35);
     stairs(true);
     if (x === 17) walk(78.2, 15.4);
@@ -37,6 +37,6 @@ async () => {
     walk(x + 16.9, y + 5.7);
     stairs(false);
   }
-  walk(29, 32);
-  return {outside: z.P.y > 30 * 32, residents: z.ents.filter(e => e !== z.P).length};
+  walk(29, 61);
+  return {outside: z.P.y > 59 * 32, residents: z.ents.filter(e => e !== z.P).length};
 }
