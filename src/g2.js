@@ -1266,6 +1266,7 @@ function helpCompanion(e,dt){
   return true;
 }
 function idleHuman(e, dt) {
+  if(BEREZKI && e.sid==='fisher'){fishRoutine(e,dt);return;}
   if(chapter()==='aid' && S.campaign.villageMedic && e.sid===S.campaign.villageMedic){
     const wolf=byS('wolf');
     if(wolf?.wounded){

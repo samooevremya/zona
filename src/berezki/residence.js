@@ -158,7 +158,7 @@ function drawResidence(h,i){
   if(cam.x>x+w)drawResidenceFace(h,1);
   if(cam.y+residenceTilt>y+d)drawResidenceFace(h,2);
   if(cam.x<x)drawResidenceFace(h,3);
-  if(cam.y+residenceTilt>y+d){
+  if(h.storeys>1 && cam.y+residenceTilt>y+d){
     const door=h.entrances[0],width=door.width+14,capLift=k*.15;
     const [left,back]=residencePoint(x+door.x-width/2,y+d,capLift);
     const cw=width*(1+capLift),cd=15*(1+capLift);
