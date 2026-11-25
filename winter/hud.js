@@ -20,7 +20,7 @@
     return {key, row, fill:row.querySelector('.fill'), value:row.querySelector('b'), last:null};
   });
   const ui = Object.fromEntries([
-    'condition','air-temp','clock','weather','gear','gear-pic','place','route','context','interact','sound','sound-pic',
+    'jacket-name','condition','air-temp','clock','weather','gear','gear-pic','place','route','context','interact','sound','sound-pic',
     'eat','drink','ration-count','water-count','toast','hud','reset','map-toggle','map-close','equip','sprint'
   ].map(id => [id, byId(id)]));
   let toastTimer = 0;
@@ -79,6 +79,7 @@
     }
     write(ui.condition,state.condition);
     ui.condition.hidden = !state.condition;
+    write(ui['jacket-name'],state.jacket==='insulated'?'Утеплённая':'Стартовая');
     if ('gear' in state) {
       const gear = String(state.gear || 'Свободно');
       const icon = /нож|knife/i.test(gear) ? 'knife' : /винтов|ружь|карабин|автомат|rifle|дробовик/i.test(gear) ? 'rifle' : 'empty';
@@ -180,7 +181,7 @@
   window.addEventListener('blur', releaseInputs);
   document.addEventListener('visibilitychange', () => { if (document.hidden) releaseInputs(); });
   for (const [id,method,...args] of [
-    ['jump','jump'],['interact','interact'],['context','interact'],['equip','cycleGear'],
+    ['jump','jump'],['interact','interact'],['context','interact'],['equip','cycleGear'],['jacket','changeJacket'],
     ['eat','consume','food'],['drink','consume','water'],['sound','toggleSound'],['reset','reset']
   ]) byId(id).addEventListener('click', () => action(method, ...args));
   ui['map-toggle'].addEventListener('click', () => toggleMap(true));
