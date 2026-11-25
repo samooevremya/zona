@@ -875,6 +875,39 @@ function drawDeskTrader(e) {
   ctx.restore();
 }
 const reducedCameraMotion = matchMedia('(prefers-reduced-motion: reduce)');
+function drawCordonCanopies(vx,vy,vw,vh,shopVisible,loft){
+  // кроны
+  const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
+  const tx0 = Math.max(0, Math.floor(vx / T) - margin), tx1 = Math.min(MW - 1, Math.ceil((vx + vw) / T) + margin);
+  const ty0 = Math.max(0, Math.floor(vy / T) - margin), ty1 = Math.min(MH - 1, Math.ceil((vy + vh) / T) + margin);
+  for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
+    const tile=map[y*MW+x];
+    const backdrop=BIG && x<PW && tile===VO && !shopVisible && !loft && hash2(x+17,y)>.73;
+    if (tile!==TR && !backdrop) continue;
+    // в глубине леса каждая вторая крона всё равно закрыта соседями: не рисуем её (меньше перерисовки на телефоне)
+    if (CAN_SZ > 72 && (x + y) & 1 && map[y * MW + x - 1] === TR && map[y * MW + x + 1] === TR && map[(y - 1) * MW + x] === TR && map[(y + 1) * MW + x] === TR) continue;
+    const h = hash2(x, y), cx = x * T + 16 + (h - 0.5) * 8, cy = y * T + 12 + (hash2(y, x) - 0.5) * 8;
+    const sw = Math.sin(S.min * 0.8 + x * 0.7 + y) * 1.2;
+    if (C1 && ART) {
+      const nb = (map[y * MW + x - 1] === TR) + (map[y * MW + x + 1] === TR) + (map[(y - 1) * MW + x] === TR) + (map[(y + 1) * MW + x] === TR);
+      // На сухой кромке у дороги даже тесная пара деревьев даёт
+      // силуэты берёз и сухостоя. Используем уже существующие клетки деревьев.
+      const verge = BIG && ARTM.autumn && ARTM.autumn.verge[y * MW + x] <= 3;
+      const edge = nb <= 1 || (verge && nb === 2 && ARTM.autumn.water[y * MW + x] > 2);
+      const ci = edge ? forestCrowns.length + Math.floor(h * edgeCrowns.length) : Math.floor(h * forestCrowns.length);
+      const scale = .65 + hash2(x + 73, y + 13) * .52;
+      const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
+      const width = height * (.77 + .30 * hash2(y + 31, x));
+      const crown = yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[ci];
+      if (perspective) drawLayeredCrown(crown, cx + sw, cy, width, height,
+        crown === yardTreeCrown ? 'yard' : edge ? edgeCrowns[ci-forestCrowns.length] : forestCrowns[ci]);
+      else drawAutumnCrown(crown, cx + sw, cy, width, height);
+    } else {
+      const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
+      drawAutumnCrown(CANOPY[Math.floor(h*8)],cx+sw,cy,2*sp,2*sp);
+    }
+  }
+}
 function render() {
   let sx = (Math.random() - 0.5) * shakeA, sy = (Math.random() - 0.5) * shakeA;
   const dizzy=clamp(((S?.flags.dizzyUntil||0)-(S?.min||0))/10,0,1);
@@ -1021,6 +1054,11 @@ function render() {
   }
   for (const p of parts) { if (!inView(p.x, p.y, 20)) continue; const k = p.ml ? p.life / p.ml : 0; ctx.globalAlpha = p.ml ? clamp(Math.min(k * 1.4, (1 - k) * 6), 0, 1) * 0.26 : clamp(p.life * (p.smoke ? 0.5 : 3), 0, 1); ctx.fillStyle = p.c; if (p.fragment) {drawFragment(p);} else if (p.hearth) { drawHearthSmoke(p, 1-k); } else if (p.smoke) { ctx.beginPath(); ctx.arc(p.x, p.y, p.ml ? p.s * (1 + (1 - k) * 2.2) : p.s * (2 - p.life * 0.3), 0, 6.28); ctx.fill(); } else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
   ctx.globalAlpha = 1;
+  // Open the leaves over the person within speaking or helping distance.
+  const near=G.near;
+  canopyCompanion=near?.e?.alive && ['talk','heal','free'].includes(near.k) && dE(near.e,P)<=60 &&
+    los(P.x,P.y,near.e.x,near.e.y) ? near.e : null;
+  if (BEREZKI) drawWinterTrees(inView);
   // крыши: скрывают дом, пока ты не внутри
   HOUSES.forEach((h, i) => {
     const hide = P && roofHidden(h);
@@ -1059,42 +1097,7 @@ function render() {
   ctx.restore();
   if (perspective && ART && !shopVisible && !loft) drawCheckpointSpan(inView);
   drawCloudShadows();
-  // Open the leaves over the person within speaking or helping distance.
-  const near=G.near;
-  canopyCompanion=near?.e?.alive && ['talk','heal','free'].includes(near.k) && dE(near.e,P)<=60 &&
-    los(P.x,P.y,near.e.x,near.e.y) ? near.e : null;
-  // кроны
-  const margin = Math.ceil(CAN_SZ * CAN_PAD * Math.max(1, LONE_K) * .63 / T) + 1;
-  const tx0 = Math.max(0, Math.floor(vx / T) - margin), tx1 = Math.min(MW - 1, Math.ceil((vx + vw) / T) + margin);
-  const ty0 = Math.max(0, Math.floor(vy / T) - margin), ty1 = Math.min(MH - 1, Math.ceil((vy + vh) / T) + margin);
-  for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
-    const tile=map[y*MW+x];
-    const backdrop=!BEREZKI && BIG && x<PW && tile===VO && !shopVisible && !loft && hash2(x+17,y)>.73;
-    if (tile!==TR && !backdrop) continue;
-    if (BEREZKI) {winterTree(x,y);continue;}
-    // в глубине леса каждая вторая крона всё равно закрыта соседями: не рисуем её (меньше перерисовки на телефоне)
-    if (CAN_SZ > 72 && (x + y) & 1 && map[y * MW + x - 1] === TR && map[y * MW + x + 1] === TR && map[(y - 1) * MW + x] === TR && map[(y + 1) * MW + x] === TR) continue;
-    const h = hash2(x, y), cx = x * T + 16 + (h - 0.5) * 8, cy = y * T + 12 + (hash2(y, x) - 0.5) * 8;
-    const sw = Math.sin(S.min * 0.8 + x * 0.7 + y) * 1.2;
-    if (C1 && ART) {
-      const nb = (map[y * MW + x - 1] === TR) + (map[y * MW + x + 1] === TR) + (map[(y - 1) * MW + x] === TR) + (map[(y + 1) * MW + x] === TR);
-      // На сухой кромке у дороги даже тесная пара деревьев даёт
-      // силуэты берёз и сухостоя. Используем уже существующие клетки деревьев.
-      const verge = BIG && ARTM.autumn && ARTM.autumn.verge[y * MW + x] <= 3;
-      const edge = nb <= 1 || (verge && nb === 2 && ARTM.autumn.water[y * MW + x] > 2);
-      const ci = edge ? forestCrowns.length + Math.floor(h * edgeCrowns.length) : Math.floor(h * forestCrowns.length);
-      const scale = .65 + hash2(x + 73, y + 13) * .52;
-      const height = CAN_SZ * CAN_PAD * scale * (edge ? LONE_K : 1);
-      const width = height * (.77 + .30 * hash2(y + 31, x));
-      const crown = yardTreeCells.has(y * MW + x) ? yardTreeCrown : CANOPY[ci];
-      if (perspective) drawLayeredCrown(crown, cx + sw, cy, width, height,
-        crown === yardTreeCrown ? 'yard' : edge ? edgeCrowns[ci-forestCrowns.length] : forestCrowns[ci]);
-      else drawAutumnCrown(crown, cx + sw, cy, width, height);
-    } else {
-      const sp = (.85 + h * .4) * CAN_SZ / 2 * CAN_PAD;
-      drawAutumnCrown(CANOPY[Math.floor(h*8)],cx+sw,cy,2*sp,2*sp);
-    }
-  }
+  if (!BEREZKI) drawCordonCanopies(vx,vy,vw,vh,shopVisible,loft);
   ctx.globalAlpha = 1;
   if((!BEREZKI || !winterFloor(P.x,P.y)) && !inBunker(P.x,P.y) && !loftAt(P))for (const c of crows) {
     drawFlyingCrow(c);
