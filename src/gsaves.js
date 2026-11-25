@@ -11,8 +11,8 @@ function slotPicker(nav,writing,back){
   }
   for(const slot of writing?MANUAL_SLOTS:[0,...MANUAL_SLOTS]){
     const d=loadSave(slot),label=slot?'Слот '+slot:'Автосохранение';
-    const chapterName=d?.campaign?CHAPTERS[Math.min(8,STORY[d.campaign.stage]?.[0]??0)]:'Кордон';
-    const place=d && (inBunker(d.x,d.y)?'Бункер':locAt(d.x/T,d.y/T)?.name);
+    const chapterName=BEREZKI?'Берёзки':d?.campaign?CHAPTERS[Math.min(8,STORY[d.campaign.stage]?.[0]??0)]:'Кордон';
+    const place=d && !BEREZKI && (inBunker(d.x,d.y)?'Бункер':locAt(d.x/T,d.y/T)?.name);
     const text=d?label+' · '+clockStr(d.min)+(place?' · '+place:'')+' · '+chapterName+' · '+DIFFICULTIES[difficultyKey(d.difficulty)].name:label+' · пусто';
     nav.appendChild(btn('',text,()=>{
       if(!writing){if(panel)closePanel();applyState(d);if(title.open)hideTitle();return;}

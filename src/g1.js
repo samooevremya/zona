@@ -1,9 +1,11 @@
 /* ===================== основа ===================== */
+const BEREZKI = typeof window !== 'undefined' && window.ZONA_SCENE === "berezki";
 const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 /* BIG: большой Кордон 240×220 (+12 клеток под бункер). Старая карта генерируется в свои массивы 132×110, затем gbig.js переносит её по частям. */
 const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, NORTH_ROWS = BIG ? 132 : 0,
   LESSER_TOP = NORTH_ROWS + 68, WORLD_ROWS = NORTH_ROWS + CORDON_ROWS;
 let MW = BIG ? WEST + 252 : 132, MH = WORLD_ROWS, PW = BIG ? WEST + 240 : 120, WW = MW * T, WH = MH * T;
+if (BEREZKI) { MW = PW = 160; MH = 82; WW = MW*T; WH = MH*T; }
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
 const chance = p => Math.random() < p;
@@ -201,7 +203,7 @@ const CAMP_TILE = BIG ? [28.5, 81.5] : [30.5, 84.5];
 const FIRE = { x: CAMP_TILE[0] * T, y: CAMP_TILE[1] * T };
 const FIRE2 = { x: 46.5 * T, y: 21.5 * T };
 const BUNK = { x0: 121 * T, y0: 1 * T, x1: 132 * T, y1: 13 * T };
-const inBunker = (x, y) => x > BUNK.x0 && (!BIG || y < 16*T);
+const inBunker = (x, y) => !BEREZKI && x > BUNK.x0 && (!BIG || y < 16*T);
 const POI = {
   field: { x: 80 * T, y: 61 * T }, cross: { x: 64.5 * T, y: 60 * T }, atp: { x: 79 * T, y: 71 * T },
   bridge: { x: 57 * T, y: 36 * T }, swamp: { x: 26 * T, y: 50 * T }, trafo: { x: 34 * T, y: 37 * T }, cars: { x: 58 * T, y: 89 * T }

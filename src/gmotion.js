@@ -8,12 +8,14 @@ function motionSkin(e) {
   const skin=rigSkin(e);
   if(!skin)return null;
   const color=skin==='loner' && e!==P ? JACKET_COLORS[jacketIndex(e)] : '';
-  const key=skin+color;
+  const winterTone=BEREZKI?(e===P?'slate':e.sid==='cook'?'ochre':'ash'):null;
+  const key=skin+(winterTone||color);
   if(!motionSkins.has(key)){
     motionSkins.set(key,null);
     const files=CORDON_RIG.manifest.skins[skin];
     Promise.all(Object.entries(files).map(async ([name,file])=>{
       const img=new Image();img.src=CORDON_RIG.images[file];await img.decode();
+      if(winterTone)return [name,winterCloth(img,name,winterTone)];
       if(!color)return [name,img];
       const c=frameCanvas(img),g=c.getContext('2d');
       g.filter={white:'saturate(.58) brightness(1.32)',beige:'saturate(.81) brightness(1.07)',brown:'sepia(.25) brightness(.83)'}[color];

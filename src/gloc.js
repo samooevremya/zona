@@ -4,7 +4,7 @@
    код заданий и сохранения ссылаются на id и имена якорей, а не на числа.
    bounds: [x0, y0, x1, y1]; entrances: точки входа; anchors: именованные точки или списки точек. */
 const MAP_ID = (typeof window !== 'undefined' && window.ZONA_MAP) || 'k07';
-const MAP_VERSION = (typeof window !== 'undefined' && window.ZONA_BIG === 1) ? 'kordon-north' : MAP_ID === 'rc1' ? 'kordon-rc1' : 'kordon-0.7';
+const MAP_VERSION = BEREZKI ? 'berezki-native-1' : (typeof window !== 'undefined' && window.ZONA_BIG === 1) ? 'kordon-north' : MAP_ID === 'rc1' ? 'kordon-rc1' : 'kordon-0.7';
 const LOCATIONS = [
   { id: 'village', name: 'Деревня новичков', gen: 'деревни новичков', type: 'safe', bounds: [18, 74, 42, 92], entrances: [[33, 74], [42, 84], [24, 92]],
     anchors: { fire: CAMP_TILE.slice(), shust: [34.5, 80.5], tolik: [35, 81], seats: [[28.2, 83.3], [31.8, 82.7], [32.6, 85.6], [28.6, 86.4]], wolf: [20.5, 79], safe: [30, 88] } },

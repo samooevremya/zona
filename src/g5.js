@@ -138,7 +138,7 @@ function person(c) {
 }
 const cardOf = e => ({ ent: e, n: e.name, grp: FAC_N[e.fac], fac: e.fac, att: attWord(e) });
 const SIDCARD = () => ({ ent: byS('sid') || { sid: 'sid', name: 'Сидорович', fac: 'trader' }, n: 'Сидорович', grp: 'Торговцы', fac: 'trader', att: 'нейтрал' });
-const meCard = () => ({ isPlayer: 1, n: 'Меченый', grp: 'Одиночки', fac: 'loner', att: S.rep >= 20 ? 'свой среди одиночек' : S.rep <= -30 ? 'враг одиночек' : 'нейтрал', money: S.money });
+const meCard = () => ({ isPlayer: 1, n: BEREZKI ? 'Путник' : 'Меченый', grp: FAC_N.player, fac: 'loner', att: S.rep >= 20 ? 'свой среди одиночек' : S.rep <= -30 ? 'враг одиночек' : 'нейтрал', money: S.money });
 
 /* ===================== панели ===================== */
 let panel = null;
@@ -387,6 +387,7 @@ function drawPda() {
     S.news.slice().reverse().forEach(n => { const r = el('div', 'row'), g = el('div', 'grow'); g.appendChild(el('div', 'tm', clockStr(n.t))); g.appendChild(el('div', 'ds lite', n.x)); r.appendChild(g); pbody.appendChild(r); });
   } else {
     pbody.appendChild(person(meCard()));
+    if(BEREZKI){pbody.append(el('p','note','На улице одежда остывает. У печи и костра тепло возвращается быстрее.'));return;}
     pbody.appendChild(el('h3','','Полевые заметки'));
     pbody.appendChild(el('p','note','Электра гаснет ненадолго от болта. Первые искры предупреждают о возврате заряда.' + (MAP_ID==='rc1'?' Так можно пройти Восточную канаву справа от военного моста.':'')));
     pbody.appendChild(el('p','note','Воронку выдаёт пыль: кружащийся мусор тянет к центру, осевший оставляет время пройти. Болт показывает границу.' + (BIG?' У разбитой колонны путеец спрятал вещи прямо под воронкой.':'')));
@@ -423,13 +424,13 @@ function drawMenu() {
       ? 'Левый джойстик — ходьба. Слегка отклони правый стик для прицеливания. Для огня доведи стик до края или коснись врага в режиме стрельбы касанием. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
     if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
-    nav.appendChild(el('p','pause-note','Игра сохраняется автоматически у костра и у Сидоровича. Вручную можно сохраниться, когда рядом нет врагов.'));
+    nav.appendChild(el('p','pause-note',(BEREZKI?'Автосохранение у костра.':'Игра сохраняется автоматически у костра и у Сидоровича.')+' Вручную можно сохраниться, когда рядом нет врагов.'));
     nav.appendChild(btn('start-primary','Назад',()=>{delete panel.pausePage;drawMenu();card.querySelector('.pause-help').focus();}));
     return;
   }
   if (panel.pausePage==='restart') {
     heading.textContent='Начать заново?';
-    nav.appendChild(el('p','pause-note','Текущая игра начнётся с начала Кордона.'));
+    nav.appendChild(el('p','pause-note',BEREZKI?'Вы снова окажетесь во дворе Берёзок.':'Текущая игра начнётся с начала Кордона.'));
     nav.appendChild(btn('start-primary','Отмена',()=>{delete panel.pausePage;drawMenu();card.querySelector('.restart').focus();}));
     newGameControls(nav,'Начать новую игру','',S.difficulty);
     return;
@@ -896,6 +897,7 @@ function hud(dt) {
 /* ===================== ввод ===================== */
 function interact() {
   const n = G.near; if (!n || !P.alive) return;
+  if(BEREZKI && winterUse(n))return;
   if(n.k==='floor' && fadeT<=0){
     const p=n.upstairs?n.room.stair:n.room.landing;
     fadeT=.5;fadeTo={x:p.x,y:p.y,a:P.ang};
@@ -1174,9 +1176,9 @@ function showTitle(kind) {
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
   const c = $('tcard'); c.textContent = ''; c.classList.toggle('death', kind === 'death'); title.el.classList.toggle('start', kind !== 'death');
   if (kind === 'death') {
-    const h = el('h1', '', 'Зона забрала'); h.appendChild(el('span', '', 'ещё одного')); c.appendChild(h);
+    const h = el('h1', '', BEREZKI?'Путь окончен':'Зона забрала'); h.appendChild(el('span', '', BEREZKI?'Берёзки':'ещё одного')); c.appendChild(h);
     c.appendChild(el('div', 'tape'));
-    c.appendChild(el('p', '', 'Последнее сохранение делается само у костра в деревне и у Сидоровича.'));
+    c.appendChild(el('p', '', BEREZKI?'Можно вернуться к последнему сохранению.':'Последнее сохранение делается само у костра в деревне и у Сидоровича.'));
     const b = el('div', 'tbtns');
     b.appendChild(btn('go','Загрузить сохранение',()=>slotPicker(b,false,()=>showTitle('death'))));
     newGameControls(b,'Начать заново','alt',S.difficulty);
@@ -1218,7 +1220,7 @@ function autoQuality(ms) {
     if (touchDensity <= .85) AQ.done = true;
     return;
   }
-  if (med > 22 && CAN_SZ > 72) { CAN_SZ = Math.max(72, CAN_SZ - 12); CANOPY.length = 0; buildCanopy(); AQ.lowered = (AQ.lowered || 0) + 1; }
+  if (!BEREZKI && med > 22 && CAN_SZ > 72) { CAN_SZ = Math.max(72, CAN_SZ - 12); CANOPY.length = 0; buildCanopy(); AQ.lowered = (AQ.lowered || 0) + 1; }
   else AQ.done = true;
 }
 function frame(now) {

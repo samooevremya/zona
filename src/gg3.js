@@ -101,6 +101,7 @@ function g3Body(o) {
 /* ---------- портреты: один источник для диалога, торговли (обе стороны), рюкзака и КПК ---------- */
 function portraitFor(card) {
   const ent = card && card.ent, isP = !!(card && (card.isPlayer || ent === P));
+  if(BEREZKI && (ent || isP))return winterPortrait(isP?P:ent);
   if (G3.on && window.CordonPortraits && G3.pack) {
     const e = isP ? P : ent || (card && card.n === 'Сидорович' ? { sid: 'sid', name: 'Сидорович', fac: 'trader' } : { name: card && card.n, fac: card && card.fac });
     const im = CordonPortraits.portraitElement(e, isP, G3.pack);

@@ -1,7 +1,7 @@
 # Правила для всех, кто правит игру (люди и нейросети)
 
 0. **Перед визуальной правкой** прочитай [VISUAL_GUIDE.md](VISUAL_GUIDE.md) и сверься с референсом `src/qa/reference/reference.png`.
-1. **Исходники лежат в `src/`.** Сборка: `cd src && python3 build.py big`, потом `cp src/index_big.html index.html`. Сайт берёт корневой `index.html`.
+1. **Исходники лежат в `src/`.** Публичная сборка «Берёзок»: `cd src && python3 build.py berezki && cp ../berezki.html ../index.html`. GitHub Pages открывает корневой `index.html`. Команда `python3 build.py big` собирает Кордон для регрессионных тестов в `src/index_big.html`.
 2. **Каждая правка идёт отдельной веткой и PR в `main`.** В описании PR пишите, что изменилось для игрока.
 3. **Перед слиянием дописывайте запись в начало [CHANGELOG.md](CHANGELOG.md).** В записи должно быть:
    - дата и номер PR;

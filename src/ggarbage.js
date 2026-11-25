@@ -1,6 +1,6 @@
 // The northern extension is part of the same world grid as both southern regions.
 function inGarbage(x,y) {
-  return BIG && x>=0 && x<PW && y>=0 && y<NORTH_ROWS;
+  return !BEREZKI && BIG && x>=0 && x<PW && y>=0 && y<NORTH_ROWS;
 }
 const dumpFire = {x:389*T,y:31.6*T};
 const dumpHills = [

@@ -41,7 +41,7 @@ function drawDialog2() {
   L.setAttribute('role','log');L.setAttribute('aria-label','История разговора');L.tabIndex=0;
   for(const line of panel.lines){
     const entry=el('p',line.s);
-    if(line.s!=='sys')entry.append(el('strong','',line.name || (line.s==='me'?'Меченый':panel.card.n)));
+    if(line.s!=='sys')entry.append(el('strong','',line.name || (line.s==='me'?meCard().n:panel.card.n)));
     entry.append(document.createTextNode(line.t));L.append(entry);
   }
   main.appendChild(L);
@@ -68,12 +68,13 @@ const PDA_TABS2 = [['map', 'Карта и задания'], ['log', 'Журна�
 // The viewport stores its centre in map tiles. Resizing the panel or opening a
 // quest card therefore keeps the same place under the player's finger.
 function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
+  const {w:mapW,h:mapH}=state.mapBounds||{w:PW,h:MH};
   const view=state.mapView, touches=new Map();
   let fit,k,width,height,left,top,paintFrame=0,press=null;
   function layout(){
     const W=w.clientWidth,H=w.clientHeight;
-    fit=Math.min(W/PW,H/MH); k=fit*view.zoom;
-    width=PW*k;height=MH*k;
+    fit=Math.min(W/mapW,H/mapH); k=fit*view.zoom;
+    width=mapW*k;height=mapH*k;
     const place=(size,screen,center)=>size<=screen?(screen-size)/2:clamp(screen/2-center*k,screen-size,0);
     left=place(width,W,view.x);top=place(height,H,view.y);
     view.x=(W/2-left)/k;view.y=(H/2-top)/k;
@@ -85,7 +86,7 @@ function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
     layout();
     const px=Math.min(devicePixelRatio||1,2,3000/Math.max(width,height));
     cv.width=Math.round(width*px);cv.height=Math.round(height*px);
-    const out={};drawMapTo(cv.getContext('2d'),cv.width/PW,state.f.loc,{...state.f,sel:targets,u:px,out});
+    const out={},g=cv.getContext('2d'),scale=cv.width/mapW;g.translate(-(state.mapBounds?.x||0)*scale,-(state.mapBounds?.y||0)*scale);drawMapTo(g,scale,state.f.loc,{...state.f,sel:targets,u:px,out});
     state.mapLabels=out.labels;
   }
   function schedule(){if(!paintFrame)paintFrame=requestAnimationFrame(paint);}
@@ -131,6 +132,7 @@ function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
 
 function drawPda2() {
   if (panel.tab !== 'map') { drawPda(); return; }
+  if(BEREZKI)return winterPda();
   if (!panel.f) panel.f = { ppl: 1, cache: 1, loc: 1 };
   const all = qList(), act = all.filter(q => q.st === 'a'), done = all.filter(q => q.st !== 'a');
   if (!panel.qsel || !all.some(q => q.id === panel.qsel)) panel.qsel = S.trackedQuestId || (act[0] && act[0].id) || null;

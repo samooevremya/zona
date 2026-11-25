@@ -1,6 +1,7 @@
 import sys
 MAPFLAG = sys.argv[1] if len(sys.argv) > 1 else 'k07'
-BIGF = MAPFLAG == 'big'
+WINTER = MAPFLAG == 'berezki'
+BIGF = WINTER or MAPFLAG == 'big'
 if BIGF: MAPFLAG = 'rc1'
 h=open('head.html',encoding='utf8').read(); b=open('body.html',encoding='utf8').read(); sp=open('sprite.svg',encoding='utf8').read(); av=open('avatar.js',encoding='utf8').read()
 css=open('ui/ui-theme.css',encoding='utf8').read()+'\n'+open('ui/zona-fixes.css',encoding='utf8').read()+'\n'+open('ui/hud-ref.css',encoding='utf8').read()+'\n'+open('ui/windows.css',encoding='utf8').read(); icons=open('ui/ui-icons.svg',encoding='utf8').read(); bridge=open('ui/ui-bridge.js',encoding='utf8').read()
@@ -12,9 +13,10 @@ h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
-g5=g5[:pos]+bridge+'\n'+g5[pos:]
+scene = open('berezki/scene.js',encoding='utf8').read() if WINTER else ''
+g5=g5[:pos]+bridge+'\n'+scene+'\n'+('bootBerezki();' if WINTER else g5[pos:])
 js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gscript.js','gstory.js','gsaves.js','gprologue.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gmotion.js','gprops.js','gcontrols.js','gheight.js','glandmarks.js','groominteriors.js','genvironment.js','gatmosphere.js','gfieldaudio.js','gzonelife.js','ginhabited.js'])+"\n"+g5+"\n})();\n"
-open('game.js','w',encoding='utf8').write(js)
+if not WINTER: open('game.js','w',encoding='utf8').write(js)
 art=open('art/manifest.inline.js',encoding='utf8').read()+'\n'+open('art/c1/c1.inline.js',encoding='utf8').read()+'\n'+open('art/pack/village-renderer.js',encoding='utf8').read()
 import base64 as _b64, os as _os
 detector_images = {}
@@ -87,5 +89,11 @@ if BIGF:
     aerial = _b64.b64encode(open('art/cordon-aerial.webp', 'rb').read()).decode()
     art += '\nwindow.CORDON_AERIAL="data:image/webp;base64,' + aerial + '";'
 OUT = 'index_big.html' if BIGF else 'index.html' if MAPFLAG == 'rc1' else 'index_k07.html'
+if WINTER:
+    OUT='../berezki.html'
+    h='\n'.join(line for line in h.split('\n') if 'href="https://fonts.' not in line)
+    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','objects','roofs']})+';'
+    b=b.replace('ЗОНА<span class="start-region">КОРДОН','БЕРЁЗКИ<span class="start-region">ЗИМНИЙ КВАРТАЛ')
+    h=h.replace('<title>'+h.split('<title>')[1].split('</title>')[0]+'</title>','<title>Берёзки · Зимний квартал</title>')
 open(OUT,'w',encoding='utf8').write(h+sp+"\n"+icons+"\n"+b+"\n<script>window.ZONA_MAP="+repr(MAPFLAG)+";"+("window.ZONA_BIG=1;" if BIGF else "")+"\n"+art+"\n</script>\n<script>\n"+js+"</script>\n</body>\n</html>\n")
 print('built', OUT, MAPFLAG)

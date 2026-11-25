@@ -100,7 +100,7 @@ function healWith(id) {
 /* кнопка аптечки: есть и бинты, и аптечки — даёт выбрать; есть что-то одно — сразу лечит */
 function medButton() {
   const m = cnt('medkit'), b = cnt('bandage');
-  if (!m && !b) { msg('Нечем лечиться. Аптечки и бинты продаёт Сидорович.'); return; }
+  if (!m && !b) { msg(BEREZKI?'В рюкзаке нет перевязочных средств.':'Нечем лечиться. Аптечки и бинты продаёт Сидорович.'); return; }
   if (!m || !b) { healWith(m ? 'medkit' : 'bandage'); return; }
   const mp = document.getElementById('medpick'); if (!mp.hidden) { hideMedPick(); return; }
   mp.hidden = false; positionMedicinePicker();   // висит, пока не выберешь или не нажмёшь кнопку ещё раз
@@ -141,7 +141,7 @@ function startJump() {
 const JUMP_T = 0.42, JUMP_V = 250;
 /* тихое убийство: сзади, пока враг не заметил. Тяжёлая броня защищает от мгновенного поражения */
 function canTakeDown(e){
-  return S.weapon==='knife' && e.kind==='human' && (hostile(e,P) || e.fac==='army') && !e.captive && e.tgt!==P && (e.aw||0)<1 &&
+  return !e.protectedResident && S.weapon==='knife' && e.kind==='human' && (hostile(e,P) || e.fac==='army') && !e.captive && e.tgt!==P && (e.aw||0)<1 &&
     dE(e,P)<42 && Math.abs(angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x)))>1.9 && clearNPCShot(P,e);
 }
 function takedown(e) {
@@ -266,30 +266,32 @@ function resolveActorContacts(dt){
 /* ===================== главный шаг ===================== */
 function update(dt) {
   S.min += dt;
-  cleanExpiredCrates();
-  renewFieldCrates();
+  if (!BEREZKI) {
+    cleanExpiredCrates();
+    renewFieldCrates();
+  }
   noAmmoT -= dt; warnT -= dt;
   if (fadeT > 0) { fadeT -= dt; if (fadeT <= 0.25 && fadeTo) { P.x = fadeTo.x; P.y = fadeTo.y; P.ang = fadeTo.a; cam.x = P.x; cam.y = P.y; fadeTo = null; save(true); } }
-  if (BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x < PW*T && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
+  if (!BEREZKI && BIG && P.alive && !inBunker(P.x,P.y) && P.y < WORLD_ROWS*T && warnT <= 0 && P.x < PW*T && P.x > (PW-5)*T && Math.abs(P.y/T-BIG_EXITS.east.y)<5) { warnT=6; msg('Дальше Затон. Эта часть Зоны появится в следующей версии.', 'say'); }
   const oldX = P.x, oldY = P.y;
   if (P.alive) updatePlayer(dt);
   updateBodies(dt);
   if (!P.alive && deathT > 0) { deathT -= dt; if (deathT <= 0) onDeath(); }
-  if(BIG) {
+  if(BIG && !BEREZKI) {
     checkSpherePerimeter();
     if(P.alive && !S.flags.visitedDump && inGarbage(P.x/T,P.y/T)){
       S.flags.visitedDump=1;
       bulletin('Свалка. На западной дороге работает перегрузочное депо.');
     }
   }
-  worldFx(dt);
+  if (BEREZKI) winterWeather(dt); else worldFx(dt);
   const tolik=byS('tolik');
   if(tolik?.wounded && dE(P,tolik)<175 && S.min>=(tolik.nextGroan||0)){
     play('groan',tolik.x,tolik.y,.6*(1-dE(P,tolik)/190));tolik.nextGroan=S.min+9+Math.random()*3;
   }
   for (const e of ents) {
     if (!e.alive || e === P) continue;
-    if (e.qaHold || blowoutHumanAI(e, dt)) continue;
+    if (e.qaHold || (!BEREZKI && blowoutHumanAI(e, dt))) continue;
     if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt && !e.returning) continue;
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
     if (e.kind === 'dog') aiDog(e, dt); else if (e.kind === 'boar') aiBoar(e, dt); else if (e.kind === 'sucker') aiSucker(e, dt); else aiHuman(e, dt);
@@ -298,7 +300,7 @@ function update(dt) {
   updateBolts(dt);
   updateAnoms(dt);
   deliverLonerReports();
-  checkBridgeCrossing(oldX, oldY);
+  if (!BEREZKI) checkBridgeCrossing(oldX, oldY);
   g7Tick(dt);
   // гранаты
   for (let i = nades.length - 1; i >= 0; i--) {
@@ -338,7 +340,7 @@ function update(dt) {
   // тела исчезают через двое суток
 
   // таймеры мира
-  spawnT -= dt; if (spawnT <= 0) { spawnT = 20; spawnTick(); }
+  spawnT -= dt; if (spawnT <= 0) { spawnT = 20; if (!BEREZKI) spawnTick(); }
   fogT -= dt; if (fogT <= 0 && P.alive) { fogT = 0.4; reveal(); }
   saveT -= dt;
   if (saveT <= 0 && P.alive && (dE(P, campOf(P)) < 300 || inBunker(P.x, P.y)) && !ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 500)) { saveT = 60; save(true); }
@@ -346,7 +348,7 @@ function update(dt) {
     const inside=locAt(P.x/T,P.y/T)?.id==='atp';
     if(inside && ATP_BANDITS.some(id=>byS(id)?.tgt===P))beginAssault();
   }
-  if(BIG)updatePostShift();
+  if(BIG && !BEREZKI)updatePostShift();
   if (radioQueue.length && (radioQueue[0].life -= dt) <= 0) radioQueue.shift();
   for (const m of MSGS) m.life -= dt;
   MSGS = MSGS.filter(m => m.life > 0);
@@ -425,7 +427,7 @@ function updatePlayer(dt) {
   P.bloomDelay = Math.max(0,(P.bloomDelay || 0)-dt);
   if (!P.bloomDelay) P.bloom = Math.max(0,P.bloom-dt*.17);
   P.shotFlash = Math.max(0,(P.shotFlash || 0)-dt);
-  survival(dt); plusTick(dt);
+  survival(dt); if (!BEREZKI) plusTick(dt);
   if (P.reload > 0) { P.reload -= dt; if (P.reload <= 0) finishReload(); }
   // движение
   let mx = IN.moveX, my = IN.moveY;
@@ -436,7 +438,7 @@ function updatePlayer(dt) {
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
   if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (1-.12*(S.flags.coatWetness||0)) * dt);
-  if (BIG) {
+  if (BIG && !BEREZKI) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
     const exposure=S.flags.poppySleep || 0;
@@ -500,9 +502,9 @@ function findInteract() {
   if (sd && inBunker(P.x, P.y) && dE(sd, P) < 120) cand(dE(sd, P) - 30, { k: 'trader', label: 'Поговорить: Сидорович' });
   const dh = dst(P.x, P.y, HATCH.x, HATCH.y);
   const atEntrance = SID_SHOP ? Math.abs(P.x-HATCH.x)<25 && P.y>=HATCH.y-62 && P.y<HATCH.y+45 : dh<54;
-  if (atEntrance) cand(dh, { k: 'down', label: 'Спуститься в бункер' });
+  if (!BEREZKI && atEntrance) cand(dh, { k: 'down', label: 'Спуститься в бункер' });
   const ds = dst(P.x, P.y, STAIRS.x, STAIRS.y);
-  if (ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
+  if (!BEREZKI && ds < (SID_SHOP ? 32 : 56)) cand(ds, { k: 'up', label: 'Подняться наверх' });
   for (const o of objs) {
     if(o.k==='bed' || o.fitting==='bedroll'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(x,y,P.x,P.y);
@@ -526,7 +528,7 @@ function findInteract() {
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
         if(o.k==='roomFitting'){
-          if(inFurnishedRoom(o,true) || (loftAt(P) && loftAt(P)===loftAt(o)))
+          if(BEREZKI || inFurnishedRoom(o,true) || (loftAt(P) && loftAt(P)===loftAt(o)))
             cand(d,{k:'loot',o,label:'Обыскать шкаф'+(o.looted?' · пусто':'')});
         } else if (o.anomalyId) {
           const quiet=cacheFieldQuiet(o);
@@ -537,7 +539,7 @@ function findInteract() {
   }
   if (activeDetectorRange()) for (const a of arts) { const d = dE(P, a); if (d < 38) cand(d - 10, { k: 'art', a: a, label: 'Подобрать: ' + ITEMS[a.id].n }); }
   const cn = cacheNear(); if (cn) cand(dst(P.x, P.y, cn.x, cn.y), { k: 'loot', o: cn, label: 'Открыть тайник' });
-  plusInteract(cand);
+  if (BEREZKI) winterInteractChoices(cand); else plusInteract(cand);
   return best;
 }
 function carveMutant(o) {
@@ -586,11 +588,11 @@ function healWounded(e) {
 }
 
 /* ===================== сохранение ===================== */
-const KEY = /qa/.test(location.hash) ? 'zona2d-kordon-qa' : 'zona2d-kordon-v2';   // QA-прогоны не трогают сохранение игрока
+const KEY = BEREZKI ? 'berezki-native-v1' : /qa/.test(location.hash) ? 'zona2d-kordon-qa' : 'zona2d-kordon-v2';   // QA-прогоны не трогают сохранение игрока
 const SAVE_VERSION = 3;
 function save(quiet,slot=0) {
   if (!P || !P.alive) return false;
-  if(!slot && BIG && chapter()==='rescue' && !S.flags.atpClear &&
+  if(!slot && !BEREZKI && BIG && chapter()==='rescue' && !S.flags.atpClear &&
       ATP_BANDITS.some(id=>{const e=byS(id);return e && dE(e,P)<380;}))return false;
   S.x = P.x; S.y = P.y; S.hp = P.hp;
   let f = ''; for (let i = 0; i < fog.length; i += 6) { let v = 0; for (let b = 0; b < 6; b++) v |= (fog[i + b] ? 1 : 0) << b; f += String.fromCharCode(48 + v); }
@@ -603,6 +605,7 @@ function loadSave(slot=0) {
   try { const raw = localStorage.getItem(slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
 }
 function applyState(d) {
+  if (BEREZKI) return winterRestore(d);
   document.getElementById('field-notices')?.replaceChildren();
   draggedBody=null;bodyCheck=geigerAcc=radRate=0; S = d; S.difficulty=difficultyKey(d.difficulty); prepareCampaign(); lastShiftState=null;
   if (BIG && (S.mapVersion==='kordon-big' || S.mapVersion==='kordon-west')) migrateNorthernWorld(S);

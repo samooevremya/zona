@@ -547,7 +547,7 @@ function dynSnapshot() {
   S.dyn.v = DYN_VER;
   S.flags.fieldBodies=objs.filter(o=>o.k==='body'||o.k==='bones').map(o=>({...o}));
   delete S.flags.mutantBodies;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (BEREZKI || e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
     ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip, shelterOrigin:e.shelterOrigin, shelterSpot:e.shelterSpot } } : {}),
