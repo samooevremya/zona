@@ -219,10 +219,27 @@ function winterRoom(r){
   for(let j=0;j<r.h;j++)for(let i=0;i<r.w;i++)if(tAt(r.x+i,r.y+j)===CO){
     const x=ox+i*T,y=oy+j*T;artFill(g,'wall_concrete',x,y,T,T);
     g.fillStyle='rgba(36,33,29,.33)';g.fillRect(x,y,T,T);
-    if((j===0 || j===r.h-1) && i%3===2){
-      g.fillStyle='#505b5a';g.fillRect(x+2,y+10,28,9);beam(g,x+2,y+10,x+28,y+17,3,'#816d54');
-      beam(g,x,y+19,x+31,y+19,2.5,'#ae9d83');
+  }
+  for(let side=0;side<4;side++){
+    for(const win of residenceWindows(side,r.n)){
+      const length=win.width;
+      g.save();
+      const vertical=side%2;
+      const x=vertical?(side===1?w-15:15):win.u;
+      const y=vertical?win.u:(side===2?h-15:15);
+      g.translate(ox+x,oy+y);
+      if(vertical)g.rotate(Math.PI/2);
+      g.fillStyle='#49473e';g.fillRect(-length/2-2,-6,length+4,13);
+      g.fillStyle=win.warm?'#928267':'#647275';g.fillRect(-length/2,-4,length,8);
+      for(let i=0;i<win.boards;i++)beam(g,-length/2,-3+i*5,length/2,i*5,3,'#847058');
+      g.fillStyle='#a39b85';g.fillRect(-length/2-2,5,length+4,2);g.restore();
     }
+  }
+  if(r.n===1){
+    const entrance=HOUSES[0].entrances[0],cx=ox+entrance.x;
+    artFill(g,'floor_concrete',cx-37,oy+h-79,74,78);
+    g.fillStyle='#48453c';g.fillRect(cx-24,oy+h-51,48,30);
+    for(let v=0;v<29;v+=4)beam(g,cx-23,oy+h-50+v,cx+23,oy+h-50+v,1.2,'#7b7561');
   }
   // Quilts hang over the cold inner face, with visible stitching and uneven hems.
   for(const u of [2.8,8.8,15]){
@@ -284,9 +301,15 @@ function winterLandscape(){
   }
   g.fillStyle='rgba(225,233,238,.16)';g.fillRect(0,0,c.width,c.height);
   // Keep the granite sill legible under the projected front wall, even on a small screen.
-  const doorstep=tilePoint(28,30);
-  artFill(g,'floor_concrete',doorstep.x-4,doorstep.y,2*T+8,13);
-  for(const v of [3,8,12])beam(g,doorstep.x-4,doorstep.y+v,doorstep.x+2*T+4,doorstep.y+v,1.3,'#857f74');
+  const home=HOUSES[0],door=home.entrances[0];
+  const x=home.x*T+door.x,y=(home.y+home.h)*T;
+  artFill(g,'floor_concrete',x-door.width/2-4,y,door.width+8,17);
+  for(const v of [3,9,16])beam(g,x-door.width/2-4,y+v,x+door.width/2+4,y+v,1.3,'#857f74');
+  for(let track=0;track<3;track++)for(let step=0;step<15;step++){
+    const u=step/15,dx=(track-1)*u*u*46+Math.sin(step*.3)*3+(step%2?4:-4);
+    g.fillStyle='rgba(79,82,78,'+(.20-.10*u)+')';
+    g.beginPath();g.ellipse(x+dx,y+22+step*8,2.6,5,(track-1)*u*.7,0,Math.PI*2);g.fill();
+  }
   const abandoned=HOUSES[1];
   g.fillStyle='#625f57';g.fillRect(abandoned.x*T,abandoned.y*T,abandoned.w*T,abandoned.h*T);
 }
@@ -300,13 +323,20 @@ function winterGround(vx,vy,vw,vh){
     ctx.beginPath();ctx.ellipse(p.x,p.y,4.5,2,p.a,0,Math.PI*2);ctx.fill();
   }
 }
+function winterRoofOrder(){
+  const gap=h=>Math.hypot(Math.max(h.x*T-cam.x,cam.x-(h.x+h.w)*T,0),Math.max(h.y*T-cam.y,cam.y-(h.y+h.h)*T,0));
+  return district.exteriors.sort((a,b)=>gap(b)-gap(a));
+}
 function winterRoofs(){
-  const im=district.images.roofs;
+  district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
-    const w=h.w*T,hg=h.h*T,c=winterCanvas(w+10,hg+10),g=c.getContext('2d');
-    // Isolate the actual roof from the atlas' transparent margins.
-    g.drawImage(im,im.width*.015,im.height*.60,im.width*.965,im.height*.36,0,0,w+5,hg+5);
-    h.roofSurface=[w+4,hg+4];ROOFS.push(c);
+    const occupied=h===HOUSES[0];
+    h.rooftop=occupied?[[17.4*T,3.7*T,62,45,.047],[4.9*T,5.9*T,16,15,.029],[11.7*T,2.7*T,16,15,.029]]:
+      [[3*T,2*T,32,21,.02],[16*T,6*T,23,18,.02]];
+    if(occupied)h.residenceWalls=[0,1,2,3].map(side=>residenceWall(h,side));
+    h.roofIndex=ROOFS.length;
+    ROOFS.push(residenceRoof(h));
+    h.roofSurface=[h.w*T+4,h.h*T+4];
   }
 }
 function winterMap(g,s,_labels,options={}){
@@ -348,6 +378,9 @@ async function bootBerezki(){
   winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];
   drawRoomLights=(g,inView,tint)=>{
+    const house=HOUSES[0],entry=house.entrances[0];
+    const x=house.x*T+entry.x+entry.width/2+11,y=(house.y+house.h)*T;
+    if(inView(x,y,45))softLamp(g,x,y+5,39,30,tint?.25:.63,tint?'255,186,103':'0,0,0');
     for(const h of district.heaters)if(inView(h.x,h.y,120))
       softLamp(g,h.x,h.y,98,85,tint?.15:.83,tint?'255,188,116':'0,0,0');
   };

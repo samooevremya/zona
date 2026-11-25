@@ -142,10 +142,12 @@ function clipRoofsFromLight(g,x,y,w,h,inView){
     const width=house.w*T,height=house.h*T,left=house.x*T,top=house.y*T;
     if(house.a<.52 || !inView(left+width/2,top+height/2,Math.max(width,height)*.64+40))continue;
     const lift=perspective && ART?roofLift(house):0,[u,v]=roofPoint(left-3,top-3,lift);
-    g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(u,v,(width+6)*(1+lift),(height+6)*(1+lift));g.clip('evenodd');
+    const roofY=house.residenceWalls && lift?v-residenceTilt*lift:v;
+    g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(u,roofY,(width+6)*(1+lift),(height+6)*(1+lift));g.clip('evenodd');
   }
 }
 function drawRaisedHouse(h, i) {
+  if(h.residenceWalls){drawResidence(h,i);return;}
   const x = h.x * T, y = h.y * T, w = h.w * T, d = h.h * T;
   const k=roofLift(h), corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
   const ends = [[0, 1], [1, 2], [3, 2], [0, 3]], vis = [cam.y<y, cam.x>x + w, cam.y > y + d, cam.x < x];
