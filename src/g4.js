@@ -614,7 +614,9 @@ const eaveCtx=eaveView.getContext('2d');
 function captureEave(h){
   const w=h.w*T,d=h.h*T;
   const gap=Math.max(h.x*T-P.x,P.x-(h.x*T+w),h.y*T-P.y,P.y-(h.y*T+d));
-  if(gap>47 || h.a<.03)return false;
+  const lift=h.residenceWalls && perspective?roofLift(h):0;
+  const reach=lift && P.y<h.y*T?47+residenceTilt*lift/(1+lift):47;
+  if(gap>reach || h.a<.03)return false;
   const m=ctx.getTransform(),left=P.x-36,top=P.y-36;
   eaveCtx.clearRect(0,0,120,120);
   eaveCtx.drawImage(ctx.canvas,m.a*left+m.e,m.d*top+m.f,72*m.a,72*m.d,0,0,120,120);
@@ -1060,7 +1062,9 @@ function render() {
     los(P.x,P.y,near.e.x,near.e.y) ? near.e : null;
   if (BEREZKI) drawWinterTrees(inView);
   // крыши: скрывают дом, пока ты не внутри
-  HOUSES.forEach((h, i) => {
+  const roofOrder=BEREZKI?winterRoofOrder():HOUSES;
+  roofOrder.forEach((h, index) => {
+    const i=BEREZKI?h.roofIndex:index;
     const hide = P && roofHidden(h);
     h.a = lerp(h.a, hide ? 0 : 1, 0.2);
     if (h.a < 0.03 || !inView(h.x * T + h.w * T / 2, h.y * T + h.h * T / 2, h.w * T)) return;
