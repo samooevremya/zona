@@ -112,6 +112,7 @@ function wallTexture(h, side, len, wood, kind) {
   dim.addColorStop(1, 'rgba(23,21,16,.04)');
   g.fillStyle = dim;
   g.fillRect(0, 0, len, 88);
+  if (h.storeys) winterFacade(c,h,ds);
   walls.set(key, c);
   return c;
 }
@@ -133,6 +134,7 @@ function texturedFace(a, b, k, tex, light) {
   ctx.restore();
 }
 function roofLift(h){
+  if (h.storeys) return .105 * h.storeys;
   return houseHeight*(h.ruin ? .72 : h.mat==='depot' ? 1.55 : h.w*T<110 ? .68 : h.w*T>300 ? 1.12 : 1);
 }
 function clipRoofsFromLight(g,x,y,w,h,inView){

@@ -914,8 +914,8 @@ function render() {
   else if(loft){ctx.save();ctx.beginPath();ctx.rect(loft.x*T,loft.y*T,loft.w*T,loft.h*T);ctx.clip();drawLoft(loft);}
   else drawGround(vx, vy, vw, vh);
   const inView = (x, y, m) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
-  if (perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
-  if(villageAtmosphere && ART && (livingZone?ditchWater:WX.rain)>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
+  if (!BEREZKI && perspective && ART && !shopVisible && !loft) drawWorldRelief(inView);
+  if(!BEREZKI && villageAtmosphere && ART && (livingZone?ditchWater:WX.rain)>.02 && !shopVisible && !loft && inView(HATCH.x,HATCH.y,190))
     paintHatchRuts(ctx,true);
   if(livingZone){
     if(ART && C1 && !loft && !shopVisible){drawRoadWetness(vx,vy,vw,vh);drawRunoff(inView);}
@@ -994,7 +994,7 @@ function render() {
   }
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
-  const plants=livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
+  const plants=!BEREZKI && livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
   let plantIndex=0;
   for (const e of vis) {
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
@@ -1010,7 +1010,7 @@ function render() {
     }
   }
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
-  if(BIG && P) drawNearPoppies(ctx,P);
+  if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }
   ctx.lineWidth = 1;
   for (const f of flashes) {
@@ -1069,8 +1069,9 @@ function render() {
   const ty0 = Math.max(0, Math.floor(vy / T) - margin), ty1 = Math.min(MH - 1, Math.ceil((vy + vh) / T) + margin);
   for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
     const tile=map[y*MW+x];
-    const backdrop=BIG && x<PW && tile===VO && !shopVisible && !loft && hash2(x+17,y)>.73;
+    const backdrop=!BEREZKI && BIG && x<PW && tile===VO && !shopVisible && !loft && hash2(x+17,y)>.73;
     if (tile!==TR && !backdrop) continue;
+    if (BEREZKI) {winterTree(x,y);continue;}
     // в глубине леса каждая вторая крона всё равно закрыта соседями: не рисуем её (меньше перерисовки на телефоне)
     if (CAN_SZ > 72 && (x + y) & 1 && map[y * MW + x - 1] === TR && map[y * MW + x + 1] === TR && map[(y - 1) * MW + x] === TR && map[(y + 1) * MW + x] === TR) continue;
     const h = hash2(x, y), cx = x * T + 16 + (h - 0.5) * 8, cy = y * T + 12 + (hash2(y, x) - 0.5) * 8;
@@ -1095,7 +1096,7 @@ function render() {
     }
   }
   ctx.globalAlpha = 1;
-  if(!inBunker(P.x,P.y) && !loftAt(P))for (const c of crows) {
+  if((!BEREZKI || !winterFloor(P.x,P.y)) && !inBunker(P.x,P.y) && !loftAt(P))for (const c of crows) {
     drawFlyingCrow(c);
   }
   // имена дружественных рядом
@@ -1140,7 +1141,7 @@ function render() {
   if (GRADE.mul) { ctx.fillStyle = GRADE.mul; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalCompositeOperation = 'source-over';
   const bunk = P && (loftAt(P) || inBunker(P.x, P.y));
-  const dk = loft ? .18+.15*darkness() : bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
+  const dk = BEREZKI && winterFloor(P.x,P.y) ? .20+.44*darkness() : loft ? .18+.15*darkness() : bunk ? (shopVisible ? 0.41 : 0.62) : darkness();
   const toS = (x, y) => [(x - vx) * Z / 2 + sx / 2, (y - vy) * Z / 2 + sy / 2];
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
@@ -1204,7 +1205,7 @@ function render() {
     }
   }
   for (const f of flashes) if (f.big) { const s = toS(f.x, f.y); const g = ctx.createRadialGradient(s[0] * 2, s[1] * 2, 0, s[0] * 2, s[1] * 2, 140 * Z); g.addColorStop(0, f.blue ? 'rgba(180,220,255,0.6)' : 'rgba(255,200,120,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
-  if (villageAtmosphere && !bunk) {
+  if (!BEREZKI && villageAtmosphere && !bunk) {
     const dawn=clamp(1-Math.abs((S.min%1440)-420)/110,0,1);
     const local=clamp((1080-Math.hypot(cam.x-(FIRE.x+HATCH.x)/2,cam.y-(FIRE.y+HATCH.y)/2))/400,0,1);
     if (dawn*local>.001) {
@@ -1212,7 +1213,7 @@ function render() {
       ctx.fillRect(0,0,VW,VH);ctx.restore();
     }
   }
-  drawWeatherScreen();
+  if (!BEREZKI) drawWeatherScreen();
   // откуда стреляют: красные дуги по краю экрана
   if (P && P.alive) HURTDIR.forEach(h => {
     const cx = VW / 2, cy = VH / 2, R = Math.min(VW, VH) * 0.42, a = h.a;

@@ -1,5 +1,5 @@
 const LESSER_FIRE = { x: 90.5*T, y: (LESSER_TOP+49.5)*T };
-const campOf = e => inGarbage(e.x/T,e.y/T) ? dumpFire : BIG && e.x < WEST*T ? LESSER_FIRE : FIRE;
+const campOf = e => BEREZKI ? FIRE : inGarbage(e.x/T,e.y/T) ? dumpFire : BIG && e.x < WEST*T ? LESSER_FIRE : FIRE;
 const WORLD_FIRES = BIG ? [FIRE, FIRE2, LESSER_FIRE] : [FIRE, FIRE2];
 const lesserPlaces = [
   // id, название, границы, общедоступная точка подхода

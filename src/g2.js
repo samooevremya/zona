@@ -80,6 +80,7 @@ const earnings = base => Math.round(base*rules().income);
 const supplyCount = count => Math.max(1,Math.round(count*rules().loot));
 
 function freshS(difficulty='normal') {
+  if (BEREZKI) return winterNew(difficulty);
   return { v: 1, difficulty:difficultyKey(difficulty), money: 0, inv: { ar_jacket: 1, medkit: 1, bandage: 2, bread: 1 }, weapon: 'knife', armor: 'ar_jacket', belt: [], mag: {},
     q: { flash: 0, medusa: 0, pack: 0 }, rep: 0, stats: { kS: 0, kM: 0, q: 0, art: 0 }, news: [], flags: {}, dead: {}, min: 420,
     fog: '', mapVersion: MAP_VERSION, trackedQuestId: null, x: locPt('sid', 'spawn').x, y: locPt('sid', 'spawn').y, hp: 100, rad: 0, q2: { fox: 0, tolik: 0 } };
@@ -737,7 +738,7 @@ function shotTrace(sh, a, W, target=sh.tgt) {   // чистая функция �
   let best = null, bt = wallT;
 
   for (const e of ents) {
-    if (!e.alive || e === sh) continue;
+    if (!e.alive || e === sh || e.protectedResident) continue;
     const t = rayCircle(sh.x, sh.y, ca, sa, e.x, e.y, e.r + (e.captive ? -4 : 0));
     if (t !== null && t <= bt) { best = e; bt = t; }
   }
@@ -850,6 +851,10 @@ function melee(sh, W) {
   if (hit) hurt(hit, W.dmg * rnd(0.9, 1.1) * (sneak ? 3 : 1), sh, sh.ang);
 }
 function hurt(e, dmg, src, ang, shot) {
+  if(e.protectedResident)return;
+  if(BEREZKI && src===P && e.fac==='loner' && e.alive && dmg>0){
+    for(const guard of ents)if(guard.fac==='loner' && guard.alive && !guard.protectedResident)rememberAttacker(guard);
+  }
   if(BIG && src===P && e.guard==='south' && !(e.quiet && dmg>=e.hp))alarmPost();
   if (!e.alive || e.sid === 'sid' || (e.sid==='fox' && src===P)) return;
   if (src && (src === P || src.follow)) {
@@ -987,7 +992,7 @@ function aiHuman(e, dt) {
     e.deskLook = lerp(e.deskLook || 0, visiting ? 1 : 0, Math.min(1, dt * 3));
     return;
   }
-  if (e.captive) return;
+  if (e.captive || e.protectedResident) return;
   if(e.robberyAlarm && e.fac==='loner'){
     const responders=ents.filter(o=>o!==e && o.fac==='loner' && o.alive && !o.captive && !o.angry && dE(o,e)<170 && los(o.x,o.y,e.x,e.y));
     if(responders.length){responders.forEach(rememberAttacker);sayLine(e,'Мужики, он меня грабить хотел!');e.robberyAlarm=false;}
