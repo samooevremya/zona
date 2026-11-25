@@ -2632,14 +2632,19 @@ function collide(e) {
   const x0 = Math.floor((e.x - e.r) / T), x1 = Math.floor((e.x + e.r) / T), y0 = Math.floor((e.y - e.r) / T), y1 = Math.floor((e.y + e.r) / T);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!inb(x, y) || SOLID[map[y * MW + x]]) pushOut(e, x * T, y * T, T, T);
   const hop = e.jumpT > 0;   // в прыжке низкие препятствия не держат
-  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(hop && canVaultObject(o)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
+  for (let i = 0; i < objs.length; i++) { const o = objs[i]; if (o.solid && !(BEREZKI && e===P && S.flags.stationDeck && o.underDeck) && !(hop && canVaultObject(o)) && e.x + e.r > o.x && e.x - e.r < o.x + o.w && e.y + e.r > o.y && e.y - e.r < o.y + o.h) pushOut(e, o.x, o.y, o.w, o.h); }
   for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
     const nearby=propCells.get(y*MW+x);
     if(nearby) for(const p of nearby) if(!hop || !p.vaultable) touchesProp(p,e,true);
   }
   e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r);
 }
-function moveE(e, dx, dy) { e.x += dx; e.y += dy; collide(e); collide(e); }
+function moveE(e, dx, dy) {
+  const oldY=e.y;
+  e.x+=dx;e.y+=dy;
+  if(BEREZKI && e===P)moveOnStationBridge(e,oldY);
+  collide(e);collide(e);
+}
 const swampAt = (x, y) => tAt(Math.floor(x / T), Math.floor(y / T)) === SW;
 function anomNear(x, y, pad) { for (const a of anoms) if (dst(x, y, a.x, a.y) < a.r + pad) return a; return null; }
 function steer(e, tx, ty, speed, dt) {
@@ -5460,6 +5465,9 @@ function render() {
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   const plants=!BEREZKI && livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
   let plantIndex=0;
+  const drawBridge=()=>ctx.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
+  const bridgeVisible=BEREZKI && inView(footbridge.x,(footbridge.south+footbridge.north)/2,200);
+  if(bridgeVisible && S.flags.stationDeck)drawBridge();
   for (const e of vis) {
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
     drawRestingPack(e);
@@ -5473,6 +5481,7 @@ function render() {
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
     }
   }
+  if(bridgeVisible && !S.flags.stationDeck)drawBridge();
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }
@@ -16451,8 +16460,9 @@ function shoreGround(g){
   ig.globalCompositeOperation='destination-in';ig.drawImage(mask,left,top);
   g.drawImage(ice,left,top);
   // Stay on the bank until the last few metres. The two soles alternate on bends.
-  const approach=[[33,33],[39.8,30.8],[42.1,23],[45.4,20],[48,18.8]];
-  for(const trail of [approach,fishingTrack.slice(2)]){
+  const approach=[[33,62],[40.7,59.7],[41,46],[40,35],[35.8,32.9],[29,32.7]];
+  const lakeside=[[39,17.5],[40.8,16.8],[43.4,18.9],[48,18.8]];
+  for(const trail of [approach,lakeside,fishingTrack.slice(2)]){
     let step=0;
     for(let i=1;i<trail.length;i++){
       const [x,y]=trail[i-1],[tx,ty]=trail[i],dx=(tx-x)*T,dy=(ty-y)*T;
@@ -16532,11 +16542,233 @@ function fishingRoof(h){
   return c;
 }
 
+// The station doors are the only cut in the railway boundary. The footbridge
+// has its own walking surface above the continuous northern fence and rails.
+const stationRoom={x:22,y:26,w:13,h:6,n:1};
+const footbridge={x:39*T,width:1.8*T,north:17.6*T,south:24.5*T};
+const platform={x:16*T,y:23.5*T,w:26*T,h:2.5*T};
+const northFence=19.95*T,southFence=26.05*T;
+let stationHouse;
+const trackFences=[];
+
+function makeWinterStation(){
+  for(let y=17;y<=33;y++)for(let x=1;x<district.width-1;x++){
+    if((y>=20 && y<=31 || x>=37 && x<=41) && tAt(x,y)===TR)setT(x,y,GR);
+  }
+  for(let y=19;y<=26;y++){
+    setT(0,y,VO);setT(district.width-1,y,VO);
+  }
+  const r=stationRoom;
+  house(r.x,r.y,r.w,r.h,[[6,0],[7,0],[6,5],[7,5]],CO,0,'slate');
+  stationHouse=HOUSES[HOUSES.length-1];buildEntrances(stationHouse);
+  district.levels.push(r);
+  for(const [key,x,y,angle] of [['bench',25,28,0],['bench',32.5,28,0],['desk',24,30.2,0],['stove',33.1,30.5,0]]){
+    putFurniture(key,x*T,y*T,angle,'winter-station');
+  }
+  district.heaters.push(tilePoint(33.1,30.5));
+  function fence(x,end,y,underDeck=false){
+    trackFences.push(addObj({k:'fence',material:'stationMesh',solid:1,underDeck,x,y:y-3,w:end-x,h:6}));
+  }
+  fence(0,district.width*T,northFence,true);
+  fence(0,r.x*T,southFence);fence((r.x+r.w)*T,district.width*T,southFence);
+  for(const x of [20,33.5])putFurniture('bench',x*T,25*T,0,'station-platform');
+  const b=footbridge;
+  // The stair stringers block side entry at ground level. The open span
+  // between them leaves both tracks walkable underneath.
+  for(const [y,length] of [[b.north,1.65*T],[b.south-1.0*T,1.0*T]]){
+    for(const x of [b.x-b.width/2,b.x+b.width/2])addObj({k:'stairRail',x:x-2,y,w:4,h:length,solid:1,underDeck:true});
+    const back=y===b.north?y+length:y;
+    addObj({k:'stairBack',x:b.x-b.width/2,y:back-2,w:b.width,h:4,solid:1,underDeck:true});
+  }
+}
+function moveOnStationBridge(e,oldY){
+  if(e!==P)return;
+  const b=footbridge,inside=Math.abs(e.x-b.x)<=b.width/2-e.r;
+  if(!S.flags.stationDeck && inside){
+    if(oldY>=b.south && e.y<b.south || oldY<=b.north && e.y>b.north)S.flags.stationDeck=true;
+  }
+  if(S.flags.stationDeck){
+    if(e.y<=b.north || e.y>=b.south){delete S.flags.stationDeck;return;}
+    e.x=clamp(e.x,b.x-b.width/2+e.r+2,b.x+b.width/2-e.r-2);
+  }
+}
+function stationPlace(){
+  const r=winterFloor(P.x,P.y);
+  if(r===stationRoom)return 'Вокзал · Сотый километр';
+  if(S.flags.stationDeck)return 'Пешеходный мост';
+  if(P.x<district.width*T && P.y>=northFence && P.y<southFence){
+    if(P.x<3*T)return 'Западный перегон · путь пока закрыт';
+    return P.x>=platform.x && P.x<platform.x+platform.w && P.y>=platform.y?'Перрон':'Железная дорога';
+  }
+  return '';
+}
+function upgradeStationSave(d){
+  if(d.flags.stationLayout)return;
+  // Insert the station strip between the two original neighbourhoods. Upper
+  // floors have separate world space and retain their original coordinates.
+  function moved(x,y){return x<58*T && (y>=19*T || x<37*T);}
+  for(const e of [d,...(d.dyn?.npcs||[]),...(d.flags.fieldBodies||[])]){
+    if(moved(e.x,e.y))e.y+=29*T;
+  }
+  const key='cupboard_'+Math.round(36.8*T)+'_';
+  for(const prefix of ['contents_','st_']){
+    const old=prefix+key+28*T;
+    if(old in d.flags){d.flags[prefix+key+57*T]=d.flags[old];delete d.flags[old];}
+  }
+  if(d.fog){
+    const packed=new Uint8Array(Math.ceil(MW*MH/6));
+    for(let i=0;i<MW*MH;i++)if((d.fog.charCodeAt(Math.floor(i/6))-48)&(1<<(i%6))){
+      const x=i%MW,y=Math.floor(i/MW);
+      const j=i+(y<52 && moved(x*T,y*T)?29*MW:0);
+      packed[Math.floor(j/6)]|=1<<(j%6);
+    }
+    d.fog=Array.from(packed,n=>String.fromCharCode(48+n)).join('');
+  }
+  d.flags.stationLayout=1;
+}
+function stationInterior(r){
+  const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
+  const x=r.x*T,y=r.y*T,w=c.width,h=c.height;
+  g.translate(-x,-y);artFill(g,'floor_concrete',x,y,w,h);
+  for(let j=0;j<r.h;j++)for(let i=0;i<r.w;i++){
+    const xx=x+i*T,yy=y+j*T;
+    if(tAt(r.x+i,r.y+j)===CO){artFill(g,'wall_brick',xx,yy,T,T);g.fillStyle='#524d4290';g.fillRect(xx,yy,T,T);}
+    else{beam(g,xx,yy,xx+T,yy,.85,'#686559');beam(g,xx,yy,xx,yy+T,.85,'#686559');}
+  }
+  for(const o of objs)if(o.home==='winter-station')drawRoomFitting(g,o);
+  return c;
+}
+function stationRoof(){
+  const h=stationHouse,w=h.w*T+10,d=h.h*T+10;
+  h.residenceWalls=[0,1,2,3].map(s=>wallTexture(h,s,(s%2?h.h:h.w)*T,false,'station'));
+  const front=h.residenceWalls[2].getContext('2d');
+  front.save();front.translate(7*T,19);front.scale(1.4,1.4);stationSign(front,0,0,'СОТЫЙ КИЛОМЕТР');front.restore();
+  h.storeys=1;h.rooftop=[];
+  const c=winterCanvas(w,d),g=c.getContext('2d');
+  g.drawImage(balancedGable('c1_roof_slate'),0,0,w,d);
+  const snow=g.createPattern(snowMaterial(),'repeat');snow.setTransform(new DOMMatrix().scale(.5));
+  g.globalAlpha=.59;g.fillStyle=snow;g.fillRect(2,2,w-5,d-6);g.globalAlpha=1;
+  g.fillStyle='#41506530';g.fillRect(2,d/2,w-5,d/2-4);
+  beam(g,3,d/2,w-3,d/2,3,'#d1d5cf');
+  // A cross-gable over the central entrance breaks up the long roofline.
+  const cx=7*T;
+  for(const s of [-1,1]){
+    g.save();g.beginPath();g.moveTo(cx,d*.38);g.lineTo(cx+s*48,d*.73);g.lineTo(cx+s*48,d-3);g.lineTo(cx,d-3);g.closePath();g.clip();
+    g.translate(cx,d*.7);g.rotate(Math.PI/2);g.drawImage(balancedGable('c1_roof_slate'),-d*.36,-49,d*.72,98);
+    g.globalAlpha=.42;g.fillStyle=snow;g.fillRect(-d*.36,-49,d*.72,98);g.restore();
+  }
+  return c;
+}
+function stationSign(g,x,y,label){
+  g.font='bold 8px Arial';g.textAlign='center';
+  const w=g.measureText(label).width+9;
+  g.fillStyle='#453e34';g.fillRect(x-w/2-1,y-9,w+2,13);
+  g.fillStyle='#344744';g.fillRect(x-w/2,y-8,w,10);
+  g.fillStyle='#eee3c7';g.fillText(label,x,y);
+}
+function paintStationGround(g){
+  const w=district.width*T;
+  g.save();
+  const bed=winterCanvas(w,38),rg=bed.getContext('2d');
+  for(let i=0;i<district.width;i++){
+    rg.save();rg.translate(i*T,0);drawRailStrip(rg,i,0,38);rg.restore();
+  }
+  // Exposed steel runs unbroken through drifts on either side of the sleepers.
+  for(const y of [14,23]){
+    beam(rg,0,y+1,w,y+1,2,'#4e4a41');beam(rg,0,y,w,y,1,'#a5a397');
+  }
+  rg.globalCompositeOperation='destination-in';
+  const edge=rg.createLinearGradient(0,0,0,38);
+  for(const [at,alpha] of [[0,0],[.16,.6],[.29,1],[.71,1],[.87,.65],[1,0]])
+    edge.addColorStop(at,'rgba(0,0,0,'+alpha+')');
+  rg.fillStyle=edge;rg.fillRect(0,0,w,38);
+  for(const y of [21.05*T,22.65*T])g.drawImage(bed,0,y-19);
+  for(const line of [21.05,22.65]){
+    const x=(district.width-1.05)*T,y=line*T;
+    for(const dy of [-8,8])beam(g,x-19,y+dy,x,y+dy,3,'#575046');
+    beam(g,x-4,y-14,x-4,y+14,5,'#59433b');
+    beam(g,x-5,y-12,x-5,y+12,1.5,'#d9d3bf');
+  }
+  const p=platform;
+  g.fillStyle='#55554c';g.fillRect(p.x,p.y-3,p.w,p.h+4);
+  artFill(g,'floor_concrete',p.x,p.y,p.w,p.h);
+  for(let x=p.x;x<p.x+p.w;x+=32){
+    beam(g,x,p.y,x,p.y+p.h,1,'#64645a');beam(g,x,p.y+4,x+27,p.y+4,2,'#d2c8aa');
+  }
+  for(const f of trackFences){
+    drawFenceRun(g,f);
+    // Snow caps and the rusted top wire lift the mesh above its footing.
+    beam(g,f.x,f.y-6,f.x+f.w,f.y-6,1.5,'#77776b');
+    for(let x=f.x+2;x<f.x+f.w;x+=40){
+      beam(g,x,f.y+2,x,f.y-8,2.8,'#5f6058');beam(g,x-1,f.y-8,x+2,f.y-8,1.6,'#c5c9c3');
+      const end=Math.min(x+40,f.x+f.w);
+      for(let u=x;u<end-4;u+=6){beam(g,u,f.y-5,u+4,f.y+.5,.75,'#6d7066');beam(g,u,f.y+.5,u+4,f.y-5,.75,'#74756a');}
+    }
+  }
+  for(const o of objs)if(o.home==='station-platform')drawRoomFitting(g,o);
+  const doorX=29*T;
+  artFill(g,'floor_concrete',doorX-35,32*T,70,18);
+  for(const i of [4,10,16])beam(g,doorX-35,32*T+i,doorX+35,32*T+i,1.2,'#68695f');
+  stationSign(g,doorX+59,32*T+10,'ВОКЗАЛ');
+  stationSign(g,36.8*T,25.6*T,'К ОЗЕРУ →');
+  stationSign(g,2.8*T,24.6*T,'← ПЕРЕГОН ЗАКРЫТ');
+  const b=footbridge;
+  g.fillStyle='rgba(42,49,53,.23)';g.beginPath();
+  for(const side of [-1,1]){
+    const x=b.x+side*b.width/2,ys=[b.north,b.north+2.3*T,b.south-2.3*T,b.south];
+    if(side>0)ys.reverse();
+    for(const yy of ys){
+      const lift=yy===b.south || yy===b.north?2:25;
+      g.lineTo(x+lift*.7,yy+lift*.6);
+    }
+  }
+  g.closePath();g.fill();
+  for(const y of [b.north+1.8*T,b.south-1.4*T])for(const s of [-1,1]){
+    const x=b.x+s*(b.width/2+2);artFill(g,'floor_concrete',x-5,y-6,10,13);
+  }
+  g.restore();
+}
+function paintStationBridge(g){
+  const b=footbridge,x=b.x-b.width/2,y=b.north,w=b.width,h=b.south-y;
+  g.save();
+  artFill(g,'floor_wood',x,y,w,h);
+  const rand=mulberry32(7164);
+  for(let v=0;v<h;v+=7){
+    const stair=v<2.5*T || h-v<2.5*T;
+    if(!stair){
+      if(v%21===0)beam(g,x,y+v,x+w,y+v,1.1,'#534b3e');
+      continue;
+    }
+    beam(g,x,y+v,x+w,y+v,2.3,'#504c42');
+    beam(g,x+1,y+v+2,x+w-1,y+v+2,1.6,'#bcb8a5');
+    const len=2+rand()*14;
+    beam(g,x+2,y+v+4,x+len,y+v+4,2.1,'#c3c9c6');
+  }
+  // Upright and diagonal steelwork is visible below the raised central span.
+  for(const side of [-1,1]){
+    const xx=side<0?x:x+w;
+    for(let v=2.35*T;v<h-2.35*T;v+=19){
+      const end=Math.min(v+19,h-2.35*T);
+      beam(g,xx,y+v,xx+5,y+v+7,2.2,'#534f45');
+      beam(g,xx+5,y+v+7,xx,y+end,1.7,'#8b8170');
+    }
+  }
+  for(const xx of [x,x+w]){
+    beam(g,xx,y,xx,y+h,4,'#524b3f');
+    for(let v=0;v<h;v+=24){
+      beam(g,xx,y+v,xx-2,y+v-5,3,'#685649');
+      beam(g,xx-2,y+v-5,xx+1,y+Math.min(v+24,h),1.4,'#85725d');
+    }
+    beam(g,xx-2,y-4,xx-2,y+h-4,1.8,'#c3c5b9');
+  }
+  g.restore();
+}
+
 // The winter district plugs into the Cordon movement, combat, roof, HUD and inventory systems.
 // Upper storeys occupy enclosed map cells. A save position therefore identifies its floor.
 const district = {
-  width:58, height:52, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[], trees:[],
-  fire:tilePoint(31,32.6), start:tilePoint(29,32.4)
+  width:58, height:81, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[], trees:[],
+  fire:tilePoint(31,61.6), start:tilePoint(29,61.4)
 };
 function winterCanvas(w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -16552,12 +16784,12 @@ function makeDistrict(){
     const edge=Math.min(x,y,district.width-1-x,district.height-1-y);
     if(edge===0 || (edge<5 && rand()<.36) || (x>46 && rand()<.12) || (x<11 && rand()<.12))setT(x,y,TR);
   }
-  for(const [x,y] of [[13,31],[14,36],[40,33],[38,40],[36,10],[42,17]])setT(x,y,TR);
-  house(17,19,22,11,[[11,10],[12,10]],CO,0,'conc');
-  house(14,5,22,10,[],CO,0,'conc');
+  for(const [x,y] of [[13,60],[14,65],[40,62],[38,69],[36,39],[42,17]])setT(x,y,TR);
+  house(17,48,22,11,[[11,10],[12,10]],CO,0,'conc');
+  house(14,34,22,10,[],CO,0,'conc');
   HOUSES.forEach(h=>{h.storeys=5;buildEntrances(h);});
   for(let n=1;n<=5;n++){
-    const x=n===1?17:n%2===0?70:110, y=n===1?19:n<=3?12:49;
+    const x=n===1?17:n%2===0?70:110, y=n===1?48:n<=3?12:49;
     const r={x,y,w:22,h:11,n};
     district.levels.push(r);
     if(n>1)house(x,y,r.w,r.h,[],CO,0,'none');
@@ -16581,10 +16813,11 @@ function makeDistrict(){
     if(n>1)district.stairs.push({room:r,up:false,...tilePoint(x+16.9,y+5.7)});
   }
   makeFishingShore();
+  makeWinterStation();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE);
   ANOM0.length=CACHES.length=0;
-  supplyBox(20*T,28*T,'berezki-canteen',{bread:1,bandage:2});
+  supplyBox(20*T,57*T,'berezki-canteen',{bread:1,bandage:2});
   for(const s of district.stairs){
     stairRun({id:'berezki',stair:s,landing:s},!s.up);
   }
@@ -16592,16 +16825,17 @@ function makeDistrict(){
 }
 function winterNew(difficulty){
   return {v:1,difficulty:difficultyKey(difficulty),...district.start,hp:100,min:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
-    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100},campaign:{stage:'district',wounds:{}},
+    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
 const winterResidents=[
-  ['warden','Агат',27,32.5,'w_obrez'],['door','Савва',30.7,27.6,'w_pm'],
-  ['cook','Тамара',20.5,24.5,'knife'],['tenant','Глеб',78.4,17.5,'knife'],
+  ['warden','Агат',27,61.5,'w_obrez'],['door','Савва',30.7,56.6,'w_pm'],
+  ['cook','Тамара',20.5,53.5,'knife'],['tenant','Глеб',78.4,17.5,'knife'],
   ['fisher','Егор',...fishingTrack[0],'knife']
 ];
 function winterRestore(d){
-  S=d;survDefaults();plusDefaults();restoreKit();resetCampAudio();resetInput();resetEnvironment();
+  S=d;survDefaults();plusDefaults();
+  const oldLayout=!S.flags.stationLayout;upgradeStationSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
   S.blow={stage:0};S.flags.warmth??=100;
   HURTDIR.length=0;fog.fill(0);fogDirty=true;fogRegion=null;
   if(S.fog)for(let i=0;i<fog.length;i++){const v=S.fog.charCodeAt(Math.floor(i/6))-48;fog[i]=(v>>(i%6))&1;}
@@ -16617,7 +16851,13 @@ function winterRestore(d){
     ents.push(e);
   }
   for(const b of S.flags.fieldBodies||[])objs.push({...b,loot:{...b.loot}});
-  ageRemains();buildGrids();restoreShoreFooting();cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
+  ageRemains();buildGrids();restoreShoreFooting();
+  if(oldLayout)for(const e of ents){
+    if(e.x>=district.width*T || clearFooting(e.x,e.y,e.r))continue;
+    const cell=nearestNav(Math.floor(e.x/T),Math.floor(e.y/T));
+    if(cell>=0)Object.assign(e,tilePoint(cell%MW+.5,Math.floor(cell/MW)+.5));
+  }
+  cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
   envSteps.length=0;stepDistance=0;winterFootSide=1;deathT=0;hurtFlash=0;armyAngry=false;MSGS=[];radioQueue.length=0;
 }
 function winterInteractChoices(cand){
@@ -16657,8 +16897,9 @@ function winterWeather(dt){
   const r=winterFloor(P.x,P.y), warm=[FIRE,...district.heaters].some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
   S.flags.warmth=clamp(S.flags.warmth+dt*(warm ? 1.3 : r ? .2 : night() ? -.22 : -.07),0,100);
   if(S.flags.warmth===0 && P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
-  if(r || P.jumpT)stepDistance=P.step;
-  if(!r && P.step-stepDistance>20 && !P.jumpT){
+  const hardSurface=r || S.flags.stationDeck || (P.y>northFence && P.y<southFence);
+  if(hardSurface || P.jumpT)stepDistance=P.step;
+  if(!hardSurface && P.step-stepDistance>20 && !P.jumpT){
     stepDistance=P.step;const g=GAIT.get(P),a=g&&Math.hypot(P.x-g.x,P.y-g.y)>.01?Math.atan2(P.y-g.y,P.x-g.x):P.ang;
     winterFootSide=-winterFootSide;const side=winterFootSide*4;
     envSteps.push({x:P.x-Math.sin(a)*side,y:P.y+Math.cos(a)*side,a,t:S.min});
@@ -16824,15 +17065,19 @@ function winterLandscape(){
   for(let i=0;i<9400;i++){
     const lane=i%3,u=rand(),off=(rand()+rand()+rand()-1.5)*(lane===0?47:30);
     let x,y;
-    if(lane===0){x=u*c.width;y=(36.5-2*Math.sin(u*5))*T+off;}
-    else if(lane===1){x=(29+.7*Math.sin(u*3))*T+off;y=(29+7*u)*T;}
-    else{x=(31+9*u)*T+off;y=(33-1.2*Math.sin(u*3))*T+off;}
+    if(lane===0){x=u*c.width;y=(65.5-2*Math.sin(u*5))*T+off;}
+    else if(lane===1){x=(29+.7*Math.sin(u*3))*T+off;y=(58+7*u)*T;}
+    else{x=(31+9*u)*T+off;y=(62-1.2*Math.sin(u*3))*T+off;}
     g.fillStyle=i%3?'rgba(95,99,99,.059)':'rgba(76,73,62,.12)';g.beginPath();g.ellipse(x,y,rand()*6+1,rand()*2+1,-.5,0,2*Math.PI);g.fill();
   }
   shoreGround(g);
+  paintStationGround(g);
+  const bridge=footbridge;
+  district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
+  const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
   plantWinterTrees(g);
   district.ground=c;
-  district.plans=district.levels.map(r=>r===fishingRoom?fishingInterior(r):winterRoom(r));
+  district.plans=district.levels.map(r=>r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):winterRoom(r));
   const f=district.fire;for(let j=0;j<12;j++){
     const a=j*Math.PI/6;g.fillStyle=j%2?'#665e50':'#827b6a';g.beginPath();g.ellipse(f.x+14*Math.cos(a),f.y+11*Math.sin(a),4.6,3.8,a,0,7);g.fill();
   }
@@ -16869,6 +17114,7 @@ function winterRoofOrder(){
 function winterRoofs(){
   district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
+    if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
     if(h===fishingHouse){
       h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
       h.storeys=1;h.rooftop=[[2*T-5,2.4*T-7,14,15,.035]];
@@ -16887,6 +17133,7 @@ function winterMap(g,s,_labels,options={}){
   const r=winterFloor(P.x,P.y), floor=r?.n>1?r:null;
   if(!floor){
     g.drawImage(district.ground,0,0,district.width*s,district.height*s);
+    g.save();g.scale(s/T,s/T);g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);g.restore();
     for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++)if(tAt(x,y)===TR){
       g.fillStyle='#627570';g.fillRect(x*s,y*s,s,s);
     }
@@ -16895,7 +17142,7 @@ function winterMap(g,s,_labels,options={}){
   const u=options.u||1;
   if(!floor && options.loc){
     g.save();g.textAlign='center';g.font='bold '+Math.max(11,12*u)+'px Arial';
-    for(const [text,x,y] of [['Жилой корпус',28,26],['Заколоченный корпус',25,11],['Костёр',31,34],['Дом рыбака',48,16],['Прорубь',48.4,7.4]]){
+    for(const [text,x,y] of [['Жилой корпус',28,55],['Заколоченный корпус',25,40],['Костёр',31,63],['Сотый километр',28,29],['Мост к озеру',39,20],['← Западный перегон',7,23],['Дом рыбака',48,16],['Прорубь',48.4,7.4]]){
       g.lineWidth=3*u;g.strokeStyle='#343b3d';g.strokeText(text,x*s,y*s);g.fillStyle='#f2e8cd';g.fillText(text,x*s,y*s);
     }
     g.restore();
@@ -16910,7 +17157,7 @@ function winterMini(){
   const s=size/30;mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5});
   const room=winterFloor(P.x,P.y);
-  $('mini-distance').textContent=room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
+  $('mini-distance').textContent=room===stationRoom?'Вокзал':room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
 }
 async function bootBerezki(){
@@ -16931,8 +17178,8 @@ async function bootBerezki(){
   };
   // Bake a winter view for the shared title and pause menus.
   const cover=winterCanvas(900,490),cg=cover.getContext('2d');
-  cg.drawImage(district.ground,310,260,1150,680,0,0,900,490);
-  for(const h of HOUSES)cg.drawImage(ROOFS[HOUSES.indexOf(h)],(h.x*T-310)*900/1150,(h.y*T-260)*490/680,h.w*T*900/1150,h.h*T*490/680);
+  cg.drawImage(district.ground,310,1188,1150,680,0,0,900,490);
+  for(const h of HOUSES)cg.drawImage(ROOFS[HOUSES.indexOf(h)],(h.x*T-310)*900/1150,(h.y*T-1188)*490/680,h.w*T*900/1150,h.h*T*490/680);
   const scene='url('+cover.toDataURL('image/webp',.86)+')';
   $('title').style.setProperty('--signal-scene',scene);$('ov').style.setProperty('--signal-scene',scene);
   // Install content providers before the first frame. Main simulation and input handlers are shared.
@@ -16940,7 +17187,7 @@ async function bootBerezki(){
   qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const temp=r?(r.n===1?2:4):Math.round(-18-28*darkness()/.8);
-    const text=(r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:P.x>38*T && P.y<20*T?'Рыбацкий берег':'Берёзки · двор')+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:P.x>38*T && P.y<20*T?'Рыбацкий берег':'Берёзки · двор'))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
   intro=()=>{msg('Жилой корпус. У входа дежурит смена.','say');save(true);};

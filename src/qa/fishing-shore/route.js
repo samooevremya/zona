@@ -39,7 +39,11 @@ async () => {
   }
   if(!sawHome)throw Error('Incomplete fishing round '+JSON.stringify([fisher.x/32,fisher.y/32,z.S.flags.fishingRound]));
   z.S.min=20*60;
-  for(const p of [[39.8,30.8],[42.1,23],[48,18.8],[48,16.6],[49.4,13.25]])walk(...p);
+  walk(29,28.8);walk(29,25.2);walk(38,25.6);walk(39,25.6);
+  z.IN.moveY=-1;
+  for(let i=0;i<480 && z.P.y>17.3*32;i++)z.update(1/60);
+  z.IN.moveY=0;
+  for(const p of [[48,18.8],[48,16.6],[49.4,13.25]])walk(...p);
   if(z.near?.k!=='loot' || z.near.o?.fitting!=='cupboard')throw Error('Wardrobe out of reach');
   walk(49.3,14.65);
   if(z.near?.k!=='winterRest' || !z.near.bed)throw Error('Bed out of reach '+JSON.stringify([z.near?.k,z.near?.label,z.P.x/32,z.P.y/32]));

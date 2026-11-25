@@ -1,8 +1,8 @@
 // The winter district plugs into the Cordon movement, combat, roof, HUD and inventory systems.
 // Upper storeys occupy enclosed map cells. A save position therefore identifies its floor.
 const district = {
-  width:58, height:52, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[], trees:[],
-  fire:tilePoint(31,32.6), start:tilePoint(29,32.4)
+  width:58, height:81, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[], trees:[],
+  fire:tilePoint(31,61.6), start:tilePoint(29,61.4)
 };
 function winterCanvas(w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -18,12 +18,12 @@ function makeDistrict(){
     const edge=Math.min(x,y,district.width-1-x,district.height-1-y);
     if(edge===0 || (edge<5 && rand()<.36) || (x>46 && rand()<.12) || (x<11 && rand()<.12))setT(x,y,TR);
   }
-  for(const [x,y] of [[13,31],[14,36],[40,33],[38,40],[36,10],[42,17]])setT(x,y,TR);
-  house(17,19,22,11,[[11,10],[12,10]],CO,0,'conc');
-  house(14,5,22,10,[],CO,0,'conc');
+  for(const [x,y] of [[13,60],[14,65],[40,62],[38,69],[36,39],[42,17]])setT(x,y,TR);
+  house(17,48,22,11,[[11,10],[12,10]],CO,0,'conc');
+  house(14,34,22,10,[],CO,0,'conc');
   HOUSES.forEach(h=>{h.storeys=5;buildEntrances(h);});
   for(let n=1;n<=5;n++){
-    const x=n===1?17:n%2===0?70:110, y=n===1?19:n<=3?12:49;
+    const x=n===1?17:n%2===0?70:110, y=n===1?48:n<=3?12:49;
     const r={x,y,w:22,h:11,n};
     district.levels.push(r);
     if(n>1)house(x,y,r.w,r.h,[],CO,0,'none');
@@ -47,10 +47,11 @@ function makeDistrict(){
     if(n>1)district.stairs.push({room:r,up:false,...tilePoint(x+16.9,y+5.7)});
   }
   makeFishingShore();
+  makeWinterStation();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE);
   ANOM0.length=CACHES.length=0;
-  supplyBox(20*T,28*T,'berezki-canteen',{bread:1,bandage:2});
+  supplyBox(20*T,57*T,'berezki-canteen',{bread:1,bandage:2});
   for(const s of district.stairs){
     stairRun({id:'berezki',stair:s,landing:s},!s.up);
   }
@@ -58,16 +59,17 @@ function makeDistrict(){
 }
 function winterNew(difficulty){
   return {v:1,difficulty:difficultyKey(difficulty),...district.start,hp:100,min:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
-    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100},campaign:{stage:'district',wounds:{}},
+    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
 const winterResidents=[
-  ['warden','Агат',27,32.5,'w_obrez'],['door','Савва',30.7,27.6,'w_pm'],
-  ['cook','Тамара',20.5,24.5,'knife'],['tenant','Глеб',78.4,17.5,'knife'],
+  ['warden','Агат',27,61.5,'w_obrez'],['door','Савва',30.7,56.6,'w_pm'],
+  ['cook','Тамара',20.5,53.5,'knife'],['tenant','Глеб',78.4,17.5,'knife'],
   ['fisher','Егор',...fishingTrack[0],'knife']
 ];
 function winterRestore(d){
-  S=d;survDefaults();plusDefaults();restoreKit();resetCampAudio();resetInput();resetEnvironment();
+  S=d;survDefaults();plusDefaults();
+  const oldLayout=!S.flags.stationLayout;upgradeStationSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
   S.blow={stage:0};S.flags.warmth??=100;
   HURTDIR.length=0;fog.fill(0);fogDirty=true;fogRegion=null;
   if(S.fog)for(let i=0;i<fog.length;i++){const v=S.fog.charCodeAt(Math.floor(i/6))-48;fog[i]=(v>>(i%6))&1;}
@@ -83,7 +85,13 @@ function winterRestore(d){
     ents.push(e);
   }
   for(const b of S.flags.fieldBodies||[])objs.push({...b,loot:{...b.loot}});
-  ageRemains();buildGrids();restoreShoreFooting();cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
+  ageRemains();buildGrids();restoreShoreFooting();
+  if(oldLayout)for(const e of ents){
+    if(e.x>=district.width*T || clearFooting(e.x,e.y,e.r))continue;
+    const cell=nearestNav(Math.floor(e.x/T),Math.floor(e.y/T));
+    if(cell>=0)Object.assign(e,tilePoint(cell%MW+.5,Math.floor(cell/MW)+.5));
+  }
+  cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
   envSteps.length=0;stepDistance=0;winterFootSide=1;deathT=0;hurtFlash=0;armyAngry=false;MSGS=[];radioQueue.length=0;
 }
 function winterInteractChoices(cand){
@@ -123,8 +131,9 @@ function winterWeather(dt){
   const r=winterFloor(P.x,P.y), warm=[FIRE,...district.heaters].some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
   S.flags.warmth=clamp(S.flags.warmth+dt*(warm ? 1.3 : r ? .2 : night() ? -.22 : -.07),0,100);
   if(S.flags.warmth===0 && P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
-  if(r || P.jumpT)stepDistance=P.step;
-  if(!r && P.step-stepDistance>20 && !P.jumpT){
+  const hardSurface=r || S.flags.stationDeck || (P.y>northFence && P.y<southFence);
+  if(hardSurface || P.jumpT)stepDistance=P.step;
+  if(!hardSurface && P.step-stepDistance>20 && !P.jumpT){
     stepDistance=P.step;const g=GAIT.get(P),a=g&&Math.hypot(P.x-g.x,P.y-g.y)>.01?Math.atan2(P.y-g.y,P.x-g.x):P.ang;
     winterFootSide=-winterFootSide;const side=winterFootSide*4;
     envSteps.push({x:P.x-Math.sin(a)*side,y:P.y+Math.cos(a)*side,a,t:S.min});
@@ -290,15 +299,19 @@ function winterLandscape(){
   for(let i=0;i<9400;i++){
     const lane=i%3,u=rand(),off=(rand()+rand()+rand()-1.5)*(lane===0?47:30);
     let x,y;
-    if(lane===0){x=u*c.width;y=(36.5-2*Math.sin(u*5))*T+off;}
-    else if(lane===1){x=(29+.7*Math.sin(u*3))*T+off;y=(29+7*u)*T;}
-    else{x=(31+9*u)*T+off;y=(33-1.2*Math.sin(u*3))*T+off;}
+    if(lane===0){x=u*c.width;y=(65.5-2*Math.sin(u*5))*T+off;}
+    else if(lane===1){x=(29+.7*Math.sin(u*3))*T+off;y=(58+7*u)*T;}
+    else{x=(31+9*u)*T+off;y=(62-1.2*Math.sin(u*3))*T+off;}
     g.fillStyle=i%3?'rgba(95,99,99,.059)':'rgba(76,73,62,.12)';g.beginPath();g.ellipse(x,y,rand()*6+1,rand()*2+1,-.5,0,2*Math.PI);g.fill();
   }
   shoreGround(g);
+  paintStationGround(g);
+  const bridge=footbridge;
+  district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
+  const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
   plantWinterTrees(g);
   district.ground=c;
-  district.plans=district.levels.map(r=>r===fishingRoom?fishingInterior(r):winterRoom(r));
+  district.plans=district.levels.map(r=>r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):winterRoom(r));
   const f=district.fire;for(let j=0;j<12;j++){
     const a=j*Math.PI/6;g.fillStyle=j%2?'#665e50':'#827b6a';g.beginPath();g.ellipse(f.x+14*Math.cos(a),f.y+11*Math.sin(a),4.6,3.8,a,0,7);g.fill();
   }
@@ -335,6 +348,7 @@ function winterRoofOrder(){
 function winterRoofs(){
   district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
+    if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
     if(h===fishingHouse){
       h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
       h.storeys=1;h.rooftop=[[2*T-5,2.4*T-7,14,15,.035]];
@@ -353,6 +367,7 @@ function winterMap(g,s,_labels,options={}){
   const r=winterFloor(P.x,P.y), floor=r?.n>1?r:null;
   if(!floor){
     g.drawImage(district.ground,0,0,district.width*s,district.height*s);
+    g.save();g.scale(s/T,s/T);g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);g.restore();
     for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++)if(tAt(x,y)===TR){
       g.fillStyle='#627570';g.fillRect(x*s,y*s,s,s);
     }
@@ -361,7 +376,7 @@ function winterMap(g,s,_labels,options={}){
   const u=options.u||1;
   if(!floor && options.loc){
     g.save();g.textAlign='center';g.font='bold '+Math.max(11,12*u)+'px Arial';
-    for(const [text,x,y] of [['Жилой корпус',28,26],['Заколоченный корпус',25,11],['Костёр',31,34],['Дом рыбака',48,16],['Прорубь',48.4,7.4]]){
+    for(const [text,x,y] of [['Жилой корпус',28,55],['Заколоченный корпус',25,40],['Костёр',31,63],['Сотый километр',28,29],['Мост к озеру',39,20],['← Западный перегон',7,23],['Дом рыбака',48,16],['Прорубь',48.4,7.4]]){
       g.lineWidth=3*u;g.strokeStyle='#343b3d';g.strokeText(text,x*s,y*s);g.fillStyle='#f2e8cd';g.fillText(text,x*s,y*s);
     }
     g.restore();
@@ -376,7 +391,7 @@ function winterMini(){
   const s=size/30;mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5});
   const room=winterFloor(P.x,P.y);
-  $('mini-distance').textContent=room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
+  $('mini-distance').textContent=room===stationRoom?'Вокзал':room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
 }
 async function bootBerezki(){
@@ -397,8 +412,8 @@ async function bootBerezki(){
   };
   // Bake a winter view for the shared title and pause menus.
   const cover=winterCanvas(900,490),cg=cover.getContext('2d');
-  cg.drawImage(district.ground,310,260,1150,680,0,0,900,490);
-  for(const h of HOUSES)cg.drawImage(ROOFS[HOUSES.indexOf(h)],(h.x*T-310)*900/1150,(h.y*T-260)*490/680,h.w*T*900/1150,h.h*T*490/680);
+  cg.drawImage(district.ground,310,1188,1150,680,0,0,900,490);
+  for(const h of HOUSES)cg.drawImage(ROOFS[HOUSES.indexOf(h)],(h.x*T-310)*900/1150,(h.y*T-1188)*490/680,h.w*T*900/1150,h.h*T*490/680);
   const scene='url('+cover.toDataURL('image/webp',.86)+')';
   $('title').style.setProperty('--signal-scene',scene);$('ov').style.setProperty('--signal-scene',scene);
   // Install content providers before the first frame. Main simulation and input handlers are shared.
@@ -406,7 +421,7 @@ async function bootBerezki(){
   qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const temp=r?(r.n===1?2:4):Math.round(-18-28*darkness()/.8);
-    const text=(r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:P.x>38*T && P.y<20*T?'Рыбацкий берег':'Берёзки · двор')+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:P.x>38*T && P.y<20*T?'Рыбацкий берег':'Берёзки · двор'))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
   intro=()=>{msg('Жилой корпус. У входа дежурит смена.','say');save(true);};

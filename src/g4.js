@@ -1031,6 +1031,9 @@ function render() {
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   const plants=!BEREZKI && livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
   let plantIndex=0;
+  const drawBridge=()=>ctx.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
+  const bridgeVisible=BEREZKI && inView(footbridge.x,(footbridge.south+footbridge.north)/2,200);
+  if(bridgeVisible && S.flags.stationDeck)drawBridge();
   for (const e of vis) {
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
     drawRestingPack(e);
@@ -1044,6 +1047,7 @@ function render() {
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
     }
   }
+  if(bridgeVisible && !S.flags.stationDeck)drawBridge();
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }
