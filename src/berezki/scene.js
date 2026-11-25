@@ -1,7 +1,7 @@
 // The winter district plugs into the Cordon movement, combat, roof, HUD and inventory systems.
 // Upper storeys occupy enclosed map cells. A save position therefore identifies its floor.
 const district = {
-  width:58, height:52, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[],
+  width:58, height:52, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[], trees:[],
   fire:tilePoint(31,32.6), start:tilePoint(29,32.4)
 };
 function winterCanvas(w,h){
@@ -129,12 +129,60 @@ function winterWeather(dt){
   }
   while(envSteps.length>100 || envSteps.length && envSteps[0].t<S.min-70)envSteps.shift();
 }
-function winterTree(x,y){
-  const h=hash2(x,y),size=76+42*h,atlas=district.images.objects,cell=atlas.width/3,id=h>.54?6:7;
-  const px=(x+.5)*T,py=(y+.5)*T;
-  const [tx,ty]=roofPoint(px,py,.045);
-  ctx.save();if(dE(P,{x:px,y:py})<size*.42)ctx.globalAlpha=.55;
-  ctx.drawImage(atlas,id%3*cell,Math.floor(id/3)*cell,cell,cell,tx-size/2,ty-size/2,size,size);ctx.restore();
+// Extract the two overhead crowns once. Their silhouettes also cast the shadows on the snow.
+function winterTreeArt(id, quarterTurn){
+  const atlas=district.images.objects, cell=atlas.width/3;
+  const crown=winterCanvas(cell,cell), g=crown.getContext('2d');
+  g.translate(cell/2,cell/2);g.rotate(quarterTurn*Math.PI/2);
+  g.drawImage(atlas,id%3*cell,Math.floor(id/3)*cell,cell,cell,-cell/2,-cell/2,cell,cell);
+  makeLeaves(crown,crown);
+  const shadow=winterCanvas(64,64), sg=shadow.getContext('2d');
+  sg.drawImage(crown,0,0,shadow.width,shadow.height);sg.globalCompositeOperation='source-in';
+  sg.fillStyle='#354559';sg.fillRect(0,0,shadow.width,shadow.height);
+  return {crown,shadow,kind:id===6?'c1_pine':'c1_birch'};
+}
+function plantWinterTrees(g){
+  const crowns=[6,7].map(id=>Array.from({length:4},(_,turn)=>winterTreeArt(id,turn)));
+  for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++){
+    if(tAt(x,y)!==TR)continue;
+    const h=hash2(x,y), size=76+42*h;
+    const art=crowns[h>.54?0:1][Math.floor(hash2(x+31,y+7)*4)];
+    const px=(x+.5)*T, py=(y+.5)*T;
+    district.trees.push({x:px,y:py,size,art});
+    g.save();g.translate(px,py);
+    if(SHADOWS){
+      g.save();g.globalAlpha=.32;
+      g.transform(.91,0,.16,.78,size*.14,size*.15);
+      g.drawImage(art.shadow,-size/2,-size/2,size,size);g.restore();
+    }
+    // A hollow in the snow, deepest immediately around the root collar.
+    g.scale(1,.76);
+    const hollow=g.createRadialGradient(0,0,1,0,0,size*.19);
+    hollow.addColorStop(0,'rgba(54,52,46,.85)');
+    hollow.addColorStop(.30,'rgba(84,82,72,.57)');
+    hollow.addColorStop(.67,'rgba(125,137,143,.28)');hollow.addColorStop(1,'transparent');
+    g.fillStyle=hollow;g.fillRect(-size*.2,-size*.2,size*.4,size*.4);
+    g.restore();
+  }
+}
+function drawWinterTrees(inView){
+  const room=winterFloor(P.x,P.y);
+  if(room?.n>1)return;
+  ctx.save();
+  if(room){
+    // Cutaway rooms expose the floor beneath the roof, never the street vegetation.
+    ctx.beginPath();ctx.rect(0,0,district.width*T,district.height*T);
+    ctx.rect(room.x*T,room.y*T,room.w*T,room.h*T);ctx.clip('evenodd');
+  }
+  for(const {x,y,size,art} of district.trees){
+    if(!inView(x,y,size))continue;
+    const lift=perspective ? (art.kind==='c1_pine'?.12:.096)*clamp(size/150,.72,1.2) : 0;
+    const [tipX,tipY]=roofPoint(x,y,lift*.68);
+    beam(ctx,x,y,tipX,tipY,art.kind==='c1_pine'?5:4,'#5b5448');
+    if(perspective)drawLayeredCrown(art.crown,x,y,size,size,art.kind);
+    else drawAutumnCrown(art.crown,x,y,size,size);
+  }
+  ctx.restore();
 }
 function winterFacade(canvas,h,doors){
   const row=winterCanvas(canvas.width,88),g=row.getContext('2d');g.drawImage(canvas,0,0);
@@ -228,6 +276,7 @@ function winterLandscape(){
     else{x=(31+9*u)*T+off;y=(33-1.2*Math.sin(u*3))*T+off;}
     g.fillStyle=i%3?'rgba(95,99,99,.059)':'rgba(76,73,62,.12)';g.beginPath();g.ellipse(x,y,rand()*6+1,rand()*2+1,-.5,0,2*Math.PI);g.fill();
   }
+  plantWinterTrees(g);
   district.ground=c;
   district.plans=district.levels.map(winterRoom);
   const f=district.fire;for(let j=0;j<12;j++){
