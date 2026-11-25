@@ -71,9 +71,9 @@ function updateHumanMotion(e,g,dx,dy,d,dt,tele){
   const step=Math.floor(g.cycle/Math.PI);
   if(walk && step!==old && !(e.jumpT>0)){
     const side=step%2?-1:1,foot=motionFoot(g,side),point=localToWorld(e,e.ang,...foot);
+    point.a=e.ang+g.hips;
+    if(livingZone && (e===P || inhabited && dE(e,P)<320))leaveBootMark(e,point);
     if(e===P){
-      point.a=e.ang+g.hips;
-      if(livingZone)leaveBootMark(e,point);
       const surface=surf(point.x,point.y);emitFootfall(surface);
       play(surface,undefined,undefined,e.crouch?.36:running?1.3:1);
       if(surface==='stepWood' && loftAt(e) && step%4===1)play('creak');
@@ -94,8 +94,8 @@ function motionReload(e,id){
 function motionWeapon(e,id,W,grip){
   const g=GAIT.get(e) || motionIdle, re=motionReload(e,id);
   const draw=g.swap||0,ready=g.ready||0;
-  const x=(grip==='two'?-7.4:-3)+(grip==='two'?1.2:0)*ready-2*draw;
-  const y=8+ready*4-re*2.5-draw*5+(DETECTORS[id]?3:0);
+  const x=(grip==='two'?-2.2:-3)+(grip==='two'?.6:0)*ready-2*draw;
+  const y=(grip==='two'?4.5:8)+ready*2.4-re*2.5-draw*5+(DETECTORS[id]?3:0);
   const support=HELD_POSES[id]?.support||6;
   return {mode:'g3',articulated:true,id,W,grip,main:[x,y],support:[x,y+support],muzzle:[x,y+W.len]};
 }
@@ -112,24 +112,26 @@ function paintMotionHuman(target,e,opacity){
   target.save();target.globalAlpha*=opacity;
   target.translate(e.x+(sway?.dx||0),e.y+(sway?.dy||0));target.scale(sway?.k||1,sway?.k||1);
   target.rotate(e.ang-Math.PI/2);
+  const weightShift=idleWeight(e)*(1-(g.drive||0));target.translate(weightShift,0);
   const low=g.low||0,lean=(g.run||0)*2-low*2.1;
   const reload=w?motionReload(e,w.id):0;
   const breath=Math.sin(G7.vt*1.85+(e.seed||0))*.21*(1-(g.drive||0));
   const torsoTurn=(w?.grip==='two' ? .31 : 0)+swing*.075;
-  const hands=[];
+  const hands=[],guitar=holdsGuitar(e)?guitarHands(e):null;
   for(const [index,sign] of [['l',-1],['r',1]]){
     const foot=motionFoot(g.cycle==null?motionIdle:g,sign);
     const spread=sign*(4.6+low);
     motionSegment(target,art['leg_'+index],spread,.8,foot[0],foot[1],6+low*.6);
     const ax=sign*8.4,ay=-1+lean+ax*Math.sin(torsoTurn);
-    let hx=sign*(8.6+low),hy=7-sign*swing*(3+2*(g.run||0))+lean;
+    let hx=sign*(8.6+low),hy=7-sign*swing*(2.1+1.2*(g.run||0))*(g.forward??1)+lean;
     if(w && sign<0){[hx,hy]=w.main;}
     if(w && sign>0 && (w.grip==='two'||reload>.02)){
       const grip=w.grip==='two'?w.support:w.main;
       hx=lerp(grip[0],5.8,reload);hy=lerp(grip[1],2.5,reload);
     }
+    if(guitar)[hx,hy]=guitar[sign<0?0:1];
     const dx=hx-ax,dy=hy-ay,len=Math.max(.01,Math.hypot(dx,dy));
-    const bend=Math.sqrt(Math.max(1,6.7*6.7-len*len*.25));
+    const bend=Math.min(4,Math.sqrt(Math.max(0,6.7*6.7-len*len*.25)));
     const ex=(ax+hx)*.5+sign*dy*bend/len,ey=(ay+hy)*.5-sign*dx*bend/len;
     motionSegment(target,art['arm_'+index+'_upper'],ax,ay,ex,ey,6.4);
     hands.push({index,hx,hy,ex,ey});
@@ -161,7 +163,8 @@ function paintMotionHuman(target,e,opacity){
   for(const {index,hx,hy,ex,ey} of hands)
     motionSegment(target,art['arm_'+index+'_lower'],ex,ey,hx,hy,5.2);
   if(base)window.__g7tap(e,base,target.getTransform(),w);
-  if(w)drawWeaponLocal(target,w);
+  if(guitar)paintGuitar(target);
+  else if(w)drawWeaponLocal(target,w);
   for(const {index,hx:x,hy:y,ex,ey} of hands){
     const im=art['arm_'+index+'_hand'],r=-Math.atan2(x-ex,y-ey);
     target.save();target.translate(x,y);target.rotate(r);target.drawImage(im,-2.35,-1.9,4.7,4.6);target.restore();
@@ -179,7 +182,9 @@ function campMotion(e){
     const turn=angD(e.ang,Math.atan2(P.y-e.y,P.x-e.x));
     return {lean:.55,turn:clamp(turn,-.19,.19)};
   }
+  const drink=inhabited && e.sid?.startsWith('lz_guest')?tavernSip(e):0;
+  if(drink)return {lean:drink*1.2,turn:.1*drink};
   const phase=(G7.vt+(e.seed||0)%37)%15;
-  const warm=e.fireRef && dE(e,e.fireRef)<76 && phase<3.3?Math.sin(Math.PI*phase/3.3):0;
+  const warm=fireLit(e.fireRef) && dE(e,e.fireRef)<76 && phase<3.3?Math.sin(Math.PI*phase/3.3):0;
   return {lean:warm*1.4,turn:warm*((e.seed||0)%2?.08:-.08)};
 }

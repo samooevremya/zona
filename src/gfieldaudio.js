@@ -60,7 +60,7 @@ function mixRecordedRain(){
   if(!AC)return;
   const room=roomAcoustics(),now=AC.currentTime;
   let nearest=290;
-  for(const f of WORLD_FIRES)nearest=Math.min(nearest,dst(f.x,f.y,P.x,P.y));
+  for(const f of WORLD_FIRES)if(fireLit(f))nearest=Math.min(nearest,dst(f.x,f.y,P.x,P.y));
   const fireVolume=room.underground?0:.16*soundPrefs.nature*(1-nearest/290)**2*(1-.8*room.enclosure);
   if(!hearthGain && fireVolume>0 && fieldBuffers.has('hearth')){
     const fire=AC.createBufferSource();fire.buffer=fieldBuffers.get('hearth');fire.loop=true;

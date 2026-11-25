@@ -76,7 +76,7 @@ const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
   groundShadow(ctx, e.x, e.y, 14 + 3 * height, 9, Math.atan2(SUN_DY, SUN_DX), 4 + 4 * height);
-  const fire=WORLD_FIRES.find(f=>Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
+  const fire=WORLD_FIRES.find(f=>fireLit(f) && Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
   const wet=e===P ? S.flags.coatWetness||0 : 0;
   if(!fire && wet<.03){drawHuman(e,ctx);return;}
   const dx = fire ? fire.x-e.x : 0, dy = fire ? fire.y-e.y : 0, distance = Math.hypot(dx, dy);
@@ -98,11 +98,18 @@ function drawLitHuman(e) {
     const k = 12 / Math.max(1, distance);
     const tint = g.createLinearGradient(-dx * k, -dy * k, dx * k, dy * k);
     tint.addColorStop(0, 'rgba(255,150,65,0)');
-    tint.addColorStop(.48, 'rgba(255,150,65,0)');
+    tint.addColorStop(.49, 'rgba(255,150,65,0)');
+    tint.addColorStop(.73, 'rgba(255,171,93,.22)');
     tint.addColorStop(1, 'rgb(255,166,83)');
     g.save(); g.globalCompositeOperation = 'source-atop';
     g.globalAlpha = .55 * (1 - distance / FIRE_REACH) * fireFlick();
-    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96); g.restore();
+    g.fillStyle = tint; g.fillRect(-48, -48, 96, 96);
+    if(inhabited){
+      const back=g.createLinearGradient(-dx*k,-dy*k,dx*k,dy*k);
+      back.addColorStop(0,'#1a1c21');back.addColorStop(.54,'transparent');back.addColorStop(1,'transparent');
+      g.globalAlpha=.35*(1-distance/FIRE_REACH)*darkness();g.fillStyle=back;g.fillRect(-48,-48,96,96);
+    }
+    g.restore();
   }
   ctx.drawImage(figureC, e.x - 48, e.y - 48, 96, 96);
 }
@@ -308,6 +315,7 @@ function* paintGroundWin(g, R) {
   ANOM0.forEach(a => { if (a.k === 'g') { g.strokeStyle = 'rgba(150,130,80,0.06)'; g.lineWidth = 2; g.beginPath(); g.arc(a.x, a.y, a.r * 0.7, 0, 6.28); g.stroke(); g.lineWidth = 1; } });
   yield;
   drawWorldTracks(g,GWP);
+  if(ART && C1)paintBuildingFeet(g);
   // стены: верх, южная грань, тень
   if (ART) { for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) { const t = map[y * MW + x]; if (t === CO || t === BR) artWall(g, x, y); } }
   if (!ART) for (let y = GW.y0; y <= GW.y1; y++) for (let x = GW.x0; x <= GW.x1; x++) {
@@ -747,7 +755,6 @@ function drawBoar(e) {
 function drawBody(o) {
   if (g3Body(o)) return;
   ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.ang + 1.2);
-  ctx.fillStyle = 'rgba(80,10,6,0.55)'; ctx.beginPath(); ctx.ellipse(2, 2, 15, 11, 0, 0, 6.28); ctx.fill();
   if (o.kind === 'dog') { ctx.fillStyle = '#4a3c31'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 6, 0, 0, 6.28); ctx.fill(); ctx.beginPath(); ctx.ellipse(13, 2, 5, 4, 0.4, 0, 6.28); ctx.fill(); }
   else {
     const lk = (LOOKS[o.fac] || LOOKS.loner); const c = Array.isArray(lk) ? lk[o.seed % lk.length] : lk;
@@ -914,7 +921,15 @@ function render() {
     if(ART && C1 && !loft && !shopVisible){drawRoadWetness(vx,vy,vw,vh);drawRunoff(inView);}
     drawBootMarks(loft,inView);
   }
-  if(!loft && !shopVisible)drawLampShadows(inView);
+  if(!loft && !shopVisible){drawLampShadows(inView);if(ART && C1)drawAtpOccupation(inView);}
+  for(const o of objs){
+    if(o.k!=='body' || o.kind==='sack')continue;
+    const at=o.deathSpot||o;
+    if(inView(at.x,at.y,23)){
+      const fx=BODYFX.get(o);
+      bloodPool(o,fx?clamp((G7.vt-fx.t0)/.38,0,1):1);
+    }
+  }
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
   if(blood && inView(blood.x,blood.y,30)){
     const alpha=patient?.wounded?1:clamp(1-(S.min-blood.t)/6,0,1);
@@ -935,14 +950,26 @@ function render() {
   }
   drawCordonTrail(inView);
   // костёр
-  for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) { fireGroundLight(F); drawFlames(F); }
+  for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) {
+    if(fireLit(F)){fireGroundLight(F);drawFlames(F);}
+    else{
+      // Cover the glowing coals in the painted base while its stone ring stays visible.
+      ctx.fillStyle='#34302b';ctx.beginPath();ctx.ellipse(F.x,F.y,11,9,.2,0,Math.PI*2);ctx.fill();
+      for(let i=0;i<6;i++){
+        const x=F.x+(hash2(i,3)-.5)*14,y=F.y+(hash2(i,7)-.5)*9;
+        beam(ctx,x-3,y+3,x+3,y-2,2.5,i%2?'#272521':'#666055');
+      }
+    }
+  }
   for (const o of objs) {
     if (BIG && o.x>=PW*T && loftAt(o)!==loft) continue;
     if ((o.k==='locker'||o.k==='safe'||o.k==='hiding'||o.broken) && inView(o.x,o.y,40)) {
+      containerContact(o);
       if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
       else containerDraw(o);
     }
     else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
+      containerContact(o);
       if(perspective) liftContainer(o,crateDraw); else crateDraw(o);
     }
     if (o.pick && inView(o.x, o.y, 30)) drawPick(o);
@@ -971,12 +998,12 @@ function render() {
   let plantIndex=0;
   for (const e of vis) {
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
+    drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else drawLitHuman(e);
-    if((campAct?.actor===e && campAct.music) || (e===P && S.weapon==='guitar'))drawCampGuitar(e);
-    else if(livingZone && !loft && !shopVisible)drawHearthGesture(e);
-    if(e.sit && e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
+    if(!holdsGuitar(e) && livingZone && !loft && !shopVisible)drawHearthGesture(e);
+    if(e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
     if (e !== P && e.hp < e.maxhp && hostile(e, P) && dE(e, P) < 450 && !HOUSES.some(h => h.a > 0.5 && e.x > h.x * T && e.x < (h.x + h.w) * T && e.y > h.y * T && e.y < (h.y + h.h) * T)) {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - 12, e.y - 20, 24, 3);
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
@@ -1118,6 +1145,7 @@ function render() {
   const LW = lightC.width, LH = lightC.height;
   lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH);
   if (dk > 0.02) {
+    const windows=paneSpill(inView);
     lctx.fillStyle = 'rgba(4,7,12,' + dk + ')'; lctx.fillRect(0, 0, LW, LH);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, a) => { const s = toS(x, y), rr = r * Z / 2; if (s[0] < -rr || s[1] < -rr || s[0] > LW + rr || s[1] > LH + rr) return; const g = lctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], rr); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.beginPath(); lctx.arc(s[0], s[1], rr, 0, 6.28); lctx.fill(); };
@@ -1133,13 +1161,19 @@ function render() {
       castLight(lctx,e,e.ang,.35,180,.70);
     if(!loft && !shopVisible){
       for(const l of siteLights())if(inView(l.x,l.y,l.r))castLight(lctx,l,l.angle,l.half,l.r,.91);
-      for(const f of WORLD_FIRES)if(inView(f.x,f.y,200))
+      drawRoomLights(lctx,inView,false);
+      for(const pane of windows)windowGlow(lctx,pane,false);
+      for(const f of WORLD_FIRES)if(fireLit(f) && inView(f.x,f.y,200))
         castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120))
         castLight(lctx,lamp,0,Math.PI,120,.85);
     }
     lctx.restore();
 
+    for(const pane of windows){
+      const [x,y]=roofPoint(pane.wallX,pane.wallY,.035);
+      hole(x,y,11,.24);
+    }
     if (shopVisible) {
       hole(STAIRS.x+2.15*T, 6.13*T, 74, .9);
     } else if (bunk) { hole(RMp(126.5 * T, 7 * T)[0], RMp(126.5 * T, 7 * T)[1], 260 + Math.sin(S.min * 30) * 3, 0.9); hole(RMp(124.5 * T, 3.5 * T)[0], RMp(124.5 * T, 3.5 * T)[1], 120, 0.7); }
@@ -1158,7 +1192,10 @@ function render() {
         ctx.fillStyle='#3c3932';ctx.fillRect(l.x-4,l.y-2,8,5);
         ctx.fillStyle='#e8c588';ctx.fillRect(l.x-2.5,l.y+1,5,1.6);
       }
-      if(inView(FIRE.x,FIRE.y,205))castLight(ctx,FIRE,0,Math.PI,205,dk*.22,'255,150,60');
+      for(const f of WORLD_FIRES)if(fireLit(f) && inView(f.x,f.y,205))
+        castLight(ctx,f,0,Math.PI,f===FIRE?205:170,dk*.22,'255,150,60');
+      drawRoomLights(ctx,inView,true);
+      for(const pane of windows)windowGlow(ctx,pane,true);
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120)){
         castLight(ctx,lamp,0,Math.PI,120,dk*.32,'255,203,132');
         ctx.fillStyle='#d8ba86';ctx.beginPath();ctx.arc(lamp.x,lamp.y,2,0,Math.PI*2);ctx.fill();

@@ -68,6 +68,7 @@ function worldFx(dt) {
   if (S.wx.k === 'storm' && WX.rain > 0.7 && chance(dt * 0.07)) { WX.flash = 1; setTimeout(() => play('thunder'), rnd(400, 2200)); }
   updateCoat(dt);
   if(livingZone)updateEnvironment(dt);
+  updateCampFires();
   mixRecordedRain();
   blowout(dt);
   // шаги и анимация ног
@@ -253,6 +254,17 @@ function blowoutHumanAI(e, dt) {
   else {e.path=null;e.yielding=false;}
   return true;
 }
+const emissionDamageRate=9;
+function emissionStatus(shelter){
+  const safe=sheltered(P.x,P.y),left=Math.max(0,Math.ceil(S.blow.t));
+  if(S.blow.stage===1){
+    const route=safe?'Вы в укрытии':shelter?'Укрытие в '+Math.ceil(dE(P,shelter)/T*1.5)+' м':'Найдите укрытие';
+    return 'До удара '+left+' с · '+route;
+  }
+  if(safe)return 'В укрытии · до отбоя '+left+' с';
+  const survival=Math.ceil(P.hp/emissionDamageRate);
+  return 'Выброс · '+(survival<=left?'до гибели ≈'+Math.max(0,survival)+' с':'до отбоя '+left+' с')+' · В укрытие!';
+}
 function blowout(dt) {
   const B = S.blow;
   if (B.stage === 0 && S.min >= B.next && P.alive) {
@@ -272,7 +284,7 @@ function blowout(dt) {
   } else if (B.stage === 2) {
     B.t -= dt; WX.red = lerp(WX.red, 1, Math.min(1,dt * 2));
     if (chance(dt * 1.5)) WX.flash = 0.8;
-    if (P.alive && !sheltered(P.x, P.y)) { P.hp -= 9 * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
+    if (P.alive && !sheltered(P.x, P.y)) { P.hp -= emissionDamageRate * dt; S.rad = Math.min(100, S.rad + 1.5 * dt); if (P.hp <= 0) kill(P, 'blow'); }
     if (B.t <= 0) {
       S.flags.blowClearUntil=S.min+12;
       B.stage = 0; B.next = S.min + rnd(1440, 2400);

@@ -1044,6 +1044,12 @@ function aiHuman(e, dt) {
     e.crouch = 0; if (goTo(e, e.lastSeen.x, e.lastSeen.y, 68, dt) < 20) e.mem = 0;
     return;
   }
+  if(inhabited && atpNewSentry(e)){
+    const post=atpScene().guardPoint;
+    if(dE(e,post)>14)goTo(e,post.x,post.y,65,dt);
+    else e.ang+=angD(e.ang,Math.PI/2+.16*Math.sin(S.min*.09))*Math.min(1,dt*1.5);
+    return;
+  }
   idleHuman(e, dt);
 }
 /* ===== тактика в бою ===== */

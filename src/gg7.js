@@ -203,7 +203,7 @@ function g7Human(e, extra, target) {
       const rise = e.campRise || 0, frame = Math.round(rise * 16);
       const sw = sheet.naturalWidth / 17, sh = 168;
       target.save(); target.translate(e.x, e.y); target.rotate(e.ang - Math.PI / 2);
-      const gesture=humanMotionOn && rise===0 ? campMotion(e) : null;
+      const gesture=humanMotionOn && rise===0 && !holdsGuitar(e) ? campMotion(e) : null;
       if(gesture){
         target.translate(0,gesture.lean);target.rotate(gesture.turn);
       }
@@ -220,6 +220,7 @@ function g7Human(e, extra, target) {
         target.drawImage(sheet,0,0,sw,elbowRow,-24,-28,48,34);
         target.drawImage(sheet,0,elbowRow,sw,sh-elbowRow,-24,6,48,22+gesture.lean*1.7);
       }else target.drawImage(sheet, frame*sw, 0, sw, sh, -24, -28, 48, 56);
+      if(holdsGuitar(e))seatedGuitar(target,e);
       if (model) {
         target.globalAlpha = alpha*blend;
         target.drawImage(model.image,-24,-28,48,model.height);
@@ -283,18 +284,18 @@ function g7Body(o) {
   const skin = o.kind === 'human' ? ({ bandit: 'bandit', army: 'army' }[o.fac] || 'loner') : o.kind;
   if (G7.poseOn && window.CordonPoseKeys) {
     const pose = CordonPoseKeys.sample(skin, 'death_transition', age);
-    if (pose && pose !== 'dead') { const f = g7PoseFrame(skin, pose); if (f) { bloodPool(o, Math.min(1, age / 0.34)); drawFrameAt(o.x, o.y, o.ang, f, 1, 1, ctx, jacketFor(o)?.images); return true; } }
+    if (pose && pose !== 'dead') { const f = g7PoseFrame(skin, pose); if (f) { drawFrameAt(o.x, o.y, o.ang, f, 1, 1, ctx, jacketFor(o)?.images); return true; } }
     if (pose === 'dead') return false;
   }
   if (b.rig && G7.img && G7.skins[b.skin]) {   // запасной путь G5: наклон и смешивание к кадру трупа
-    bloodPool(o, Math.min(1, age / 0.4));
     return CordonRig.draw(ctx, G7.img, CORDON_RIG.manifest, b.rig, { skin: b.skin, x: o.x, y: o.y, angle: o.ang, grip: 'none', deadImage: G7.img[CORDON_RIG.dead[b.skin]] });
   }
   return false;
 }
 function bloodPool(o, k) {   // неровное пятно из нескольких эллипсов, форма стабильна для трупа
-  const s = (o.seed || 1) * 9301 + Math.floor(o.x) * 49297 + Math.floor(o.y) * 233;
-  ctx.save(); ctx.translate(o.x, o.y); ctx.fillStyle = 'rgba(70,10,6,' + (0.5 * k) + ')'; ctx.beginPath();   // один контур: без наложения прозрачности
+  const at=o.deathSpot||o;
+  const s = (o.seed || 1) * 9301 + Math.floor(at.x) * 49297 + Math.floor(at.y) * 233;
+  ctx.save(); ctx.translate(at.x, at.y); ctx.fillStyle = 'rgba(70,10,6,' + (0.5 * k) + ')'; ctx.beginPath();   // один контур: без наложения прозрачности
   for (let i = 0; i < 4; i++) { const h = Math.sin(s + i * 12.9898) * 43758.5453, r = h - Math.floor(h), cx = 2 + (r - 0.5) * 12, cy = 2 + Math.cos(s + i) * 6;
     ctx.moveTo(cx + (8 + r * 8) * (i ? 0.7 : 1), cy); ctx.ellipse(cx, cy, (8 + r * 8) * (i ? 0.7 : 1), (5 + r * 6) * (i ? 0.7 : 1), r * 3, 0, 6.28); }
   ctx.fill(); ctx.restore();

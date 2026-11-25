@@ -189,9 +189,14 @@ function updateBodies(dt){
     const b=draggedBody,d=dE(b,P);
     if(!P.alive || !objs.includes(b) || P.sprinting || d>70)draggedBody=null;
     else if(d>23){
-      const x=P.x+(b.x-P.x)*23/d,y=P.y+(b.y-P.y)*23/d;
-      if(clearWalk(b.x,b.y,x,y,5)){b.x=x;b.y=y;b.ang=Math.atan2(P.y-y,P.x-x);}
-      else draggedBody=null;
+      b.deathSpot ||= {x:b.x,y:b.y};
+      const pull=(d-23)*(1-Math.exp(-12*dt))/d;
+      const x=b.x+(P.x-b.x)*pull,y=b.y+(P.y-b.y)*pull;
+      if(clearWalk(b.x,b.y,x,y,5)){b.x=x;b.y=y;}
+      else if(clearWalk(b.x,b.y,x,b.y,5))b.x=x;
+      else if(clearWalk(b.x,b.y,b.x,y,5))b.y=y;
+      const turn=angD(b.ang||0,Math.atan2(P.y-b.y,P.x-b.x));
+      b.ang=(b.ang||0)+turn*(1-Math.exp(-7*dt));
     }
   }
   bodyCheck-=dt;if(bodyCheck>0)return;bodyCheck=2;ageRemains();
@@ -501,7 +506,7 @@ function findInteract() {
   for (const o of objs) {
     if(o.k==='bed' || o.fitting==='bedroll'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(x,y,P.x,P.y);
-      if(d<52 && sameBedroom(o) && los(P.x,P.y,x,y))cand(d-4,{k:'sleep',o,label:'Спать · спальное место'});
+      if(d<52 && inFurnishedRoom(o) && los(P.x,P.y,x,y))cand(d-4,{k:'sleep',o,label:'Спать · спальное место'});
     }
     if (o.k === 'locker') {
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
@@ -517,10 +522,13 @@ function findInteract() {
       continue;
     }
     if (o.k === 'body' && (o.kind==='human' || Object.keys(o.loot).length)) { const d = dst(P.x, P.y, o.x, o.y); if (d < 42) cand(d, { k: 'loot', o: o, label: 'Обыскать: ' + o.name }); }
-    if(o.stash && !o.looted && o.k!=='crate'){
+    if(o.stash && (!o.looted || o.k==='roomFitting') && o.k!=='crate'){
       const x=o.x+o.w/2,y=o.y+o.h/2,d=dst(P.x,P.y,x,y);
       if(d<46 && los(P.x,P.y,x,y)){
-        if (o.anomalyId) {
+        if(o.k==='roomFitting'){
+          if(inFurnishedRoom(o,true) || (loftAt(P) && loftAt(P)===loftAt(o)))
+            cand(d,{k:'loot',o,label:'Обыскать шкаф'+(o.looted?' · пусто':'')});
+        } else if (o.anomalyId) {
           const quiet=cacheFieldQuiet(o);
           cand(d,{k:'loot',o,label:quiet?'Обыскать схрон путейца':'Схрон путейца · дождись затишья'});
         } else cand(d,{k:'loot',o,label:o.k==='safe'?'Обыскать сейф':'Обыскать тайник'});
