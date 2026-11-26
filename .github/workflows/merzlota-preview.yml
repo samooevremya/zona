@@ -1,0 +1,21 @@
+name: Build winter preview
+on:
+  push:
+    branches: [build-merzlota-district-preview]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 build.py berezki
+        working-directory: src
+      - run: |
+          cp berezki.html index.html
+          test "$(git hash-object index.html)" = "dd94fa674ad5f051eb239c72803c68f383b1a85d"
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add index.html berezki.html
+          git commit -m "Assemble verified winter preview"
+          git push origin HEAD:build-merzlota-district-preview

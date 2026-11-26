@@ -8,7 +8,7 @@ function motionSkin(e) {
   const skin=rigSkin(e);
   if(!skin)return null;
   const color=skin==='loner' && e!==P ? JACKET_COLORS[jacketIndex(e)] : '';
-  const winterTone=BEREZKI?(e===P?'slate':(e.sid==='cook'||e.sid==='housekeeper'||e.sid==='anya')?'ochre':e.sid==='mitya'?'slate':'ash'):null;
+  const winterTone=BEREZKI?winterCoatTone(e):null;
   const key=skin+(winterTone||color);
   if(!motionSkins.has(key)){
     motionSkins.set(key,null);
@@ -96,8 +96,8 @@ function motionReload(e,id){
 function motionWeapon(e,id,W,grip){
   const g=GAIT.get(e) || motionIdle, re=motionReload(e,id);
   const draw=g.swap||0,ready=g.ready||0;
-  const x=(grip==='two'?-2.2:-3)+(grip==='two'?.6:0)*ready-2*draw;
-  const y=(grip==='two'?4.5:8)+ready*2.4-re*2.5-draw*5+(DETECTORS[id]?3:0);
+  const x=(BEREZKI && id==='w_obrez'?-3.7:0)+(grip==='two'?-2.2:-3)+(grip==='two'?.6:0)*ready-2*draw;
+  const y=(BEREZKI && id==='w_obrez'?4:0)+(grip==='two'?4.5:8)+ready*2.4-re*2.5-draw*5+(DETECTORS[id]?3:0);
   const support=HELD_POSES[id]?.support||6;
   return {mode:'g3',articulated:true,id,W,grip,main:[x,y],support:[x,y+support],muzzle:[x,y+W.len]};
 }

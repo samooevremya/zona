@@ -47,7 +47,7 @@ function makeFishingShore(){
   partition(shoreX+46.75,shoreY+15.7,.17,1.3,'timber');
   partition(shoreX+49.15,shoreY+15.7,.17,1.3,'timber');
   furnishShoreHomes();
-  woodStack=interiorObject('woodStack',484.85*T,127.75*T,60,19);
+  woodStack=interiorObject('woodStack',488.4*T,132.45*T,60,19);
 }
 function fishRoutine(e,dt){
   const last=fishingTrack.length-1;
@@ -381,8 +381,5 @@ function fishingRoof(h){
   beam(g,2,depth/2,width-4,depth/2,3,'#d5d9d6');
   for(let x=12;x<width-6;x+=17)beam(g,x,depth/2+2,x-2,depth-6,1,'#66727952');
   g.restore();
-  const cx=h.cabin?(h.w-2)*T:2*T,cy=2.4*T;g.fillStyle='#514f4c66';g.fillRect(cx-2,cy+3,17,15);
-  artFill(g,'wall_brick',cx-6,cy-7,14,15);g.fillStyle='#312f2a';g.fillRect(cx-3,cy-5,8,8);
-  beam(g,cx-7,cy-7,cx+8,cy-7,2,'#c4c6c0');
   return c;
 }

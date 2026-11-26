@@ -694,14 +694,19 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
   function tileBlocks(i,j){
     if(!inb(i,j))return true;
     const tile=map[j*MW+i];
+    if(BEREZKI && vision==='light' && tile===TR)return false;
     return OPAQ[tile] || (tile===RA && vision!=='light');
   }
   while(near<limit){
     if(tileBlocks(i,j))return near;
     const cell=j*MW+i,far=Math.min(nextX,nextY,limit);
     let hit=Infinity;
+    if(BEREZKI && vision==='light' && map[cell]===TR){
+      const u=(i+.5)*T-x,v=(j+.5)*T-y,along=u*dx+v*dy,lateral=u*dy-v*dx;
+      if(Math.abs(lateral)<4.2 && along>=near && along<=far)hit=along-Math.sqrt(4.2**2-lateral**2);
+    }
     const solids=walkSolids.get(cell),props=propCells.get(cell);
-    if(solids)for(const o of solids)if(o.solid && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
+    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k)) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
     if(props)for(const p of props){
       if(vision==='light' && p.vaultable)continue;
@@ -858,6 +863,7 @@ function melee(sh, W) {
 function hurt(e, dmg, src, ang, shot) {
   if(e.protectedResident)return;
   if(BEREZKI && src===P && e.fac==='loner' && e.alive && dmg>0){
+    winterWitness(e);
     for(const guard of ents)if(guard.fac==='loner' && guard.alive && !guard.protectedResident)rememberAttacker(guard);
   }
   if(BIG && src===P && e.guard==='south' && !(e.quiet && dmg>=e.hp))alarmPost();
@@ -938,7 +944,7 @@ function dropBody(e,identified=false) {
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }
   if (e.kind === 'human' && (e.fac === 'loner' || e.fac === 'bandit') && chance(0.3)) loot.__tip = 1;
-  const body = { k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
+  const body = { ...(BEREZKI?{sid:e.sid,winterTone:winterCoatTone(e),deathSpot:{x:e.x,y:e.y}}:{}), k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
   // Младший остаток визуального seed хранит расцветку и после загрузки тела.
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   body.deathKnown=identified || !e.hitByP;
@@ -998,6 +1004,7 @@ function aiHuman(e, dt) {
     return;
   }
   if (e.captive || e.protectedResident) {
+    if(BEREZKI && fleeWitness(e,dt))return;
     if(BEREZKI && !e.captive && shoreJobs[e.sid])shoreRoutine(e,dt);
     return;
   }

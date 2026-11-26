@@ -6,14 +6,15 @@ if BIGF: MAPFLAG = 'rc1'
 h=open('head.html',encoding='utf8').read(); b=open('body.html',encoding='utf8').read(); sp=open('sprite.svg',encoding='utf8').read(); av=open('avatar.js',encoding='utf8').read()
 css=open('ui/ui-theme.css',encoding='utf8').read()+'\n'+open('ui/zona-fixes.css',encoding='utf8').read()+'\n'+open('ui/hud-ref.css',encoding='utf8').read()+'\n'+open('ui/windows.css',encoding='utf8').read(); icons=open('ui/ui-icons.svg',encoding='utf8').read(); bridge=open('ui/ui-bridge.js',encoding='utf8').read()
 import base64
-with open('art/menu/signal-post.webp','rb') as cover:
+with open('berezki/menu.webp' if WINTER else 'art/menu/signal-post.webp','rb') as cover:
     menu_css=open('ui/main-menu.css',encoding='utf8').read().replace('__SIGNAL_POST__',base64.b64encode(cover.read()).decode())
 css += '\n'+menu_css
+if WINTER: css += '\n#title.start .start-name,#ov.pause-open .start-name{font-size:clamp(30px,5.7vw,82px);max-width:95vw;letter-spacing:.045em;line-height:1.08}'
 h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
-scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','atlas.js','scene.js')) if WINTER else ''
+scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('apartments.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','atlas.js','scene.js')) if WINTER else ''
 g5=g5[:pos]+bridge+'\n'+scene+'\n'+('bootBerezki();' if WINTER else g5[pos:])
 js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gscript.js','gstory.js','gsaves.js','gprologue.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gmotion.js','gprops.js','gcontrols.js','gheight.js','glandmarks.js','groominteriors.js','genvironment.js','gatmosphere.js','gfieldaudio.js','gzonelife.js','ginhabited.js'])+"\n"+g5+"\n})();\n"
 if not WINTER: open('game.js','w',encoding='utf8').write(js)
@@ -25,6 +26,9 @@ for file in sorted(_os.listdir('art/detectors')):
         with open('art/detectors/' + file, 'rb') as sprite:
             detector_images['det_' + file[:-4]] = 'data:image/svg+xml;base64,' + _b64.b64encode(sprite.read()).decode()
 audio_files = {f[:-4]: base64.b64encode(open('audio/'+f,'rb').read()).decode() for f in sorted(_os.listdir('audio')) if f.endswith('.mp3') and not f.startswith(('camp0','army0','foe0','ally0'))}
+if WINTER:
+    for file in _os.listdir('berezki/audio'):
+        if file.endswith('.mp3'): audio_files[file[:-4]]=base64.b64encode(open('berezki/audio/'+file,'rb').read()).decode()
 art += '\n/*\n' + open('audio/CREDITS.md', encoding='utf-8').read() + '\n*/\n'
 art += '\nwindow.ZONE_AUDIO=' + __import__('json').dumps(audio_files) + ';'
 art += '\nwindow.DETECTOR_IMAGES=' + __import__('json').dumps(detector_images) + ';'
@@ -93,7 +97,7 @@ if WINTER:
     OUT='../berezki.html'
     h='\n'.join(line for line in h.split('\n') if 'href="https://fonts.' not in line)
     art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit']})+';'
-    b=b.replace('ЗОНА<span class="start-region">КОРДОН','БЕРЁЗКИ<span class="start-region">ЗИМНИЙ КВАРТАЛ')
-    h=h.replace('<title>'+h.split('<title>')[1].split('</title>')[0]+'</title>','<title>Берёзки · Зимний квартал</title>')
+    b=b.replace('ЗОНА<span class="start-region">КОРДОН','МЕРЗЛОТА<span class="start-region">СОТЫЙ КИЛОМЕТР')
+    h=h.replace('<title>'+h.split('<title>')[1].split('</title>')[0]+'</title>','<title>Мерзлота</title>')
 open(OUT,'w',encoding='utf8').write(h+sp+"\n"+icons+"\n"+b+"\n<script>window.ZONA_MAP="+repr(MAPFLAG)+";"+("window.ZONA_BIG=1;" if BIGF else "")+"\n"+art+"\n</script>\n<script>\n"+js+"</script>\n</body>\n</html>\n")
 print('built', OUT, MAPFLAG)
