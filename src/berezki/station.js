@@ -23,6 +23,10 @@ function makeWinterStation(){
   fence(0,district.width*T,northFence,true);
   fence(0,r.x*T,southFence);fence((r.x+r.w)*T,district.width*T,southFence);
   for(const x of [20,41])putFurniture('bench',(stationX+x)*T,(stationY+25.05)*T,0,'station-platform');
+  for(const [x,y,label,west] of [[stationX+36.8,stationY+25.6,'К ОЗЕРУ',false],[2.8,stationY+24.6,'ПЕРЕГОН ЗАКРЫТ',true]]){
+    const post=interiorObject('waypost',x*T,y*T,4,5);
+    post.boardLabel=label;post.west=west;
+  }
   const b=footbridge;
   // The stair stringers block side entry at ground level. The open span
   // between them leaves both tracks walkable underneath.
@@ -31,6 +35,11 @@ function makeWinterStation(){
     const back=y===b.north?y+length:y;
     addObj({k:'stairBack',x:b.x-b.width/2,y:back-2,w:b.width,h:4,solid:1,underDeck:true});
   }
+}
+function stationUnderpass(e){
+  const b=footbridge;
+  return !(e===P && S.flags.stationDeck) && Math.abs(e.x-b.x)<b.width/2+32 &&
+    e.y>b.north+1.65*T && e.y<b.south-T;
 }
 function moveOnStationBridge(e,oldY){
   if(e!==P)return;
@@ -92,7 +101,7 @@ function stationRoof(){
   const h=stationHouse,w=h.w*T+10,d=h.h*T+10;
   h.residenceWalls=[0,1,2,3].map(s=>wallTexture(h,s,(s%2?h.h:h.w)*T,false,'station'));
   const front=h.residenceWalls[2].getContext('2d');
-  front.save();front.translate(7*T,19);front.scale(1.4,1.4);stationSign(front,0,0,'СОТЫЙ КИЛОМЕТР');front.restore();
+  front.save();front.translate(7*T,18);stationSign(front,0,0,'ВОКЗАЛ · СОТЫЙ КИЛОМЕТР',true);front.restore();
   h.storeys=1;h.rooftop=[];
   const c=winterCanvas(w,d),g=c.getContext('2d');
   g.drawImage(balancedGable('c1_roof_slate'),0,0,w,d);
@@ -109,16 +118,28 @@ function stationRoof(){
   }
   return c;
 }
-function stationSign(g,x,y,label){
-  if(label!=='ВОКЗАЛ'){
-    beam(g,x,y+3,x,y-17,3.5,'#655846');shoreEllipse(g,x,y+3,4,1.7,'#aeb9be',.1);
-    y-=12;
+function stationSign(g,x,y,label,mounted=false,west=false,mapView=false){
+  g.save();g.translate(x,y);
+  if(!mounted){
+    shoreEllipse(g,4,2,8,2,'#47494147',.33);
+    const [dx,dy]=raisedOffset(x,y,36,mapView);
+    beam(g,0,1,dx,dy-8,4.3,'#504b3d');
+    beam(g,-1,1,dx-1,dy-8,1.2,'#a29983');
+    g.translate(dx,dy-4);
   }
-  g.font='bold 8px Arial';g.textAlign='center';
-  const w=g.measureText(label).width+9;
-  g.fillStyle='#453e34';g.fillRect(x-w/2-1,y-9,w+2,13);
-  g.fillStyle='#344744';g.fillRect(x-w/2,y-8,w,10);
-  g.fillStyle='#eee3c7';g.fillText(label,x,y);
+  g.font='bold 8px Georgia';g.textBaseline='middle';g.textAlign='center';
+  const w=Math.ceil(g.measureText(label).width)+12,l=-w/2,r=w/2;
+  const shape=new Path2D();
+  shape.moveTo(l,-7);shape.lineTo(r,-7);
+  if(!mounted && !west)shape.lineTo(r+8,-1);
+  shape.lineTo(r,6);shape.lineTo(l,6);
+  if(!mounted && west)shape.lineTo(l-8,-1);shape.closePath();
+  g.save();g.clip(shape);artFill(g,'floor_wood',l-8,-8,w+16,16);
+  g.fillStyle=mounted?'#46483d85':'#64594365';g.fill(shape);
+  beam(g,l,4,r,4,.8,'#322e255c');beam(g,l,-6,r,-6,1,'#c2beb087');
+  g.fillStyle='#d4cbb8';g.fillText(label,0,-.2);
+  for(const u of [l+2,r-2])shoreEllipse(g,u,1,.85,.85,'#3c392f');
+  g.restore();g.lineWidth=.8;g.strokeStyle='#49463d';g.stroke(shape);g.restore();
 }
 function paintStationGround(g,left,right){
   g.save();
@@ -143,8 +164,6 @@ function paintStationGround(g,left,right){
   artFill(g,'floor_concrete',doorX-35,(stationY+32)*T,70,18);
   for(const i of [4,10,16])beam(g,doorX-35,(stationY+32)*T+i,doorX+35,(stationY+32)*T+i,1.2,'#68695f');
 
-  stationSign(g,(stationX+36.8)*T,(stationY+25.6)*T,'К ОЗЕРУ →');
-  stationSign(g,2.8*T,(stationY+24.6)*T,'← ПЕРЕГОН ЗАКРЫТ');
   const b=footbridge;
   g.fillStyle='rgba(42,49,53,.23)';g.beginPath();
   for(const side of [-1,1]){

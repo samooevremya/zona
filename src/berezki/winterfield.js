@@ -10,7 +10,7 @@ function makeWinterSalvage(){
   }
   recordings.frostCrack=[.14,'winterCreak'];
   for(const [x,y,key,loot] of [
-    [524,384,'landing',{candle:1,bandage:1}],[496,133,'nets',{wire:2}],
+    [524,384,'landing',{candle:1,bandage:1}],[484,130,'nets',{wire:2}],
     [337,233,'platform',{buckle:1}],[158,190,'depot',{wire:1,bread:1}],
     [81,126,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
     [253,433,'path',{candle:1}],[114,546,'hut',{bandage:1,candle:1}],
@@ -20,7 +20,6 @@ function makeWinterSalvage(){
     supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
   }
   interiorObject('fishingHole',iceHole.x,iceHole.y,22,16);
-  interiorObject('fireRing',district.fire.x,district.fire.y,18,18);
 }
 // A seeded weather calendar works across sleep and saves, even after several elapsed days.
 function snowWindow(block){
@@ -57,7 +56,9 @@ function winterTracks(dt,room){
   if(P.step-stepDistance>18){
     stepDistance=P.step;const a=Math.atan2(IN.moveY,IN.moveX);
     winterFootSide=-winterFootSide;
-    const blood=objs.some(b=>b.k==='body' && traceAlpha(b.t??S.min)>.25 && dE(b.deathSpot||b,P)<14);
+    const blood=objs.some(b=>b.k==='body' && b.kind!=='sack' && traceAlpha(b.t??S.min)>.25 && dE(b.deathSpot||b,P)<14)
+      || decals.some(d=>!d.burn && traceAlpha(d.t??S.min)>.25 && dE(d,P)<d.r+2)
+      || (flags.snowMarks||[]).some(m=>m.type==='drag' && m.blood>.25 && dE(m,P)<8 && traceAlpha(m.t)>.25);
     flags.bloodySteps=blood?7:Math.max(0,(flags.bloodySteps||0)-1);
     recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',blood:flags.bloodySteps/7});
   }

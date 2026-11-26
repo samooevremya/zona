@@ -48,7 +48,7 @@ function buildRaisedScenery(){
       raisedScenery.push({panel,wood,vertical,span,x,y,depth:y,underDeck:f.underDeck});
     }
   }
-  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery'){
+  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost'){
     const x=o.x+o.w/2,y=o.y+o.h/2;
     raisedScenery.push({item:o,x,y,depth:y+o.h*.24,height:fittingHeight[o.fitting]||28});
   }
@@ -74,12 +74,17 @@ function paintRaisedScenery(g,p,mapView){
     beam(g,x+sx-1.4,y+dy,x+sx+1.5,y+dy,1.8,'#dadad0');
     return;
   }
+  if(p.item.k==='waypost'){stationSign(g,p.x,p.y,p.item.boardLabel,false,p.item.west,mapView);return;}
   const o=p.item,[dx,dy]=raisedOffset(p.x,p.y,p.height,mapView);
   // Cast shadows and feet stay on the footprint. Broad faces carry wood grain
   // from the same interior material as the original raster top.
   const x=o.x+1,y=o.y+1,w=o.w-2,h=o.h-2;
   g.save();
-  if(SHADOWS){g.fillStyle='#33322d39';g.fillRect(x+3,y+4,w,h);}
+  if(SHADOWS){
+    g.fillStyle='#33322d39';
+    if(o.k==='partition')g.fillRect(o.x,o.y+1,o.w+1,o.h+1);
+    else g.fillRect(x+3,y+4,w,h);
+  }
   const side=(a,b,c,d,color)=>{
     g.beginPath();g.moveTo(a,b);g.lineTo(c,d);g.lineTo(c+dx,d+dy);g.lineTo(a+dx,b+dy);g.closePath();g.save();g.clip();
     artFill(g,o.k==='partition'||o.fitting==='stove'?'wall_concrete':'floor_wood',x-Math.abs(dx)-2,y-Math.abs(dy)-2,w+Math.abs(dx)*2+4,h+Math.abs(dy)*2+4);
