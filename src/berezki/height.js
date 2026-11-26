@@ -48,7 +48,7 @@ function buildRaisedScenery(){
       raisedScenery.push({panel,wood,vertical,span,x,y,depth:y,underDeck:f.underDeck});
     }
   }
-  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition'){
+  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery'){
     const x=o.x+o.w/2,y=o.y+o.h/2;
     raisedScenery.push({item:o,x,y,depth:y+o.h*.24,height:fittingHeight[o.fitting]||28});
   }
@@ -93,7 +93,8 @@ function paintRaisedScenery(g,p,mapView){
     side(edge,y,edge,y+h,'#655d50');side(x,y+h,x+w,y+h,o.fitting==='stove'?'#534d46':'#736752');
   }
   g.translate(dx,dy);
-  if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
+  if(o.k==='pumpMachinery')g.drawImage(district.images.pumpMotor,o.x-2,o.y-3,o.w+4,o.h+6);
+  else if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
   g.restore();
 }
 function paintFenceFooting(g,f,left,right){

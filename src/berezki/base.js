@@ -16,7 +16,9 @@ const baseFences=[];
 const baseLanes=[[[325,568],[325,573],[324,582],[324,589],[324,596],[336.5,597],[336.5,595]],
   [[320,573],[325,573],[331,574]],[[324,589],[319,589]],[[324,582],[336.5,581.5],[336.5,585]]];
 const baseStove=tilePoint(314,572);
-function baseStoveLit(){return (S.flags.baseStoveUntil||0)>S.min;}
+const baseHeater={at:baseStove,flag:'baseStoveUntil',room:baseRooms[0],action:'baseKindle'};
+function stoveIn(room){return room===baseRooms[0]?baseHeater:room===pumpRoom?pumpHeater:null;}
+function stoveBurning(stove){return stove && (S.flags[stove.flag]||0)>S.min;}
 function makeBase(){
   for(const r of baseRooms){
     r.n=1;house(r.x,r.y,r.w,r.h,r.doors,CO,0,'conc');
@@ -62,7 +64,7 @@ function baseInterior(r){
     for(const u of [6.2,8.75])for(let j=0;j<32;j++)
       beam(g,u*T,j*10,u*T+1,j*10+8,2.2,'#514c4138');
   }
-  if(r.kind!=='guard'){
+  if(r.kind && r.kind!=='guard'){
     const u=r.kind==='stores'?.62:.73,v=r.kind==='barracks'?.64:.42;
     g.save();g.globalAlpha=.76;g.translate(u*w,v*h);g.rotate(-.33);
     g.drawImage(district.snowStamp,-55,-31,110,62);g.restore();
@@ -73,7 +75,7 @@ function baseInterior(r){
   return c;
 }
 function baseRoof(h){
-  const r=h.baseRoom,w=r.w*T+10,d=r.h*T+10,c=winterCanvas(w,d),g=c.getContext('2d');
+  const r=h.baseRoom || pumpRoom,w=r.w*T+10,d=r.h*T+10,c=winterCanvas(w,d),g=c.getContext('2d');
   artFill(g,'wall_concrete',0,0,w,d);
   const rand=mulberry32(h.x*317+h.y);
   g.fillStyle=r.kind==='hangar'?'#655c5199':'#77796770';g.fillRect(0,0,w,d);
@@ -90,7 +92,7 @@ function baseRoof(h){
     g.save();g.globalAlpha=.36;g.drawImage(district.snowStamp,x-l/2,y-l*.19,l,l*.38);g.restore();
   }
   beam(g,0,d*.5,w,d*.5,4,'#666960');beam(g,0,d*.5-1,w,d*.5-1,2,'#dddcd1');
-  if(r.kind!=='guard'){
+  if(r.kind && r.kind!=='guard'){
     // Remove a ragged section of roof so the real floor and broken rafters show through.
     const cx=w*(r.kind==='stores'?.62:.73),cy=d*(r.kind==='barracks'?.64:.42);
     const hole=baseBreach(r,w,d);g.lineWidth=6;g.strokeStyle='#59554a';g.stroke(hole);
@@ -102,8 +104,8 @@ function baseRoof(h){
     g.restore();
   }
   g.strokeStyle='#7d8076';g.lineWidth=4;g.strokeRect(2,2,w-4,d-4);
-  if(r.kind==='guard'){
-    const x=2*T,y=2*T;
+  if(r.kind==='guard' || r===pumpRoom){
+    const x=r===pumpRoom?pumpHearth.x-r.x*T:2*T,y=r===pumpRoom?pumpHearth.y-r.y*T:2*T;
     g.fillStyle='#605e54';g.fillRect(x-7,y-8,16,16);
     shoreEllipse(g,x,y,6,6,'#323532');shoreEllipse(g,x-1,y-1,4,4,'#141916');
   }
