@@ -64,7 +64,7 @@ function paintRaisedScenery(g,p,mapView){
     const h=p.wood?28:43,d=p.span/2;
     const [dx,dy]=raisedOffset(p.x,p.y,h,mapView);
     // Slight side view keeps a lengthwise fence readable even on the camera axis.
-    const sx=p.vertical && Math.abs(dx)<2?(dx>0?2:-2):dx;
+    const sx=dx;
     const vx=p.vertical?0:1,vy=p.vertical?1:0;
     g.save();g.translate(p.x-vx*d,p.y-vy*d);
     g.transform(vx,vy,-sx/h,-dy/h,sx,dy);
@@ -82,7 +82,7 @@ function paintRaisedScenery(g,p,mapView){
   if(SHADOWS){g.fillStyle='#33322d39';g.fillRect(x+3,y+4,w,h);}
   const side=(a,b,c,d,color)=>{
     g.beginPath();g.moveTo(a,b);g.lineTo(c,d);g.lineTo(c+dx,d+dy);g.lineTo(a+dx,b+dy);g.closePath();g.save();g.clip();
-    artFill(g,o.fitting==='stove'?'wall_concrete':'floor_wood',x-Math.abs(dx)-2,y-Math.abs(dy)-2,w+Math.abs(dx)*2+4,h+Math.abs(dy)*2+4);
+    artFill(g,o.k==='partition'||o.fitting==='stove'?'wall_concrete':'floor_wood',x-Math.abs(dx)-2,y-Math.abs(dy)-2,w+Math.abs(dx)*2+4,h+Math.abs(dy)*2+4);
     g.fillStyle=color;g.globalAlpha=.54;g.fill();g.restore();
   };
   if(['bench','supper','desk','stool'].includes(o.fitting)){
@@ -93,8 +93,19 @@ function paintRaisedScenery(g,p,mapView){
     side(edge,y,edge,y+h,'#655d50');side(x,y+h,x+w,y+h,o.fitting==='stove'?'#534d46':'#736752');
   }
   g.translate(dx,dy);
+  if(o.fitting==='supper' || o.fitting==='desk'){
+    const variant=Math.floor(o.x/29+o.y/37)%3;
+    if(variant!==0){
+      g.save();g.beginPath();g.roundRect(x,y,w,h,variant===1?5:1);g.clip();
+      artFill(g,'floor_wood',x,y,w,h);
+      g.fillStyle=variant===1?'#7e81766e':'#735b4942';g.fillRect(x,y,w,h);
+      for(let v=7;v<h;v+=8)beam(g,x,y+v,x+w,y+v,.8,'#605c50');
+      shoreEllipse(g,x+w*.68,y+h*.43,3.3,3,'#b5ac95',0);g.restore();
+      if(o.workbench)baseBenchTools(g,o);g.restore();return;
+    }
+  }
   if(o.k==='pumpMachinery')g.drawImage(district.images.pumpMotor,o.x-2,o.y-3,o.w+4,o.h+6);
-  else if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
+  else if(o.k==='partition'){artFill(g,'wall_concrete',o.x,o.y,o.w,o.h);g.strokeStyle='#77756a';g.lineWidth=.8;g.strokeRect(o.x,o.y,o.w,o.h);}else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
   g.restore();
 }
 function paintFenceFooting(g,f,left,right){

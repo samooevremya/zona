@@ -60,15 +60,16 @@ function mixRecordedRain(){
   if(!AC)return;
   const room=roomAcoustics(),now=AC.currentTime;
   let nearest=290;
+  const windKey=BEREZKI?'winterWind':'wind',fireKey=BEREZKI?'winterFire':'hearth';
   for(const f of WORLD_FIRES)if(fireLit(f))nearest=Math.min(nearest,dst(f.x,f.y,P.x,P.y));
   const fireVolume=room.underground?0:.16*soundPrefs.nature*(1-nearest/290)**2*(1-.8*room.enclosure);
-  if(!hearthGain && fireVolume>0 && fieldBuffers.has('hearth')){
-    const fire=AC.createBufferSource();fire.buffer=fieldBuffers.get('hearth');fire.loop=true;
+  if(!hearthGain && fireVolume>0 && fieldBuffers.has(fireKey)){
+    const fire=AC.createBufferSource();fire.buffer=fieldBuffers.get(fireKey);fire.loop=true;
     hearthGain=AC.createGain();hearthGain.gain.value=0;const hiss=AC.createBiquadFilter();hiss.type='highpass';hiss.frequency.value=460;fire.connect(hiss);hiss.connect(hearthGain);hearthGain.connect(master);fire.start();
   }
   hearthGain?.gain.setTargetAtTime(fireVolume,now,.22);
-  if(!airGain && fieldBuffers.has('wind')){
-    const air=AC.createBufferSource();air.buffer=fieldBuffers.get('wind');air.loop=true;
+  if(!airGain && fieldBuffers.has(windKey)){
+    const air=AC.createBufferSource();air.buffer=fieldBuffers.get(windKey);air.loop=true;
     airGain=AC.createGain();airGain.gain.value=0;air.connect(airGain);airGain.connect(master);air.start();
   }
   const wind=soundPrefs.nature*(.045+.105*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);

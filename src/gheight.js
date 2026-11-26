@@ -71,6 +71,10 @@ function wallTexture(h, side, len, wood, kind) {
     g.fillRect(l, 25, w, 63);
     g.fillStyle = '#4f483a';
     g.fillRect(l + 1, 27, w * .27, 59);
+    if(BEREZKI && h.baseRoom){
+      artFill(g,'floor_wood',l+w*.77,27,w*.22,58);
+      beam(g,l+w*.77,27,l+w*.77,84,2,'#978c77');
+    }
     g.fillStyle = '#a69b7f';
     g.fillRect(l + w * .19, 57, 2, 3);
   }
@@ -106,6 +110,7 @@ function wallTexture(h, side, len, wood, kind) {
   }
   g.fillStyle = 'rgba(50,44,36,.55)';
   g.fillRect(0, 79, len, 9);
+  if(BEREZKI && h===stationHouse && side===2)stationSign(g,len*.55,19,'ВОКЗАЛ');
   const dim = g.createLinearGradient(0, 0, 0, 88);
   dim.addColorStop(0, 'rgba(23,21,16,.64)');
   dim.addColorStop(.22, 'rgba(23,21,16,.10)');

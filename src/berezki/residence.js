@@ -40,7 +40,10 @@ function residenceWall(h,side){
       g.fillStyle='#a49c84';g.fillRect(x-2,wy-2,w+4,48);
       const glass=g.createLinearGradient(0,wy,0,wy+43);
       glass.addColorStop(0,win.warm?'#5c4931':'#2d383d');glass.addColorStop(1,win.warm?'#b0935b':'#778388');
-      g.fillStyle=glass;g.fillRect(x,wy,w,43);
+      g.fillStyle=h.flat?.abandoned?'#384144':glass;g.fillRect(x,wy,w,43);
+      if(h.flat?.abandoned && rnd()<.72){
+        g.fillStyle='#1e2628';g.beginPath();g.moveTo(x+2,wy+4);g.lineTo(x+w*.65,wy+12);g.lineTo(x+w*.48,wy+22);g.lineTo(x+w-2,wy+17);g.lineTo(x+w-2,wy+42);g.lineTo(x+2,wy+42);g.fill();
+      }
       g.fillStyle='#574f42';g.fillRect(win.u-1,wy,3,43);g.fillRect(x,wy+10,w,2);
       for(let i=0;i<win.boards;i++){
         const ay=wy+14+i*11,delta=i?3:-4;
@@ -58,7 +61,7 @@ function residenceWall(h,side){
     g.fillStyle='#80867e';g.fillRect(x,0,5,base-7);
     for(let y=18;y<base-8;y+=43){g.fillStyle='#424743';g.fillRect(x-1,y,7,2);}
   }
-  if(side===2){
+  if(side===2 && h.entrances.length){
     const door=h.entrances[0],left=door.x-door.width/2;
     g.fillStyle='#ac9e86';g.fillRect(left-4,base-65,door.width+8,65);
     g.fillStyle='#292923';g.fillRect(left,base-61,door.width,61);
@@ -66,8 +69,7 @@ function residenceWall(h,side){
     beam(g,left+10,base-27,left+10,base-19,2,'#b0ac91');
     g.fillStyle='#494c45';g.fillRect(left-8,base-68,door.width+16,5);
     g.fillStyle='#d8d9d0';g.fillRect(left-8,base-69,door.width+16,2);
-    g.fillStyle='#363831';g.fillRect(left+door.width+7,base-51,9,15);
-    g.fillStyle='#efc781';g.fillRect(left+door.width+9,base-49,5,10);
+
   }
   return canvas;
 }
@@ -101,24 +103,6 @@ function residenceRoof(h){
   }
   g.strokeStyle='#5d6261';g.lineWidth=7;g.strokeRect(5,5,w-10,d-10);
   g.strokeStyle='#d5d8d5';g.lineWidth=4;g.strokeRect(4,4,w-8,d-8);
-  // Top view of the stair headhouse and vents also serves the map and menus.
-  for(const part of h.rooftop){
-    const [x,y,width,depth]=part;
-    g.fillStyle='rgba(64,67,65,.47)';g.fillRect(x-3,y-3,width+9,depth+10);
-    g.fillStyle='rgba(57,64,71,.28)';g.fillRect(x+12,y+9,width+4,depth+4);
-    artFill(g,'wall_concrete',x,y,width,depth);g.fillStyle=snow;
-    g.globalAlpha=.7;g.fillRect(x+1,y+1,width-2,depth-2);g.globalAlpha=1;
-    g.strokeStyle='#696f6e';g.lineWidth=1.4;g.strokeRect(x,y,width,depth);
-    if(width>40){
-      for(let seam=x+7;seam<x+width;seam+=9)beam(g,seam,y+1,seam,y+depth-1,1,'#737c79');
-      artFill(g,'floor_wood',x+7,y+7,19,14);g.fillStyle='#777f7b';g.fillRect(x+8,y+8,17,12);
-      beam(g,x+11,y+16,x+18,y+16,2,'#494e49');
-    }else{
-      const cx=x+width/2,cy=y+depth/2;
-      g.fillStyle='#707269';g.beginPath();g.arc(cx,cy,5.5,0,2*Math.PI);g.fill();
-      g.fillStyle='#393e3c';g.beginPath();g.arc(cx,cy,3.5,0,2*Math.PI);g.fill();
-    }
-  }
   return c;
 }
 // Both endpoints of a horizontal wall course share the same projected depth.
@@ -167,16 +151,21 @@ function drawResidence(h,i){
     ctx.fillStyle='rgba(204,212,211,.62)';ctx.fillRect(left,back,cw,cd-2);
     beam(ctx,left,back+cd-2,left+cw,back+cd-2,2,'#e0e3db');
   }
-  const [rx,ry]=residencePoint(x-3,y-3,k);
-  ctx.drawImage(ROOFS[i],rx,ry,(w+10)*(1+k),(d+10)*(1+k));
+  const [rx,ry]=residencePoint(x,y,k);
+  ctx.drawImage(ROOFS[i],rx,ry,w*(1+k),d*(1+k));
   for(const [u,v,width,depth,rise] of h.rooftop){
-    const px=x-3+u,py=y-3+v;
+    const px=x+u,py=y+v;
     const corners=[[px,py],[px+width,py],[px+width,py+depth],[px,py+depth]];
-    const bottom=corners.map(p=>residencePoint(...p,k)),top=corners.map(p=>residencePoint(...p,k+rise));
+    const bottom=corners.map(p=>residencePoint(...p,k)),top=bottom.map(([x,y])=>[x,y-rise*residenceTilt]);
     for(const [a,b,visible,shade] of [[0,1,cam.y+residenceTilt<py,'#626963'],[1,2,cam.x>px+width,'#5f6665'],[3,2,cam.y+residenceTilt>py+depth,'#85877b'],[0,3,cam.x<px,'#72756c']]){
       if(!visible)continue;
       ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(...bottom[a]);ctx.lineTo(...bottom[b]);ctx.lineTo(...top[b]);ctx.lineTo(...top[a]);ctx.fill();
     }
-    ctx.drawImage(ROOFS[i],u,v,width,depth,...top[0],width*(1+k+rise),depth*(1+k+rise));
+    const [lx,ly]=top[0],ww=width*(1+k),dd=depth*(1+k);
+    artFill(ctx,'wall_concrete',lx,ly,ww,dd);
+    ctx.fillStyle='#c7ced1be';ctx.fillRect(lx,ly,ww,dd);
+    ctx.strokeStyle='#6c7576';ctx.lineWidth=1;ctx.strokeRect(lx,ly,ww,dd);
+    if(width>40){for(let seam=8;seam<ww;seam+=10)beam(ctx,lx+seam,ly,lx+seam,ly+dd,.8,'#8a9291');}
+    else {ctx.fillStyle='#565b59';ctx.fillRect(lx+ww*.25,ly+dd*.25,ww*.50,dd*.50);}
   }
 }

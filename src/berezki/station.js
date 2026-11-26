@@ -110,6 +110,10 @@ function stationRoof(){
   return c;
 }
 function stationSign(g,x,y,label){
+  if(label!=='ВОКЗАЛ'){
+    beam(g,x,y+3,x,y-17,3.5,'#655846');shoreEllipse(g,x,y+3,4,1.7,'#aeb9be',.1);
+    y-=12;
+  }
   g.font='bold 8px Arial';g.textAlign='center';
   const w=g.measureText(label).width+9;
   g.fillStyle='#453e34';g.fillRect(x-w/2-1,y-9,w+2,13);
@@ -138,7 +142,7 @@ function paintStationGround(g,left,right){
   const doorX=(stationX+29)*T;
   artFill(g,'floor_concrete',doorX-35,(stationY+32)*T,70,18);
   for(const i of [4,10,16])beam(g,doorX-35,(stationY+32)*T+i,doorX+35,(stationY+32)*T+i,1.2,'#68695f');
-  stationSign(g,doorX+59,(stationY+32)*T+10,'ВОКЗАЛ');
+
   stationSign(g,(stationX+36.8)*T,(stationY+25.6)*T,'К ОЗЕРУ →');
   stationSign(g,2.8*T,(stationY+24.6)*T,'← ПЕРЕГОН ЗАКРЫТ');
   const b=footbridge;
