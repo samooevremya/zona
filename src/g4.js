@@ -1034,7 +1034,10 @@ function render() {
   const drawBridge=()=>ctx.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
   const bridgeVisible=BEREZKI && inView(footbridge.x,(footbridge.south+footbridge.north)/2,200);
   if(bridgeVisible && S.flags.stationDeck)drawBridge();
+  const winterProps=BEREZKI?atlasProps.filter(p=>inView(p.x,p.y,150)):[];
+  let winterIndex=0;
   for (const e of vis) {
+    while(winterIndex<winterProps.length && winterProps[winterIndex].depth<e.y)drawAtlasProp(ctx,winterProps[winterIndex++]);
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
     drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
@@ -1047,6 +1050,7 @@ function render() {
       ctx.fillStyle = '#d64541'; ctx.fillRect(e.x - 12, e.y - 20, 24 * e.hp / e.maxhp, 3);
     }
   }
+  while(winterIndex<winterProps.length)drawAtlasProp(ctx,winterProps[winterIndex++]);
   if(bridgeVisible && !S.flags.stationDeck)drawBridge();
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);

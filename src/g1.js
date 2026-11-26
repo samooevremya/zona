@@ -5,7 +5,7 @@ const T = 32, BIG = typeof window !== 'undefined' && window.ZONA_BIG === 1;
 const CORDON_ROWS = BIG ? 220 : 110, WEST = BIG ? 240 : 0, NORTH_ROWS = BIG ? 132 : 0,
   LESSER_TOP = NORTH_ROWS + 68, WORLD_ROWS = NORTH_ROWS + CORDON_ROWS;
 let MW = BIG ? WEST + 252 : 132, MH = WORLD_ROWS, PW = BIG ? WEST + 240 : 120, WW = MW * T, WH = MH * T;
-if (BEREZKI) { MW = PW = 160; MH = 82; WW = MW*T; WH = MH*T; }
+if (BEREZKI) { MW = PW = 860; MH = 740; WW = MW*T; WH = MH*T; }
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
 const chance = p => Math.random() < p;

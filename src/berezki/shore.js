@@ -1,25 +1,22 @@
 // Both the worn track in the snow and the resident's route use these landings.
-const fishingTrack=[[46.9,14.4],[48,16.6],[48,18.8],[52.9,18.8],[53.2,12],[51.8,9.2],[48.4,8]];
-const iceHole=tilePoint(48.4,7.4);
-const fishingRoom={x:44,y:11,w:8,h:7,n:1};
+const shoreX=510,shoreY=131;
+const fishingTrack=[[46.9,14.4],[48,16.6],[48,18.8],[52.9,18.8],[53.2,12],[51.8,9.2],[48.4,8]].map(([x,y])=>[shoreX+x,shoreY+y]);
+const iceHole=tilePoint(shoreX+48.4,shoreY+7.4);
+const fishingRoom={x:shoreX+44,y:shoreY+11,w:8,h:7,n:1};
 let fishingHouse,woodStack;
 function makeFishingShore(){
-  for(let y=1;y<=20;y++)for(let x=37;x<56;x++){
-    if(tAt(x,y)===TR && (y<11 || x>=43))setT(x,y,GR);
-  }
-  setT(42,15,TR);setT(54,13,TR);setT(55,17,TR);
   const r=fishingRoom;
   house(r.x,r.y,r.w,r.h,[[3,6],[4,6]],BR,0,'plank');
   fishingHouse=HOUSES[HOUSES.length-1];buildEntrances(fishingHouse);
   district.levels.push(r);
-  partition(46.75,15.7,.17,1.3,'timber');
-  partition(49.15,15.7,.17,1.3,'timber');
-  putFurniture('stove',46*T,13.4*T,0,'shore');
-  district.heaters.push(tilePoint(46,13.4));
-  putFurniture('bedroll',50.1*T,13.9*T,0,'shore');
-  putFurniture('cupboard',49.4*T,12.5*T,Math.PI/2,'shore').loot={bandage:1};
-  putFurniture('supper',45.9*T,16.25*T,0,'shore');
-  woodStack=interiorObject('woodStack',45.5*T,18.43*T,60,19);
+  partition(shoreX+46.75,shoreY+15.7,.17,1.3,'timber');
+  partition(shoreX+49.15,shoreY+15.7,.17,1.3,'timber');
+  putFurniture('stove',(shoreX+46)*T,(shoreY+13.4)*T,0,'shore');
+  district.heaters.push(tilePoint(shoreX+46,shoreY+13.4));
+  putFurniture('bedroll',(shoreX+50.1)*T,(shoreY+13.9)*T,0,'shore');
+  putFurniture('cupboard',(shoreX+49.4)*T,(shoreY+12.5)*T,Math.PI/2,'shore').loot={bandage:1};
+  putFurniture('supper',(shoreX+45.9)*T,(shoreY+16.25)*T,0,'shore');
+  woodStack=interiorObject('woodStack',(shoreX+45.5)*T,(shoreY+18.43)*T,60,19);
 }
 function fishRoutine(e,dt){
   const last=fishingTrack.length-1;
@@ -34,7 +31,7 @@ function fishRoutine(e,dt){
   }
   if(round.index===0 || round.index===last){
     const onIce=round.index===last;
-    e.crouch=onIce?1:0;e.ang=onIce?-Math.PI/2:Math.atan2(13.4-y,46-x);
+    e.crouch=onIce?1:0;e.ang=onIce?-Math.PI/2:Math.atan2(shoreY+13.4-y,shoreX+46-x);
     if(!round.until)round.until=S.min+(onIce?9:4);
     if(S.min<round.until || (!onIce && !day))return;
     round.outward=!onIce;round.until=0;
@@ -42,11 +39,11 @@ function fishRoutine(e,dt){
   round.index+=round.outward?1:-1;
 }
 function restoreShoreFooting(){
-  const inYard=P.x>=42*T && P.x<56*T && P.y>=10*T && P.y<20*T;
+  const inYard=P.x>=(shoreX+42)*T && P.x<(shoreX+56)*T && P.y>=(shoreY+10)*T && P.y<(shoreY+20)*T;
   if(!inYard || clearFooting(P.x,P.y,P.r))return;
   // An older save can put the player inside a newly built wall or fitting.
   let best=null,gap=Infinity;
-  for(let y=9;y<=20;y++)for(let x=41;x<=56;x++){
+  for(let y=shoreY+9;y<=shoreY+20;y++)for(let x=shoreX+41;x<=shoreX+56;x++){
     const p=tilePoint(x+.5,y+.5),d=dE(P,p);
     if(d<gap && clearFooting(p.x,p.y,P.r)){best=p;gap=d;}
   }
@@ -57,29 +54,7 @@ function shoreEllipse(g,x,y,rx,ry,color,angle=0){
 }
 function shoreGround(g){
   const rand=mulberry32(24485);
-  const basin=new Path2D();
-  for(let i=0;i<=120;i++){
-    const a=i*Math.PI/60,edge=1+.044*Math.sin(a*5)+.026*Math.sin(a*9+.7);
-    const x=(45.9+8.65*Math.cos(a)*edge)*T,y=(5.9+4.2*Math.sin(a)*edge)*T;
-    if(i)basin.lineTo(x,y);else basin.moveTo(x,y);
-  }
-  basin.closePath();
-  const im=district.images.materials,half=im.width/2,tile=winterCanvas(432,432),t=tile.getContext('2d');
-  for(const u of [0,1])for(const v of [0,1]){
-    t.save();t.translate(u*432,v*432);t.scale(u?-1:1,v?-1:1);
-    t.drawImage(im,half+2,half+2,half-4,half-4,0,0,216,216);t.restore();
-  }
-  const left=36*T,top=T,ice=winterCanvas(20*T,10*T),ig=ice.getContext('2d');
-  ig.translate(-left,-top);ig.fillStyle=ig.createPattern(tile,'repeat');ig.fillRect(left,top,ice.width,ice.height);
-  // Feather the bank into the existing snow. Both surfaces are fixed in world space.
-  const mask=winterCanvas(ice.width,ice.height),mg=mask.getContext('2d');
-  mg.translate(-left,-top);mg.filter='blur(10px)';mg.fill(basin);
-  ig.globalCompositeOperation='destination-in';ig.drawImage(mask,left,top);
-  g.drawImage(ice,left,top);
-  // Stay on the bank until the last few metres. The two soles alternate on bends.
-  const approach=[[33,62],[40.7,59.7],[41,46],[40,35],[35.8,32.9],[29,32.7]];
-  const lakeside=[[39,17.5],[40.8,16.8],[43.4,18.9],[48,18.8]];
-  for(const trail of [approach,lakeside,fishingTrack.slice(2)]){
+  for(const trail of [fishingTrack.slice(2)]){
     let step=0;
     for(let i=1;i<trail.length;i++){
       const [x,y]=trail[i-1],[tx,ty]=trail[i],dx=(tx-x)*T,dy=(ty-y)*T;
@@ -102,15 +77,7 @@ function shoreGround(g){
   const door=fishingHouse.entrances[0],cx=fishingHouse.x*T+door.x,py=(fishingHouse.y+fishingHouse.h)*T;
   artFill(g,'floor_wood',cx-door.width/2-3,py,door.width+6,16);
   for(const h of [5,10,15])beam(g,cx-door.width/2-3,py+h,cx+door.width/2+3,py+h,1.4,'#746859');
-  const o=woodStack;
-  g.fillStyle='#42434166';g.fillRect(o.x+4,o.y+5,o.w,o.h);
-  artFill(g,'floor_wood',o.x,o.y,o.w,o.h);
-  for(let row=0;row<2;row++)for(let i=0;i<9;i++){
-    const ax=o.x+4+i*6+(row?2:0),ay=o.y+o.h-2-row*5;
-    shoreEllipse(g,ax,ay,3.4,2.9,'#504532');shoreEllipse(g,ax,ay,2.4,2,'#ac9070');
-  }
-  artFill(g,'floor_wood',o.x-2,o.y-3,o.w+4,12);
-  g.fillStyle=g.createPattern(snowMaterial(),'repeat');g.fillRect(o.x-2,o.y-3,o.w+4,9);
+
 }
 function fishingInterior(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
@@ -123,6 +90,7 @@ function fishingInterior(r){
     g.fillStyle='#423b2e80';g.fillRect(left,top,T,T);
     for(let i=2;i<T;i+=8)beam(g,left,top+i,left+T,top+i,1,'#352e2470');
   }
+  g.save();g.translate(shoreX*T,shoreY*T);
   g.fillStyle='#695545';g.fillRect(47*T,16*T,2*T,1.4*T);
   for(let i=1;i<43;i+=5)beam(g,47*T,16*T+i,49*T,16*T+i,1.2,'#918071');
   // Folded felt over the window and a clothesline close to the stove.
@@ -134,11 +102,13 @@ function fishingInterior(r){
     shoreEllipse(g,ix*T,12.47*T,3,5,'#74533a',-.17);
     shoreEllipse(g,ix*T+2.5,12.50*T,1.6,2.6,'#74533a',-.7);
   }
+  g.restore();
   for(const o of objs){
     if(winterFloor(o.x,o.y)!==r)continue;
     if(o.k==='roomFitting')drawRoomFitting(g,o);
     if(o.k==='partition')paintPartition(g,o);
   }
+  g.translate(shoreX*T,shoreY*T);
   const glow=g.createRadialGradient(46*T,13.4*T,2,46*T,13.4*T,53);
   glow.addColorStop(0,'rgba(238,146,57,.36)');glow.addColorStop(1,'transparent');
   g.fillStyle=glow;g.fillRect(46*T-53,13.4*T-53,106,106);
