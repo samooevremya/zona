@@ -350,7 +350,7 @@ function buildAtlasOverview(){
   for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++)if(tAt(x,y)===TR)g.fillRect(x,y,1.3,1.3);
   g.save();g.scale(1/T,1/T);
   g.fillStyle='#8babb9';g.fill(district.basinPaths[0]);g.fillStyle='#879593';g.fill(district.basinPaths[1]);
-  for(const route of atlasRoutes){g.beginPath();for(const [x,y] of route)g.lineTo(x*T,y*T);g.strokeStyle='#8d8173';g.lineWidth=52;g.stroke();}
+  for(const route of atlasRoutes){g.beginPath();for(const [x,y] of route)g.lineTo(x*T,y*T);g.strokeStyle='#8d8173';g.lineWidth=85;g.stroke();}
   g.restore();
   for(const y of [northFence/T,stationY+21,stationY+22.65,southFence/T]){
     g.fillStyle='#6c7472';g.fillRect(0,y,district.width,.6);
@@ -363,10 +363,11 @@ function buildAtlasOverview(){
 }
 function atlasMapLabels(g,s,u){
   const detail=s>3*u;
-  g.textAlign='center';g.font='bold '+Math.max(8*u,Math.min(13*u,s*10))+'px Arial';
+  g.textAlign='center';g.font='bold '+Math.max(10*u,Math.min(13*u,s*10))+'px Arial';
   const labels=detail?[...atlasSites,['Лодки',550,132],['Прорубь',558.4,138.4],['Мост',379,251],
     ['Жилой корпус',587,402],['Детская площадка',593,417],['Заброшенный корпус',587,430]]:atlasSites;
   for(const [name,x,y] of labels){
-    g.lineWidth=2.8*u;g.strokeStyle='#384247';g.strokeText(name,x*s,y*s);g.fillStyle='#f2e8ce';g.fillText(name,x*s,y*s);
+    const margin=g.measureText(name).width/2+2*u,cx=clamp(x*s,margin,district.width*s-margin);
+    g.lineWidth=2.8*u;g.strokeStyle='#384247';g.strokeText(name,cx,y*s);g.fillStyle='#f2e8ce';g.fillText(name,cx,y*s);
   }
 }

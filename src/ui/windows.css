@@ -316,3 +316,7 @@ img.b1ic.tall{width:62%;height:86%}
 #field-notices{position:fixed;z-index:9999;pointer-events:none;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:max-content;max-width:68vw;display:grid;gap:3px}
 .field-notice{background:#25241ef2;border:1px solid #75674e;border-left:3px solid #c29c5c;padding:5px 11px;color:#e4dece;font:14px/1.25 Arial,sans-serif;box-shadow:0 2px 5px #0008}
 .field-notice b,.field-notice span{display:block}.field-notice b{font-size:12px;color:#dabc84}
+
+/* The winter map is the only panel in this tab and fills the available screen. */
+.berezki #pbody > .kpk-map { flex: 1 1 0; min-height: 0; width: 100%; }
+.berezki #pbody > .kpk-map > .kpk-wrap { flex: 1 1 0; min-height: 0; }
