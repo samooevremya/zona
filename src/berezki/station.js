@@ -1,6 +1,6 @@
 // The station doors are the only cut in the railway boundary. The footbridge
 // has its own walking surface above the continuous northern fence and rails.
-const stationX=340,stationY=233;
+const stationX=296,stationY=202;
 const stationRoom={x:stationX+22,y:stationY+26,w:13,h:6,n:1};
 const footbridge={x:(stationX+39)*T,width:1.8*T,north:(stationY+17.6)*T,south:(stationY+24.5)*T};
 const platform={x:(stationX+16)*T,y:(stationY+23.5)*T,w:26*T,h:2.5*T};

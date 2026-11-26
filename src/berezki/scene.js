@@ -1,8 +1,8 @@
 // The winter district plugs into the Cordon movement, combat, roof, HUD and inventory systems.
 // Upper storeys occupy enclosed map cells. A save position therefore identifies its floor.
 const district = {
-  width:760, height:740, levels:[], images:{}, plans:[], stairs:[], heaters:[],
-  fire:tilePoint(590,411.6), start:tilePoint(588,406)
+  width:669, height:651, levels:[], images:{}, plans:[], stairs:[], heaters:[],
+  fire:tilePoint(520,362.6), start:tilePoint(518,357)
 };
 function winterCanvas(w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -12,11 +12,11 @@ function winterFloor(x,y){
 }
 function makeDistrict(){
   seedAtlasTerrain();
-  house(576,398,22,11,[[11,10],[12,10]],CO,0,'conc');
-  house(576,424,22,10,[],CO,0,'conc');
+  house(506,349,22,11,[[11,10],[12,10]],CO,0,'conc');
+  house(506,375,22,10,[],CO,0,'conc');
   HOUSES.forEach(h=>{h.storeys=5;buildEntrances(h);});
   for(let n=1;n<=5;n++){
-    const x=n===1?576:n%2===0?770:810, y=n===1?398:n<=3?12:49;
+    const x=n===1?506:n%2===0?770:810, y=n===1?349:n<=3?12:49;
     const r={x,y,w:22,h:11,n};
     district.levels.push(r);
     if(n>1)house(x,y,r.w,r.h,[],CO,0,'none');
@@ -45,7 +45,7 @@ function makeDistrict(){
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE);
   ANOM0.length=CACHES.length=0;
   makeAtlasProps();
-  supplyBox(579*T,407*T,'berezki-canteen',{bread:1,bandage:2});
+  supplyBox(509*T,358*T,'berezki-canteen',{bread:1,bandage:2});
   for(const s of district.stairs){
     stairRun({id:'berezki',stair:s,landing:s},!s.up);
   }
@@ -53,17 +53,17 @@ function makeDistrict(){
 }
 function winterNew(difficulty){
   return {v:1,difficulty:difficultyKey(difficulty),...district.start,hp:100,min:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
-    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:1},campaign:{stage:'district',wounds:{}},
+    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:2},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
 const winterResidents=[
-  ['warden','Агат',586,411.5,'w_obrez'],['door','Савва',589.7,406.6,'w_pm'],
-  ['cook','Тамара',579.5,403.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
+  ['warden','Агат',516,362.5,'w_obrez'],['door','Савва',519.7,357.6,'w_pm'],
+  ['cook','Тамара',509.5,354.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
   ['fisher','Егор',...fishingTrack[0],'knife']
 ];
 function winterRestore(d){
   S=d;survDefaults();plusDefaults();
-  const oldLayout=!S.flags.atlasLayout;upgradeStationSave(S);upgradeAtlasSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
+  const oldLayout=(S.flags.atlasLayout||0)<2;upgradeStationSave(S);upgradeAtlasSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
   S.blow={stage:0};S.flags.warmth??=100;
   HURTDIR.length=0;fog.fill(0);fogDirty=true;fogRegion=null;
   if(S.fog)for(let i=0;i<Math.min(S.fog.length*6,fog.length);i++){const v=S.fog.charCodeAt(Math.floor(i/6))-48;fog[i]=(v>>(i%6))&1;}
@@ -82,8 +82,15 @@ function winterRestore(d){
   ageRemains();buildGrids();restoreShoreFooting();
   if(oldLayout)for(const e of ents){
     if((e===P && S.flags.stationDeck) || clearFooting(e.x,e.y,e.r))continue;
-    const cell=nearestNav(Math.floor(e.x/T),Math.floor(e.y/T));
-    if(cell>=0)Object.assign(e,tilePoint(cell%MW+.5,Math.floor(cell/MW)+.5));
+    // A footprint introduced under an old save can obstruct the very first
+    // step. Look for a free destination, independently of that blocked start.
+    let landing=null,gap=Infinity;
+    const tx=Math.floor(e.x/T),ty=Math.floor(e.y/T);
+    for(let y=ty-4;y<=ty+4;y++)for(let x=tx-4;x<=tx+4;x++){
+      const p=tilePoint(x+.5,y+.5),d=dE(p,e);
+      if(d<gap && clearFooting(p.x,p.y,e.r)){landing=p;gap=d;}
+    }
+    if(landing)Object.assign(e,landing);
   }
   cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
   envSteps.length=0;stepDistance=0;winterFootSide=1;deathT=0;hurtFlash=0;armyAngry=false;MSGS=[];radioQueue.length=0;
@@ -297,17 +304,11 @@ function winterRoofs(){
 function winterMap(g,s,_labels,options={}){
   const r=winterFloor(P.x,P.y), floor=r?.n>1?r:null;
   if(!floor){
-    if(options.mini){
-      const radius=15*T,l=P.x-radius,t=P.y-radius;
-      g.save();g.scale(s/T,s/T);
-      drawAtlasGround(g,l,t,2*radius,2*radius);
-      for(const tree of treesInRect(l-60,t-60,l+2*radius+60,t+2*radius+60))
-        g.drawImage(tree.art.crown,tree.x-tree.size/2,tree.y-tree.size/2,tree.size,tree.size);
-      for(const p of atlasProps)drawAtlasProp(g,p,true);
-      g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
-      for(const h of HOUSES)g.drawImage(ROOFS[h.roofIndex],h.x*T,h.y*T,h.w*T,h.h*T);
-      g.restore();
-    }else g.drawImage(district.overview,0,0,district.width*s,district.height*s);
+    g.drawImage(district.images.survey,0,0,district.width*s,district.height*s);
+    if(options.mini && r){
+      const i=district.levels.indexOf(r);
+      g.drawImage(district.plans[i],r.x*s,r.y*s,r.w*s,r.h*s);
+    }
   }else g.drawImage(district.plans[r.n-1],r.x*s,r.y*s,r.w*s,r.h*s);
   const u=options.u||1;
   if(!floor && options.loc){
@@ -322,7 +323,7 @@ function winterMap(g,s,_labels,options={}){
 function winterMini(){
   const size=(mini.clientWidth||128)*2;
   if(mini.width!==size)mini.width=mini.height=size;
-  const s=size/30;mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
+  const s=size/(winterFloor(P.x,P.y)?30:46);mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5,mini:true});
   const room=winterFloor(P.x,P.y);
   $('mini-distance').textContent=room===stationRoom?'Вокзал':room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
@@ -335,7 +336,7 @@ async function bootBerezki(){
     const im=new Image();im.src=url;await im.decode();district.images[id]=im;
   })]);
   GRADE.mul='rgb(240,247,251)';
-  winterLandscape();winterRoofs();buildAtlasOverview();
+  winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];
   drawRoomLights=(g,inView,tint)=>{
     const house=HOUSES[0],entry=house.entrances[0];
@@ -346,7 +347,7 @@ async function bootBerezki(){
   };
   // Bake a winter view for the shared title and pause menus.
   const cover=winterCanvas(900,490),cg=cover.getContext('2d');
-  const left=571*T,top=393*T;
+  const left=501*T,top=344*T;
   cg.save();cg.scale(900/1150,490/680);cg.translate(-left,-top);
   drawAtlasGround(cg,left,top,1150,680);
   for(const h of HOUSES)cg.drawImage(ROOFS[h.roofIndex],h.x*T,h.y*T,h.w*T,h.h*T);
@@ -369,13 +370,14 @@ async function bootBerezki(){
 function winterPda(){
   const r=winterFloor(P.x,P.y),upper=r?.n>1;
   panel.mapBounds=upper?r:{x:0,y:0,w:district.width,h:district.height};
-  const b=panel.mapBounds,view=panel.mapView||={zoom:1,x:b.w/2,y:b.h/2};
+  const b=panel.mapBounds,view=panel.mapView||={zoom:upper?1:3,x:P.x/T-b.x,y:P.y/T-b.y};
   panel.f={ppl:1,loc:1};
   const box=el('div','kpk-map'),bar=el('div','kpk-bar'),scale=el('span','zl');
   bar.append(el('span','zl',upper?'Жилой корпус · этаж '+r.n:'Сотый километр'),
     btn('chip','−',()=>{view.zoom=clamp(view.zoom/1.6,1,12);refresh();}),scale,
     btn('chip','+',()=>{view.zoom=clamp(view.zoom*1.6,1,12);refresh();}),
-    btn('chip','К игроку',()=>{view.x=P.x/T-b.x;view.y=P.y/T-b.y;view.zoom=3;refresh();}));
+    btn('chip','Вся карта',()=>{view.x=b.w/2;view.y=b.h/2;view.zoom=1;refresh();}),
+    btn('chip','К игроку',()=>{view.x=P.x/T-b.x;view.y=P.y/T-b.y;view.zoom=upper?2:7;refresh();}));
   const w=el('div','mapwrap kpk-wrap'),cv=el('canvas');cv.id='bigmap';w.append(cv);
   box.append(bar,w);pbody.append(box);mountPdaMap(w,cv,panel,[],()=>{},scale);
 }
