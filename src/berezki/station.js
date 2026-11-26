@@ -53,6 +53,7 @@ function moveOnStationBridge(e,oldY){
   }
 }
 function stationPlace(){
+  if(S.flags.onLookout)return 'Охотничья вышка';
   const r=winterFloor(P.x,P.y);
   if(r===stationRoom)return 'Вокзал · Сотый километр';
   if(S.flags.stationDeck)return 'Пешеходный мост';

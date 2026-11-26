@@ -15,7 +15,7 @@ function makeDistrict(){
   makeApartments();
   makeFishingShore();
   makeWinterStation();
-  makeBase();makePumpingStation();
+  makeBase();makePumpingStation();makeWesternSites();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE,shoreFire);
   ANOM0.length=CACHES.length=0;
@@ -73,7 +73,7 @@ function winterRestore(d){
   ageRemains();buildGrids();
   for(const e of ents)if(e===P || shoreJobs[e.sid])restoreShoreFooting(e);
   for(const e of ents){
-    if((e===P && S.flags.stationDeck) || clearFooting(e.x,e.y,e.r))continue;
+    if((e===P && (S.flags.stationDeck || S.flags.onLookout)) || clearFooting(e.x,e.y,e.r))continue;
     // A footprint introduced under an old save can obstruct the very first
     // step. Look for a free destination, independently of that blocked start.
     let landing=null,gap=Infinity;
@@ -295,7 +295,7 @@ function winterGround(vx,vy,vw,vh){
   if(!upper || upper.n===1)drawAtlasGround(ctx,vx,vy,vw,vh);
   district.levels.forEach((r,i)=>{
     if(r.n===1 && (!upper || (upper.n===1 && r.kind)) || r===upper)ctx.drawImage(district.plans[i],r.x*T,r.y*T);
-    if(r===upper && r.kind && r.kind!=='guard')driftingBaseSnow(ctx,r);
+    if(r===upper && r.kind && r!==westStore && r.kind!=='guard')driftingBaseSnow(ctx,r);
   });
   renderWinterMarks(vx,vy,vw,vh);
 }
@@ -310,6 +310,11 @@ function winterRoofs(){
       h.storeys=1;h.rooftop=h.baseRoom && h.baseRoom.kind!=='guard'?
         [[h.w*T*.18,h.h*T*.23,32,23,.053],[h.w*T*.65,h.h*T*.10,26,18,.043],[h.w*T*.80,h.h*T*.74,24,24,.046]]:[];h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
       h.roofIndex=ROOFS.length;ROOFS.push(baseRoof(h));continue;
+    }
+    if(h.loadingBay){
+      h.rooftop=[];
+      h.storeys=1;h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
+      h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
     }
     if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
     if(h===fishingHouse || h.cabin){

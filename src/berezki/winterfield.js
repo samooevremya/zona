@@ -11,8 +11,8 @@ function makeWinterSalvage(){
   recordings.frostCrack=[.14,'winterCreak'];
   for(const [x,y,key,loot] of [
     [524,384,'landing',{candle:1,bandage:1}],[484,130,'nets',{wire:2}],
-    [337,233,'platform',{buckle:1}],[158,190,'depot',{wire:1,bread:1}],
-    [81,126,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
+    [337,233,'platform',{buckle:1}],[153,183,'depot',{wire:1,bread:1}],
+    [82,121,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
     [253,433,'path',{candle:1}],[114,546,'hut',{bandage:1,candle:1}],
     [339,592,'workshop',{wire:1,buckle:1}],[435,164,'forest',{candle:1,bread:1}],
     [326,492,'road',{buckle:1}],[142,352,'marsh',{wire:1}]]){
@@ -52,7 +52,7 @@ function winterTracks(dt,room){
     flags.snowMarks=(flags.snowMarks||[]).filter(p=>traceAlpha(p.t)>.005);
     flags.markSweep=S.min+30;
   }
-  if(room || S.flags.stationDeck || P.jumpT){stepDistance=P.step;return;}
+  if(room || S.flags.onLookout || S.flags.stationDeck || P.jumpT){stepDistance=P.step;return;}
   if(P.step-stepDistance>18){
     stepDistance=P.step;const a=Math.atan2(IN.moveY,IN.moveX);
     winterFootSide=-winterFootSide;
@@ -113,6 +113,7 @@ function fleeWitness(e,dt){
   return true;
 }
 function winterSurface(x,y){
+  if(S.flags.onLookout)return 'winterBoard';
   const r=winterFloor(x,y);
   if(r)return r===fishingRoom||villageCabins.includes(r)||r.kind==='barracks'||(r.block && x<(r.x+16)*T && (y<(r.y+4.4)*T||y>(r.y+6.75)*T))?'winterBoard':'winterConcrete';
   if(swampAt(x,y))return 'winterSlush';
