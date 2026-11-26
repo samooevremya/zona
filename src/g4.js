@@ -3,8 +3,9 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 // Keep the HUD at native CSS resolution. Only the world canvas and terrain cache use the mobile budget.
 const touchRenderer = matchMedia('(pointer: coarse)').matches;
 let touchDensity = 1.25;
+let desktopDensity = 2;
 function sizeWorldCanvas() {
-  const limit = touchRenderer ? Math.min(touchDensity, Math.sqrt(600000 / (VW * VH))) : 2;
+  const limit = touchRenderer ? Math.min(touchDensity, Math.sqrt(600000 / (VW * VH))) : desktopDensity;
   DPR = Math.min(window.devicePixelRatio || 1, limit);
   cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
 }
@@ -13,7 +14,7 @@ const ZNEAR = 1.25; let HUDZ = 1;   // камера как в референсе
 const cam = { x: 0, y: 0 };
 const groundC = document.createElement('canvas');
 const lightC = document.createElement('canvas'), lctx = lightC.getContext('2d');
-const grainC = document.createElement('canvas');
+let grainPattern = null;
 let vignetteC = null;
 const CANOPY = [], LONE_K = +((location.hash.match(/lone-([0-9.]+)/) || [])[1] || 1.3);
 
@@ -652,10 +653,13 @@ function buildCanopy() {
     }
     CANOPY.push(c);
   }
-  const gc = grainC.getContext('2d'); grainC.width = grainC.height = 128;
+  const grainC = document.createElement('canvas');
+  grainC.width = grainC.height = 128;
+  const gc = grainC.getContext('2d');
   const id = gc.createImageData(128, 128);
   for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = GRADE.grain; }
   gc.putImageData(id, 0, 0);
+  grainPattern = ctx.createPattern(grainC, 'repeat');
 }
 
 /* ---------- персонажи ---------- */
@@ -1254,6 +1258,10 @@ function render() {
   if (hurtFlash > 0) { ctx.fillStyle = 'rgba(150,20,10,' + hurtFlash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
   if (P && P.alive && P.hp < 30) { ctx.fillStyle = 'rgba(120,10,5,' + (0.12 + 0.08 * Math.sin(S.min * 6)) + ')'; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalAlpha = 1;
-  ctx.fillStyle = ctx.createPattern(grainC, 'repeat');
-  ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128); ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
+  // The winter scene has no film-grain tile. Only composite a populated pattern.
+  if (grainPattern) {
+    ctx.fillStyle = grainPattern;
+    ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128);
+    ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
+  }
 }

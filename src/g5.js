@@ -1207,8 +1207,42 @@ function onDeath() { showTitle('death'); }
 let last = performance.now();
 /* автоподстройка: если в игре кадр в среднем дольше 22 мс, кроны деревьев рисуются мельче (меньше заливки для слабого телефона) */
 const AQ = { buf: [], done: /aq-off/.test(location.hash) };
+// Sample windows instead of reacting to an isolated terrain upload or a tab switch.
+let sampleTime = 0, fastTime = 0, recoveryDelay = 12000;
+function adaptDesktopWorld(ms) {
+  if (panel || title.open || document.hidden || ms <= 0 || ms > 500) {
+    AQ.buf.length = 0; sampleTime = fastTime = 0;
+    return;
+  }
+  AQ.buf.push(ms); sampleTime += ms;
+  if (sampleTime < 900 || AQ.buf.length < 10) return;
+  AQ.buf.sort((a,b)=>a-b);
+  const median = AQ.buf[AQ.buf.length >> 1];
+  const p85 = AQ.buf[Math.floor(AQ.buf.length * .85)];
+  const nativeDensity = Math.min(devicePixelRatio || 1, 2);
+  const floor = Math.min(1, nativeDensity);
+  let next = DPR;
+  if (median > 22) {
+    fastTime = 0;
+    // Pixel cost scales with area. Quantize steps to avoid continual resampling.
+    next = Math.max(floor, Math.min(DPR - .25, Math.floor(DPR * Math.sqrt(19 / median) * 4) / 4));
+  } else if (p85 < 19 && DPR < nativeDensity) {
+    fastTime += sampleTime;
+    if (fastTime >= recoveryDelay) {
+      next = Math.min(nativeDensity, DPR + .25); fastTime = 0;
+      recoveryDelay = Math.min(60000, recoveryDelay * 2);
+    }
+  } else fastTime = 0;
+  AQ.buf.length = 0; sampleTime = 0;
+  if (next !== DPR) {
+    desktopDensity = next >= nativeDensity ? 2 : next;
+    sizeWorldCanvas();
+  }
+}
 function autoQuality(ms) {
-  if (AQ.done || panel || title.open || document.hidden) return;
+  if (AQ.done) return;
+  if (BEREZKI && !touchRenderer) { adaptDesktopWorld(ms); return; }
+  if (panel || title.open || document.hidden) return;
   if (ms > 0 && ms < 200) AQ.buf.push(ms);
   if (AQ.buf.length < (touchRenderer ? 90 : 180)) return;
   const a = AQ.buf.slice().sort((x, y) => x - y), med = a[a.length >> 1]; AQ.buf.length = 0;
