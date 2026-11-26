@@ -1,85 +1,80 @@
-// All points are in ground pixels plus physical height. The same structure casts the shadow.
-const yardEquipment=new Set(['swing','slide','seesaw','roundabout']);
-function paintEquipment(g,p,mapView,shadow=false){
-  const project=([x,y,z=0])=>{
-    if(shadow)return [p.x+x+z*.42,p.y+y+z*.27];
-    const [u,v]=raisedOffset(p.x+x,p.y+y,z,mapView);
-    return [p.x+x+u,p.y+y+v];
-  };
-  const pipe=(a,b,w,color)=>{
-    const [x,y]=project(a),[u,v]=project(b);
-    beam(g,x,y,u,v,w,shadow?'#4b58602f':'#494b42');
-    if(!shadow){
-      beam(g,x,y-.5,u,v-.5,Math.max(.65,w-1.35),color);
-      if(w>2){
-        const n=Math.ceil(Math.hypot(u-x,v-y)/8);
-        for(let i=1;i<n;i++){
-          const f=i/n,chip=hash2(Math.floor(a[0]+i*7),Math.floor(b[1]+i));
-          if(chip>.52)continue;
-          const xx=x+(u-x)*f,yy=y+(v-y)*f;
-          beam(g,xx,yy,xx+(u-x)/n*.43,yy+(v-y)/n*.43,.85,chip>.24?'#8a6550':'#c1c0b0');
-        }
-      }
-    }
-  };
-  const face=(points,color)=>{
-    g.beginPath();for(const [i,a] of points.entries()){const [x,y]=project(a);if(i)g.lineTo(x,y);else g.moveTo(x,y);}
-    g.closePath();g.fillStyle=shadow?'#48576330':color;g.fill();
-    if(!shadow){
-      const pts=points.map(project),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
-      const x=Math.min(...xs),y=Math.min(...ys),w=Math.max(...xs)-x,h=Math.max(...ys)-y;
-      g.save();g.clip();g.globalAlpha=.80;
-      artFill(g,p.key==='slide'?'wall_concrete':'floor_wood',x,y,w,h);
-      g.fillStyle=color;g.globalAlpha=.35;g.fillRect(x,y,w,h);
-      const frost=g.createLinearGradient(x,y,x+w*.3,y+h);frost.addColorStop(0,'#e5e6debf');frost.addColorStop(.62,'#cbcdc65c');frost.addColorStop(1,'#53574340');
-      g.globalAlpha=1;g.fillStyle=frost;g.fillRect(x,y,w,h);
-      const rand=mulberry32(177+Math.round(points[0][0]));
-      for(let i=0;i<w*h*.063;i++){
-        const xx=x+rand()*w,yy=y+rand()*h;g.fillStyle=i%4?'#dbded554':'#715e4e84';g.fillRect(xx,yy,.7+rand()*2,.8);
-      }
-      g.restore();
-      g.beginPath();for(const [i,v] of pts.entries()){if(i)g.lineTo(...v);else g.moveTo(...v);}g.closePath();g.strokeStyle='#645e53';g.lineWidth=1;g.stroke();
-    }
-  };
-  const rust='#937052',green='#71806d',snow='#d2d5cc',metal='#a2a6a0';
-  if(p.key==='swing'){
-    for(const x of [-44,44]){
-      for(const y of [-15,15]){pipe([x,y],[x,0,75],4.3,green);if(!shadow)shoreEllipse(g,p.x+x,p.y+y,4.8,2.3,'#aab4b9',.15);}
-    }
-    pipe([-45,0,75],[45,0,75],5,rust);pipe([-44,0,77],[44,0,77],1.4,snow);
-    for(const u of [-20,20]){
-      for(const side of [-10,10]){pipe([u+side,0,73],[u+side,1,16],1.6,metal);}
-      face([[u-11,-4,15],[u+11,-4,15],[u+11,6,15],[u-11,6,15]],'#958573');
-      pipe([u-11,5,15],[u+11,5,15],2.4,rust);
-    }
-  }else if(p.key==='slide'){
-    for(const x of [-12,12]){
-      pipe([x,-25],[x,-11,49],3,green);pipe([x,-10],[x,-11,49],3,rust);
-      pipe([x,-16,57],[x,-4,57],2.8,green);pipe([x,-3,57],[x,-2,45],2,green);
-    }
-    for(let i=0;i<=5;i++)pipe([-12,-25+i*2.3,i*8],[12,-25+i*2.3,i*8],2.6,rust);
-    face([[-12,-12,47],[12,-12,47],[12,-2,46],[-12,-2,46]],'#969588');
-    face([[-12,-2,46],[12,-2,46],[12,25,6],[-12,25,6]],'#adb2ad');
-    for(const x of [-12,12])pipe([x,-2,48],[x,25,8],2.6,metal);
-  }else if(p.key==='seesaw'){
-    for(const y of [-6,6]){pipe([-7,y],[0,y,18],3,green);pipe([7,y],[0,y,18],3,green);}
-    pipe([-49,0,8],[49,0,30],6,rust);
-    for(const side of [-1,1]){
-      const x=side*38,z=19+side*9;
-      face([[x-9,-7,z],[x+9,-7,z],[x+9,7,z],[x-9,7,z]],'#827767');
-      pipe([x-side*9,0,z],[x-side*9,0,z+10],2.7,green);
-    }
-  }else{
-    const ring=Array.from({length:32},(_,i)=>[35*Math.cos(i*Math.PI/16),29*Math.sin(i*Math.PI/16),11]);
-    for(let i=0;i<16;i++){
-      const a=ring[i],b=ring[i+1];pipe([a[0],a[1],7],[b[0],b[1],7],3,rust);
-    }
-    face(ring,'#88877a');
-    for(let i=-24;i<=24;i+=8){const end=29*Math.sqrt(1-i*i/(35*35));pipe([i,-end,11],[i,end,11],1,'#736c60');}
-    pipe([0,0],[0,0,32],5,green);
-    for(let i=0;i<6;i++){
-      const a=i*Math.PI/3,x=29*Math.cos(a),y=24*Math.sin(a);
-      pipe([x,y,11],[x,y,30],3,green);pipe([0,0,32],[x,y,30],2.6,rust);
-    }
+// The photographed fittings keep their grain, welds and chipped enamel. Height is
+// measured from the feet in each image. Only elevated parts move against the snow.
+const equipmentProfile={
+  swing:{rise:75,front:14},slide:{rise:56,front:26},
+  roundabout:{rise:29,front:26},seesaw:{rise:33,front:6}
+};
+const yardEquipment=new Set(Object.keys(equipmentProfile));
+function equipmentHeight(key,u,v){
+  if(key==='swing'){
+    const bay=u>.19 && u<.82;
+    if(bay)return clamp(1-v*.97,.19,1); // seat boards hang above ground
+    const backFoot=(u>.12 && u<.19)||(u>.82 && u<.89);
+    return clamp(1-v/(backFoot?.58:.96),0,1);
   }
+  if(key==='slide')return clamp(1-v/.97,0,1);
+  if(key==='roundabout'){
+    const rim=Math.hypot((u-.5)/.49,(v-.54)/.44);
+    return clamp(.2+.75*(1-v)-.17*rim,.08,1);
+  }
+  const plank=.59-.31*u;
+  if(v<=plank+.09)return .35+.58*u;
+  return clamp((1-v)*1.3,0,.67);
+}
+function prepareYardEquipment(p,source){
+  const cfg=equipmentProfile[p.key],scale=2;
+  const w=Math.round(p.width*scale),h=Math.round(p.height*scale),pad=32;
+  const c=winterCanvas(w,h),g=c.getContext('2d',{willReadFrequently:true});
+  g.imageSmoothingQuality='high';g.drawImage(source,0,0,w,h);
+  const rgba=g.getImageData(0,0,w,h).data,z=new Float32Array(w*h);
+  const shadow=winterCanvas(w+pad*2,h+pad*2),sg=shadow.getContext('2d');
+  const mask=sg.createImageData(shadow.width,shadow.height);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,rel=equipmentHeight(p.key,x/w,y/h);
+    z[i]=rel;
+    if(rgba[i*4+3]<18)continue;
+    // Project the point down onto the snow, then away from the winter sun.
+    const px=pad+x+Math.round(rel*cfg.rise*.34*scale);
+    const py=pad+y+Math.round(rel*cfg.rise*.64*scale);
+    if(px>=shadow.width || py>=shadow.height)continue;
+    const j=(py*shadow.width+px)*4;
+    mask.data[j]=52;mask.data[j+1]=63;mask.data[j+2]=74;mask.data[j+3]=rgba[i*4+3];
+  }
+  sg.putImageData(mask,0,0);
+  const out=winterCanvas(w+pad*2,h+pad*2),og=out.getContext('2d');
+  p.yard={w,h,pad,scale,rgba,z,shadow,out,og,pixels:og.createImageData(out.width,out.height)};
+  p.foot=1-cfg.front/p.height;p.depth=p.y+cfg.front;
+}
+function paintEquipment(g,p,mapView,shadow=false){
+  const a=p.yard,cfg=equipmentProfile[p.key];
+  const x=p.x-p.width/2-a.pad/a.scale,y=p.y-p.foot*p.height-a.pad/a.scale;
+  if(shadow){
+    g.save();g.globalAlpha*=.25;g.filter='blur(1.6px)';
+    g.drawImage(a.shadow,x,y,a.shadow.width/a.scale,a.shadow.height/a.scale);g.restore();return;
+  }
+  if(mapView || !perspective){
+    g.drawImage(district.images[p.key],p.x-p.width/2,p.y-p.foot*p.height,p.width,p.height);return;
+  }
+  // The camera changes relief only by a few pixels. Cache the warped raster until
+  // a half-pixel boundary is crossed. Absolute world position remains continuous.
+  const dx=Math.round(clamp((p.x-cam.x)*.001,-.15,.15)*cfg.rise*a.scale);
+  const dy=Math.round(clamp((p.y-cam.y)*.00075,-.085,.085)*cfg.rise*a.scale);
+  if(a.dx!==dx || a.dy!==dy){
+    a.dx=dx;a.dy=dy;
+    const {w,h,pad,z,rgba,pixels}=a,dst=pixels.data,stride=pixels.width;
+    dst.fill(0);
+    for(let v=Math.min(0,dy);v<h+Math.max(0,dy);v++)for(let u=Math.min(0,dx);u<w+Math.max(0,dx);u++){
+      let sx=u,sy=v;
+      for(let it=0;it<2;it++){
+        const f=z[clamp(Math.round(sy),0,h-1)*w+clamp(Math.round(sx),0,w-1)];
+        sx=u-f*dx;sy=v-f*dy;
+      }
+      sx=Math.round(sx);sy=Math.round(sy);
+      if(sx<0||sx>=w||sy<0||sy>=h)continue;
+      const src=(sy*w+sx)*4,at=((v+pad)*stride+u+pad)*4;
+      dst[at]=rgba[src];dst[at+1]=rgba[src+1];dst[at+2]=rgba[src+2];dst[at+3]=rgba[src+3];
+    }
+    a.og.putImageData(pixels,0,0);
+  }
+  g.drawImage(a.out,x,y,a.out.width/a.scale,a.out.height/a.scale);
 }
