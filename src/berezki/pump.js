@@ -124,9 +124,13 @@ function pumpFloor(r){
 let towerTank;
 function waterTankArt(){
   if(towerTank)return towerTank;
-  const c=winterCanvas(208,262),g=c.getContext('2d');
+  const c=winterCanvas(208,280),g=c.getContext('2d');
   g.scale(2,2);g.translate(52,63);
   const rx=46,ry=35,wall=29;
+  // Rolled bearing ring below the shell; its underside catches the sky light.
+  const ring=g.createLinearGradient(0,wall+4,0,wall+ry+6);
+  ring.addColorStop(0,'#454640');ring.addColorStop(.85,'#464943');ring.addColorStop(1,'#77766a');
+  shoreEllipse(g,0,wall+3,rx+.5,ry+2,ring);
   const side=new Path2D();
   side.moveTo(-rx,0);side.lineTo(-rx,wall);side.ellipse(0,wall,rx,ry,0,Math.PI,0,true);
   side.lineTo(rx,0);side.ellipse(0,0,rx,ry,0,0,Math.PI);side.closePath();
@@ -183,8 +187,11 @@ function drawWaterTower(g,p,mapView){
     beam(g,x-.8,y,a-.8,b,w*.46,'#8d8876');
     beam(g,x-1.4,y-1,a-1.4,b-1,.75,'#b0b0a1');
   };
+  // The front crossbeam seats under the tank at both posts. The curved rim
+  // projects beyond that beam in the centre while all feet stay on their pads.
+  const bearingHeight=68;
   for(const y of [-18,18]){
-    const ey=y-53+dy*.6,shift=dx*.6;
+    const ey=y-bearingHeight+dy*.7,shift=dx*.7;
     upright(-35,y,35+shift,ey,2.4);upright(35,y,-35+shift,ey,2.4);
     for(const x of [-35,35]){
       upright(x,y,x+shift,ey,5.1);
@@ -192,9 +199,9 @@ function drawWaterTower(g,p,mapView){
     }
     upright(-35+shift,ey,35+shift,ey,4);
   }
-  for(const x of [-35,35])upright(x,-18,x+dx*.6,18-53+dy*.6,2.1);
+  for(const x of [-35,35])upright(x,-18,x+dx*.7,18-bearingHeight+dy*.7,2.1);
   // Canvas origin of the tank is the centre of the eaves.
-  g.drawImage(waterTankArt(),dx-52,dy-99-63,104,131);
+  g.drawImage(waterTankArt(),dx-52,dy-99-63,104,140);
   const lx=24,top=dy-76;
   for(const x of [lx,lx+7])upright(x,18,x+dx,top,1.55);
   for(let i=1;i<15;i++){
