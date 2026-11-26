@@ -1053,7 +1053,7 @@ function render() {
     ...raisedScenery.filter(p=>inView(p.x,p.y,80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
-    while(winterIndex<winterProps.length && winterProps[winterIndex].depth<e.y)drawAtlasProp(ctx,winterProps[winterIndex++]);
+    while(winterIndex<winterProps.length && winterProps[winterIndex].depth<(BEREZKI && e===P && S.flags.onLookout?lookout.y+lookout.half+lookout.run+1:e.y))drawAtlasProp(ctx,winterProps[winterIndex++]);
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
     drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
@@ -1066,7 +1066,10 @@ function render() {
         ctx.clip('evenodd');
       }
       const sink=e.jumpT?0:snowAtBoots(e)*3;
-      ctx.translate(0,sink-winterStairLift(e));drawLitHuman(e);ctx.restore();
+      if(e===P && S.flags.onLookout)ctx.translate(...lookoutOffset(e.y));
+      else ctx.translate(0,sink-winterStairLift(e));
+      drawLitHuman(e);ctx.restore();
+      if(e===P && S.flags.onLookout)paintLookout(ctx,false,true);
     }
     else drawLitHuman(e);
     if(!holdsGuitar(e) && livingZone && !loft && !shopVisible)drawHearthGesture(e);

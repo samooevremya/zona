@@ -11,11 +11,11 @@ const atlasRoutes=[
   [[322.08,338.8],[368.72,344.08],[427.68,360.8],[483.12,365.2],[503,364],[518,362],[518,360]],
   [[503,364],[509,367],[517,369],[522,370]],
   [[335,219.5],[341.44,209.44],[372.24,192.72],[404.8,185.68],[432.96,161.92],[466.4,145.2],[481,136],[491,132.8]],
-  [[341.44,209.44],[279.84,201.52],[218.24,196.24],[158.4,189.2],[118.8,166.32],[80.08,124.08]],
+  [[341.44,209.44],[279.84,201.52],[218.24,196.24],[158.4,189.2],[118.8,166.32],[83,127.7],[79,125.8],[79,124.8]],
   [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
   [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
   [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
-  ...shoreLanes,...baseLanes,...pumpPaths
+  ...shoreLanes,...baseLanes,...pumpPaths,[[158.4,189.2],[157.5,186.5]]
 ];
 const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
 const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
@@ -49,7 +49,7 @@ function seedAtlasTerrain(){
   }
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
   for(const r of villageCabins)clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
-  clear(495,132,7,7);
+  clear(495,132,7,7);clear(149,178,17,11);clear(75,117,9,11);
   clear(302,566,47,35);clear(186,427,28,14);
 }
 const atlasProps=[];
@@ -158,6 +158,7 @@ function paintPropShadow(g,p){
 function drawAtlasProp(g,p,mapView=false){
   if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);paintYardFooting(g,p,true);return;}
   if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
+  if(p.westDeck){paintLookout(g,mapView);if(mapView || !S.flags.onLookout)paintLookout(g,mapView,true);return;}
   if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
   const k=perspective && !mapView?p.lift:0;
@@ -415,6 +416,7 @@ function atlasTerrainChunk(cx,cy){
   }
   if(l<203*T && r>145*T && t<441*T && b>368*T)paintMarshChannel(g);
   if(l<203*T && r>73*T && t<441*T && b>300*T)paintMarshCover(g,l,t,r,b);
+  if(near(79,121,155))westGround(g);
   if(near(202,434,13*T))pumpYardGround(g);
   if(near(325,583,25*T))paintBaseYard(g);
   drawAtlasRoutes(g,l,t,r,b);roadImprints(g,l,t,r,b);
