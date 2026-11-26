@@ -212,7 +212,7 @@ function snowMaterial(){
 }
 function winterRoom(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d'),w=c.width,h=c.height;
-  artFill(g,'floor_concrete',0,0,w,h);
+  winterPaving(g,'slab',0,0,w,h);
   const rug=(x,y,rw,rh)=>{
     artFill(g,'floor_wood',x,y,rw,rh);g.fillStyle='rgba(93,49,39,.65)';g.fillRect(x,y,rw,rh);
     g.strokeStyle='#ac9574';g.strokeRect(x+3,y+3,rw-6,rh-6);g.strokeRect(x+6,y+6,rw-12,rh-12);
@@ -220,9 +220,9 @@ function winterRoom(r){
     for(let j=0;j<rh;j+=10)for(let i=0;i<rw;i+=12){g.beginPath();g.moveTo(x+i,y+j);g.lineTo(x+i+5,y+j+4);g.lineTo(x+i+10,y+j);g.stroke();}
     g.restore();
   };
-  if(r.n===1 && !r.abandoned){artFill(g,'floor_wood',T,T,8*T,h-2*T);rug(2*T,6.6*T,2.5*T,2.2*T);}
+  if(r.n===1 && !r.abandoned){winterPaving(g,'boards',T,T,8*T,h-2*T);rug(2*T,6.6*T,2.5*T,2.2*T);}
   else{
-    for(const y of [T,6.8*T])artFill(g,'floor_wood',T,y,15*T,3*T);
+    for(const y of [T,6.8*T])winterPaving(g,'boards',T,y,15*T,3*T);
     if(!r.abandoned)for(const x of [3.2,8.2,13.2])rug(x*T,1.7*T,T*1.55,T*1.25);
   }
   const ox=r.x*T,oy=r.y*T;g.translate(-ox,-oy);
@@ -277,6 +277,7 @@ function winterLandscape(){
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
 
   district.plans=district.levels.map(r=>r===pumpRoom?pumpFloor(r):r.kind?baseInterior(r):r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
+  district.plans.forEach((plan,i)=>thawAtDoor(district.levels[i],plan));
 
 }
 function winterFloorPlan(r){
