@@ -12,7 +12,7 @@
 - **Платформа:** iPhone в горизонтальном положении (главное), MacBook. Зоны нажатия не меньше 44 px.
 
 ## Как игра устроена
-- **Игра собирается в один файл.** `src/build.py` склеивает `head.html`, `body.html`, `ui/*.css`, JS-модули и упакованную графику `art/`. Сборка: `cd src && python3 build.py big` → `src/index_big.html` → копия в корневой `index.html`, его отдаёт GitHub Pages.
+- **Игра собирается в один файл.** `src/build.py` склеивает `head.html`, `body.html`, `ui/*.css`, JS-модули и упакованную графику `art/`. Зимняя карта собирается командой `cd src && python3 build.py berezki && cp ../berezki.html ../index.html`. GitHub Pages открывает корневой `index.html`.
 - **Мир и логика:**
   - `g1.js` — константы, клетки (`T = 32` px), генерация;
   - `gbig.js` — большой Кордон: размеры, перенос мест, заборы, детали;
