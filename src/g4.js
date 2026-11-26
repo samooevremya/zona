@@ -1065,7 +1065,8 @@ function render() {
         ctx.rect(footbridge.x-footbridge.width/2,footbridge.north,footbridge.width,footbridge.south-footbridge.north);
         ctx.clip('evenodd');
       }
-      ctx.translate(0,-winterStairLift(e));drawLitHuman(e);ctx.restore();
+      const sink=e.jumpT?0:forestDepth(e.x,e.y)*3;
+      ctx.translate(0,sink-winterStairLift(e));drawLitHuman(e);ctx.restore();
     }
     else drawLitHuman(e);
     if(!holdsGuitar(e) && livingZone && !loft && !shopVisible)drawHearthGesture(e);
