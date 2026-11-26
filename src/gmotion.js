@@ -187,6 +187,12 @@ function paintMotionHuman(target,e,opacity){
     const im=art['arm_'+index+'_hand'],r=-Math.atan2(x-ex,y-ey);
     target.save();target.translate(x,y);target.rotate(r);target.drawImage(im,-2.35,-1.9,4.7,4.6);target.restore();
   }
+  if(BEREZKI && w?.id==='w_obrez'){
+    // The stock can cross the hood during a turn or reload. The hood is above the hands.
+    target.save();target.translate(0,lean+breath);target.rotate(torsoTurn);
+    target.translate(0,art.neckY);target.rotate(g.look||0);
+    target.drawImage(art.head,-11.7,-13.4-art.neckY,23.4,26);target.restore();
+  }
   target.restore();return true;
 }
 

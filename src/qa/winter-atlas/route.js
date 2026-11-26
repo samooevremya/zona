@@ -44,8 +44,8 @@ async () => {
       }
     }
   }
-  const boats=z.map.objs.filter(o=>o.k==='beachedBoat'),yardProps=z.map.objs.filter(o=>o.k==='yardFrame');
-  if(boats.length!==9 || new Set(yardProps.map(o=>o.fixture)).size!==4)throw Error('Missing fixtures');
+  const boats=z.map.objs.filter(o=>o.k==='beachedBoat'),yardProps=z.map.objs.filter(o=>['yardFrame','yardUpright','yardSeat'].includes(o.k));
+  if(boats.length!==9 || new Set(yardProps.map(o=>o.fixture||'swing')).size!==4 || yardProps.filter(o=>o.k==='yardSeat').length!==2)throw Error('Missing fixtures');
   for(const o of [...boats,...yardProps]){
     const e={x:o.x+o.w/2,y:o.y-18,r:10};
     for(let i=0;i<24;i++)z.map.moveE(e,0,3);

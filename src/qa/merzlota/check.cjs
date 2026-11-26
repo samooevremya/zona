@@ -49,14 +49,27 @@ function checks(){
       else {rooms++;assert(reachable(u+3.55,v),'apartment isolated '+r.name+' bay '+u+' row '+v);}
     }
   }
-  for(const f of [iceHole,district.fire,shoreFire])assert(!clearFooting(f.x,f.y,P.r),'hole or fire passable');
+  assert(!clearFooting(iceHole.x,iceHole.y,P.r),'ice hole passable');
   const tree=Array.from(treesInRect(450*T,150*T,465*T,165*T))[0];assert(tree,'tree missing');
   const ray=(dy)=>npcBarrier({x:tree.x-14,y:tree.y+dy},1,0,27,null,'light');
   assert(ray(0)<14 && ray(9)===27,'trunk shadow');
   const swing=atlasProps.find(p=>p.key==='swing');
   assert(npcBarrier({x:swing.x,y:swing.y-25},0,1,45,null,'light')===45,'swing opening');
-  Object.assign(P,{x:district.fire.x+24,y:district.fire.y});const hp=P.hp;
-  winterWeather(.2);assert(P.hp<hp,'fire contact');
+  for(const f of WORLD_FIRES){
+    Object.assign(P,{x:f.x,y:f.y+25});P.hp=80;
+    winterWeather(.2);assert(P.hp===80,'damage beside fire');
+    for(let i=0;i<25;i++)moveE(P,0,-1);
+    assert(dE(P,f)<1,'fire center blocked');
+    winterWeather(.2);assert(P.hp<80,'no damage on embers');
+    for(let i=0;i<25;i++)moveE(P,0,1);
+    const hp=P.hp;winterWeather(.2);assert(P.hp===hp,'damage after exit');
+  }
+  const b=footbridge;P.x=b.x;
+  for(const y of [b.north-2,b.north+5,b.south-5,b.south+2]){
+    P.y=y;assert(!stationUnderpass(P),'visible steps or approach hidden');
+  }
+  P.y=(b.north+b.south)/2;assert(stationUnderpass(P),'rail underpass exposed');
+  S.flags.stationDeck=true;assert(!stationUnderpass(P),'bridge walker hidden');delete S.flags.stationDeck;
   const friend=byS('housekeeper'),guard=byS('shorePatrol'),victim=byS('shorePost');
   const point=tilePoint(498.6,135.8);Object.assign(friend,point);Object.assign(guard,{x:point.x+28,y:point.y});
   Object.assign(victim,{x:point.x+12,y:point.y});winterWitness(victim);
@@ -71,6 +84,14 @@ function checks(){
   const storm=snowWindow(4);
   S.min=storm.start-.1;assert(traceAlpha(storm.start-4)>.99,'footprint in dry weather');
   S.min=storm.start+storm.length*.56;assert(traceAlpha(storm.start-4)===0 && traceAlpha(S.min)===1,'snow burial');
+  S.flags.snowMarks=[];S.flags.bloodySteps=0;P.jumpT=0;
+  const sole=()=>{P.step=stepDistance+20;winterTracks(.1,null);return S.flags.snowMarks.at(-1).blood;};
+  const splash={x:P.x,y:P.y,r:5,t:S.min};
+  decals.push(splash);assert(sole()===1,'boots missed a blood splash');decals.pop();
+  P.x+=60;let last=1;
+  for(let i=0;i<7;i++){P.x+=20;const faded=sole();assert(faded<last,'bloody prints failed to fade');last=faded;}
+  assert(last===0,'boots never clean');
+  recordTrace({x:P.x,y:P.y,t:S.min,a:0,type:'drag',blood:.7});assert(sole()===1,'boots missed drag blood');
   const body={k:'body',kind:'human',t:S.min,x:P.x,y:P.y,loot:{}};objs.push(body);draggedBody=body;
   S.weapon='w_pm';S.mag.w_pm=5;P.cool=P.reload=0;playerFire();assert(S.mag.w_pm===5,'shot while dragging');
   S.min+=1441;ageRemains();assert(objs.some(b=>b.k==='bones' && b.t===body.t),'skeleton missing');
