@@ -15,7 +15,7 @@ const atlasRoutes=[
   [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
   [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
   [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
-  ...shoreLanes
+  ...shoreLanes,...baseLanes
 ];
 const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
 const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
@@ -50,7 +50,7 @@ function seedAtlasTerrain(){
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
   for(const r of villageCabins)clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
   clear(495,132,7,7);
-  clear(320,564,11,10);
+  clear(302,566,47,35);
 }
 const atlasProps=[];
 function atlasProp(key,x,y,width,lift,{angle=0,flip=1}={}){
@@ -186,6 +186,8 @@ function makeAtlasProps(){
     interiorObject('yardFrame',x-94,y+94+offset-4,w,h,{fixture:'roundabout'});
   atlasProp('seesaw',x+71,y+98,102,.023);
   interiorObject('yardFrame',x+71,y+96,99,19,{fixture:'seesaw'});
+  atlasProp('baseLorry',320.55*T,580.6*T,124,.022);
+  interiorObject('parkedLorry',320.55*T,580.6*T-8,117,46);
   for(const [gx,gy] of gatePosts){
     const sign=gx<325?-1:1;
     atlasProp('gate',gx*T+sign*28,gy*T,91,.045,{flip:sign});
@@ -286,7 +288,7 @@ function visibleAtlasTrees(){
 }
 function prepareAtlasArt(){
   district.crowns=[6,7].map(id=>Array.from({length:4},(_,turn)=>winterTreeArt(id,turn)));
-  district.snow=snowMaterial();preparePropShadows();
+  district.snow=snowMaterial();prepareBaseLorry();preparePropShadows();
   const ice=winterCanvas(512,512),g=ice.getContext('2d'),m=district.images.materials,s=m.width/2;
   for(const u of [0,1])for(const v of [0,1]){
     g.save();g.translate(u*512,v*512);g.scale(u?-1:1,v?-1:1);
@@ -400,6 +402,7 @@ function atlasTerrainChunk(cx,cy){
     }
     g.restore();
   }
+  if(near(325,583,25*T))paintBaseYard(g);
   drawAtlasRoutes(g);roadImprints(g,l,t,r,b);
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
   if(near(493,132,18*T))shoreGround(g);

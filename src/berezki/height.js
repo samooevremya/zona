@@ -39,7 +39,7 @@ function fencePanel(wood,width,variant){
   fencePanels.set(key,c);return c;
 }
 function buildRaisedScenery(){
-  for(const f of [...shoreFences,...trackFences]){
+  for(const f of [...shoreFences,...trackFences,...baseFences]){
     const vertical=f.h>f.w,wood=f.material==='picket',len=Math.max(f.w,f.h);
     const count=Math.ceil(len/(wood?43:52)),span=len/count;
     for(let i=0;i<count;i++){
@@ -93,7 +93,7 @@ function paintRaisedScenery(g,p,mapView){
     side(edge,y,edge,y+h,'#655d50');side(x,y+h,x+w,y+h,o.fitting==='stove'?'#534d46':'#736752');
   }
   g.translate(dx,dy);
-  if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);}
+  if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
   g.restore();
 }
 function paintFenceFooting(g,f,left,right){

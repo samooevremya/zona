@@ -589,7 +589,8 @@ function healWounded(e) {
 
 /* ===================== сохранение ===================== */
 const shorePreview=BEREZKI && new URLSearchParams(location.search).get('preview')==='shore';
-const KEY = shorePreview ? 'berezki-preview-shore' : BEREZKI ? 'berezki-native-v1' : /qa/.test(location.hash) ? 'zona2d-kordon-qa' : 'zona2d-kordon-v2';   // QA-прогоны не трогают сохранение игрока
+const basePreview=BEREZKI && new URLSearchParams(location.search).get('preview')==='base';
+const KEY = basePreview ? 'berezki-preview-base' : shorePreview ? 'berezki-preview-shore' : BEREZKI ? 'berezki-native-v1' : /qa/.test(location.hash) ? 'zona2d-kordon-qa' : 'zona2d-kordon-v2';   // QA-прогоны не трогают сохранение игрока
 const SAVE_VERSION = 3;
 function save(quiet,slot=0) {
   if (!P || !P.alive) return false;
