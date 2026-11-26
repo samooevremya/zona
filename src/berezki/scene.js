@@ -1,8 +1,8 @@
 // The winter district plugs into the Cordon movement, combat, roof, HUD and inventory systems.
 // Upper storeys occupy enclosed map cells. A save position therefore identifies its floor.
 const district = {
-  width:58, height:81, levels:[], images:{}, ground:null, plans:[], stairs:[], heaters:[], trees:[],
-  fire:tilePoint(31,61.6), start:tilePoint(29,61.4)
+  width:760, height:740, levels:[], images:{}, plans:[], stairs:[], heaters:[],
+  fire:tilePoint(590,411.6), start:tilePoint(588,406)
 };
 function winterCanvas(w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -11,19 +11,12 @@ function winterFloor(x,y){
   return district.levels.find(r=>x>=r.x*T && x<(r.x+r.w)*T && y>=r.y*T && y<(r.y+r.h)*T);
 }
 function makeDistrict(){
-  map.fill(VO);
-  for(let y=1;y<district.height-1;y++)for(let x=1;x<district.width-1;x++)setT(x,y,GR);
-  const rand=mulberry32(1724);
-  for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++){
-    const edge=Math.min(x,y,district.width-1-x,district.height-1-y);
-    if(edge===0 || (edge<5 && rand()<.36) || (x>46 && rand()<.12) || (x<11 && rand()<.12))setT(x,y,TR);
-  }
-  for(const [x,y] of [[13,60],[14,65],[40,62],[38,69],[36,39],[42,17]])setT(x,y,TR);
-  house(17,48,22,11,[[11,10],[12,10]],CO,0,'conc');
-  house(14,34,22,10,[],CO,0,'conc');
+  seedAtlasTerrain();
+  house(576,398,22,11,[[11,10],[12,10]],CO,0,'conc');
+  house(576,424,22,10,[],CO,0,'conc');
   HOUSES.forEach(h=>{h.storeys=5;buildEntrances(h);});
   for(let n=1;n<=5;n++){
-    const x=n===1?17:n%2===0?70:110, y=n===1?48:n<=3?12:49;
+    const x=n===1?576:n%2===0?770:810, y=n===1?398:n<=3?12:49;
     const r={x,y,w:22,h:11,n};
     district.levels.push(r);
     if(n>1)house(x,y,r.w,r.h,[],CO,0,'none');
@@ -51,7 +44,8 @@ function makeDistrict(){
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE);
   ANOM0.length=CACHES.length=0;
-  supplyBox(20*T,57*T,'berezki-canteen',{bread:1,bandage:2});
+  makeAtlasProps();
+  supplyBox(579*T,407*T,'berezki-canteen',{bread:1,bandage:2});
   for(const s of district.stairs){
     stairRun({id:'berezki',stair:s,landing:s},!s.up);
   }
@@ -59,20 +53,20 @@ function makeDistrict(){
 }
 function winterNew(difficulty){
   return {v:1,difficulty:difficultyKey(difficulty),...district.start,hp:100,min:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
-    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1},campaign:{stage:'district',wounds:{}},
+    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:1},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
 const winterResidents=[
-  ['warden','Агат',27,61.5,'w_obrez'],['door','Савва',30.7,56.6,'w_pm'],
-  ['cook','Тамара',20.5,53.5,'knife'],['tenant','Глеб',78.4,17.5,'knife'],
+  ['warden','Агат',586,411.5,'w_obrez'],['door','Савва',589.7,406.6,'w_pm'],
+  ['cook','Тамара',579.5,403.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
   ['fisher','Егор',...fishingTrack[0],'knife']
 ];
 function winterRestore(d){
   S=d;survDefaults();plusDefaults();
-  const oldLayout=!S.flags.stationLayout;upgradeStationSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
+  const oldLayout=!S.flags.atlasLayout;upgradeStationSave(S);upgradeAtlasSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
   S.blow={stage:0};S.flags.warmth??=100;
   HURTDIR.length=0;fog.fill(0);fogDirty=true;fogRegion=null;
-  if(S.fog)for(let i=0;i<fog.length;i++){const v=S.fog.charCodeAt(Math.floor(i/6))-48;fog[i]=(v>>(i%6))&1;}
+  if(S.fog)for(let i=0;i<Math.min(S.fog.length*6,fog.length);i++){const v=S.fog.charCodeAt(Math.floor(i/6))-48;fog[i]=(v>>(i%6))&1;}
   P=mkPlayer();P.name='Путник';ents=[P];decals=[];parts=[];nades=[];tracers=[];flashes=[];bolts=[];crows=[];
   for(let i=objs.length-1;i>=0;i--)if(!objs[i].static)objs.splice(i,1);
   for(const o of objs)if(o.stash)restoreContainer(o);
@@ -87,7 +81,7 @@ function winterRestore(d){
   for(const b of S.flags.fieldBodies||[])objs.push({...b,loot:{...b.loot}});
   ageRemains();buildGrids();restoreShoreFooting();
   if(oldLayout)for(const e of ents){
-    if(e.x>=district.width*T || clearFooting(e.x,e.y,e.r))continue;
+    if((e===P && S.flags.stationDeck) || clearFooting(e.x,e.y,e.r))continue;
     const cell=nearestNav(Math.floor(e.x/T),Math.floor(e.y/T));
     if(cell>=0)Object.assign(e,tilePoint(cell%MW+.5,Math.floor(cell/MW)+.5));
   }
@@ -129,7 +123,10 @@ function winterWeather(dt){
   WX.time+=dt;environmentTime+=dt;
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
   const r=winterFloor(P.x,P.y), warm=[FIRE,...district.heaters].some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
-  S.flags.warmth=clamp(S.flags.warmth+dt*(warm ? 1.3 : r ? .2 : night() ? -.22 : -.07),0,100);
+  const wet=swampAt(P.x,P.y);
+  S.flags.coatWetness=clamp((S.flags.coatWetness||0)+dt*(wet?.05:warm?-.045:r?-.012:-.001),0,1);
+  const cooling=(night()?.22:.07)*(1+2*S.flags.coatWetness);
+  S.flags.warmth=clamp(S.flags.warmth+dt*(warm?1.3:r?.2:-cooling),0,100);
   if(S.flags.warmth===0 && P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
   const hardSurface=r || S.flags.stationDeck || (P.y>northFence && P.y<southFence);
   if(hardSurface || P.jumpT)stepDistance=P.step;
@@ -152,30 +149,6 @@ function winterTreeArt(id, quarterTurn){
   sg.fillStyle='#354559';sg.fillRect(0,0,shadow.width,shadow.height);
   return {crown,shadow,kind:id===6?'c1_pine':'c1_birch'};
 }
-function plantWinterTrees(g){
-  const crowns=[6,7].map(id=>Array.from({length:4},(_,turn)=>winterTreeArt(id,turn)));
-  for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++){
-    if(tAt(x,y)!==TR)continue;
-    const h=hash2(x,y), size=76+42*h;
-    const art=crowns[(x===42 && y===15 || h>.54)?0:1][Math.floor(hash2(x+31,y+7)*4)];
-    const px=(x+.5)*T, py=(y+.5)*T;
-    district.trees.push({x:px,y:py,size,art});
-    g.save();g.translate(px,py);
-    if(SHADOWS){
-      g.save();g.globalAlpha=.32;
-      g.transform(.91,0,.16,.78,size*.14,size*.15);
-      g.drawImage(art.shadow,-size/2,-size/2,size,size);g.restore();
-    }
-    // A hollow in the snow, deepest immediately around the root collar.
-    g.scale(1,.76);
-    const hollow=g.createRadialGradient(0,0,1,0,0,size*.19);
-    hollow.addColorStop(0,'rgba(54,52,46,.85)');
-    hollow.addColorStop(.30,'rgba(84,82,72,.57)');
-    hollow.addColorStop(.67,'rgba(125,137,143,.28)');hollow.addColorStop(1,'transparent');
-    g.fillStyle=hollow;g.fillRect(-size*.2,-size*.2,size*.4,size*.4);
-    g.restore();
-  }
-}
 function drawWinterTrees(inView){
   const room=winterFloor(P.x,P.y);
   if(room?.n>1)return;
@@ -185,7 +158,7 @@ function drawWinterTrees(inView){
     ctx.beginPath();ctx.rect(0,0,district.width*T,district.height*T);
     ctx.rect(room.x*T,room.y*T,room.w*T,room.h*T);ctx.clip('evenodd');
   }
-  for(const {x,y,size,art} of district.trees){
+  for(const {x,y,size,art} of visibleAtlasTrees()){
     if(!inView(x,y,size))continue;
     const lift=perspective ? (art.kind==='c1_pine'?.12:.096)*clamp(size/150,.72,1.2) : 0;
     const [tipX,tipY]=roofPoint(x,y,lift*.68);
@@ -279,60 +252,18 @@ function winterRoom(r){
   return c;
 }
 function winterLandscape(){
-  const c=winterCanvas(district.width*T,district.height*T),g=c.getContext('2d'),rand=mulberry32(916);
-  const pattern=g.createPattern(snowMaterial(),'repeat');pattern.setTransform(new DOMMatrix().scale(.76));
-  g.fillStyle=pattern;g.fillRect(0,0,c.width,c.height);
-  // World-space drifts and worn paths are baked once. Snow stays fixed as the camera travels.
-  const brush=winterCanvas(190,190),b=brush.getContext('2d'),im=district.images.materials;
-  b.drawImage(im,6,6,im.width/2-12,im.width/2-12,0,0,190,190);
-  b.globalCompositeOperation='destination-in';
-  const fall=b.createRadialGradient(95,95,42,95,95,95);fall.addColorStop(0,'#fff');fall.addColorStop(1,'transparent');b.fillStyle=fall;b.fillRect(0,0,190,190);
-  for(let i=0;i<1800;i++){
-    const x=rand()*c.width,y=rand()*c.height,size=90+rand()*90;
-    g.save();g.translate(x,y);g.rotate(rand()*6.28);g.drawImage(brush,-size/2,-size/2,size,size);g.restore();
-  }
-  for(let i=0;i<780;i++){
-    const x=rand()*c.width,y=rand()*c.height,w=rand()*57+8,h=w*(.13+rand()*.23);
-    g.save();g.translate(x,y);g.rotate(-.45+rand()*.24);g.scale(w,h);
-    const fade=g.createRadialGradient(0,0,0,0,0,1);fade.addColorStop(0,i%3?'rgba(239,244,243,.27)':'rgba(80,100,118,.21)');fade.addColorStop(1,'transparent');g.fillStyle=fade;g.fillRect(-1,-1,2,2);g.restore();
-  }
-  for(let i=0;i<9400;i++){
-    const lane=i%3,u=rand(),off=(rand()+rand()+rand()-1.5)*(lane===0?47:30);
-    let x,y;
-    if(lane===0){x=u*c.width;y=(65.5-2*Math.sin(u*5))*T+off;}
-    else if(lane===1){x=(29+.7*Math.sin(u*3))*T+off;y=(58+7*u)*T;}
-    else{x=(31+9*u)*T+off;y=(62-1.2*Math.sin(u*3))*T+off;}
-    g.fillStyle=i%3?'rgba(95,99,99,.059)':'rgba(76,73,62,.12)';g.beginPath();g.ellipse(x,y,rand()*6+1,rand()*2+1,-.5,0,2*Math.PI);g.fill();
-  }
-  shoreGround(g);
-  paintStationGround(g);
+  prepareAtlasArt();
   const bridge=footbridge;
   district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
-  plantWinterTrees(g);
-  district.ground=c;
+
   district.plans=district.levels.map(r=>r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):winterRoom(r));
-  const f=district.fire;for(let j=0;j<12;j++){
-    const a=j*Math.PI/6;g.fillStyle=j%2?'#665e50':'#827b6a';g.beginPath();g.ellipse(f.x+14*Math.cos(a),f.y+11*Math.sin(a),4.6,3.8,a,0,7);g.fill();
-  }
-  g.fillStyle='rgba(225,233,238,.16)';g.fillRect(0,0,c.width,c.height);
-  // Keep the granite sill legible under the projected front wall, even on a small screen.
-  const home=HOUSES[0],door=home.entrances[0];
-  const x=home.x*T+door.x,y=(home.y+home.h)*T;
-  artFill(g,'floor_concrete',x-door.width/2-4,y,door.width+8,17);
-  for(const v of [3,9,16])beam(g,x-door.width/2-4,y+v,x+door.width/2+4,y+v,1.3,'#857f74');
-  for(let track=0;track<3;track++)for(let step=0;step<15;step++){
-    const u=step/15,dx=(track-1)*u*u*46+Math.sin(step*.3)*3+(step%2?4:-4);
-    g.fillStyle='rgba(79,82,78,'+(.20-.10*u)+')';
-    g.beginPath();g.ellipse(x+dx,y+22+step*8,2.6,5,(track-1)*u*.7,0,Math.PI*2);g.fill();
-  }
-  const abandoned=HOUSES[1];
-  g.fillStyle='#625f57';g.fillRect(abandoned.x*T,abandoned.y*T,abandoned.w*T,abandoned.h*T);
+
 }
 function winterGround(vx,vy,vw,vh){
   const upper=winterFloor(P.x,P.y);
   ctx.fillStyle=upper?.n>1?'#202324':'#cad3da';ctx.fillRect(vx,vy,vw,vh);
-  if(!upper || upper.n===1)ctx.drawImage(district.ground,0,0);
+  if(!upper || upper.n===1)drawAtlasGround(ctx,vx,vy,vw,vh);
   district.levels.forEach((r,i)=>{
     if(r.n===1 && !upper || r===upper)ctx.drawImage(district.plans[i],r.x*T,r.y*T);
   });
@@ -366,19 +297,22 @@ function winterRoofs(){
 function winterMap(g,s,_labels,options={}){
   const r=winterFloor(P.x,P.y), floor=r?.n>1?r:null;
   if(!floor){
-    g.drawImage(district.ground,0,0,district.width*s,district.height*s);
-    g.save();g.scale(s/T,s/T);g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);g.restore();
-    for(let y=0;y<district.height;y++)for(let x=0;x<district.width;x++)if(tAt(x,y)===TR){
-      g.fillStyle='#627570';g.fillRect(x*s,y*s,s,s);
-    }
-    HOUSES.forEach((h,i)=>g.drawImage(ROOFS[i],h.x*s,h.y*s,h.w*s,h.h*s));
+    if(options.mini){
+      const radius=15*T,l=P.x-radius,t=P.y-radius;
+      g.save();g.scale(s/T,s/T);
+      drawAtlasGround(g,l,t,2*radius,2*radius);
+      for(const tree of treesInRect(l-60,t-60,l+2*radius+60,t+2*radius+60))
+        g.drawImage(tree.art.crown,tree.x-tree.size/2,tree.y-tree.size/2,tree.size,tree.size);
+      for(const p of atlasProps)drawAtlasProp(g,p,true);
+      g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
+      for(const h of HOUSES)g.drawImage(ROOFS[h.roofIndex],h.x*T,h.y*T,h.w*T,h.h*T);
+      g.restore();
+    }else g.drawImage(district.overview,0,0,district.width*s,district.height*s);
   }else g.drawImage(district.plans[r.n-1],r.x*s,r.y*s,r.w*s,r.h*s);
   const u=options.u||1;
   if(!floor && options.loc){
     g.save();g.textAlign='center';g.font='bold '+Math.max(11,12*u)+'px Arial';
-    for(const [text,x,y] of [['Жилой корпус',28,55],['Заколоченный корпус',25,40],['Костёр',31,63],['Сотый километр',28,29],['Мост к озеру',39,20],['← Западный перегон',7,23],['Дом рыбака',48,16],['Прорубь',48.4,7.4]]){
-      g.lineWidth=3*u;g.strokeStyle='#343b3d';g.strokeText(text,x*s,y*s);g.fillStyle='#f2e8cd';g.fillText(text,x*s,y*s);
-    }
+    atlasMapLabels(g,s,u);
     g.restore();
   }
   if(options.ppl!==0)for(const e of ents)if(e!==P && e.alive && dE(e,P)<520)mapSymbol(g,playerRelation(e),e.x/T*s,e.y/T*s,u);
@@ -389,7 +323,7 @@ function winterMini(){
   const size=(mini.clientWidth||128)*2;
   if(mini.width!==size)mini.width=mini.height=size;
   const s=size/30;mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
-  mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5});
+  mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5,mini:true});
   const room=winterFloor(P.x,P.y);
   $('mini-distance').textContent=room===stationRoom?'Вокзал':room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
@@ -401,7 +335,7 @@ async function bootBerezki(){
     const im=new Image();im.src=url;await im.decode();district.images[id]=im;
   })]);
   GRADE.mul='rgb(240,247,251)';
-  winterLandscape();winterRoofs();
+  winterLandscape();winterRoofs();buildAtlasOverview();
   PDA_TABS2[0]=['map','Карта'];
   drawRoomLights=(g,inView,tint)=>{
     const house=HOUSES[0],entry=house.entrances[0];
@@ -412,8 +346,11 @@ async function bootBerezki(){
   };
   // Bake a winter view for the shared title and pause menus.
   const cover=winterCanvas(900,490),cg=cover.getContext('2d');
-  cg.drawImage(district.ground,310,1188,1150,680,0,0,900,490);
-  for(const h of HOUSES)cg.drawImage(ROOFS[HOUSES.indexOf(h)],(h.x*T-310)*900/1150,(h.y*T-1188)*490/680,h.w*T*900/1150,h.h*T*490/680);
+  const left=571*T,top=393*T;
+  cg.save();cg.scale(900/1150,490/680);cg.translate(-left,-top);
+  drawAtlasGround(cg,left,top,1150,680);
+  for(const h of HOUSES)cg.drawImage(ROOFS[h.roofIndex],h.x*T,h.y*T,h.w*T,h.h*T);
+  cg.restore();
   const scene='url('+cover.toDataURL('image/webp',.86)+')';
   $('title').style.setProperty('--signal-scene',scene);$('ov').style.setProperty('--signal-scene',scene);
   // Install content providers before the first frame. Main simulation and input handlers are shared.
@@ -421,7 +358,7 @@ async function bootBerezki(){
   qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const temp=r?(r.n===1?2:4):Math.round(-18-28*darkness()/.8);
-    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:P.x>38*T && P.y<20*T?'Рыбацкий берег':'Берёзки · двор'))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
   intro=()=>{msg('Жилой корпус. У входа дежурит смена.','say');save(true);};
@@ -435,7 +372,7 @@ function winterPda(){
   const b=panel.mapBounds,view=panel.mapView||={zoom:1,x:b.w/2,y:b.h/2};
   panel.f={ppl:1,loc:1};
   const box=el('div','kpk-map'),bar=el('div','kpk-bar'),scale=el('span','zl');
-  bar.append(el('span','zl',upper?'Жилой корпус · этаж '+r.n:'Берёзки'),
+  bar.append(el('span','zl',upper?'Жилой корпус · этаж '+r.n:'Сотый километр'),
     btn('chip','−',()=>{view.zoom=clamp(view.zoom/1.6,1,12);refresh();}),scale,
     btn('chip','+',()=>{view.zoom=clamp(view.zoom*1.6,1,12);refresh();}),
     btn('chip','К игроку',()=>{view.x=P.x/T-b.x;view.y=P.y/T-b.y;view.zoom=3;refresh();}));

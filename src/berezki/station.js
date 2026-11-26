@@ -1,33 +1,28 @@
 // The station doors are the only cut in the railway boundary. The footbridge
 // has its own walking surface above the continuous northern fence and rails.
-const stationRoom={x:22,y:26,w:13,h:6,n:1};
-const footbridge={x:39*T,width:1.8*T,north:17.6*T,south:24.5*T};
-const platform={x:16*T,y:23.5*T,w:26*T,h:2.5*T};
-const northFence=19.95*T,southFence=26.05*T;
+const stationX=340,stationY=233;
+const stationRoom={x:stationX+22,y:stationY+26,w:13,h:6,n:1};
+const footbridge={x:(stationX+39)*T,width:1.8*T,north:(stationY+17.6)*T,south:(stationY+24.5)*T};
+const platform={x:(stationX+16)*T,y:(stationY+23.5)*T,w:26*T,h:2.5*T};
+const northFence=(stationY+19.95)*T,southFence=(stationY+26.05)*T;
 let stationHouse;
 const trackFences=[];
 
 function makeWinterStation(){
-  for(let y=17;y<=33;y++)for(let x=1;x<district.width-1;x++){
-    if((y>=20 && y<=31 || x>=37 && x<=41) && tAt(x,y)===TR)setT(x,y,GR);
-  }
-  for(let y=19;y<=26;y++){
-    setT(0,y,VO);setT(district.width-1,y,VO);
-  }
   const r=stationRoom;
   house(r.x,r.y,r.w,r.h,[[6,0],[7,0],[6,5],[7,5]],CO,0,'slate');
   stationHouse=HOUSES[HOUSES.length-1];buildEntrances(stationHouse);
   district.levels.push(r);
   for(const [key,x,y,angle] of [['bench',25,28,0],['bench',32.5,28,0],['desk',24,30.2,0],['stove',33.1,30.5,0]]){
-    putFurniture(key,x*T,y*T,angle,'winter-station');
+    putFurniture(key,(stationX+x)*T,(stationY+y)*T,angle,'winter-station');
   }
-  district.heaters.push(tilePoint(33.1,30.5));
+  district.heaters.push(tilePoint(stationX+33.1,stationY+30.5));
   function fence(x,end,y,underDeck=false){
     trackFences.push(addObj({k:'fence',material:'stationMesh',solid:1,underDeck,x,y:y-3,w:end-x,h:6}));
   }
   fence(0,district.width*T,northFence,true);
   fence(0,r.x*T,southFence);fence((r.x+r.w)*T,district.width*T,southFence);
-  for(const x of [20,33.5])putFurniture('bench',x*T,25*T,0,'station-platform');
+  for(const x of [20,33.5])putFurniture('bench',(stationX+x)*T,(stationY+25.62)*T,0,'station-platform');
   const b=footbridge;
   // The stair stringers block side entry at ground level. The open span
   // between them leaves both tracks walkable underneath.
@@ -72,10 +67,10 @@ function upgradeStationSave(d){
     if(old in d.flags){d.flags[prefix+key+57*T]=d.flags[old];delete d.flags[old];}
   }
   if(d.fog){
-    const packed=new Uint8Array(Math.ceil(MW*MH/6));
-    for(let i=0;i<MW*MH;i++)if((d.fog.charCodeAt(Math.floor(i/6))-48)&(1<<(i%6))){
-      const x=i%MW,y=Math.floor(i/MW);
-      const j=i+(y<52 && moved(x*T,y*T)?29*MW:0);
+    const packed=new Uint8Array(Math.ceil(160*82/6));
+    for(let i=0;i<160*82;i++)if((d.fog.charCodeAt(Math.floor(i/6))-48)&(1<<(i%6))){
+      const x=i%160,y=Math.floor(i/160);
+      const j=i+(y<52 && moved(x*T,y*T)?29*160:0);
       packed[Math.floor(j/6)]|=1<<(j%6);
     }
     d.fog=Array.from(packed,n=>String.fromCharCode(48+n)).join('');
@@ -122,28 +117,17 @@ function stationSign(g,x,y,label){
   g.fillStyle='#344744';g.fillRect(x-w/2,y-8,w,10);
   g.fillStyle='#eee3c7';g.fillText(label,x,y);
 }
-function paintStationGround(g){
-  const w=district.width*T;
+function paintStationGround(g,left,right){
   g.save();
-  const bed=winterCanvas(w,38),rg=bed.getContext('2d');
-  for(let i=0;i<district.width;i++){
-    rg.save();rg.translate(i*T,0);drawRailStrip(rg,i,0,38);rg.restore();
-  }
-  // Exposed steel runs unbroken through drifts on either side of the sleepers.
-  for(const y of [14,23]){
-    beam(rg,0,y+1,w,y+1,2,'#4e4a41');beam(rg,0,y,w,y,1,'#a5a397');
-  }
-  rg.globalCompositeOperation='destination-in';
-  const edge=rg.createLinearGradient(0,0,0,38);
-  for(const [at,alpha] of [[0,0],[.16,.6],[.29,1],[.71,1],[.87,.65],[1,0]])
-    edge.addColorStop(at,'rgba(0,0,0,'+alpha+')');
-  rg.fillStyle=edge;rg.fillRect(0,0,w,38);
-  for(const y of [21.05*T,22.65*T])g.drawImage(bed,0,y-19);
+  const start=Math.max(0,Math.floor(left/T)),end=Math.min(district.width,Math.ceil(right/T));
   for(const line of [21.05,22.65]){
-    const x=(district.width-1.05)*T,y=line*T;
-    for(const dy of [-8,8])beam(g,x-19,y+dy,x,y+dy,3,'#575046');
-    beam(g,x-4,y-14,x-4,y+14,5,'#59433b');
-    beam(g,x-5,y-12,x-5,y+12,1.5,'#d9d3bf');
+    const y=(stationY+line)*T;
+    for(let i=start;i<end;i++)g.drawImage(district.sleeperBed,(i%16)*T,0,T,38,i*T,y-19,T,38);
+    if(end===district.width){
+      const x=(district.width-1.05)*T;
+      for(const dy of [-8,8])beam(g,x-19,y+dy,x,y+dy,3,'#575046');
+      beam(g,x-4,y-14,x-4,y+14,5,'#59433b');
+    }
   }
   const p=platform;
   g.fillStyle='#55554c';g.fillRect(p.x,p.y-3,p.w,p.h+4);
@@ -152,22 +136,24 @@ function paintStationGround(g){
     beam(g,x,p.y,x,p.y+p.h,1,'#64645a');beam(g,x,p.y+4,x+27,p.y+4,2,'#d2c8aa');
   }
   for(const f of trackFences){
-    drawFenceRun(g,f);
+    const x0=Math.max(f.x, Math.floor(left/40)*40-40),x1=Math.min(f.x+f.w,right+40);
+    if(x1<=x0)continue;
+    drawFenceRun(g,{...f,x:x0,w:x1-x0});
     // Snow caps and the rusted top wire lift the mesh above its footing.
     beam(g,f.x,f.y-6,f.x+f.w,f.y-6,1.5,'#77776b');
-    for(let x=f.x+2;x<f.x+f.w;x+=40){
+    for(let x=f.x+2+Math.max(0,Math.floor((left-f.x-2)/40))*40;x<x1;x+=40){
       beam(g,x,f.y+2,x,f.y-8,2.8,'#5f6058');beam(g,x-1,f.y-8,x+2,f.y-8,1.6,'#c5c9c3');
       const end=Math.min(x+40,f.x+f.w);
       for(let u=x;u<end-4;u+=6){beam(g,u,f.y-5,u+4,f.y+.5,.75,'#6d7066');beam(g,u,f.y+.5,u+4,f.y-5,.75,'#74756a');}
     }
   }
   for(const o of objs)if(o.home==='station-platform')drawRoomFitting(g,o);
-  const doorX=29*T;
-  artFill(g,'floor_concrete',doorX-35,32*T,70,18);
-  for(const i of [4,10,16])beam(g,doorX-35,32*T+i,doorX+35,32*T+i,1.2,'#68695f');
-  stationSign(g,doorX+59,32*T+10,'ВОКЗАЛ');
-  stationSign(g,36.8*T,25.6*T,'К ОЗЕРУ →');
-  stationSign(g,2.8*T,24.6*T,'← ПЕРЕГОН ЗАКРЫТ');
+  const doorX=(stationX+29)*T;
+  artFill(g,'floor_concrete',doorX-35,(stationY+32)*T,70,18);
+  for(const i of [4,10,16])beam(g,doorX-35,(stationY+32)*T+i,doorX+35,(stationY+32)*T+i,1.2,'#68695f');
+  stationSign(g,doorX+59,(stationY+32)*T+10,'ВОКЗАЛ');
+  stationSign(g,(stationX+36.8)*T,(stationY+25.6)*T,'К ОЗЕРУ →');
+  stationSign(g,2.8*T,(stationY+24.6)*T,'← ПЕРЕГОН ЗАКРЫТ');
   const b=footbridge;
   g.fillStyle='rgba(42,49,53,.23)';g.beginPath();
   for(const side of [-1,1]){

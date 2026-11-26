@@ -430,7 +430,7 @@ function drawMenu() {
   }
   if (panel.pausePage==='restart') {
     heading.textContent='Начать заново?';
-    nav.appendChild(el('p','pause-note',BEREZKI?'Вы снова окажетесь во дворе Берёзок.':'Текущая игра начнётся с начала Кордона.'));
+    nav.appendChild(el('p','pause-note',BEREZKI?'Вы снова окажетесь в жилом корпусе Берёзок.':'Текущая игра начнётся с начала Кордона.'));
     nav.appendChild(btn('start-primary','Отмена',()=>{delete panel.pausePage;drawMenu();card.querySelector('.restart').focus();}));
     newGameControls(nav,'Начать новую игру','',S.difficulty);
     return;
