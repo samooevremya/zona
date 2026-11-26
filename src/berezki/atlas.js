@@ -14,7 +14,8 @@ const atlasRoutes=[
   [[341.44,209.44],[279.84,201.52],[218.24,196.24],[158.4,189.2],[118.8,166.32],[80.08,124.08]],
   [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
   [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
-  [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]]
+  [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
+  ...shoreLanes
 ];
 const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
 const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
@@ -47,6 +48,8 @@ function seedAtlasTerrain(){
     }
   }
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
+  for(const r of villageCabins)clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
+  clear(495,132,7,7);
   clear(320,564,11,10);
 }
 const atlasProps=[];
@@ -160,6 +163,11 @@ function makeAtlasProps(){
     interiorObject('gatePier',gx*T,gy*T,22,22);
     interiorObject('gateLeaf',gx*T+sign*42,gy*T,61,5);
   }
+  atlasProp('netrack',netRack.x,netRack.y,89,.044);
+  atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,.022);
+  const pile=tilePoint(505.5,131.64);
+  atlasProp('wood',pile.x,pile.y,54,.019);
+  interiorObject('woodStack',pile.x,pile.y,51,16);
   atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h/2,67,.023);
 
 }
@@ -365,7 +373,7 @@ function atlasTerrainChunk(cx,cy){
   }
   drawAtlasRoutes(g);roadImprints(g,l,t,r,b);
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
-  if(near(491,128,14*T))shoreGround(g);
+  if(near(493,132,18*T))shoreGround(g);
   if(near(playYard.x,playYard.y,230)){
     paintPlaygroundSnow(g,0,0);paintPlaygroundSnow(g,-40,94);paintPlaygroundSnow(g,60,98);
   }
@@ -373,8 +381,7 @@ function atlasTerrainChunk(cx,cy){
     if(prop.burial)paintFrozenBerth(g,prop);
     else paintPropShadow(g,prop);
   }
-  const fire=district.fire;
-  if(near(fire.x/T,fire.y/T,25))for(let i=0;i<12;i++)
+  for(const fire of [district.fire,shoreFire])if(near(fire.x/T,fire.y/T,25))for(let i=0;i<12;i++)
     shoreEllipse(g,fire.x+14*Math.cos(i*Math.PI/6),fire.y+11*Math.sin(i*Math.PI/6),4.5,3.8,i%2?'#665e50':'#827b6a',i*.52);
   if(near(518,360,70)){
     const x=518*T,y=360*T;artFill(g,'floor_concrete',x-35,y,70,17);
