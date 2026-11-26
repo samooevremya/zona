@@ -153,7 +153,8 @@ function restoreShoreFooting(actor){
   const room=winterFloor(actor.x,actor.y);
   const nearShore=actor.x>477*T && actor.x<512*T && actor.y>120*T && actor.y<146*T;
   const nearStation=actor.x>platform.x && actor.x<platform.x+platform.w && actor.y>platform.y && actor.y<platform.y+platform.h;
-  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation && !(actor.x>303*T && actor.x<348*T && actor.y>567*T && actor.y<599*T)) || clearFooting(actor.x,actor.y,actor.r))return;
+  const nearPump=actor.x>193*T && actor.x<213*T && actor.y>426*T && actor.y<441*T;
+  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation && !nearPump && !(actor.x>303*T && actor.x<348*T && actor.y>567*T && actor.y<599*T)) || clearFooting(actor.x,actor.y,actor.r))return;
   // Slots saved on a newly occupied footprint resume at its closest free spot.
   let best=null,gap=Infinity;
   const tx=Math.floor(actor.x/T),ty=Math.floor(actor.y/T);

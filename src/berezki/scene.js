@@ -44,7 +44,7 @@ function makeDistrict(){
   }
   makeFishingShore();
   makeWinterStation();
-  makeBase();
+  makeBase();makePumpingStation();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE,shoreFire);
   ANOM0.length=CACHES.length=0;
@@ -57,7 +57,7 @@ function makeDistrict(){
 }
 const fishingNames=['Илья','Павел','Денис','Макар','Никита','Олег','Тимофей','Юрий','Артём','Борис','Антон','Василий'];
 function winterNew(difficulty){
-  return {v:1,difficulty:difficultyKey(difficulty),...(basePreview?tilePoint(325,566.8):shorePreview?tilePoint(488.2,135.8):district.start),hp:100,min:basePreview?660:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
+  return {v:1,difficulty:difficultyKey(difficulty),...(marshPreview?tilePoint(...marshFork):basePreview?tilePoint(325,566.8):shorePreview?tilePoint(488.2,135.8):district.start),hp:100,min:marshPreview||basePreview?660:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
     weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:2,fisherName:fishingNames[ri(0,fishingNames.length-1)]},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
@@ -117,9 +117,10 @@ function winterRestore(d){
 function winterInteractChoices(cand){
   for(const s of district.stairs){const d=dE(P,s);if(d<32)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
   const room=winterFloor(P.x,P.y);
-  if(room===baseRooms[0] && dE(P,baseStove)<53 && los(P.x,P.y,baseStove.x,baseStove.y)){
-    const lit=baseStoveLit();
-    cand(dE(P,baseStove),{k:lit?'winterRest':'baseKindle',label:lit?'Согреться у печи':'Растопить печь'});
+  const stove=stoveIn(room);
+  if(stove && dE(P,stove.at)<53 && los(P.x,P.y,stove.at.x,stove.at.y)){
+    const lit=stoveBurning(stove);
+    cand(dE(P,stove.at),{k:lit?'winterRest':stove.action,stove,label:lit?'Согреться у печи':'Растопить печь'});
   }
   if(room?.n>1 || shoreHomes.some(home=>home.room===room))for(const o of objs){
     if(o.fitting!=='bedroll')continue;
@@ -130,18 +131,25 @@ function winterInteractChoices(cand){
   if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
 }
 function winterUse(n){
-  if(n.k==='baseKindle'){
-    S.flags.baseStoveUntil=S.min+8*60;msg('Сухие поленья занялись. В караульной теплеет.','say');save(true);
+  if(n.k==='baseKindle' || n.k==='pumpKindle'){
+    S.flags[n.stove.flag]=S.min+8*60;msg(n.stove===pumpHeater?'Дрова занялись. Здесь можно просушить одежду.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
     const from=n.s,to=district.stairs.find(s=>s.room.n===from.room.n+(from.up?1:-1) && s.up!==from.up);
     P.x=to.x;P.y=to.y+(to.up?1:-1)*.38*T;cam.x=P.x;cam.y=P.y;G.near=null;msg('Берёзки · этаж '+to.room.n,'say');
   }else if(n.k==='winterRest'){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
-    dialog({n:n.bed?'Лежанка':'У огня',grp:winterFloor(P.x,P.y)===baseRooms[0]?'Караульная':shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
+    dialog({n:n.bed?'Лежанка':'У огня',grp:n.stove?n.stove.room.name:shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
       ...[1,3,8].map(h=>({t:'Отдохнуть · '+h+' ч',fn:()=>{
         const result=restPreview(h,n.bed?'sleep':'rest');
         S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
-        if(result.minutes){P.st=100;S.flags.warmth=100;ageRemains();}
+        if(result.minutes){
+          P.st=100;S.flags.warmth=100;
+          if(n.stove===pumpHeater){
+            const heated=Math.min(result.minutes,Math.max(0,S.flags[n.stove.flag]-(S.min-result.minutes)));
+            S.flags.coatWetness=Math.max(0,(S.flags.coatWetness||0)-heated*.045);
+          }
+          ageRemains();
+        }
         closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
       }})),{t:'Встать',close:1}]);
   }else if(n.k==='talk'){
@@ -154,11 +162,15 @@ const envSteps=[];let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
   WX.time+=dt;environmentTime+=dt;
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
-  const r=winterFloor(P.x,P.y), warm=(r===baseRooms[0] && baseStoveLit() && dE(P,baseStove)<90) || district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
+  const r=winterFloor(P.x,P.y),stove=stoveIn(r);
+  const warm=(stoveBurning(stove) && dE(P,stove.at)<90 && los(P.x,P.y,stove.at.x,stove.at.y)) || district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
   const wet=swampAt(P.x,P.y);
   S.flags.coatWetness=clamp((S.flags.coatWetness||0)+dt*(wet?.05:warm?-.045:r?-.012:-.001),0,1);
   const cooling=(night()?.22:.07)*(1+2*S.flags.coatWetness);
-  S.flags.warmth=clamp(S.flags.warmth+dt*(warm?1.3:r?.kind?-cooling*(r.kind==='guard'?.4:.75):r?.2:-cooling),0,100);
+  let thermalRate=-cooling-(wet?(night()?.95:.55):0);
+  if(r)thermalRate=stove?-cooling*.4:r.kind?-cooling*.75:.2;
+  if(warm)thermalRate=1.3;
+  S.flags.warmth=clamp(S.flags.warmth+dt*thermalRate,0,100);
   if(S.flags.warmth===0 && P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
   const hardSurface=r || S.flags.stationDeck || (P.y>northFence && P.y<southFence);
   if(hardSurface || P.jumpT)stepDistance=P.step;
@@ -284,7 +296,7 @@ function winterLandscape(){
   district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
 
-  district.plans=district.levels.map(r=>r.kind?baseInterior(r):r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
+  district.plans=district.levels.map(r=>r===pumpRoom?pumpFloor(r):r.kind?baseInterior(r):r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
 
 }
 function winterFloorPlan(r){
@@ -316,7 +328,7 @@ function winterRoofOrder(){
 function winterRoofs(){
   district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
-    if(h.baseRoom){
+    if(h.baseRoom || h.pumpingStation){
       h.storeys=1;h.rooftop=[];h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
       h.roofIndex=ROOFS.length;ROOFS.push(baseRoof(h));continue;
     }
@@ -359,7 +371,7 @@ function winterMini(){
   const s=size/(winterFloor(P.x,P.y)?30:46);mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5,mini:true});
   const room=winterFloor(P.x,P.y);
-  $('mini-distance').textContent=room?.kind?room.name:room===stationRoom?'Вокзал':room===fishingRoom || villageCabins.includes(room)?'Изба':room?'Эт. '+room.n:'Улица';
+  $('mini-distance').textContent=room===pumpRoom || room?.kind?room.name:room===stationRoom?'Вокзал':room===fishingRoom || villageCabins.includes(room)?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
 }
 async function bootBerezki(){
@@ -376,8 +388,9 @@ async function bootBerezki(){
     const x=house.x*T+entry.x+entry.width/2+11,y=(house.y+house.h)*T;
     if(inView(x,y,45))softLamp(g,x,y+5,39,30,tint?.25:.63,tint?'255,186,103':'0,0,0');
     lightShoreHomes(g,inView,tint);
-    if(baseStoveLit() && winterFloor(P.x,P.y)===baseRooms[0])
-      softLamp(g,baseStove.x,baseStove.y,69,60,tint?.25:.82,tint?'236,151,76':'0,0,0');
+    const stove=stoveIn(winterFloor(P.x,P.y));
+    if(stoveBurning(stove))
+      softLamp(g,stove.at.x,stove.at.y,69,60,tint?.25:.82,tint?'236,151,76':'0,0,0');
     for(const h of district.heaters)if(inView(h.x,h.y,120) && !shoreHomes.some(home=>home.hearth===h))
       softLamp(g,h.x,h.y,98,85,tint?.15:.83,tint?'255,188,116':'0,0,0');
   };
@@ -395,11 +408,11 @@ async function bootBerezki(){
   qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const outside=Math.round(-18-28*darkness()/.8);
-    const temp=r?.kind?(r.kind==='guard' && baseStoveLit()?3:outside+(r.kind==='guard'?9:3)):r?(r.n===1?2:4):outside;
-    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const stove=stoveIn(r),temp=stove?(stoveBurning(stove)?3:outside+9):r?.kind?outside+3:r?(r.n===1?2:4):outside;
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%'+(S.flags.coatWetness>=.01?' · одежда мокрая '+Math.round(S.flags.coatWetness*100)+'%':'');
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
-  intro=()=>{msg(basePreview?'Южная дорога. Впереди старые ворота базы.':shorePreview?'Рыбацкий посёлок. Тропа у навеса спускается ко льду.':'Жилой корпус. У входа дежурит смена.','say');save(true);};
+  intro=()=>{msg(marshPreview?'Старая водокачка. Тропа по сухой кромке огибает камыши.':basePreview?'Южная дорога. Впереди старые ворота базы.':shorePreview?'Рыбацкий посёлок. Тропа у навеса спускается ко льду.':'Жилой корпус. У входа дежурит смена.','say');save(true);};
   FAC_N.player=FAC_N.loner='Выживальщики';ITEMS.ar_jacket.n='Подбитая куртка';
   const saveData=loadSave();winterRestore(saveData||winterNew('normal'));
   $('bootlog')?.remove();addEventListener('resize',resize);setupControlEditor();showTitle();requestAnimationFrame(frame);

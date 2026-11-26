@@ -15,7 +15,7 @@ const atlasRoutes=[
   [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
   [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
   [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
-  ...shoreLanes,...baseLanes
+  ...shoreLanes,...baseLanes,...pumpPaths
 ];
 const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
 const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
@@ -31,7 +31,7 @@ function seedAtlasTerrain(){
   map.fill(VO);
   for(let y=1;y<district.height-1;y++)for(let x=1;x<district.width-1;x++){
     let cell=GR;
-    if(basinRadius(x,y,marshShape)<1)cell=SW;
+    if(basinRadius(x,y,marshShape)<1 || inMarshChannel(x+.5,y+.5))cell=SW;
     else if(basinRadius(x,y,lakeShape)>1.02 && hash2(x,y)<.075 && vnoise(x,y,13)>.38)cell=TR;
     setT(x,y,cell);
   }
@@ -50,7 +50,7 @@ function seedAtlasTerrain(){
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
   for(const r of villageCabins)clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
   clear(495,132,7,7);
-  clear(302,566,47,35);
+  clear(302,566,47,35);clear(186,427,28,14);
 }
 const atlasProps=[];
 function atlasProp(key,x,y,width,lift,{angle=0,flip=1}={}){
@@ -59,6 +59,7 @@ function atlasProp(key,x,y,width,lift,{angle=0,flip=1}={}){
 }
 function preparePropShadows(){
   for(const prop of atlasProps){
+    if(prop.key==='waterTower'){prop.height=160;prop.foot=.875;prop.depth=prop.y+18;continue;}
     const image=district.images[prop.key];
     prop.height=prop.width*image.height/image.width;
     // The foot line lies below the centre in the photo. Its world position stays fixed.
@@ -138,6 +139,10 @@ function paintFrozenBerth(g,p){
 }
 function paintPropShadow(g,p){
   if(!SHADOWS || p.burial)return;
+  if(p.key==='waterTower'){
+    for(const [dx,dy] of towerFeet)beam(g,p.x+dx,p.y+dy,p.x+dx+29,p.y+dy+16,3,'#48566840');
+    shoreEllipse(g,p.x+42,p.y+23,42,26,'#49586a40',.2);return;
+  }
   g.save();g.translate(p.x,p.y);g.rotate(p.angle);
   // Low hulls rest on the ice. Tall open frames cast the outline of their uprights.
   if(p.key==='netrack' || p.key==='wood'){
@@ -149,6 +154,7 @@ function paintPropShadow(g,p){
   g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
 }
 function drawAtlasProp(g,p,mapView=false){
+  if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
   if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
   const k=perspective && !mapView?p.lift:0;
@@ -206,6 +212,7 @@ function atlasPlace(x,y){
   let nearest=atlasSites[0],gap=Infinity;
   for(const p of atlasSites){const d=Math.hypot(x-p[1],y-p[2]);if(d<gap){nearest=p;gap=d;}}
   if(basinRadius(x,y,lakeShape)<1)return atlasSites[0][0];
+  if(inMarshChannel(x,y) || basinRadius(x,y,marshShape)<1)return 'Замёрзшее болото';
   return gap<42?nearest[0]:'Зимняя дорога';
 }
 function upgradePrototypeAtlas(d){
@@ -288,7 +295,7 @@ function visibleAtlasTrees(){
 }
 function prepareAtlasArt(){
   district.crowns=[6,7].map(id=>Array.from({length:4},(_,turn)=>winterTreeArt(id,turn)));
-  district.snow=snowMaterial();prepareBaseLorry();preparePropShadows();
+  district.snow=snowMaterial();prepareBaseLorry();preparePumpArt();preparePropShadows();
   const ice=winterCanvas(512,512),g=ice.getContext('2d'),m=district.images.materials,s=m.width/2;
   for(const u of [0,1])for(const v of [0,1]){
     g.save();g.translate(u*512,v*512);g.scale(u?-1:1,v?-1:1);
@@ -402,6 +409,9 @@ function atlasTerrainChunk(cx,cy){
     }
     g.restore();
   }
+  if(l<203*T && r>145*T && t<441*T && b>368*T)paintMarshChannel(g);
+  if(l<203*T && r>73*T && t<441*T && b>300*T)paintMarshCover(g,l,t,r,b);
+  if(near(202,434,13*T))pumpYardGround(g);
   if(near(325,583,25*T))paintBaseYard(g);
   drawAtlasRoutes(g);roadImprints(g,l,t,r,b);
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
