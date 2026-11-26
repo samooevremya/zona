@@ -16515,7 +16515,7 @@ function paintRaisedScenery(g,p,mapView){
     side(edge,y,edge,y+h,'#655d50');side(x,y+h,x+w,y+h,o.fitting==='stove'?'#534d46':'#736752');
   }
   g.translate(dx,dy);
-  if(o.k==='partition')paintPartition(g,o);else drawRoomFitting(g,o);
+  if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);}
   g.restore();
 }
 function paintFenceFooting(g,f,left,right){
@@ -16580,11 +16580,7 @@ function makeFishingShore(){
   district.levels.push(r);
   partition(shoreX+46.75,shoreY+15.7,.17,1.3,'timber');
   partition(shoreX+49.15,shoreY+15.7,.17,1.3,'timber');
-  putFurniture('stove',(shoreX+46)*T,(shoreY+13.4)*T,0,'shore');
-  district.heaters.push(tilePoint(shoreX+46,shoreY+13.4));
-  putFurniture('bedroll',(shoreX+50.1)*T,(shoreY+13.9)*T,0,'shore');
-  putFurniture('cupboard',(shoreX+49.4)*T,(shoreY+12.5)*T,Math.PI/2,'shore').loot={bandage:1};
-  putFurniture('supper',(shoreX+45.9)*T,(shoreY+16.25)*T,0,'shore');
+  furnishShoreHomes();
   woodStack=interiorObject('woodStack',484.85*T,127.75*T,60,19);
 }
 function fishRoutine(e,dt){
@@ -16687,19 +16683,19 @@ function shoreRoutine(e,dt){
   }
 }
 
-function restoreShoreFooting(){
-  const room=winterFloor(P.x,P.y);
-  const nearShore=P.x>477*T && P.x<512*T && P.y>120*T && P.y<146*T;
-  const nearStation=P.x>platform.x && P.x<platform.x+platform.w && P.y>platform.y && P.y<platform.y+platform.h;
-  if(S.flags.stationDeck || (!room && !nearShore && !nearStation) || clearFooting(P.x,P.y,P.r))return;
+function restoreShoreFooting(actor){
+  const room=winterFloor(actor.x,actor.y);
+  const nearShore=actor.x>477*T && actor.x<512*T && actor.y>120*T && actor.y<146*T;
+  const nearStation=actor.x>platform.x && actor.x<platform.x+platform.w && actor.y>platform.y && actor.y<platform.y+platform.h;
+  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation) || clearFooting(actor.x,actor.y,actor.r))return;
   // Slots saved on a newly occupied footprint resume at its closest free spot.
   let best=null,gap=Infinity;
-  const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);
+  const tx=Math.floor(actor.x/T),ty=Math.floor(actor.y/T);
   for(let y=ty-5;y<=ty+5;y++)for(let x=tx-5;x<=tx+5;x++){
-    const p=tilePoint(x+.5,y+.5),d=dE(P,p);
-    if(d<gap && clearFooting(p.x,p.y,P.r)){best=p;gap=d;}
+    const p=tilePoint(x+.5,y+.5),d=dE(actor,p);
+    if(d<gap && winterFloor(p.x,p.y)===room && clearFooting(p.x,p.y,actor.r)){best=p;gap=d;}
   }
-  if(best)Object.assign(P,best);
+  if(best)Object.assign(actor,best);
 }
 function shoreEllipse(g,x,y,rx,ry,color,angle=0){
   g.fillStyle=color;g.beginPath();g.ellipse(x,y,rx,ry,angle,0,Math.PI*2);g.fill();
@@ -16870,6 +16866,7 @@ function cabinFloor(r){
     artFill(g,'floor_wood',x*T,y*T,T,T);
     g.fillStyle='#493f3480';g.fillRect(x*T,y*T,T,T);
   }
+  paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));
   return c;
 }
 function fishingInterior(r){
@@ -16896,6 +16893,7 @@ function fishingInterior(r){
     shoreEllipse(g,ix*T+2.5,12.50*T,1.6,2.6,'#74533a',-.7);
   }
   g.restore();
+  g.save();g.translate(x,y);paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));g.restore();
   g.translate(shoreX*T,shoreY*T);
   const glow=g.createRadialGradient(46*T,13.4*T,2,46*T,13.4*T,53);
   glow.addColorStop(0,'rgba(238,146,57,.36)');glow.addColorStop(1,'transparent');
@@ -16920,6 +16918,152 @@ function fishingRoof(h){
   artFill(g,'wall_brick',cx-6,cy-7,14,15);g.fillStyle='#312f2a';g.fillRect(cx-3,cy-5,8,8);
   beam(g,cx-7,cy-7,cx+8,cy-7,2,'#c4c6c0');
   return c;
+}
+
+// All coordinates are in tiles from the corresponding cabin's northwest corner.
+// Keep the two-tile entries and the residents' evening destinations free.
+const shoreHomes=[
+  {room:villageCabins[0],key:'family',wool:'#71635c',stripe:'#a19577',
+    runner:[3.72,2.64,52,26],window:[2.9,3.92],wall:2,
+    furniture:[
+      ['stove',5.52,1.74],['cupboard',1.53,1.73,0,{bandage:1}],
+      ['bedroll',2.04,3.46,1],['bedroll',4.94,3.46,1]
+    ]},
+  {room:villageCabins[1],key:'kitchen',wool:'#635c48',stripe:'#a18c60',
+    runner:[3.35,3.4,39,56],window:[5.74,4.93],wall:2,
+    furniture:[
+      ['stove',6.14,2.03],['cupboard',1.53,1.83,0,{bread:1}],
+      ['bedroll',1.55,3.67],['bedroll',3.64,1.55,1],['supper',5.89,4.09],['stool',4.73,4.19]
+    ]},
+  {room:fishingRoom,key:'workshop',wool:'#515d59',stripe:'#9e9179',
+    runner:[3.88,3.33,53,33],window:[2.45,1.04],wall:0,
+    furniture:[
+      ['stove',2,2.4],['bedroll',6.1,2.9],['cupboard',5.4,1.5,1,{bandage:1}],
+      ['supper',1.9,5.25],['rack',6.44,5.02,1]
+    ]}
+];
+function furnishShoreHomes(){
+  for(const home of shoreHomes){
+    const r=home.room;
+    for(const [type,u,v,turn=0,loot] of home.furniture){
+      const x=(r.x+u)*T,y=(r.y+v)*T;
+      const o=putFurniture(type,x,y,turn*Math.PI/2,'shore-'+home.key);
+      o.cabinHome=home.key;
+      if(loot)o.loot=loot;
+      if(type==='stove'){
+        home.hearth=tilePoint(r.x+u,r.y+v);district.heaters.push(home.hearth);
+      }
+      if(type==='supper' || (home.key==='family' && type==='cupboard'))home.lamp=o;
+    }
+  }
+}
+function wovenRunner(g,home){
+  const [u,v,w,h]=home.runner,x=u*T-w/2,y=v*T-h/2;
+  const rand=mulberry32(Math.floor(home.room.x));
+  g.fillStyle='#25252170';g.fillRect(x+1,y+2,w,h);
+  g.fillStyle=home.wool;g.fillRect(x,y,w,h);
+  for(let j=0;j<h;j+=1.5){
+    const hem=j<7 || j>h-8;
+    g.fillStyle=hem&&Math.floor(j/1.5)%3===1?home.stripe:j%3?'#362f2c61':'#d5c3a037';
+    g.fillRect(x+rand(),y+j,w-1-rand(),.8);
+  }
+  // Faded lozenges are woven into the pile, with broken threads near the doors.
+  g.save();g.translate(x+w/2,y+h/2);
+  if(h>w)g.rotate(Math.PI/2);
+  for(const cx of [-13,0,13]){
+    for(const size of [5,3]){
+      g.strokeStyle=size===5?home.stripe+'aa':'#35312c8c';g.lineWidth=1.1;
+      g.beginPath();g.moveTo(cx-size,0);g.lineTo(cx,-size*.8);
+      g.lineTo(cx+size,0);g.lineTo(cx,size*.8);g.closePath();g.stroke();
+    }
+  }
+  g.restore();
+  for(let k=0;k<65;k++){
+    g.fillStyle=k%3?'#322b2521':'#ddcaa331';
+    g.fillRect(x+rand()*(w-4),y+rand()*h,1+rand()*3,.9);
+  }
+  for(let i=1;i<w;i+=2){
+    beam(g,x+i,y,x+i-.3,y-rand()*3,.7,home.stripe);
+    beam(g,x+i,y+h-.5,x+i+.5,y+h+rand()*3,.7,home.stripe);
+  }
+}
+// These are flat furnishings on the floor and along the wall. Tall pieces use
+// the same depth-sorted furniture layer as the rest of the district.
+function paintCabinTextiles(g,home){
+  // A scorched sheet protects the floorboards under each iron stove.
+  const [,sx,sy]=home.furniture.find(f=>f[0]==='stove');
+  g.save();g.translate(sx*T,sy*T);
+  artFill(g,'floor_concrete',-14,-14,29,32);
+  g.fillStyle='#48403979';g.fillRect(-14,-14,29,32);
+  for(let i=0;i<9;i++)shoreEllipse(g,-6+i*1.7,14+Math.sin(i*4)*1.7,2.1,1,'#4841388a');
+  g.restore();
+  wovenRunner(g,home);
+  const [u,v]=home.window,x=u*T,y=v*T;
+  g.save();g.translate(x,y);
+  artFill(g,'floor_wood',-19,-5,38,9);
+  g.fillStyle='#46453b';g.fillRect(-17,-4,34,6);
+  for(let i=-16;i<17;i+=3){
+    const hem=4+1.5*Math.cos(i*.48);
+    beam(g,i,-4,i+.6,hem,3.1,Math.sin(i)>.1?home.wool:'#6c695d');
+    beam(g,i,-3,i+.2,hem,.6,'#b0a48e96');
+  }
+  beam(g,-19,-5,19,-5,2,'#635441');g.restore();
+  if(home.key==='family'){
+    // Knitted mittens, drying near the stove but clear of the family doorway.
+    const ax=4.58*T,ay=1.13*T;
+    beam(g,ax,ay,ax+30,ay+3,1.2,'#726656');
+    for(let i=0;i<4;i++){
+      const px=ax+4+i*6,py=ay+2+i*.6;
+      shoreEllipse(g,px,py+3,2.4,4.3,i<2?'#776052':'#686c62',.14);
+      beam(g,px+1,py+3,px+3,py+1,1.5,'#625a4f');
+    }
+  }
+}
+function cabinFittingDetail(g,o){
+  const home=shoreHomes.find(h=>h.key===o.cabinHome),x=o.x+o.w/2,y=o.y+o.h/2;
+  g.save();g.translate(x,y);g.rotate(o.angle);
+  if(o.fitting==='bedroll'){
+    // Tint the middle folds lightly so the grain of the painted bed remains visible.
+    g.fillStyle=home.wool+'70';g.fillRect(-9,-1,18,16);
+    for(const yy of [1,3,12])beam(g,-9,yy,8,yy+.5,.9,home.stripe+'c4');
+  }else if(o.fitting==='stove'){
+    shoreEllipse(g,1,7,6,2.3,'#512f21');beam(g,-3,7,4,7.3,1.2,'#e89852');
+  }else if(o.fitting==='rack' && home.key==='workshop'){
+    // A loose net, folded on the work rack, with two wooden floats.
+    for(let i=-12;i<=7;i+=3){
+      beam(g,i,-5,i+5,4,.8,'#817963');beam(g,i,4,i+5,-5,.7,'#a09272');
+    }
+    for(const px of [-9,5])shoreEllipse(g,px,-6,3.2,1.7,'#9d7950',.3);
+  }
+  if(o===home.lamp){
+    const cx=o.fitting==='cupboard'?0:-10;
+    shoreEllipse(g,cx,0,3.3,2.2,'#373832');
+    beam(g,cx,0,cx,-3.4,2,'#c5b18a');
+    shoreEllipse(g,cx,-4.4,1,1.6,'#f3d392',.1);
+  }
+  g.restore();
+}
+function lightShoreHomes(g,inView,tint){
+  const indoors=winterFloor(P.x,P.y);
+  for(const home of shoreHomes){
+    const r=home.room,h=home.hearth;
+    if(!inView(h.x,h.y,300))continue;
+    if(indoors===r){
+      g.save();g.beginPath();g.rect(r.x*T,r.y*T,r.w*T,r.h*T);g.clip();
+      softLamp(g,h.x,h.y,79,63,tint?.24:.84,tint?'224,140,70':'0,0,0');
+      const o=home.lamp,dx=o.fitting==='cupboard'?0:-10;
+      const [lx,ly]=raisedOffset(o.x+o.w/2,o.y+o.h/2,fittingHeight[o.fitting],false);
+      softLamp(g,o.x+o.w/2+dx+lx,o.y+o.h/2+ly-4,39,32,tint?.17:.50,tint?'245,189,112':'0,0,0');
+      g.restore();
+    }else if(!indoors && darkness()>.16 && ents.some(e=>e!==P && e.alive && winterFloor(e.x,e.y)===r)){
+      const facade=r===fishingRoom?fishingHouse:district.exteriors.find(h=>h.cabin===r);
+      const panes=facade?.facadePanes?.[home.wall];
+      if(!panes?.length)continue;
+      const wanted=home.window[0]*T,u=panes.reduce((a,b)=>Math.abs(a-wanted)<Math.abs(b-wanted)?a:b);
+      const y=(r.y+(home.wall===2?r.h:0))*T;
+      softLamp(g,r.x*T+u,y+(home.wall===2?3:-3),29,13,tint?.18:.45,tint?'255,183,109':'0,0,0');
+    }
+  }
 }
 
 // The station doors are the only cut in the railway boundary. The footbridge
@@ -17724,7 +17868,8 @@ function winterRestore(d){
     if(b.name==='Егор' && b.fac==='loner' && S.dead.fisher)b.name=S.flags.fisherName;
     objs.push({...b,loot:{...b.loot}});
   }
-  ageRemains();buildGrids();restoreShoreFooting();
+  ageRemains();buildGrids();
+  for(const e of ents)if(e===P || shoreJobs[e.sid])restoreShoreFooting(e);
   if(oldLayout)for(const e of ents){
     if((e===P && S.flags.stationDeck) || clearFooting(e.x,e.y,e.r))continue;
     // A footprint introduced under an old save can obstruct the very first
@@ -17743,12 +17888,12 @@ function winterRestore(d){
 function winterInteractChoices(cand){
   for(const s of district.stairs){const d=dE(P,s);if(d<32)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
   const room=winterFloor(P.x,P.y);
-  if(room?.n>1 || room===fishingRoom)for(const o of objs){
+  if(room?.n>1 || shoreHomes.some(home=>home.room===room))for(const o of objs){
     if(o.fitting!=='bedroll')continue;
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
-  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53);
+  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53 && winterFloor(h.x,h.y)===room && los(P.x,P.y,h.x,h.y));
   if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
 }
 function winterUse(n){
@@ -17757,7 +17902,7 @@ function winterUse(n){
     P.x=to.x;P.y=to.y+(to.up?1:-1)*.38*T;cam.x=P.x;cam.y=P.y;G.near=null;msg('Берёзки · этаж '+to.room.n,'say');
   }else if(n.k==='winterRest'){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
-    dialog({n:n.bed?'Лежанка':'У огня',grp:'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
+    dialog({n:n.bed?'Лежанка':'У огня',grp:shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
       ...[1,3,8].map(h=>({t:'Отдохнуть · '+h+' ч',fn:()=>{
         const result=restPreview(h,n.bed?'sleep':'rest');
         S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
@@ -17774,7 +17919,7 @@ const envSteps=[];let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
   WX.time+=dt;environmentTime+=dt;
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
-  const r=winterFloor(P.x,P.y), warm=district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
+  const r=winterFloor(P.x,P.y), warm=district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
   const wet=swampAt(P.x,P.y);
   S.flags.coatWetness=clamp((S.flags.coatWetness||0)+dt*(wet?.05:warm?-.045:r?-.012:-.001),0,1);
   const cooling=(night()?.22:.07)*(1+2*S.flags.coatWetness);
@@ -17990,13 +18135,8 @@ async function bootBerezki(){
     const house=HOUSES[0],entry=house.entrances[0];
     const x=house.x*T+entry.x+entry.width/2+11,y=(house.y+house.h)*T;
     if(inView(x,y,45))softLamp(g,x,y+5,39,30,tint?.25:.63,tint?'255,186,103':'0,0,0');
-    if(darkness()>.16)for(const cabin of villageCabins){
-      const x=(cabin.x+cabin.w*.67)*T,y=(cabin.y+cabin.h)*T;
-      if(inView(x,y,76) && ents.some(e=>e!==P && e.alive && winterFloor(e.x,e.y)===cabin)){
-        softLamp(g,x,y,33,18,tint?.18:.45,tint?'255,178,101':'0,0,0');
-      }
-    }
-    for(const h of district.heaters)if(inView(h.x,h.y,120))
+    lightShoreHomes(g,inView,tint);
+    for(const h of district.heaters)if(inView(h.x,h.y,120) && !shoreHomes.some(home=>home.hearth===h))
       softLamp(g,h.x,h.y,98,85,tint?.15:.83,tint?'255,188,116':'0,0,0');
   };
   // Bake a winter view for the shared title and pause menus.

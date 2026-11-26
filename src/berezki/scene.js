@@ -96,7 +96,8 @@ function winterRestore(d){
     if(b.name==='Егор' && b.fac==='loner' && S.dead.fisher)b.name=S.flags.fisherName;
     objs.push({...b,loot:{...b.loot}});
   }
-  ageRemains();buildGrids();restoreShoreFooting();
+  ageRemains();buildGrids();
+  for(const e of ents)if(e===P || shoreJobs[e.sid])restoreShoreFooting(e);
   if(oldLayout)for(const e of ents){
     if((e===P && S.flags.stationDeck) || clearFooting(e.x,e.y,e.r))continue;
     // A footprint introduced under an old save can obstruct the very first
@@ -115,12 +116,12 @@ function winterRestore(d){
 function winterInteractChoices(cand){
   for(const s of district.stairs){const d=dE(P,s);if(d<32)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
   const room=winterFloor(P.x,P.y);
-  if(room?.n>1 || room===fishingRoom)for(const o of objs){
+  if(room?.n>1 || shoreHomes.some(home=>home.room===room))for(const o of objs){
     if(o.fitting!=='bedroll')continue;
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
-  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53);
+  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53 && winterFloor(h.x,h.y)===room && los(P.x,P.y,h.x,h.y));
   if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
 }
 function winterUse(n){
@@ -129,7 +130,7 @@ function winterUse(n){
     P.x=to.x;P.y=to.y+(to.up?1:-1)*.38*T;cam.x=P.x;cam.y=P.y;G.near=null;msg('Берёзки · этаж '+to.room.n,'say');
   }else if(n.k==='winterRest'){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
-    dialog({n:n.bed?'Лежанка':'У огня',grp:'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
+    dialog({n:n.bed?'Лежанка':'У огня',grp:shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
       ...[1,3,8].map(h=>({t:'Отдохнуть · '+h+' ч',fn:()=>{
         const result=restPreview(h,n.bed?'sleep':'rest');
         S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
@@ -146,7 +147,7 @@ const envSteps=[];let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
   WX.time+=dt;environmentTime+=dt;
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
-  const r=winterFloor(P.x,P.y), warm=district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
+  const r=winterFloor(P.x,P.y), warm=district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
   const wet=swampAt(P.x,P.y);
   S.flags.coatWetness=clamp((S.flags.coatWetness||0)+dt*(wet?.05:warm?-.045:r?-.012:-.001),0,1);
   const cooling=(night()?.22:.07)*(1+2*S.flags.coatWetness);
@@ -362,13 +363,8 @@ async function bootBerezki(){
     const house=HOUSES[0],entry=house.entrances[0];
     const x=house.x*T+entry.x+entry.width/2+11,y=(house.y+house.h)*T;
     if(inView(x,y,45))softLamp(g,x,y+5,39,30,tint?.25:.63,tint?'255,186,103':'0,0,0');
-    if(darkness()>.16)for(const cabin of villageCabins){
-      const x=(cabin.x+cabin.w*.67)*T,y=(cabin.y+cabin.h)*T;
-      if(inView(x,y,76) && ents.some(e=>e!==P && e.alive && winterFloor(e.x,e.y)===cabin)){
-        softLamp(g,x,y,33,18,tint?.18:.45,tint?'255,178,101':'0,0,0');
-      }
-    }
-    for(const h of district.heaters)if(inView(h.x,h.y,120))
+    lightShoreHomes(g,inView,tint);
+    for(const h of district.heaters)if(inView(h.x,h.y,120) && !shoreHomes.some(home=>home.hearth===h))
       softLamp(g,h.x,h.y,98,85,tint?.15:.83,tint?'255,188,116':'0,0,0');
   };
   // Bake a winter view for the shared title and pause menus.

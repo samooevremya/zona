@@ -46,11 +46,7 @@ function makeFishingShore(){
   district.levels.push(r);
   partition(shoreX+46.75,shoreY+15.7,.17,1.3,'timber');
   partition(shoreX+49.15,shoreY+15.7,.17,1.3,'timber');
-  putFurniture('stove',(shoreX+46)*T,(shoreY+13.4)*T,0,'shore');
-  district.heaters.push(tilePoint(shoreX+46,shoreY+13.4));
-  putFurniture('bedroll',(shoreX+50.1)*T,(shoreY+13.9)*T,0,'shore');
-  putFurniture('cupboard',(shoreX+49.4)*T,(shoreY+12.5)*T,Math.PI/2,'shore').loot={bandage:1};
-  putFurniture('supper',(shoreX+45.9)*T,(shoreY+16.25)*T,0,'shore');
+  furnishShoreHomes();
   woodStack=interiorObject('woodStack',484.85*T,127.75*T,60,19);
 }
 function fishRoutine(e,dt){
@@ -153,19 +149,19 @@ function shoreRoutine(e,dt){
   }
 }
 
-function restoreShoreFooting(){
-  const room=winterFloor(P.x,P.y);
-  const nearShore=P.x>477*T && P.x<512*T && P.y>120*T && P.y<146*T;
-  const nearStation=P.x>platform.x && P.x<platform.x+platform.w && P.y>platform.y && P.y<platform.y+platform.h;
-  if(S.flags.stationDeck || (!room && !nearShore && !nearStation) || clearFooting(P.x,P.y,P.r))return;
+function restoreShoreFooting(actor){
+  const room=winterFloor(actor.x,actor.y);
+  const nearShore=actor.x>477*T && actor.x<512*T && actor.y>120*T && actor.y<146*T;
+  const nearStation=actor.x>platform.x && actor.x<platform.x+platform.w && actor.y>platform.y && actor.y<platform.y+platform.h;
+  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation) || clearFooting(actor.x,actor.y,actor.r))return;
   // Slots saved on a newly occupied footprint resume at its closest free spot.
   let best=null,gap=Infinity;
-  const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);
+  const tx=Math.floor(actor.x/T),ty=Math.floor(actor.y/T);
   for(let y=ty-5;y<=ty+5;y++)for(let x=tx-5;x<=tx+5;x++){
-    const p=tilePoint(x+.5,y+.5),d=dE(P,p);
-    if(d<gap && clearFooting(p.x,p.y,P.r)){best=p;gap=d;}
+    const p=tilePoint(x+.5,y+.5),d=dE(actor,p);
+    if(d<gap && winterFloor(p.x,p.y)===room && clearFooting(p.x,p.y,actor.r)){best=p;gap=d;}
   }
-  if(best)Object.assign(P,best);
+  if(best)Object.assign(actor,best);
 }
 function shoreEllipse(g,x,y,rx,ry,color,angle=0){
   g.fillStyle=color;g.beginPath();g.ellipse(x,y,rx,ry,angle,0,Math.PI*2);g.fill();
@@ -336,6 +332,7 @@ function cabinFloor(r){
     artFill(g,'floor_wood',x*T,y*T,T,T);
     g.fillStyle='#493f3480';g.fillRect(x*T,y*T,T,T);
   }
+  paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));
   return c;
 }
 function fishingInterior(r){
@@ -362,6 +359,7 @@ function fishingInterior(r){
     shoreEllipse(g,ix*T+2.5,12.50*T,1.6,2.6,'#74533a',-.7);
   }
   g.restore();
+  g.save();g.translate(x,y);paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));g.restore();
   g.translate(shoreX*T,shoreY*T);
   const glow=g.createRadialGradient(46*T,13.4*T,2,46*T,13.4*T,53);
   glow.addColorStop(0,'rgba(238,146,57,.36)');glow.addColorStop(1,'transparent');

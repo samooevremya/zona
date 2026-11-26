@@ -93,7 +93,7 @@ function paintRaisedScenery(g,p,mapView){
     side(edge,y,edge,y+h,'#655d50');side(x,y+h,x+w,y+h,o.fitting==='stove'?'#534d46':'#736752');
   }
   g.translate(dx,dy);
-  if(o.k==='partition')paintPartition(g,o);else drawRoomFitting(g,o);
+  if(o.k==='partition')paintPartition(g,o);else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);}
   g.restore();
 }
 function paintFenceFooting(g,f,left,right){
