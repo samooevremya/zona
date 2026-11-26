@@ -14,7 +14,7 @@ function makeWinterSalvage(){
     [337,233,'platform',{buckle:1}],[158,190,'depot',{wire:1,bread:1}],
     [81,126,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
     [253,433,'path',{candle:1}],[114,546,'hut',{bandage:1,candle:1}],
-    [339,592,'workshop',{wire:1,buckle:1}],[432,162,'forest',{candle:1,bread:1}],
+    [339,592,'workshop',{wire:1,buckle:1}],[435,164,'forest',{candle:1,bread:1}],
     [326,492,'road',{buckle:1}],[142,352,'marsh',{wire:1}]]){
     if(tAt(x,y)===TR)setT(x,y,GR);
     supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
