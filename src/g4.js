@@ -672,6 +672,12 @@ function lookOf(e) {
   return L[(e.seed || e.id) % L.length];
 }
 function drawHuman(e, g) {
+  if(e.shoreChild){
+    g.save();g.translate(e.x,e.y);g.scale(.73,.73);g.translate(-e.x,-e.y);
+    drawHumanBody(e,g);g.restore();
+  }else drawHumanBody(e,g);
+}
+function drawHumanBody(e, g) {
   if (g3Draw(e, { shadow: false }, g)) return;
   if (b1Human(e, g)) return;
   const lk = lookOf(e);
@@ -1033,8 +1039,12 @@ function render() {
   let plantIndex=0;
   const drawBridge=()=>ctx.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
   const bridgeVisible=BEREZKI && inView(footbridge.x,(footbridge.south+footbridge.north)/2,200);
-  if(bridgeVisible && S.flags.stationDeck)drawBridge();
-  const winterProps=BEREZKI?atlasProps.filter(p=>inView(p.x,p.y,150)):[];
+  if(bridgeVisible && S.flags.stationDeck){
+    for(const p of raisedScenery)if(p.underDeck && inView(p.x,p.y,80))paintRaisedScenery(ctx,p,false);
+    drawBridge();
+  }
+  const winterProps=BEREZKI?[...atlasProps.filter(p=>inView(p.x,p.y,150)),
+    ...raisedScenery.filter(p=>inView(p.x,p.y,80) && !(bridgeVisible && S.flags.stationDeck && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
     while(winterIndex<winterProps.length && winterProps[winterIndex].depth<e.y)drawAtlasProp(ctx,winterProps[winterIndex++]);
@@ -1051,7 +1061,7 @@ function render() {
     }
   }
   while(winterIndex<winterProps.length)drawAtlasProp(ctx,winterProps[winterIndex++]);
-  if(bridgeVisible && !S.flags.stationDeck)drawBridge();
+  if(bridgeVisible){if(!S.flags.stationDeck)drawBridge();paintBridgeRails(ctx);}
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }

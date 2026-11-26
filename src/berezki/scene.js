@@ -26,7 +26,7 @@ function makeDistrict(){
     if(n===1){
       wall(9,1,.18,4.5);wall(9,8,.18,2); // canteen doorway opens onto the entrance hall
       stove(5,6);fit('supper',3,3.5);fit('bench',3,2.5);fit('supper',6.9,8);fit('bench',7,9);
-      fit('desk',14.8,8.6);fit('cabinet',19.8,9);fit('rack',2.1,8.8);
+      fit('desk',14.8,8.6);fit('cabinet',19.8,9);fit('rack',2.1,7.35);
     }else{
       // An open central corridor connects the stair landing to each room.
       for(const u of [1,6.6,13]){wall(u,4.6,2.9,.17);wall(u,6.7,2.9,.17);}
@@ -34,7 +34,10 @@ function makeDistrict(){
       for(const u of [2.3,8,14.3]){
         fit('bedroll',u,2.4);fit('cupboard',u+2.6,1.8);fit('supper',u+1.2,8.6);
       }
-      stove(11.7,2.7);fit('cabinet',3,9.3);fit('bedroll',14.5,8.7);
+      stove(11.7,2.7);
+      // Preserve the saved container key and its seeded contents when moving this cabinet.
+      const cabinet=fit('cabinet',3,9.3);cabinet.x-=T;cabinet.y-=.5*T;
+      fit('bedroll',17.45,8.7);
     }
     if(n<5)district.stairs.push({room:r,up:true,...tilePoint(x+18.7,y+5.35)});
     if(n>1)district.stairs.push({room:r,up:false,...tilePoint(x+16.9,y+5.7)});
@@ -59,7 +62,10 @@ function winterNew(difficulty){
 const winterResidents=[
   ['warden','Агат',516,362.5,'w_obrez'],['door','Савва',519.7,357.6,'w_pm'],
   ['cook','Тамара',509.5,354.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
-  ['fisher','Егор',...fishingTrack[0],'knife']
+  ['fisher','Егор',...fishingTrack[0],'knife'],
+  ['housekeeper','Вера',503.4,128.6,'knife'],['anya','Аня',482.2,140.2,'knife'],
+  ['mitya','Митя',485.5,140.75,'knife'],['shorePatrol','Григорий',494.4,133.2,'w_obrez'],
+  ['shorePost','Семён',481.8,134.5,'w_pm']
 ];
 function winterRestore(d){
   S=d;survDefaults();plusDefaults();
@@ -74,7 +80,9 @@ function winterRestore(d){
     const e=mkHuman({sid,name,x,y,wpn,fac:'loner',stay:1,ang:Math.PI/2});
     const previous=S.dyn.npcs.find(n=>n.sid===sid);
     if(previous)for(const key of ['x','y','hp','mag','money','inv'])if(previous[key]!=null)e[key]=previous[key];
-    e.protectedResident=sid==='cook';
+    e.shoreChild=sid==='anya' || sid==='mitya';
+    e.protectedResident=sid==='cook' || sid==='housekeeper' || e.shoreChild;
+    if(e.shoreChild)e.r=8;
     if(S.flags.angry?.[sid])e.angry=1;
     ents.push(e);
   }
@@ -120,8 +128,8 @@ function winterUse(n){
         closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
       }})),{t:'Встать',close:1}]);
   }else if(n.k==='talk'){
-    const lines={warden:'Дверь за собой притвори. Нанесёт снегу — к утру её вдвоём не отворишь.',door:'Проходи. Налево столовая, наверх — по дальней лестнице.',cook:'Чайник ещё горячий. Кружки на полке.',fisher:'От крыльца держись по следам. У лунки лёд скользкий. Замёрзнешь — возвращайся, печь ещё держит тепло.',tenant:'Окна к ночи войлоком закрываем. От стекла так и тянет.'};
-    dialog({ent:n.e,n:n.e.name,fac:'loner',grp:'Выживальщики',att:'житель Берёзок'},[lines[n.e.sid]||'Добрый вечер.'],()=>[{t:'До встречи',close:1}],'dialog',n.e);
+    const lines={warden:'Дверь за собой притвори. Нанесёт снегу — к утру её вдвоём не отворишь.',door:'Проходи. Налево столовая, наверх — по дальней лестнице.',cook:'Чайник ещё горячий. Кружки на полке.',fisher:'От крыльца держись по следам. У лунки лёд скользкий. Замёрзнешь — возвращайся, печь ещё держит тепло.',housekeeper:'К вечеру крыльцо снова заметёт.',anya:'Мы до следа и обратно. Смотри!',mitya:'Вон туда Аня убежала!',shorePost:'К домам проходи по тропе.',shorePatrol:'С берега ветер крепчает.',tenant:'Окна к ночи войлоком закрываем. От стекла так и тянет.'};
+    dialog({ent:n.e,n:n.e.name,fac:'loner',grp:'Выживальщики',att:shoreJobs[n.e.sid]?'рыбацкий посёлок':'житель Берёзок'},[n.e.shoreAction==='net'?'Ячею прихвати, пока узел тяну. Ещё пару рядов — и к огню.':lines[n.e.sid]||'Добрый вечер.'],()=>[{t:'До встречи',close:1}],'dialog',n.e);
   }else return false;
   return true;
 }
@@ -241,11 +249,6 @@ function winterRoom(r){
     for(let k=-12;k<62;k+=6){beam(g,x+k,y-11,x+k+14,y+9,.7,'#908875');beam(g,x+k,y+8,x+k+12,y-10,.7,'#565146');}
     g.restore();beam(g,x-2,y-11,x+51,y-11,2,'#484038');
   }
-  for(const o of objs){
-    if(o.x<ox || o.y<oy || o.x>=ox+w || o.y>=oy+h)continue;
-    if(o.k==='roomFitting')drawRoomFitting(g,o);
-    if(o.k==='partition')paintPartition(g,o);
-  }
   for(const s of district.stairs.filter(s=>s.room===r)){
     // Two flights run in parallel. Each mouth opens onto the corridor.
     drawBuiltStair(g,{id:'berezki',stair:s,landing:s},!s.up);
@@ -259,13 +262,22 @@ function winterRoom(r){
   return c;
 }
 function winterLandscape(){
-  prepareAtlasArt();
+  prepareAtlasArt();buildRaisedScenery();
   const bridge=footbridge;
   district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
 
   district.plans=district.levels.map(r=>r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
 
+}
+function winterFloorPlan(r){
+  if(!r.furnishedPlan){
+    const i=district.levels.indexOf(r),c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
+    g.drawImage(district.plans[i],0,0);g.translate(-r.x*T,-r.y*T);
+    for(const p of raisedScenery)if(p.item && winterFloor(p.x,p.y)===r)paintRaisedScenery(g,p,true);
+    r.furnishedPlan=c;
+  }
+  return r.furnishedPlan;
 }
 function winterGround(vx,vy,vw,vh){
   const upper=winterFloor(P.x,P.y);
@@ -306,10 +318,9 @@ function winterMap(g,s,_labels,options={}){
   if(!floor){
     g.drawImage(district.images.survey,0,0,district.width*s,district.height*s);
     if(options.mini && r){
-      const i=district.levels.indexOf(r);
-      g.drawImage(district.plans[i],r.x*s,r.y*s,r.w*s,r.h*s);
+      g.drawImage(winterFloorPlan(r),r.x*s,r.y*s,r.w*s,r.h*s);
     }
-  }else g.drawImage(district.plans[r.n-1],r.x*s,r.y*s,r.w*s,r.h*s);
+  }else g.drawImage(winterFloorPlan(r),r.x*s,r.y*s,r.w*s,r.h*s);
   const u=options.u||1;
   if(!floor && options.loc){
     g.save();g.textAlign='center';g.font='bold '+Math.max(11,12*u)+'px Arial';
@@ -342,6 +353,12 @@ async function bootBerezki(){
     const house=HOUSES[0],entry=house.entrances[0];
     const x=house.x*T+entry.x+entry.width/2+11,y=(house.y+house.h)*T;
     if(inView(x,y,45))softLamp(g,x,y+5,39,30,tint?.25:.63,tint?'255,186,103':'0,0,0');
+    if(darkness()>.16)for(const cabin of villageCabins){
+      const x=(cabin.x+cabin.w*.67)*T,y=(cabin.y+cabin.h)*T;
+      if(inView(x,y,76) && ents.some(e=>e!==P && e.alive && winterFloor(e.x,e.y)===cabin)){
+        softLamp(g,x,y,33,18,tint?.18:.45,tint?'255,178,101':'0,0,0');
+      }
+    }
     for(const h of district.heaters)if(inView(h.x,h.y,120))
       softLamp(g,h.x,h.y,98,85,tint?.15:.83,tint?'255,188,116':'0,0,0');
   };

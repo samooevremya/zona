@@ -82,6 +82,7 @@ function g7PoseFrame(skin, pose) {
 
 /* ---------- единая геометрия оружия: хват, цевьё и дуло в южных локальных координатах тела ---------- */
 function weaponLocal(e) {
+  if(BEREZKI && (e.shoreChild || e.sid==='housekeeper' || e.sid==='fisher' && !e.tgt))return null;
   const id = e === P ? S.weapon : e.wpn, W = G3W[id] || (DETECTORS[id] && { len: 5 }); if (!W) return null;
   const grip = kitSlot(id) === 'sidearm' || id === 'knife' || id === 'grenade' || DETECTORS[id] ? 'one' : 'two';
   const r = rigActive(e);

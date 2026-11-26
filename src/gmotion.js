@@ -8,7 +8,7 @@ function motionSkin(e) {
   const skin=rigSkin(e);
   if(!skin)return null;
   const color=skin==='loner' && e!==P ? JACKET_COLORS[jacketIndex(e)] : '';
-  const winterTone=BEREZKI?(e===P?'slate':e.sid==='cook'?'ochre':'ash'):null;
+  const winterTone=BEREZKI?(e===P?'slate':(e.sid==='cook'||e.sid==='housekeeper'||e.sid==='anya')?'ochre':e.sid==='mitya'?'slate':'ash'):null;
   const key=skin+(winterTone||color);
   if(!motionSkins.has(key)){
     motionSkins.set(key,null);
@@ -131,6 +131,12 @@ function paintMotionHuman(target,e,opacity){
       const grip=w.grip==='two'?w.support:w.main;
       hx=lerp(grip[0],5.8,reload);hy=lerp(grip[1],2.5,reload);
     }
+    if(BEREZKI && !e.tgt && e.shoreAction==='net'){
+      const pull=(1-Math.cos(G7.vt*2.7))*.5;
+      hx=sign*(sign<0?4+pull*3:5.2);hy=sign<0?15-6*pull:14+.8*pull;
+    }else if(BEREZKI && e.shoreAction==='sweep'){
+      const side=3.6*Math.sin(G7.vt*2.2);hx=side+sign*2.2;hy=sign<0?12:7;
+    }
     if(guitar)[hx,hy]=guitar[sign<0?0:1];
     const dx=hx-ax,dy=hy-ay,len=Math.max(.01,Math.hypot(dx,dy));
     const bend=Math.min(4,Math.sqrt(Math.max(0,6.7*6.7-len*len*.25)));
@@ -165,6 +171,16 @@ function paintMotionHuman(target,e,opacity){
   for(const {index,hx,hy,ex,ey} of hands)
     motionSegment(target,art['arm_'+index+'_lower'],ex,ey,hx,hy,5.2);
   if(base)window.__g7tap(e,base,target.getTransform(),w);
+  if(BEREZKI && !e.tgt && e.shoreAction==='net'){
+    const hand=hands[0];
+    beam(target,hand.hx,hand.hy,hand.hx+1,hand.hy+4,1.7,'#96805b');
+    target.strokeStyle='#897e67';target.lineWidth=.75;target.beginPath();
+    target.moveTo(hand.hx+1,hand.hy+4);target.quadraticCurveTo(0,21,5,24);target.stroke();
+  }else if(BEREZKI && e.shoreAction==='sweep'){
+    const side=hands[0].hx;
+    beam(target,side+4,4,side-4,20,1.7,'#7e6950');
+    for(let i=-3;i<=3;i++)beam(target,side-4,18,side-5+i,24-Math.abs(i)*.45,.9,'#8e816b');
+  }
   if(guitar)paintGuitar(target);
   else if(w)drawWeaponLocal(target,w);
   for(const {index,hx:x,hy:y,ex,ey} of hands){
