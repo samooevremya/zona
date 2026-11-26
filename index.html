@@ -16234,10 +16234,11 @@ function adaptDesktopWorld(ms) {
   const nativeDensity = Math.min(devicePixelRatio || 1, 2);
   const floor = Math.min(1, nativeDensity);
   let next = DPR;
-  if (median > 22) {
+  const mean = sampleTime / AQ.buf.length;
+  if (median > 22 || (mean > 21 && p85 > 25)) {
     fastTime = 0;
     // Pixel cost scales with area. Quantize steps to avoid continual resampling.
-    next = Math.max(floor, Math.min(DPR - .25, Math.floor(DPR * Math.sqrt(19 / median) * 4) / 4));
+    next = Math.max(floor, Math.min(DPR - .25, Math.floor(DPR * Math.sqrt(19 / Math.max(mean, median)) * 4) / 4));
   } else if (p85 < 19 && DPR < nativeDensity) {
     fastTime += sampleTime;
     if (fastTime >= recoveryDelay) {
