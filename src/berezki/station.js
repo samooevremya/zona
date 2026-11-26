@@ -13,16 +13,16 @@ function makeWinterStation(){
   house(r.x,r.y,r.w,r.h,[[6,0],[7,0],[6,5],[7,5]],CO,0,'slate');
   stationHouse=HOUSES[HOUSES.length-1];buildEntrances(stationHouse);
   district.levels.push(r);
-  for(const [key,x,y,angle] of [['bench',25,28,0],['bench',32.5,28,0],['desk',24,30.2,0],['stove',33.1,30.5,0]]){
+  for(const [key,x,y,angle] of [['bench',25,28,0],['bench',32.5,28,0],['desk',24,30.2,0],['stove',33.1,29.95,0]]){
     putFurniture(key,(stationX+x)*T,(stationY+y)*T,angle,'winter-station');
   }
-  district.heaters.push(tilePoint(stationX+33.1,stationY+30.5));
+  district.heaters.push(tilePoint(stationX+33.1,stationY+29.95));
   function fence(x,end,y,underDeck=false){
     trackFences.push(addObj({k:'fence',material:'stationMesh',solid:1,underDeck,x,y:y-3,w:end-x,h:6}));
   }
   fence(0,district.width*T,northFence,true);
   fence(0,r.x*T,southFence);fence((r.x+r.w)*T,district.width*T,southFence);
-  for(const x of [20,33.5])putFurniture('bench',(stationX+x)*T,(stationY+25.62)*T,0,'station-platform');
+  for(const x of [20,41])putFurniture('bench',(stationX+x)*T,(stationY+25.05)*T,0,'station-platform');
   const b=footbridge;
   // The stair stringers block side entry at ground level. The open span
   // between them leaves both tracks walkable underneath.
@@ -86,7 +86,6 @@ function stationInterior(r){
     if(tAt(r.x+i,r.y+j)===CO){artFill(g,'wall_brick',xx,yy,T,T);g.fillStyle='#524d4290';g.fillRect(xx,yy,T,T);}
     else{beam(g,xx,yy,xx+T,yy,.85,'#686559');beam(g,xx,yy,xx,yy+T,.85,'#686559');}
   }
-  for(const o of objs)if(o.home==='winter-station')drawRoomFitting(g,o);
   return c;
 }
 function stationRoof(){
@@ -135,19 +134,7 @@ function paintStationGround(g,left,right){
   for(let x=p.x;x<p.x+p.w;x+=32){
     beam(g,x,p.y,x,p.y+p.h,1,'#64645a');beam(g,x,p.y+4,x+27,p.y+4,2,'#d2c8aa');
   }
-  for(const f of trackFences){
-    const x0=Math.max(f.x, Math.floor(left/40)*40-40),x1=Math.min(f.x+f.w,right+40);
-    if(x1<=x0)continue;
-    drawFenceRun(g,{...f,x:x0,w:x1-x0});
-    // Snow caps and the rusted top wire lift the mesh above its footing.
-    beam(g,f.x,f.y-6,f.x+f.w,f.y-6,1.5,'#77776b');
-    for(let x=f.x+2+Math.max(0,Math.floor((left-f.x-2)/40))*40;x<x1;x+=40){
-      beam(g,x,f.y+2,x,f.y-8,2.8,'#5f6058');beam(g,x-1,f.y-8,x+2,f.y-8,1.6,'#c5c9c3');
-      const end=Math.min(x+40,f.x+f.w);
-      for(let u=x;u<end-4;u+=6){beam(g,u,f.y-5,u+4,f.y+.5,.75,'#6d7066');beam(g,u,f.y+.5,u+4,f.y-5,.75,'#74756a');}
-    }
-  }
-  for(const o of objs)if(o.home==='station-platform')drawRoomFitting(g,o);
+  for(const f of trackFences)paintFenceFooting(g,f,left,right);
   const doorX=(stationX+29)*T;
   artFill(g,'floor_concrete',doorX-35,(stationY+32)*T,70,18);
   for(const i of [4,10,16])beam(g,doorX-35,(stationY+32)*T+i,doorX+35,(stationY+32)*T+i,1.2,'#68695f');
@@ -197,11 +184,27 @@ function paintStationBridge(g){
   }
   for(const xx of [x,x+w]){
     beam(g,xx,y,xx,y+h,4,'#524b3f');
-    for(let v=0;v<h;v+=24){
-      beam(g,xx,y+v,xx-2,y+v-5,3,'#685649');
-      beam(g,xx-2,y+v-5,xx+1,y+Math.min(v+24,h),1.4,'#85725d');
-    }
-    beam(g,xx-2,y-4,xx-2,y+h-4,1.8,'#c3c5b9');
+
   }
   g.restore();
+}
+
+// The deck is cached; the guard rails above it lean with the same projection
+// as the station mesh. Draw the posts from their actual attachment to the deck.
+function paintBridgeRails(g,mapView=false){
+  const b=footbridge,span=b.south-b.north,count=Math.ceil(span/24);
+  for(const sign of [-1,1]){
+    const x=b.x+sign*b.width/2;
+    let previous=null;
+    for(let i=0;i<=count;i++){
+      const y=b.north+span*i/count,[dx,dy]=raisedOffset(x,y,22,mapView);
+      const top=[x+dx,y+dy];
+      beam(g,x,y,...top,2.7,'#62594d');
+      if(previous){
+        beam(g,...previous,...top,2.6,'#766e60');
+        beam(g,previous[0],previous[1]-.6,top[0],top[1]-.6,.95,'#c9cbc2');
+      }
+      previous=top;
+    }
+  }
 }

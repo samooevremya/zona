@@ -149,6 +149,7 @@ function paintPropShadow(g,p){
   g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
 }
 function drawAtlasProp(g,p,mapView=false){
+  if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
   const k=perspective && !mapView?p.lift:0;
   const [topX,topY]=roofPoint(p.x,p.y,k);
@@ -193,7 +194,7 @@ function makeAtlasProps(){
   }
   atlasProp('netrack',netRack.x,netRack.y+10,89,.044);
   atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,.022);
-  const pile=tilePoint(505.5,131.39);
+  const pile=tilePoint(509.05,130.15);
   atlasProp('wood',pile.x,pile.y+6,54,.019);
   interiorObject('woodStack',pile.x,pile.y,51,16);
   atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h-1,67,.023);
@@ -471,8 +472,8 @@ function bakeSurvey(){
   for(const tree of treesInRect(0,0,district.width*T,district.height*T)){
     const {x,y,size,art}=tree;g.drawImage(art.crown,x-size/2,y-size/2,size,size);
   }
-  for(const p of atlasProps)drawAtlasProp(g,p,true);
-  g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
+  for(const p of [...raisedScenery,...atlasProps])drawAtlasProp(g,p,true);
+  g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);paintBridgeRails(g,true);
   for(const h of HOUSES)if(h.x<district.width){
     g.shadowColor='#374859aa';g.shadowBlur=2;g.shadowOffsetX=2;g.shadowOffsetY=3;
     g.drawImage(ROOFS[h.roofIndex],h.x*T,h.y*T,h.w*T,h.h*T);

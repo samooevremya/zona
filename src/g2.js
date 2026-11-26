@@ -997,7 +997,10 @@ function aiHuman(e, dt) {
     e.deskLook = lerp(e.deskLook || 0, visiting ? 1 : 0, Math.min(1, dt * 3));
     return;
   }
-  if (e.captive || e.protectedResident) return;
+  if (e.captive || e.protectedResident) {
+    if(BEREZKI && !e.captive && shoreJobs[e.sid])shoreRoutine(e,dt);
+    return;
+  }
   if(e.robberyAlarm && e.fac==='loner'){
     const responders=ents.filter(o=>o!==e && o.fac==='loner' && o.alive && !o.captive && !o.angry && dE(o,e)<170 && los(o.x,o.y,e.x,e.y));
     if(responders.length){responders.forEach(rememberAttacker);sayLine(e,'Мужики, он меня грабить хотел!');e.robberyAlarm=false;}
@@ -1271,7 +1274,7 @@ function helpCompanion(e,dt){
   return true;
 }
 function idleHuman(e, dt) {
-  if(BEREZKI && e.sid==='fisher'){fishRoutine(e,dt);return;}
+  if(BEREZKI && shoreJobs[e.sid]){shoreRoutine(e,dt);return;}
   if(chapter()==='aid' && S.campaign.villageMedic && e.sid===S.campaign.villageMedic){
     const wolf=byS('wolf');
     if(wolf?.wounded){

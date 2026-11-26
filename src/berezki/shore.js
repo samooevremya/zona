@@ -18,7 +18,6 @@ const shoreLanes=[
   [[483.2,124.4],[486.5,122.2],[488.9,121.6],[491.4,121.4]]
 ];
 const shoreFences=[];
-const outdoorSeats=[];
 let fishingHouse,woodStack;
 function makeVillageYards(){
   for(const r of villageCabins){
@@ -27,14 +26,16 @@ function makeVillageYards(){
     district.levels.push(r);
   }
   for(const [x,y,w,h] of [
-    [479,137,3,.16],[486,137,1,.16],[479,137,.16,6],
-    [499.4,132.1,1.25,.16],[504.3,132.1,3.5,.16],[507.65,127.7,.16,4.55],
-    // Return the short wings to the yard boundaries; the paths cross at the gates.
-    [499.4,131,.16,1.26],[486.84,137,.16,1.12]
+    [478,138.85,.96,.16],[486,136.55,3,.16],[478,138.85,.16,4.2],
+    [488.84,136.55,.16,2.4],
+    // Leave open snow between the corner posts and the eaves, including projected height.
+    [498.3,132.85,2.35,.16],[504.3,132.85,6,.16],[510.14,127.7,.16,5.31]
+
   ])shoreFences.push(addObj({k:'fence',material:'picket',solid:1,x:x*T,y:y*T,w:w*T,h:h*T}));
   for(const [x,y,angle] of [[497.5,137.45,0],[500.55,135.25,Math.PI/2]])
-    outdoorSeats.push(putFurniture('bench',x*T,y*T,angle,'shore-court'));
-  interiorObject('netShelter',netRack.x,netRack.y,78,36);
+    putFurniture('bench',x*T,y*T,angle,'shore-court');
+  interiorObject('netShelter',netRack.x,netRack.y-5,78,25);
+  for(const side of [-1,1])interiorObject('netFoot',netRack.x+side*36,netRack.y+10,5,7);
   interiorObject('roastingPit',shoreFire.x,shoreFire.y,41,24);
 }
 function makeFishingShore(){
@@ -45,12 +46,8 @@ function makeFishingShore(){
   district.levels.push(r);
   partition(shoreX+46.75,shoreY+15.7,.17,1.3,'timber');
   partition(shoreX+49.15,shoreY+15.7,.17,1.3,'timber');
-  putFurniture('stove',(shoreX+46)*T,(shoreY+13.4)*T,0,'shore');
-  district.heaters.push(tilePoint(shoreX+46,shoreY+13.4));
-  putFurniture('bedroll',(shoreX+50.1)*T,(shoreY+13.9)*T,0,'shore');
-  putFurniture('cupboard',(shoreX+49.4)*T,(shoreY+12.5)*T,Math.PI/2,'shore').loot={bandage:1};
-  putFurniture('supper',(shoreX+45.9)*T,(shoreY+16.25)*T,0,'shore');
-  woodStack=interiorObject('woodStack',(shoreX+45.5)*T,(shoreY+18.43)*T,60,19);
+  furnishShoreHomes();
+  woodStack=interiorObject('woodStack',484.85*T,127.75*T,60,19);
 }
 function fishRoutine(e,dt){
   const last=fishingTrack.length-1;
@@ -72,16 +69,99 @@ function fishRoutine(e,dt){
   }
   round.index+=round.outward?1:-1;
 }
-function restoreShoreFooting(){
-  if(P.x<478*T || P.x>509*T || P.y<121*T || P.y>145*T || clearFooting(P.x,P.y,P.r))return;
+// Stops are on walkable ground, including the landings on either side of a door.
+// A stop's clock starts when the resident arrives, never while the path is blocked.
+const shoreJobs={
+  fisher:[
+    [489.9,128.4,3,'home'],[491,130.6],[491,132.8],[488.1,134.4],[486.2,133],
+    [484.55,131.85,16,'net'],[486.2,133],[488.1,134.4],[492,134.9],
+    [495.6,133.9],[496.1,135.7],[497.5,136.62,7,'warm'],
+    [496.1,135.7],[495.6,133.9],[492,134.9],[488.1,134.4],[491,132.8],[491,130.6]
+  ],
+  housekeeper:[
+    [503.4,128.6,5,'home'],[502,131.45],[502.55,132.65,8,'sweep'],[501.1,133.1,7,'sweep'],
+    [499.3,133.5],[499.58,135.2,5,'warm'],[499.3,133.5],[502,131.45]
+  ],
+  anya:[
+    [482.2,140.2,2,'home'],[483.6,137.6],[483.7,135.7,2,'play'],[487.2,134.9],
+    [490.8,135.65,2,'play'],[494.3,136],[496.35,136.6,3,'warm'],[490.2,136.5],[484,136.5],[483.6,137.6]
+  ],
+  mitya:[
+    [485.5,140.75,3,'home'],[484.5,138],[484.7,136.3],[487.7,135.25,2,'play'],
+    [490.1,136.1],[493.3,135.75,2,'play'],[496.25,135.15,3,'warm'],[490.8,135.65],[484.5,136.2],[484.5,138]
+  ],
+  shorePatrol:[
+    [494.4,133.2,6,'watch'],[488.1,134.4],[483.2,135.3,4,'watch'],[482.6,130.9],
+    [483.1,128.6,5,'watch'],[486.2,133],[492,134.9],[498.65,136.25,5,'warm']
+  ],
+  shorePost:[[481.8,134.5,4,'watch']]
+};
+const shoreHours={fisher:[7,18],housekeeper:[7.2,18.65],anya:[8,18.1],mitya:[8.15,18.32]};
+function shoreRoutine(e,dt){
+  const stops=shoreJobs[e.sid],hours=shoreHours[e.sid],minute=S.min%1440;
+  const awake=!hours || minute>=hours[0]*60 && minute<hours[1]*60;
+  const journal=S.flags.shoreJobs||={};
+  const job=journal[e.sid]||={stop:0,until:0};
+  // Keep an existing trip to the ice hole, including its waypoints in old slots.
+  if(e.sid==='fisher' && (job.onIce || !job.started && S.flags.fishingRound)){
+    job.started=true;job.onIce=true;e.shoreAction=null;
+    fishRoutine(e,dt);
+    const round=S.flags.fishingRound;
+    if(round.outward || round.index>0)job.startIce=false;
+    if((!job.startIce || !awake) && !round.outward && round.index===0 && dst(e.x,e.y,stops[0][0]*T,stops[0][1]*T)<5){
+      job.onIce=false;job.stop=0;job.until=0;
+    }
+    return;
+  }
+  job.started=true;
+  if(!awake && job.stop!==0){job.stop=0;job.until=0;}
+  const [x,y,delay=0,act]=stops[job.stop];
+  if(e.sid==='fisher'){
+    const sheltered=winterFloor(e.x,e.y) || fireLit(shoreFire) && dE(e,shoreFire)<58;
+    job.chill=clamp((job.chill||0)+dt*(sheltered?-.12:.035+darkness()*.045),0,1);
+  }
+  if(dst(e.x,e.y,x*T,y*T)>4){
+    e.shoreAction=null;
+    if(e.sit){setCampSeat(e,false);return;}
+    goTo(e,x*T,y*T,e.shoreChild?91:61,dt);return;
+  }
+  e.path=null;e.shoreAction=act;
+  if(act==='warm'){
+    if(fireLit(shoreFire)){
+      e.fireRef=shoreFire;
+      e.ang+=angD(e.ang,Math.atan2(shoreFire.y-e.y,shoreFire.x-e.x))*Math.min(1,dt*5);
+      if(e.sid==='fisher')setCampSeat(e,true);
+    }else job.until=S.min;
+  }else if(act==='net' || act==='sweep' || act==='watch'){
+    const heading=act==='net'?-Math.PI/2:act==='sweep'?Math.PI*.65:
+      -Math.PI*.6+.65*Math.sin(S.min*.27+e.id);
+    e.ang+=angD(e.ang,heading)*Math.min(1,dt*4);
+  }
+  if(!awake){job.until=0;return;}
+  if(!job.until)job.until=S.min+delay;
+  if(S.min<job.until && !(act==='net' && job.chill>=.82))return;
+  setCampSeat(e,false);e.shoreAction=null;job.until=0;
+  job.stop=(job.stop+1)%stops.length;
+  if(e.sid==='fisher' && !job.stop){
+    // Arrive home first, then start the next existing fishing trip through the doorway.
+    job.onIce=true;S.flags.fishingRound={index:0,outward:false,until:0};
+    job.startIce=true;
+  }
+}
+
+function restoreShoreFooting(actor){
+  const room=winterFloor(actor.x,actor.y);
+  const nearShore=actor.x>477*T && actor.x<512*T && actor.y>120*T && actor.y<146*T;
+  const nearStation=actor.x>platform.x && actor.x<platform.x+platform.w && actor.y>platform.y && actor.y<platform.y+platform.h;
+  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation) || clearFooting(actor.x,actor.y,actor.r))return;
   // Slots saved on a newly occupied footprint resume at its closest free spot.
   let best=null,gap=Infinity;
-  const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);
+  const tx=Math.floor(actor.x/T),ty=Math.floor(actor.y/T);
   for(let y=ty-5;y<=ty+5;y++)for(let x=tx-5;x<=tx+5;x++){
-    const p=tilePoint(x+.5,y+.5),d=dE(P,p);
-    if(d<gap && clearFooting(p.x,p.y,P.r)){best=p;gap=d;}
+    const p=tilePoint(x+.5,y+.5),d=dE(actor,p);
+    if(d<gap && winterFloor(p.x,p.y)===room && clearFooting(p.x,p.y,actor.r)){best=p;gap=d;}
   }
-  if(best)Object.assign(P,best);
+  if(best)Object.assign(actor,best);
 }
 function shoreEllipse(g,x,y,rx,ry,color,angle=0){
   g.fillStyle=color;g.beginPath();g.ellipse(x,y,rx,ry,angle,0,Math.PI*2);g.fill();
@@ -169,7 +249,7 @@ function drawShoreFence(g,o){
   g.save();g.translate(o.x+o.w/2,o.y+o.h/2);
   if(vertical)g.rotate(Math.PI/2);
   packedSnow(g,0,1,length*.62,8,.48);
-  drawFenceRun(g,{x:-length/2,y:-2,w:length,h:4,material:o.material});
+
   for(let i=0;i<count;i++){
     const x=(i+.5)*length/count-length/2;
     snowDrift(g,x,4,Math.round(length/count*.56),5+(i%2),-.06,31+i%4);
@@ -185,7 +265,8 @@ function shoreGround(g){
   // Broken crust follows the width of the lane and thins along its edges.
   const workTracks=[
     [[486.2,133],[485.25,132.35],[484.7,131.95]],
-    [[502,132.5],[503.3,131.82],[505.05,131.88]]
+    [[502,132.5],[503.3,132.04],[507.8,132.04],[508.95,130.75]],
+    [[483,133.1],[482.6,130.9],[483.2,128.7],[484.6,128.4]]
   ];
   for(const trail of [...shoreLanes,...workTracks]){
     for(let i=1;i<trail.length;i++){
@@ -239,7 +320,7 @@ function shoreGround(g){
     }
   }
   for(const o of shoreFences)drawShoreFence(g,o);
-  for(const o of outdoorSeats)drawRoomFitting(g,o);
+  for(const o of shoreFences)paintFenceFooting(g,o,-Infinity,Infinity);
   const ash=g.createRadialGradient(shoreFire.x,shoreFire.y,5,shoreFire.x,shoreFire.y,29);
   ash.addColorStop(0,'#37312b');ash.addColorStop(.5,'#6f655cb3');ash.addColorStop(1,'#908c8000');
   g.fillStyle=ash;g.fillRect(shoreFire.x-29,shoreFire.y-29,58,58);
@@ -251,6 +332,7 @@ function cabinFloor(r){
     artFill(g,'floor_wood',x*T,y*T,T,T);
     g.fillStyle='#493f3480';g.fillRect(x*T,y*T,T,T);
   }
+  paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));
   return c;
 }
 function fishingInterior(r){
@@ -277,11 +359,7 @@ function fishingInterior(r){
     shoreEllipse(g,ix*T+2.5,12.50*T,1.6,2.6,'#74533a',-.7);
   }
   g.restore();
-  for(const o of objs){
-    if(winterFloor(o.x,o.y)!==r)continue;
-    if(o.k==='roomFitting')drawRoomFitting(g,o);
-    if(o.k==='partition')paintPartition(g,o);
-  }
+  g.save();g.translate(x,y);paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));g.restore();
   g.translate(shoreX*T,shoreY*T);
   const glow=g.createRadialGradient(46*T,13.4*T,2,46*T,13.4*T,53);
   glow.addColorStop(0,'rgba(238,146,57,.36)');glow.addColorStop(1,'transparent');
