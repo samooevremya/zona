@@ -60,7 +60,7 @@ function winterTracks(dt,room){
       || decals.some(d=>!d.burn && traceAlpha(d.t??S.min)>.25 && dE(d,P)<d.r+2)
       || (flags.snowMarks||[]).some(m=>m.type==='drag' && m.blood>.25 && dE(m,P)<8 && traceAlpha(m.t)>.25);
     flags.bloodySteps=blood?7:Math.max(0,(flags.bloodySteps||0)-1);
-    recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',depth:forestDepth(P.x,P.y),blood:flags.bloodySteps/7});
+    recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',depth:snowAtBoots(P),blood:flags.bloodySteps/7});
   }
   if(draggedBody){
     const b=draggedBody;

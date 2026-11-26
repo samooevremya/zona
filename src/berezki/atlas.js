@@ -304,12 +304,8 @@ function prepareAtlasArt(){
   for(let i=0;i<5;i++)bankArt[i]=makeBankArt(i);
   district.crowns=[6,7].map(id=>Array.from({length:8},(_,turn)=>winterTreeArt(id,turn)));
   district.snow=snowMaterial();prepareBaseLorry();preparePumpArt();preparePropShadows();
-  const ice=winterCanvas(512,512),g=ice.getContext('2d'),m=district.images.materials,s=m.width/2;
-  for(const u of [0,1])for(const v of [0,1]){
-    g.save();g.translate(u*512,v*512);g.scale(u?-1:1,v?-1:1);
-    g.drawImage(m,s+2,s+2,s-4,s-4,0,0,256,256);g.restore();
-  }
-  district.ice=ice;
+  const m=district.images.materials,s=m.width/2;
+  district.ice=district.images.lakeIce;
   const stamp=winterCanvas(192,192),brush=stamp.getContext('2d');
   brush.drawImage(m,6,6,s-12,s-12,0,0,192,192);
   brush.globalCompositeOperation='destination-in';
@@ -395,7 +391,7 @@ function atlasTerrainChunk(cx,cy){
     g.save();g.clip(path);
     lakeIceDetail(g,l,t,r,b);
     const iceWash=district.surface.powder;
-    g.globalAlpha=.21;g.fillStyle=iceWash;g.fillRect(l,t,atlasChunk,atlasChunk);g.globalAlpha=1;
+    g.globalAlpha=.14;g.fillStyle=iceWash;g.fillRect(l,t,atlasChunk,atlasChunk);g.globalAlpha=1;
     // Wind packs snow along the shore. Broad translucent courses soften the ice margin.
     for(const [w,col] of [[8*T,'#e0e6e218'],[4*T,'#e2e7e327'],[1.5*T,'#e1e5e238']]){
       g.lineWidth=w;g.strokeStyle=col;g.stroke(path);

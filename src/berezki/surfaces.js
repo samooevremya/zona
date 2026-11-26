@@ -1,7 +1,7 @@
 // World-space materials and leeward snow banks. The same height profile lights
 // the crust, covers the boots and sets resistance to movement.
 const snowCell=160, forestBanks=new Map();
-const bankArt=[];
+const bankArt=[], bootDepthCache=new WeakMap();
 function windProfile(u,v,variant){
   const bend=.19*Math.sin(u*3.8+variant)+.07*Math.sin(u*7.1-variant);
   const across=v-bend;
@@ -77,6 +77,15 @@ function forestDepth(x,y){
       height=Math.max(height,b.depth*windProfile(u,v,b.variant));
     }
   return height;
+}
+function snowAtBoots(actor){
+  let sample=bootDepthCache.get(actor);
+  if(!sample){sample={};bootDepthCache.set(actor,sample);}
+  if(sample.x!==actor.x || sample.y!==actor.y){
+    sample.x=actor.x;sample.y=actor.y;
+    sample.depth=forestDepth(actor.x,actor.y);
+  }
+  return sample.depth;
 }
 function drawForestSnow(g,l,t,r,bottom){
   for(let j=Math.floor((t-180)/snowCell);j<=Math.floor((bottom+150)/snowCell);j++)

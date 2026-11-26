@@ -123,7 +123,7 @@ function paintMotionHuman(target,e,opacity){
   const breath=Math.sin(G7.vt*1.85+(e.seed||0))*.21*(1-(g.drive||0));
   const torsoTurn=(w?.grip==='two' ? .31 : 0)+swing*.075;
   const hands=[],guitar=holdsGuitar(e)?guitarHands(e):null;
-  const buried=BEREZKI && !e.jumpT?forestDepth(e.x,e.y):0;
+  const buried=BEREZKI && !e.jumpT?snowAtBoots(e):0;
   for(const [index,sign] of [['l',-1],['r',1]]){
     const foot=motionFoot(g.cycle==null?motionIdle:g,sign);
     const spread=sign*(4.6+low);

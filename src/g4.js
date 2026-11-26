@@ -1065,7 +1065,7 @@ function render() {
         ctx.rect(footbridge.x-footbridge.width/2,footbridge.north,footbridge.width,footbridge.south-footbridge.north);
         ctx.clip('evenodd');
       }
-      const sink=e.jumpT?0:forestDepth(e.x,e.y)*3;
+      const sink=e.jumpT?0:snowAtBoots(e)*3;
       ctx.translate(0,sink-winterStairLift(e));drawLitHuman(e);ctx.restore();
     }
     else drawLitHuman(e);
