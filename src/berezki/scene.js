@@ -154,7 +154,7 @@ function winterWeather(dt){
   }
   if(decals.length)decals=decals.filter(d=>d.t==null || winterFloor(d.x,d.y) || traceAlpha(d.t)>.02);
   winterTracks(dt,r);
-  for(const f of WORLD_FIRES)if(fireLit(f) && dE(P,f)<29 && P.alive){
+  for(const f of WORLD_FIRES)if(fireLit(f) && ((P.x-f.x)/9)**2+((P.y-f.y)/7)**2<1 && P.alive){
     P.hp-=dt*5;hurtFlash=Math.max(hurtFlash,.12);if(P.hp<=0)kill(P,'fire');
   }
 

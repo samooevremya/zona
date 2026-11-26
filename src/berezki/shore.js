@@ -36,7 +36,7 @@ function makeVillageYards(){
     putFurniture('bench',x*T,y*T,angle,'shore-court');
   interiorObject('netShelter',netRack.x,netRack.y-5,78,25);
   for(const side of [-1,1])interiorObject('netFoot',netRack.x+side*36,netRack.y+10,5,7);
-  interiorObject('roastingPit',shoreFire.x,shoreFire.y,41,24);
+  for(const sign of [-1,1])interiorObject('spitPost',shoreFire.x+sign*21,shoreFire.y+5,4,5);
 }
 function makeFishingShore(){
   makeVillageYards();

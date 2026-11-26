@@ -112,7 +112,6 @@ function wallTexture(h, side, len, wood, kind) {
   g.fillStyle = 'rgba(50,44,36,.55)';
   g.fillRect(0, 79, len, 9);
   if(BEREZKI && h.baseRoom?.kind==='hangar')for(const d of ds)paintHangarGate(g,d);
-  if(BEREZKI && h===stationHouse && side===2)stationSign(g,len*.55,19,'ВОКЗАЛ');
   const dim = g.createLinearGradient(0, 0, 0, 88);
   dim.addColorStop(0, 'rgba(23,21,16,.64)');
   dim.addColorStop(.22, 'rgba(23,21,16,.10)');

@@ -156,7 +156,7 @@ function paintPropShadow(g,p){
   g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
 }
 function drawAtlasProp(g,p,mapView=false){
-  if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);return;}
+  if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);paintYardFooting(g,p,true);return;}
   if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
   if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
@@ -425,6 +425,7 @@ function atlasTerrainChunk(cx,cy){
     paintPlaygroundSnow(g,0,0);paintPlaygroundSnow(g,-40,94);paintPlaygroundSnow(g,60,98);
   }
   for(const prop of atlasProps)if(near(prop.x/T,prop.y/T,160)){
+    if(yardEquipment.has(prop.key))paintWornYardSnow(g,prop);
     if(prop.burial)paintFrozenBerth(g,prop);
     else {
       if(prop.key==='netrack' || prop.key==='wood')shelterGround(g,prop);

@@ -987,7 +987,8 @@ function render() {
   }
   for(const r of lofts){const p=loft===r?r.landing:r.stair;if((!loft || loft===r) && inView(p.x,p.y,145)) drawBuiltStair(ctx,r,loft===r);}
   for (const d of decals) if (inView(d.x, d.y, 30)) {
-    ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a + ')';
+    const stainFade=BEREZKI && !d.burn && d.t!=null && !winterFloor(d.x,d.y)?traceAlpha(d.t):1;
+    ctx.fillStyle = d.burn ? 'rgba(20,16,10,' + d.a + ')' : 'rgba(70,10,6,' + d.a*stainFade + ')';
     if (d.burn) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.28); ctx.fill(); continue; }
     const h = Math.sin(d.x * 12.9898 + d.y * 78.233) * 43758.5453, q = h - Math.floor(h);   // стабильная неровная форма из той же записи decal
     ctx.beginPath(); ctx.ellipse(d.x, d.y, d.r * (0.75 + q * 0.5), d.r * (0.55 + (1 - q) * 0.35), q * 6.28, 0, 6.28); ctx.fill();
@@ -1044,12 +1045,12 @@ function render() {
   let plantIndex=0;
   const drawBridge=()=>ctx.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
   const bridgeVisible=BEREZKI && inView(footbridge.x,(footbridge.south+footbridge.north)/2,200);
-  if(bridgeVisible && S.flags.stationDeck){
+  if(bridgeVisible){
     for(const p of raisedScenery)if(p.underDeck && inView(p.x,p.y,80))paintRaisedScenery(ctx,p,false);
     drawBridge();
   }
   const winterProps=BEREZKI?[...atlasProps.filter(p=>inView(p.x,p.y,150)),
-    ...raisedScenery.filter(p=>inView(p.x,p.y,80) && !(bridgeVisible && S.flags.stationDeck && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
+    ...raisedScenery.filter(p=>inView(p.x,p.y,80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
     while(winterIndex<winterProps.length && winterProps[winterIndex].depth<e.y)drawAtlasProp(ctx,winterProps[winterIndex++]);
@@ -1057,7 +1058,15 @@ function render() {
     drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
-    else if(BEREZKI){ctx.save();ctx.translate(0,-winterStairLift(e));drawLitHuman(e);ctx.restore();}
+    else if(BEREZKI){
+      ctx.save();
+      if(bridgeVisible && stationUnderpass(e)){
+        ctx.beginPath();ctx.rect(vx-100,vy-100,vw+200,vh+200);
+        ctx.rect(footbridge.x-footbridge.width/2,footbridge.north,footbridge.width,footbridge.south-footbridge.north);
+        ctx.clip('evenodd');
+      }
+      ctx.translate(0,-winterStairLift(e));drawLitHuman(e);ctx.restore();
+    }
     else drawLitHuman(e);
     if(!holdsGuitar(e) && livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
@@ -1067,7 +1076,7 @@ function render() {
     }
   }
   while(winterIndex<winterProps.length)drawAtlasProp(ctx,winterProps[winterIndex++]);
-  if(bridgeVisible){if(!S.flags.stationDeck)drawBridge();paintBridgeRails(ctx);}
+  if(bridgeVisible)paintBridgeRails(ctx);
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);
   for (const t of tracers) { ctx.strokeStyle = 'rgba(255,230,160,' + (t.life / 0.07) * 0.8 + ')'; ctx.lineWidth = t.w; ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke(); }
