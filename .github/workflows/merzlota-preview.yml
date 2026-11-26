@@ -13,7 +13,7 @@ jobs:
         working-directory: src
       - run: |
           cp berezki.html index.html
-          test "$(git hash-object index.html)" = "dd94fa674ad5f051eb239c72803c68f383b1a85d"
+          test "$(git hash-object index.html)" = "0565f40ab4d2a458c7840d4d243d8d3a7c56ace1"
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
           git add index.html berezki.html

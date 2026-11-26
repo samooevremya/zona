@@ -27,7 +27,7 @@ for file in sorted(_os.listdir('art/detectors')):
             detector_images['det_' + file[:-4]] = 'data:image/svg+xml;base64,' + _b64.b64encode(sprite.read()).decode()
 audio_files = {f[:-4]: base64.b64encode(open('audio/'+f,'rb').read()).decode() for f in sorted(_os.listdir('audio')) if f.endswith('.mp3') and not f.startswith(('camp0','army0','foe0','ally0'))}
 if WINTER:
-    for file in _os.listdir('berezki/audio'):
+    for file in sorted(_os.listdir('berezki/audio')):
         if file.endswith('.mp3'): audio_files[file[:-4]]=base64.b64encode(open('berezki/audio/'+file,'rb').read()).decode()
 art += '\n/*\n' + open('audio/CREDITS.md', encoding='utf-8').read() + '\n*/\n'
 art += '\nwindow.ZONE_AUDIO=' + __import__('json').dumps(audio_files) + ';'
