@@ -4458,8 +4458,9 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 // Keep the HUD at native CSS resolution. Only the world canvas and terrain cache use the mobile budget.
 const touchRenderer = matchMedia('(pointer: coarse)').matches;
 let touchDensity = 1.25;
+let desktopDensity = 2;
 function sizeWorldCanvas() {
-  const limit = touchRenderer ? Math.min(touchDensity, Math.sqrt(600000 / (VW * VH))) : 2;
+  const limit = touchRenderer ? Math.min(touchDensity, Math.sqrt(600000 / (VW * VH))) : desktopDensity;
   DPR = Math.min(window.devicePixelRatio || 1, limit);
   cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
 }
@@ -4468,7 +4469,7 @@ const ZNEAR = 1.25; let HUDZ = 1;   // камера как в референсе
 const cam = { x: 0, y: 0 };
 const groundC = document.createElement('canvas');
 const lightC = document.createElement('canvas'), lctx = lightC.getContext('2d');
-const grainC = document.createElement('canvas');
+let grainPattern = null;
 let vignetteC = null;
 const CANOPY = [], LONE_K = +((location.hash.match(/lone-([0-9.]+)/) || [])[1] || 1.3);
 
@@ -5107,10 +5108,13 @@ function buildCanopy() {
     }
     CANOPY.push(c);
   }
-  const gc = grainC.getContext('2d'); grainC.width = grainC.height = 128;
+  const grainC = document.createElement('canvas');
+  grainC.width = grainC.height = 128;
+  const gc = grainC.getContext('2d');
   const id = gc.createImageData(128, 128);
   for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = GRADE.grain; }
   gc.putImageData(id, 0, 0);
+  grainPattern = ctx.createPattern(grainC, 'repeat');
 }
 
 /* ---------- персонажи ---------- */
@@ -5709,8 +5713,12 @@ function render() {
   if (hurtFlash > 0) { ctx.fillStyle = 'rgba(150,20,10,' + hurtFlash * 0.45 + ')'; ctx.fillRect(0, 0, VW, VH); }
   if (P && P.alive && P.hp < 30) { ctx.fillStyle = 'rgba(120,10,5,' + (0.12 + 0.08 * Math.sin(S.min * 6)) + ')'; ctx.fillRect(0, 0, VW, VH); }
   ctx.globalAlpha = 1;
-  ctx.fillStyle = ctx.createPattern(grainC, 'repeat');
-  ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128); ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
+  // The winter scene has no film-grain tile. Only composite a populated pattern.
+  if (grainPattern) {
+    ctx.fillStyle = grainPattern;
+    ctx.save(); ctx.translate(Math.random() * 128, Math.random() * 128);
+    ctx.fillRect(-128, -128, VW + 256, VH + 256); ctx.restore();
+  }
 }
 
 /* ===================== погода, выброс, шаги, голоса, гитара ===================== */
@@ -16211,8 +16219,42 @@ function onDeath() { showTitle('death'); }
 let last = performance.now();
 /* автоподстройка: если в игре кадр в среднем дольше 22 мс, кроны деревьев рисуются мельче (меньше заливки для слабого телефона) */
 const AQ = { buf: [], done: /aq-off/.test(location.hash) };
+// Sample windows instead of reacting to an isolated terrain upload or a tab switch.
+let sampleTime = 0, fastTime = 0, recoveryDelay = 12000;
+function adaptDesktopWorld(ms) {
+  if (panel || title.open || document.hidden || ms <= 0 || ms > 500) {
+    AQ.buf.length = 0; sampleTime = fastTime = 0;
+    return;
+  }
+  AQ.buf.push(ms); sampleTime += ms;
+  if (sampleTime < 900 || AQ.buf.length < 10) return;
+  AQ.buf.sort((a,b)=>a-b);
+  const median = AQ.buf[AQ.buf.length >> 1];
+  const p85 = AQ.buf[Math.floor(AQ.buf.length * .85)];
+  const nativeDensity = Math.min(devicePixelRatio || 1, 2);
+  const floor = Math.min(1, nativeDensity);
+  let next = DPR;
+  if (median > 22) {
+    fastTime = 0;
+    // Pixel cost scales with area. Quantize steps to avoid continual resampling.
+    next = Math.max(floor, Math.min(DPR - .25, Math.floor(DPR * Math.sqrt(19 / median) * 4) / 4));
+  } else if (p85 < 19 && DPR < nativeDensity) {
+    fastTime += sampleTime;
+    if (fastTime >= recoveryDelay) {
+      next = Math.min(nativeDensity, DPR + .25); fastTime = 0;
+      recoveryDelay = Math.min(60000, recoveryDelay * 2);
+    }
+  } else fastTime = 0;
+  AQ.buf.length = 0; sampleTime = 0;
+  if (next !== DPR) {
+    desktopDensity = next >= nativeDensity ? 2 : next;
+    sizeWorldCanvas();
+  }
+}
 function autoQuality(ms) {
-  if (AQ.done || panel || title.open || document.hidden) return;
+  if (AQ.done) return;
+  if (BEREZKI && !touchRenderer) { adaptDesktopWorld(ms); return; }
+  if (panel || title.open || document.hidden) return;
   if (ms > 0 && ms < 200) AQ.buf.push(ms);
   if (AQ.buf.length < (touchRenderer ? 90 : 180)) return;
   const a = AQ.buf.slice().sort((x, y) => x - y), med = a[a.length >> 1]; AQ.buf.length = 0;
