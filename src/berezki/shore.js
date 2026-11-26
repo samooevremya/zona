@@ -1,5 +1,5 @@
 // Both the worn track in the snow and the resident's route use these landings.
-const shoreX=510,shoreY=131;
+const shoreX=443,shoreY=114;
 const fishingTrack=[[46.9,14.4],[48,16.6],[48,18.8],[52.9,18.8],[53.2,12],[51.8,9.2],[48.4,8]].map(([x,y])=>[shoreX+x,shoreY+y]);
 const iceHole=tilePoint(shoreX+48.4,shoreY+7.4);
 const fishingRoom={x:shoreX+44,y:shoreY+11,w:8,h:7,n:1};

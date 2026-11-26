@@ -2,9 +2,9 @@
 // for every footstep. Only the same interaction as the HUD button changes storeys.
 async () => {
   const z = window.__z;
-  const stationOffset=340;
+  const stationOffset=296;
   function walk(x, y) {
-    const a = z.P, target = {x: (stationOffset+x) * 32, y: (233+y) * 32};
+    const a = z.P, target = {x: (stationOffset+x) * 32, y: (202+y) * 32};
     const path = z.findPath(a.x, a.y, target.x, target.y, true);
     if (!path) throw Error('No walking route to ' + [x, y]);
     try {
@@ -29,19 +29,19 @@ async () => {
     z.IN.moveX=z.IN.moveY=0;
   }
   function cross(to){
-    to+=233;
+    to+=202;
     const dir=Math.sign(to*32-z.P.y);
     let frames=0;
     while(dir*(to*32-z.P.y)>1 && frames++<400)steps(0,dir,1);
     if(frames>=400)throw Error('Bridge obstructed '+[z.P.x/32,z.P.y/32,to]);
   }
   // Start outside the residential block and enter the hall from the square.
-  Object.assign(z.P,{x:369*32,y:266*32});
+  Object.assign(z.P,{x:325*32,y:235*32});
   walk(29,32.8);walk(29,29);walk(29,25.3);
   walk(39,25.5);cross(22.65);
   if(!z.S.flags.stationDeck)throw Error('Did not ascend from platform');
   steps(1,0,100);
-  if(z.P.x>379.6*32 || !z.S.flags.stationDeck)throw Error('Walked off the side');
+  if(z.P.x>335.6*32 || !z.S.flags.stationDeck)throw Error('Walked off the side');
   z.save(true,1);z.applyState(z.loadSave(1));
   if(!z.S.flags.stationDeck)throw Error('Lost deck level on load');
   cross(17);
@@ -56,8 +56,8 @@ async () => {
   walk(1.6-stationOffset,22.65);
   if(!z.P.alive)throw Error('West approach failed');
   // Probe both fences from both sides, including the ends, with a jumping body.
-  for(const [y,gaps] of [[252.95,[]],[259.05,[[362,375]]]]){
-    for(let x=1.5;x<759;x+=.5){
+  for(const [y,gaps] of [[221.95,[]],[228.05,[[318,331]]]]){
+    for(let x=1.5;x<668;x+=.5){
       if(gaps.some(([lo,hi])=>x>=lo && x<=hi))continue;
       for(const dir of [-1,1]){
         const e={x:x*32,y:y*32-dir*19,r:11,jumpT:.2};
