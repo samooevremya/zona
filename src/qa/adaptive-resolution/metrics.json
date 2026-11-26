@@ -1,0 +1,323 @@
+{
+  "viewport": [
+    1920,
+    1080
+  ],
+  "renderer": "Chromium headless, software rasterization",
+  "routes_ms": 4800,
+  "dpr2": {
+    "before": [
+      [
+        {
+          "scene": "yard",
+          "fps": 15,
+          "p95": 83,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        },
+        {
+          "scene": "forest",
+          "fps": 17,
+          "p95": 67,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        },
+        {
+          "scene": "village",
+          "fps": 15,
+          "p95": 83,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        }
+      ],
+      [
+        {
+          "scene": "yard",
+          "fps": 14,
+          "p95": 83,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        },
+        {
+          "scene": "forest",
+          "fps": 17,
+          "p95": 67,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        },
+        {
+          "scene": "village",
+          "fps": 15,
+          "p95": 83,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        }
+      ],
+      [
+        {
+          "scene": "yard",
+          "fps": 15,
+          "p95": 83,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        },
+        {
+          "scene": "forest",
+          "fps": 17,
+          "p95": 67,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        },
+        {
+          "scene": "village",
+          "fps": 15,
+          "p95": 83,
+          "widths": [
+            3840
+          ],
+          "canvas": [
+            3840,
+            2160
+          ]
+        }
+      ]
+    ],
+    "after": [
+      [
+        {
+          "scene": "yard",
+          "fps": 60,
+          "p95": 17,
+          "widths": [
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "scene": "forest",
+          "fps": 60,
+          "p95": 17,
+          "widths": [
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "scene": "village",
+          "fps": 59,
+          "p95": 17,
+          "widths": [
+            2400,
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        }
+      ],
+      [
+        {
+          "scene": "yard",
+          "fps": 60,
+          "p95": 17,
+          "widths": [
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "scene": "forest",
+          "fps": 60,
+          "p95": 17,
+          "widths": [
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "scene": "village",
+          "fps": 56,
+          "p95": 33,
+          "widths": [
+            2400,
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        }
+      ],
+      [
+        {
+          "scene": "yard",
+          "fps": 60,
+          "p95": 17,
+          "widths": [
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "scene": "forest",
+          "fps": 60,
+          "p95": 17,
+          "widths": [
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "scene": "village",
+          "fps": 56,
+          "p95": 33,
+          "widths": [
+            2400,
+            1920
+          ],
+          "canvas": [
+            1920,
+            1080
+          ]
+        }
+      ]
+    ]
+  },
+  "dpr1": {
+    "before": [
+      {
+        "scene": "yard",
+        "fps": 52,
+        "p95": 33,
+        "widths": [
+          1920
+        ],
+        "canvas": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "scene": "forest",
+        "fps": 60,
+        "p95": 17,
+        "widths": [
+          1920
+        ],
+        "canvas": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "scene": "village",
+        "fps": 53,
+        "p95": 33,
+        "widths": [
+          1920
+        ],
+        "canvas": [
+          1920,
+          1080
+        ]
+      }
+    ],
+    "after": [
+      {
+        "scene": "yard",
+        "fps": 60,
+        "p95": 17,
+        "widths": [
+          1920
+        ],
+        "canvas": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "scene": "forest",
+        "fps": 60,
+        "p95": 17,
+        "widths": [
+          1920
+        ],
+        "canvas": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "scene": "village",
+        "fps": 60,
+        "p95": 17,
+        "widths": [
+          1920
+        ],
+        "canvas": [
+          1920,
+          1080
+        ]
+      }
+    ]
+  }
+}
