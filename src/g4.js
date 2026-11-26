@@ -968,7 +968,8 @@ function render() {
     const at=o.deathSpot||o;
     if(inView(at.x,at.y,23)){
       const fx=BODYFX.get(o);
-      bloodPool(o,fx?clamp((G7.vt-fx.t0)/.38,0,1):1);
+      ctx.save();if(BEREZKI && !winterFloor(at.x,at.y))ctx.globalAlpha*=traceAlpha(o.t??S.min);
+      bloodPool(o,fx?clamp((G7.vt-fx.t0)/.38,0,1):1);ctx.restore();
     }
   }
   const patient=byS('tolik'), blood=patient?.wounded?patient:S.flags.tolikBlood;
@@ -1052,6 +1053,7 @@ function render() {
     drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
     else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
+    else if(BEREZKI){ctx.save();ctx.translate(0,-winterStairLift(e));drawLitHuman(e);ctx.restore();}
     else drawLitHuman(e);
     if(!holdsGuitar(e) && livingZone && !loft && !shopVisible)drawHearthGesture(e);
     if(e.sid?.startsWith('lz_guest')) drawDrinkingCup(e);
@@ -1238,7 +1240,7 @@ function render() {
       ctx.fillRect(0,0,VW,VH);ctx.restore();
     }
   }
-  if (!BEREZKI) drawWeatherScreen();
+  if (BEREZKI)snowScreen();else drawWeatherScreen();
   // откуда стреляют: красные дуги по краю экрана
   if (P && P.alive) HURTDIR.forEach(h => {
     const cx = VW / 2, cy = VH / 2, R = Math.min(VW, VH) * 0.42, a = h.a;

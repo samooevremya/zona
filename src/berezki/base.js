@@ -74,6 +74,42 @@ function baseInterior(r){
   }
   return c;
 }
+// Retracted steel leaves sit flush with the masonry on either side of the drive-through.
+function paintHangarGate(g,{u,w}){
+  const left=u-w/2,right=u+w/2,leaf=w*.51,rand=mulberry32(Math.round(u)+89);
+  const opening=g.createLinearGradient(0,14,0,88);
+  opening.addColorStop(0,'#131918');opening.addColorStop(.75,'#292b26');opening.addColorStop(1,'#56534b');
+  g.fillStyle=opening;g.fillRect(left,13,w,75);
+  const sheet=ART.m.sprites.c1_roof_hangar,[sx,sy,sw,sh]=sheet.rect;
+  for(const x of [left-leaf,right]){
+    g.fillStyle='#242723';g.fillRect(x-1,12,leaf+3,75);
+    g.drawImage(ART.images[sheet.atlas],sx+sw*.2,sy+sh*.18,sw*.29,sh*.32,x,13,leaf,71);
+    g.fillStyle='#404a40a8';g.fillRect(x,13,leaf,71);
+    for(let i=2;i<leaf-1;i+=7){
+      beam(g,x+i,14,x+i,82,1.5,'#252922ab');
+      beam(g,x+i+1,14,x+i+1,82,.8,'#c1b9a16b');
+    }
+    for(let i=0;i<84;i++){
+      const u=rand()*leaf,v=rand()*69;
+      g.fillStyle=rand()<.5?'#704e37a8':'#aea68b80';
+      g.fillRect(x+u,14+v,.6+rand()*1.4,.6+rand()*3.5);
+    }
+    for(const y of [16,48,82]){
+      beam(g,x,y,x+leaf,y,2,'#544d3f');beam(g,x,y-1,x+leaf,y-1,.9,'#a39a88');
+      for(let k=4;k<leaf;k+=13){g.fillStyle='#302e28';g.fillRect(x+k,y,1.8,2);}
+    }
+    const handle=x===right?x+4:x+leaf-7;
+    g.strokeStyle='#242825';g.lineWidth=1.7;g.strokeRect(handle,48,3,8);
+    for(const k of [.16,.84]){
+      g.fillStyle='#343630';g.fillRect(x+k*leaf,6,3,9);
+      shoreEllipse(g,x+k*leaf+1,7,2.8,2.8,'#272923');
+    }
+  }
+  beam(g,left-leaf-3,8,right+leaf+3,8,3,'#443e34');
+  beam(g,left-leaf-3,6,right+leaf+3,6,1.4,'#bcbdb4');
+  for(const x of [left,right])beam(g,x,14,x,87,2,'#756d5f');
+  beam(g,left,86,right,86,2,'#898777');
+}
 function baseRoof(h){
   const r=h.baseRoom || pumpRoom,w=r.w*T+10,d=r.h*T+10,c=winterCanvas(w,d),g=c.getContext('2d');
   artFill(g,'wall_concrete',0,0,w,d);

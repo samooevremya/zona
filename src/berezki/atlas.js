@@ -32,7 +32,7 @@ function seedAtlasTerrain(){
   for(let y=1;y<district.height-1;y++)for(let x=1;x<district.width-1;x++){
     let cell=GR;
     if(basinRadius(x,y,marshShape)<1 || inMarshChannel(x+.5,y+.5))cell=SW;
-    else if(basinRadius(x,y,lakeShape)>1.02 && hash2(x,y)<.075 && vnoise(x,y,13)>.38)cell=TR;
+    else if(basinRadius(x,y,lakeShape)>1.02 && hash2(x,y)<.095 && ![[1,0],[0,1],[1,1],[-1,1],[2,0],[0,2]].some(([u,v])=>hash2(x-u,y-v)<.095) && vnoise(x,y,13)>.38)cell=TR;
     setT(x,y,cell);
   }
   // Clear every route shoulder and doorway before planting the woods.
@@ -62,8 +62,9 @@ function preparePropShadows(){
     if(prop.key==='waterTower'){prop.height=160;prop.foot=.875;prop.depth=prop.y+18;continue;}
     const image=district.images[prop.key];
     prop.height=prop.width*image.height/image.width;
+    if(yardEquipment.has(prop.key)){prepareYardEquipment(prop,image);continue;}
     // The foot line lies below the centre in the photo. Its world position stays fixed.
-    prop.foot=prop.key==='swing'?.79:prop.key==='slide'?.66:prop.key==='gate'?.86:.65;
+    prop.foot=prop.key==='gate'?.86:.65;
     prop.depth=prop.y+prop.height*(1-prop.foot);
     if(prop.key==='netrack' || prop.key==='wood'){
       prop.foot=.88;
@@ -139,6 +140,7 @@ function paintFrozenBerth(g,p){
 }
 function paintPropShadow(g,p){
   if(!SHADOWS || p.burial)return;
+  if(yardEquipment.has(p.key)){paintEquipment(g,p,true,true);return;}
   if(p.key==='waterTower'){
     for(const [dx,dy] of towerFeet)beam(g,p.x+dx,p.y+dy,p.x+dx+29,p.y+dy+16,3,'#48566840');
     shoreEllipse(g,p.x+42,p.y+23,42,26,'#49586a40',.2);return;
@@ -154,6 +156,7 @@ function paintPropShadow(g,p){
   g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
 }
 function drawAtlasProp(g,p,mapView=false){
+  if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);return;}
   if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
   if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
@@ -184,7 +187,9 @@ function makeAtlasProps(){
   const x=playYard.x*T,y=playYard.y*T;
   atlasProp('swing',x-29,y,99,.051);
   // The seats and swept space join both A-frames at the player's foot level.
-  interiorObject('yardFrame',x-29,y-5,98,38,{fixture:'swing'});
+  for(const sign of [-1,1])for(const [offset,v] of [[33,-10],[46,14]])
+    interiorObject('yardUpright',x-29+sign*offset,y+v,5,5);
+  for(const u of [-20,20])interiorObject('yardSeat',x-29+u,y,22,10);
   atlasProp('slide',x+64,y+1,34,.042);
   interiorObject('yardFrame',x+64,y-8,32,62,{fixture:'slide'});
   atlasProp('roundabout',x-94,y+94,81,.021);
@@ -202,7 +207,7 @@ function makeAtlasProps(){
   }
   atlasProp('netrack',netRack.x,netRack.y+10,89,.044);
   atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,.022);
-  const pile=tilePoint(509.05,130.15);
+  const pile=tilePoint(505.8,131.35);
   atlasProp('wood',pile.x,pile.y+6,54,.019);
   interiorObject('woodStack',pile.x,pile.y,51,16);
   atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h-1,67,.023);
@@ -280,8 +285,8 @@ function upgradeAtlasSave(d){
   d.flags.atlasLayout=2;
 }
 function atlasTree(x,y){
-  const h=hash2(x,y),size=76+42*h;
-  const art=district.crowns[h>.54?0:1][Math.floor(hash2(x+31,y+7)*4)];
+  const h=hash2(x+91,y-77),size=68+49*hash2(x-18,y+29);
+  const art=district.crowns[h>.54?0:1][Math.floor(hash2(x+31,y+7)*8)];
   return {x:(x+.5)*T,y:(y+.5)*T,size,art};
 }
 function* treesInRect(l,t,r,b){
@@ -294,7 +299,7 @@ function visibleAtlasTrees(){
   return treesInRect(cam.x-w,cam.y-h,cam.x+w,cam.y+h);
 }
 function prepareAtlasArt(){
-  district.crowns=[6,7].map(id=>Array.from({length:4},(_,turn)=>winterTreeArt(id,turn)));
+  district.crowns=[6,7].map(id=>Array.from({length:8},(_,turn)=>winterTreeArt(id,turn)));
   district.snow=snowMaterial();prepareBaseLorry();preparePumpArt();preparePropShadows();
   const ice=winterCanvas(512,512),g=ice.getContext('2d'),m=district.images.materials,s=m.width/2;
   for(const u of [0,1])for(const v of [0,1]){

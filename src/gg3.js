@@ -88,13 +88,14 @@ function g3DrawFrame(e, a, f) {   // мутанты: шаг — левая фа�
 function deadVariant(o) { const at=o.deathSpot||o; const h = Math.sin((o.seed || 1) * 12.9898 + Math.floor(at.x) * 78.233 + Math.floor(at.y) * 37.719) * 43758.5453; return Math.floor((h - Math.floor(h)) * 4); }
 function g3Body(o) {
   if (!G3_READY() || o.kind === 'sack') return false;
-  if (g7Body(o)) return true;
+  if (!(BEREZKI && o.kind==='human') && g7Body(o)) return true;
   const skin = o.kind === 'dog' || o.kind === 'boar' || o.kind === 'sucker' ? o.kind : ({ bandit: 'bandit', army: 'army' }[o.fac] || 'loner');
   const A = G3.pack.manifest.actors[skin], v = deadVariant(o), f2 = A && v & 1 && A.dead2 && G3.images[A.dead2.file] ? A.dead2 : null;
   const f = f2 || (A && A.dead); if (!f || !G3.images[f.file]) return false;
   ctx.save(); ctx.translate(o.x, o.y);
   ctx.rotate((o.ang || 0) - Math.PI / 2); if (v & 2 && o.kind === 'human') ctx.scale(-1, 1);   // G8: 2 позы × зеркало — трупы не повторяются
-  ctx.drawImage((jacketFor(o)?.images || G3.images)[f.file], -f.width / 2, -f.height / 2, f.width, f.height); ctx.restore();
+  const image=(BEREZKI && o.kind==='human')?winterBodySprite(G3.images[f.file],o):((jacketFor(o)?.images || G3.images)[f.file]);
+  ctx.drawImage(image, -f.width / 2, -f.height / 2, f.width, f.height); ctx.restore();
   return true;
 }
 

@@ -25,6 +25,7 @@ function lightFootprint(source,angle,half,radius) {
   path.closePath();slots.set(radius,{x:source.x,y:source.y,angle,half,rev:navRevision,path});return path;
 }
 function castLight(g,source,angle,half,radius,strength,tint){
+  if(BEREZKI && source.kind && source!==P && winterFloor(source.x,source.y)!==winterFloor(P.x,P.y))return;
   const path=lightFootprint(source,angle,half,radius);
   const fade=g.createRadialGradient(source.x,source.y,1,source.x,source.y,radius);
   const color=tint||'0,0,0';
@@ -35,9 +36,11 @@ function castLight(g,source,angle,half,radius,strength,tint){
 }
 let outdoorLamps, settlementLights;
 function villageBulbs(){
+  if(BEREZKI)return [];
   return settlementLights ||= (LOC.village.anchors.lamps||[]).map(([x,y])=>({x:x*T,y:y*T}));
 }
 function siteLights(){
+  if(BEREZKI)return [];
   if(!outdoorLamps)outdoorLamps=BIG?[
     {x:HATCH.x,y:HATCH.y+10,angle:Math.PI*.48,half:.39,r:96},
     {...worldPoint(122.5,202.5),angle:1.0,half:1.34,r:167}

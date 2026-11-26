@@ -38,6 +38,7 @@ function finishReload() {
 }
 let noAmmoT = 0;
 function playerFire() {
+  if(BEREZKI && draggedBody)return;
   const W = WP[S.weapon];
   if (!W || P.cool > 0 || P.reload > 0) return;
   if (W.toss) { P.cool = W.rate; throwNade(); if (!has('grenade')) setTimeout(() => { if (S.weapon === 'grenade') { S.weapon = 'knife'; } }, 300); return; }
@@ -159,6 +160,7 @@ function solidPx(x, y, skipFences = false) {
   return objs.some(o => o.solid && !(skipFences && o.k === 'fence') && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h);
 }
 function throwNade() {
+  if(BEREZKI && draggedBody)return;
   if (!has('grenade')) { msg('Гранат нет.'); return; }
   if (!kitItem('grenade')) { msg('Положи гранату в слот снаряжения.'); return; }
   if (P.nadeT > 0) return; P.nadeT = 1;
@@ -319,7 +321,7 @@ function update(dt) {
     p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.05, dt); p.vy *= Math.pow(0.05, dt);
     if (p.rise) p.y -= p.rise * dt;
     if (p.hearth) p.x += (WX.wind*19 + 4*Math.sin(S.min*.39+p.life)) * dt;
-    if (p.life <= 0) { if (p.blood && chance(0.4)) decals.push({ x: p.x, y: p.y, r: rnd(2, 4), a: 0.7 }); parts.splice(i, 1); }
+    if (p.life <= 0) { if (p.blood && chance(0.4)) decals.push({ ...(BEREZKI?{t:S.min}:{}), x: p.x, y: p.y, r: rnd(2, 4), a: 0.7 }); parts.splice(i, 1); }
   }
   if (decals.length > 160) decals.splice(0, decals.length - 160);
   for (let i = tracers.length - 1; i >= 0; i--) { tracers[i].life -= dt; if (tracers[i].life <= 0) tracers.splice(i, 1); }
@@ -434,9 +436,10 @@ function updatePlayer(dt) {
   const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const kg = weight(), over = kg > carryLimit();
-  const sprint = (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
+  const sprint = !(BEREZKI && draggedBody) && (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
+  if(BEREZKI && draggedBody)sp*=.57;
   if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (1-.12*(S.flags.coatWetness||0)) * dt);
   if (BIG && !BEREZKI) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&

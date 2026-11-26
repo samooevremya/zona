@@ -38,6 +38,7 @@ function sayLine(e, t) { e.bub = { t: t, life: 3.6 }; }
 
 /* ---------- шаги ---------- */
 function surf(x, y) {
+  if(BEREZKI)return winterSurface(x,y);
   const loft=loftAt({x,y});
   if(loft)return loft.id==='depot'?'stepMetal':'stepWood';
   const t = tAt(Math.floor(x / T), Math.floor(y / T));
