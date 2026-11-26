@@ -17682,15 +17682,16 @@ function makeDistrict(){
   }
   buildGrids();
 }
+const fishingNames=['Илья','Павел','Денис','Макар','Никита','Олег','Тимофей','Юрий','Артём','Борис','Антон','Василий'];
 function winterNew(difficulty){
   return {v:1,difficulty:difficultyKey(difficulty),...(shorePreview?tilePoint(488.2,135.8):district.start),hp:100,min:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
-    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:2},campaign:{stage:'district',wounds:{}},
+    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:2,fisherName:fishingNames[ri(0,fishingNames.length-1)]},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
 const winterResidents=[
   ['warden','Агат',516,362.5,'w_obrez'],['door','Савва',519.7,357.6,'w_pm'],
   ['cook','Тамара',509.5,354.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
-  ['fisher','Егор',...fishingTrack[0],'knife'],
+  ['fisher',null,...fishingTrack[0],'knife'],
   ['housekeeper','Вера',503.4,128.6,'knife'],['anya','Аня',482.2,140.2,'knife'],
   ['mitya','Митя',485.5,140.75,'knife'],['shorePatrol','Григорий',494.4,133.2,'w_obrez'],
   ['shorePost','Семён',481.8,134.5,'w_pm']
@@ -17704,8 +17705,13 @@ function winterRestore(d){
   P=mkPlayer();P.name='Путник';ents=[P];decals=[];parts=[];nades=[];tracers=[];flashes=[];bolts=[];crows=[];
   for(let i=objs.length-1;i>=0;i--)if(!objs[i].static)objs.splice(i,1);
   for(const o of objs)if(o.stash)restoreContainer(o);
+  // Older slots have no resident-name flag. A stable fallback also covers slots
+  // opened repeatedly without saving and snapshots taken after the fisher died.
+  const oldFisher=S.dyn.npcs.find(n=>n.sid==='fisher');
+  S.flags.fisherName ||= fishingNames.includes(oldFisher?.name)?oldFisher.name:
+    fishingNames[(Number(oldFisher?.uid?.slice(1))||0)%fishingNames.length];
   for(const [sid,name,x,y,wpn] of winterResidents)if(!S.dead[sid]){
-    const e=mkHuman({sid,name,x,y,wpn,fac:'loner',stay:1,ang:Math.PI/2});
+    const e=mkHuman({sid,name:name??S.flags.fisherName,x,y,wpn,fac:'loner',stay:1,ang:Math.PI/2});
     const previous=S.dyn.npcs.find(n=>n.sid===sid);
     if(previous)for(const key of ['x','y','hp','mag','money','inv'])if(previous[key]!=null)e[key]=previous[key];
     e.shoreChild=sid==='anya' || sid==='mitya';
@@ -17714,7 +17720,10 @@ function winterRestore(d){
     if(S.flags.angry?.[sid])e.angry=1;
     ents.push(e);
   }
-  for(const b of S.flags.fieldBodies||[])objs.push({...b,loot:{...b.loot}});
+  for(const b of S.flags.fieldBodies||[]){
+    if(b.name==='Егор' && b.fac==='loner' && S.dead.fisher)b.name=S.flags.fisherName;
+    objs.push({...b,loot:{...b.loot}});
+  }
   ageRemains();buildGrids();restoreShoreFooting();
   if(oldLayout)for(const e of ents){
     if((e===P && S.flags.stationDeck) || clearFooting(e.x,e.y,e.r))continue;
