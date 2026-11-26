@@ -38,7 +38,7 @@ function makeBase(){
 // The same floor atlas and furniture footprints are used in the scene and PDA.
 function baseInterior(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d'),w=c.width,h=c.height;
-  artFill(g,r.kind==='barracks'?'floor_wood':'floor_concrete',0,0,w,h);
+  winterPaving(g,r.kind==='barracks'?'boards':'slab',0,0,w,h);
   const rand=mulberry32(r.x*391+r.y);
   for(let i=0;i<52;i++){
     const x=rand()*w,y=rand()*h;

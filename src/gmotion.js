@@ -101,9 +101,12 @@ function motionWeapon(e,id,W,grip){
   const support=HELD_POSES[id]?.support||6;
   return {mode:'g3',articulated:true,id,W,grip,main:[x,y],support:[x,y+support],muzzle:[x,y+W.len]};
 }
-function motionSegment(g,im,ax,ay,bx,by,width){
+function motionSegment(g,im,ax,ay,bx,by,width,buried=0){
   g.save();g.translate(ax,ay);g.rotate(-Math.atan2(bx-ax,by-ay));
-  g.drawImage(im,-width/2,-1,width,Math.hypot(bx-ax,by-ay)+2);g.restore();
+  const length=Math.hypot(bx-ax,by-ay)+2,visible=Math.max(.25,1-buried/length);
+  if(buried>0)g.drawImage(im,0,0,im.width,im.height*visible,-width/2,-1,width,length*visible);
+  else g.drawImage(im,-width/2,-1,width,length);
+  g.restore();
 }
 function paintMotionHuman(target,e,opacity){
   const art=motionSkin(e);if(!art)return false;
@@ -120,10 +123,11 @@ function paintMotionHuman(target,e,opacity){
   const breath=Math.sin(G7.vt*1.85+(e.seed||0))*.21*(1-(g.drive||0));
   const torsoTurn=(w?.grip==='two' ? .31 : 0)+swing*.075;
   const hands=[],guitar=holdsGuitar(e)?guitarHands(e):null;
+  const buried=BEREZKI && !e.jumpT?snowAtBoots(e):0;
   for(const [index,sign] of [['l',-1],['r',1]]){
     const foot=motionFoot(g.cycle==null?motionIdle:g,sign);
     const spread=sign*(4.6+low);
-    motionSegment(target,art['leg_'+index],spread,.8,foot[0],foot[1],6+low*.6);
+    motionSegment(target,art['leg_'+index],spread,.8,foot[0],foot[1],6+low*.6,7*buried);
     const ax=sign*8.4,ay=-1+lean+ax*Math.sin(torsoTurn);
     let hx=sign*(8.6+low),hy=7-sign*swing*(2.1+1.2*(g.run||0))*(g.forward??1)+lean;
     if(w && sign<0){[hx,hy]=w.main;}

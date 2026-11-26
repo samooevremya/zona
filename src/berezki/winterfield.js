@@ -60,7 +60,7 @@ function winterTracks(dt,room){
       || decals.some(d=>!d.burn && traceAlpha(d.t??S.min)>.25 && dE(d,P)<d.r+2)
       || (flags.snowMarks||[]).some(m=>m.type==='drag' && m.blood>.25 && dE(m,P)<8 && traceAlpha(m.t)>.25);
     flags.bloodySteps=blood?7:Math.max(0,(flags.bloodySteps||0)-1);
-    recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',blood:flags.bloodySteps/7});
+    recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',depth:snowAtBoots(P),blood:flags.bloodySteps/7});
   }
   if(draggedBody){
     const b=draggedBody;
@@ -78,6 +78,10 @@ function renderWinterMarks(vx,vy,vw,vh){
     if(m.x<vx-12||m.x>vx+vw+12||m.y<vy-12||m.y>vy+vh+12)continue;
     const alpha=traceAlpha(m.t);if(alpha<=0)continue;
     const drag=m.type==='drag';
+    if(m.depth>.04){
+      shoreEllipse(ctx,m.x+1,m.y+1,5.4,2.8,'rgba(218,230,235,'+(.54*m.depth*alpha)+')',m.a);
+      shoreEllipse(ctx,m.x-.5,m.y-.4,4.4,2,'rgba(67,87,107,'+(.43*m.depth*alpha)+')',m.a);
+    }
     shoreEllipse(ctx,m.x,m.y,drag?8:4.6,drag?5:2.1,'rgba(66,82,97,'+(.25*alpha)+')',m.a);
     if(m.blood)shoreEllipse(ctx,m.x+.7,m.y,drag?5:4,drag?2.7:2,'rgba(104,38,37,'+(m.blood*.78*alpha)+')',m.a);
   }

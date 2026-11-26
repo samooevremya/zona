@@ -299,25 +299,19 @@ function visibleAtlasTrees(){
   return treesInRect(cam.x-w,cam.y-h,cam.x+w,cam.y+h);
 }
 function prepareAtlasArt(){
+  district.surface=surfacePatterns();
+  district.roadBeds=atlasRoutes.map(winterRoadBed);
+  for(let i=0;i<5;i++)bankArt[i]=makeBankArt(i);
   district.crowns=[6,7].map(id=>Array.from({length:8},(_,turn)=>winterTreeArt(id,turn)));
   district.snow=snowMaterial();prepareBaseLorry();preparePumpArt();preparePropShadows();
-  const ice=winterCanvas(512,512),g=ice.getContext('2d'),m=district.images.materials,s=m.width/2;
-  for(const u of [0,1])for(const v of [0,1]){
-    g.save();g.translate(u*512,v*512);g.scale(u?-1:1,v?-1:1);
-    g.drawImage(m,s+2,s+2,s-4,s-4,0,0,256,256);g.restore();
-  }
-  district.ice=ice;
+  const m=district.images.materials,s=m.width/2;
+  district.ice=district.images.lakeIce;
   const stamp=winterCanvas(192,192),brush=stamp.getContext('2d');
   brush.drawImage(m,6,6,s-12,s-12,0,0,192,192);
   brush.globalCompositeOperation='destination-in';
   const fade=brush.createRadialGradient(96,96,39,96,96,96);fade.addColorStop(0,'white');fade.addColorStop(1,'transparent');
   brush.fillStyle=fade;brush.fillRect(0,0,192,192);district.snowStamp=stamp;
-  district.sleeperBed=winterCanvas(16*T,38);
-  const b=district.sleeperBed.getContext('2d');for(let i=0;i<16;i++){b.save();b.translate(i*T,0);drawRailStrip(b,i,0,38);b.restore();}
-  for(const y of [14,23]){beam(b,0,y+1,16*T,y+1,2,'#4e4a41');beam(b,0,y,16*T,y,1,'#a5a397');}
-  b.globalCompositeOperation='destination-in';const edge=b.createLinearGradient(0,0,0,38);
-  for(const [at,alpha] of [[0,0],[.24,1],[.76,1],[1,0]])edge.addColorStop(at,'rgba(0,0,0,'+alpha+')');
-  b.fillStyle=edge;b.fillRect(0,0,16*T,38);
+  district.sleeperBed=winterRailBed();
   district.basinPaths=[lakeShape,marshShape].map(([cx,cy,rx,ry])=>{
     const path=new Path2D();
     for(let i=0;i<=240;i++){
@@ -327,13 +321,17 @@ function prepareAtlasArt(){
     path.closePath();return path;
   });
 }
-function drawAtlasRoutes(g){
-  g.save();g.lineJoin=g.lineCap='round';
-  for(const [i,route] of atlasRoutes.entries()){
-    g.beginPath();for(const [x,y] of route)g.lineTo(x*T,y*T);
-    const w=i===0?108:i===1?72:44;
-    for(const [width,color] of [[w,'#85939a18'],[w*.84,'#747f8622'],[w*.64,'#76818a24']]){
-      g.lineWidth=width;g.strokeStyle=color;g.stroke();
+function drawAtlasRoutes(g,l,t,r,b){
+  g.save();g.fillStyle=g.strokeStyle=district.surface.pack;g.lineJoin=g.lineCap='round';
+  for(const bed of district.roadBeds){
+    if(bed.r<l || bed.l>r || bed.b<t || bed.t>b)continue;
+    for(const [i,band] of bed.bands.entries()){
+      g.globalAlpha=[.10,.15,.19,.23][i];g.fill(band);
+    }
+    for(const rut of bed.tracks){
+      for(const [width,opacity] of [[11,.17],[6,.41]]){
+        g.lineWidth=width;g.globalAlpha=opacity;g.stroke(rut);
+      }
     }
   }
   g.restore();
@@ -349,7 +347,7 @@ function roadImprints(g,l,t,r,b){
         if(px<l-55 || px>r+55 || py<t-55 || py>b+55)continue;
         for(let lane=0;lane<(i===0?3:1);lane++){
           const offset=(lane-1)*14+(j%2?3:-3)+4*Math.sin(j/7+lane);
-          shoreEllipse(g,px-dy*offset,py+dx*offset,4.7,2.3,'#58667149',Math.atan2(dy,dx));
+          shoreEllipse(g,px-dy*offset,py+dx*offset,3.8,1.65,'#66707835',Math.atan2(dy,dx));
         }
       }
     }
@@ -370,29 +368,30 @@ function atlasTerrainChunk(cx,cy){
   const c=winterCanvas(atlasChunk,atlasChunk),g=c.getContext('2d'),l=cx*atlasChunk,t=cy*atlasChunk,r=l+atlasChunk,b=t+atlasChunk;
   g.translate(-l,-t);
   const near=(x,y,pad)=>x*T>=l-pad && x*T<=r+pad && y*T>=t-pad && y*T<=b+pad;
-  const snow=g.createPattern(district.snow,'repeat');snow.setTransform(new DOMMatrix().scale(.76));
+  const snow=district.surface.powder;
   g.fillStyle=snow;g.fillRect(l,t,atlasChunk,atlasChunk);
   for(let j=cy-1;j<=cy+1;j++)for(let i=cx-1;i<=cx+1;i++){
     const random=mulberry32((hash2(i,j)*4294967296)>>>0);
-    for(let n=0;n<36;n++){
+    for(let n=0;n<20;n++){
       const x=(i+random())*atlasChunk,y=(j+random())*atlasChunk,size=112+random()*146,turn=random()*6.28;
       if(x<l-size || x>r+size || y<t-size || y>b+size)continue;
-      g.save();g.translate(x,y);g.rotate(turn);g.drawImage(district.snowStamp,-size/2,-size/2,size,size);g.restore();
+      g.save();g.translate(x,y);g.rotate(turn);g.globalAlpha=.22;g.drawImage(district.snowStamp,-size/2,-size/2,size,size);g.restore();
     }
     for(let n=0;n<28;n++){
       const x=(i+random())*atlasChunk,y=(j+random())*atlasChunk,w=random()*52+12,h=w*(.17+random()*.18);
       if(x<l-w || x>r+w || y<t-w || y>b+w)continue;
       g.save();g.translate(x,y);g.rotate(-.38);g.scale(w,h);
-      const f=g.createRadialGradient(0,0,0,0,0,1);f.addColorStop(0,n%3?'#f3f5f34a':'#5b708239');f.addColorStop(1,'transparent');g.fillStyle=f;g.fillRect(-1,-1,2,2);g.restore();
+      const f=g.createRadialGradient(0,0,0,0,0,1);f.addColorStop(0,n%3?'#f3f5f331':'#5b708221');f.addColorStop(1,'transparent');g.fillStyle=f;g.fillRect(-1,-1,2,2);g.restore();
     }
   }
+  drawForestSnow(g,l,t,r,b);
   if(near(lakeShape[0],lakeShape[1],185*T)){
     const path=district.basinPaths[0];
     g.fillStyle=g.createPattern(district.ice,'repeat');g.fill(path);
     g.save();g.clip(path);
-    const iceWash=g.createPattern(district.snow,'repeat');
-    iceWash.setTransform(new DOMMatrix().rotate(26).scale(1.31));
-    g.globalAlpha=.34;g.fillStyle=iceWash;g.fillRect(l,t,atlasChunk,atlasChunk);g.globalAlpha=1;
+    lakeIceDetail(g,l,t,r,b);
+    const iceWash=district.surface.powder;
+    g.globalAlpha=.14;g.fillStyle=iceWash;g.fillRect(l,t,atlasChunk,atlasChunk);g.globalAlpha=1;
     // Wind packs snow along the shore. Broad translucent courses soften the ice margin.
     for(const [w,col] of [[8*T,'#e0e6e218'],[4*T,'#e2e7e327'],[1.5*T,'#e1e5e238']]){
       g.lineWidth=w;g.strokeStyle=col;g.stroke(path);
@@ -418,7 +417,7 @@ function atlasTerrainChunk(cx,cy){
   if(l<203*T && r>73*T && t<441*T && b>300*T)paintMarshCover(g,l,t,r,b);
   if(near(202,434,13*T))pumpYardGround(g);
   if(near(325,583,25*T))paintBaseYard(g);
-  drawAtlasRoutes(g);roadImprints(g,l,t,r,b);
+  drawAtlasRoutes(g,l,t,r,b);roadImprints(g,l,t,r,b);
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
   if(near(493,132,18*T))shoreGround(g);
   if(near(playYard.x,playYard.y,230)){
@@ -440,6 +439,12 @@ function atlasTerrainChunk(cx,cy){
   }
   for(const tree of treesInRect(l-100,t-100,r+100,b+100)){
     const {x,y,size,art}=tree;g.save();g.translate(x,y);
+    const rand=mulberry32(Math.floor(x*37+y));
+    for(let i=0;i<17;i++){
+      const a=rand()*Math.PI*2,rad=(rand()**1.3)*size*.32;
+      const u=Math.cos(a)*rad,v=Math.sin(a)*rad*.62;
+      beam(g,u,v,u+rand()*3.2-1.6,v+rand()*2.1-1,.55+rand()*.55,'#70674f68');
+    }
     if(SHADOWS){g.save();g.globalAlpha=.32;g.transform(.91,0,.16,.78,size*.14,size*.15);g.drawImage(art.shadow,-size/2,-size/2,size,size);g.restore();}
     g.scale(1,.76);const f=g.createRadialGradient(0,0,1,0,0,size*.19);
     f.addColorStop(0,'#4b4940cf');f.addColorStop(.4,'#64645583');f.addColorStop(1,'transparent');g.fillStyle=f;g.fillRect(-size*.2,-size*.2,size*.4,size*.4);g.restore();

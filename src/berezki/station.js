@@ -89,7 +89,7 @@ function upgradeStationSave(d){
 function stationInterior(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
   const x=r.x*T,y=r.y*T,w=c.width,h=c.height;
-  g.translate(-x,-y);artFill(g,'floor_concrete',x,y,w,h);
+  g.translate(-x,-y);winterPaving(g,'slab',x,y,w,h);
   for(let j=0;j<r.h;j++)for(let i=0;i<r.w;i++){
     const xx=x+i*T,yy=y+j*T;
     if(tAt(r.x+i,r.y+j)===CO){artFill(g,'wall_brick',xx,yy,T,T);g.fillStyle='#524d4290';g.fillRect(xx,yy,T,T);}
@@ -155,7 +155,7 @@ function paintStationGround(g,left,right){
   }
   const p=platform;
   g.fillStyle='#55554c';g.fillRect(p.x,p.y-3,p.w,p.h+4);
-  artFill(g,'floor_concrete',p.x,p.y,p.w,p.h);
+  winterPaving(g,'slab',p.x,p.y,p.w,p.h);
   for(let x=p.x;x<p.x+p.w;x+=32){
     beam(g,x,p.y,x,p.y+p.h,1,'#64645a');beam(g,x,p.y+4,x+27,p.y+4,2,'#d2c8aa');
   }

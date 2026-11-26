@@ -328,7 +328,7 @@ function shoreGround(g){
 }
 function cabinFloor(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
-  artFill(g,'floor_wood',0,0,c.width,c.height);
+  winterPaving(g,'boards',0,0,c.width,c.height);
   for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++)if(tAt(r.x+x,r.y+y)===BR){
     artFill(g,'floor_wood',x*T,y*T,T,T);
     g.fillStyle='#493f3480';g.fillRect(x*T,y*T,T,T);
@@ -339,7 +339,7 @@ function cabinFloor(r){
 function fishingInterior(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
   const x=r.x*T,y=r.y*T;g.translate(-x,-y);
-  artFill(g,'floor_wood',x,y,c.width,c.height);
+  winterPaving(g,'boards',x,y,c.width,c.height);
   for(let v=0;v<r.h;v++)for(let u=0;u<r.w;u++){
     if(tAt(r.x+u,r.y+v)!==BR)continue;
     const left=x+u*T,top=y+v*T;

@@ -14,7 +14,7 @@ h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
-scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('apartments.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','atlas.js','scene.js')) if WINTER else ''
+scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('apartments.js','surfaces.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','atlas.js','scene.js')) if WINTER else ''
 g5=g5[:pos]+bridge+'\n'+scene+'\n'+('bootBerezki();' if WINTER else g5[pos:])
 js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gscript.js','gstory.js','gsaves.js','gprologue.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gmotion.js','gprops.js','gcontrols.js','gheight.js','glandmarks.js','groominteriors.js','genvironment.js','gatmosphere.js','gfieldaudio.js','gzonelife.js','ginhabited.js'])+"\n"+g5+"\n})();\n"
 if not WINTER: open('game.js','w',encoding='utf8').write(js)
@@ -96,7 +96,7 @@ OUT = 'index_big.html' if BIGF else 'index.html' if MAPFLAG == 'rc1' else 'index
 if WINTER:
     OUT='../berezki.html'
     h='\n'.join(line for line in h.split('\n') if 'href="https://fonts.' not in line)
-    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit']})+';'
+    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','groundscan','lakeIce','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit']})+';'
     b=b.replace('ЗОНА<span class="start-region">КОРДОН','МЕРЗЛОТА<span class="start-region">СОТЫЙ КИЛОМЕТР')
     h=h.replace('<title>'+h.split('<title>')[1].split('</title>')[0]+'</title>','<title>Мерзлота</title>')
 open(OUT,'w',encoding='utf8').write(h+sp+"\n"+icons+"\n"+b+"\n<script>window.ZONA_MAP="+repr(MAPFLAG)+";"+("window.ZONA_BIG=1;" if BIGF else "")+"\n"+art+"\n</script>\n<script>\n"+js+"</script>\n</body>\n</html>\n")

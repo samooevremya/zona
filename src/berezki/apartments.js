@@ -74,8 +74,7 @@ function stairwellFloor(g,r){
 function abandonedFloor(g,r){
   const rand=mulberry32(732+r.n);
   g.save();g.translate(r.x*T,r.y*T);
-  const pattern=g.createPattern(district.snow,'repeat');
-  pattern.setTransform(new DOMMatrix().scale(.45));
+  const pattern=district.surface.powder;
   function drift(cx,cy,rx,ry,phase){
     g.save();g.translate(cx,cy);
     const border=new Path2D();
