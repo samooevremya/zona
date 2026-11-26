@@ -64,9 +64,24 @@ function preparePropShadows(){
     // The foot line lies below the centre in the photo. Its world position stays fixed.
     prop.foot=prop.key==='swing'?.79:prop.key==='slide'?.66:prop.key==='gate'?.86:.65;
     prop.depth=prop.y+prop.height*(1-prop.foot);
+    if(prop.key==='netrack' || prop.key==='wood'){
+      prop.foot=.88;
+      prop.depth=prop.y;
+      // Bury the lowest part of the posts. The new contact line is the pivot for parallax.
+      const c=winterCanvas(image.width,image.height),b=c.getContext('2d');
+      b.drawImage(image,0,0);
+      const line=new Path2D();
+      for(let x=0;x<=c.width;x++){
+        const u=x/c.width;
+        line.lineTo(x,c.height*(prop.foot+.022*Math.sin(18*u+prop.x)+.013*Math.sin(47*u)));
+      }
+      line.lineTo(c.width,c.height);line.lineTo(0,c.height);line.closePath();
+      b.globalCompositeOperation='destination-out';b.fill(line);
+      b.strokeStyle='#0006';b.lineWidth=c.width/prop.width;b.stroke(line);prop.exposed=c;
+    }
     if(prop.burial)freezeHull(prop,image);
     const c=winterCanvas(Math.ceil(prop.width),Math.ceil(prop.height)),g=c.getContext('2d');
-    g.drawImage(image,0,0,c.width,c.height);g.globalCompositeOperation='source-in';
+    g.drawImage(prop.exposed||image,0,0,c.width,c.height);g.globalCompositeOperation='source-in';
     g.fillStyle='#344453';g.fillRect(0,0,c.width,c.height);prop.shadow=c;
   }
   atlasProps.sort((a,b)=>a.depth-b.depth);
@@ -125,8 +140,13 @@ function paintPropShadow(g,p){
   if(!SHADOWS || p.burial)return;
   g.save();g.translate(p.x,p.y);g.rotate(p.angle);
   // Low hulls rest on the ice. Tall open frames cast the outline of their uprights.
-  g.transform(p.flip,0,-.42,.53,3,6);
-  g.globalAlpha=.29;g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
+  if(p.key==='netrack' || p.key==='wood'){
+    g.transform(p.flip,0,-.27,-.21,0,0);
+    g.filter='blur(2px)';g.globalAlpha=.20;
+  }else{
+    g.transform(p.flip,0,-.42,.53,3,6);g.globalAlpha=.29;
+  }
+  g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
 }
 function drawAtlasProp(g,p,mapView=false){
   const h=p.height;
@@ -136,6 +156,14 @@ function drawAtlasProp(g,p,mapView=false){
   g.save();g.translate(p.x,p.y);g.rotate(p.angle);
   g.transform(p.flip,0,-shearX/h,1-shearY/h,0,0);
   g.drawImage(p.exposed||district.images[p.key],-p.width/2,-p.foot*h,p.width,h);g.restore();
+  if(p.key==='netrack' || p.key==='wood'){
+    // Foreground crust stays at ground level when the roof shifts with the camera.
+    g.save();g.globalAlpha=.54;
+    snowDrift(g,p.x-p.width*.43-1,p.y+1.5,6,2,-.13,33);
+    snowDrift(g,p.x+p.width*.43+2,p.y+1,8,2,-.26,13);
+    if(p.key==='wood')snowDrift(g,p.x+p.width*.13,p.y+.8,13,3,-.08,36);
+    g.restore();
+  }
 }
 function makeAtlasProps(){
   for(const [i,[x,y,angle]] of oldBoats.entries()){
@@ -163,12 +191,12 @@ function makeAtlasProps(){
     interiorObject('gatePier',gx*T,gy*T,22,22);
     interiorObject('gateLeaf',gx*T+sign*42,gy*T,61,5);
   }
-  atlasProp('netrack',netRack.x,netRack.y,89,.044);
+  atlasProp('netrack',netRack.x,netRack.y+10,89,.044);
   atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,.022);
-  const pile=tilePoint(505.5,131.64);
-  atlasProp('wood',pile.x,pile.y,54,.019);
+  const pile=tilePoint(505.5,131.39);
+  atlasProp('wood',pile.x,pile.y+6,54,.019);
   interiorObject('woodStack',pile.x,pile.y,51,16);
-  atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h/2,67,.023);
+  atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h-1,67,.023);
 
 }
 function atlasPlace(x,y){
@@ -379,7 +407,10 @@ function atlasTerrainChunk(cx,cy){
   }
   for(const prop of atlasProps)if(near(prop.x/T,prop.y/T,160)){
     if(prop.burial)paintFrozenBerth(g,prop);
-    else paintPropShadow(g,prop);
+    else {
+      if(prop.key==='netrack' || prop.key==='wood')shelterGround(g,prop);
+      paintPropShadow(g,prop);
+    }
   }
   for(const fire of [district.fire,shoreFire])if(near(fire.x/T,fire.y/T,25))for(let i=0;i<12;i++)
     shoreEllipse(g,fire.x+14*Math.cos(i*Math.PI/6),fire.y+11*Math.sin(i*Math.PI/6),4.5,3.8,i%2?'#665e50':'#827b6a',i*.52);

@@ -27,9 +27,10 @@ function makeVillageYards(){
     district.levels.push(r);
   }
   for(const [x,y,w,h] of [
-    [479,137,3,.16],[486,137,2,.16],[479,137,.16,6],
+    [479,137,3,.16],[486,137,1,.16],[479,137,.16,6],
     [499.4,132.1,1.25,.16],[504.3,132.1,3.5,.16],[507.65,127.7,.16,4.55],
-    [479.8,131.9,1.6,.16]
+    // Return the short wings to the yard boundaries; the paths cross at the gates.
+    [499.4,131,.16,1.26],[486.84,137,.16,1.12]
   ])shoreFences.push(addObj({k:'fence',material:'picket',solid:1,x:x*T,y:y*T,w:w*T,h:h*T}));
   for(const [x,y,angle] of [[497.5,137.45,0],[500.55,135.25,Math.PI/2]])
     outdoorSeats.push(putFurniture('bench',x*T,y*T,angle,'shore-court'));
@@ -85,10 +86,108 @@ function restoreShoreFooting(){
 function shoreEllipse(g,x,y,rx,ry,color,angle=0){
   g.fillStyle=color;g.beginPath();g.ellipse(x,y,rx,ry,angle,0,Math.PI*2);g.fill();
 }
+// Weathered snow with a shallow windward lip and a softer leeward slope.
+// Bake these little patches once; both the survey and play view use world pixels.
+const shoreDrifts=new Map();
+function snowDrift(g,x,y,rx,ry,angle,seed){
+  const key=[rx,ry,seed].join(':');
+  let c=shoreDrifts.get(key);
+  if(!c){
+    c=winterCanvas(Math.ceil(rx*2)+4,Math.ceil(ry*2)+4);
+    const b=c.getContext('2d'),img=b.createImageData(c.width,c.height);
+    const height=(px,py)=>{
+      const u=(px-c.width/2)/rx,v=(py-c.height/2)/ry;
+      const ripple=.16*(vnoise(px+seed,py,5)-.5)+.13*Math.sin(4*u+seed);
+      return Math.max(0,1-u*u-(v+ripple)*(v+ripple))**1.55;
+    };
+    for(let j=0;j<c.height;j++)for(let i=0;i<c.width;i++){
+      const h=height(i,j);if(h===0)continue;
+      const grade=(height(i+1,j+1)-height(i-1,j-1))*ry;
+      const light=clamp(grade*23,-44,34)+7*(hash2(i+seed,j)-.5);
+      const k=4*(i+j*c.width);
+      img.data[k]=196+light;img.data[k+1]=207+light;img.data[k+2]=214+light;
+      img.data[k+3]=Math.round(168*Math.sqrt(h));
+    }
+    b.putImageData(img,0,0);shoreDrifts.set(key,c);
+  }
+  g.save();g.translate(x,y);g.rotate(angle);g.drawImage(c,-c.width/2,-c.height/2);g.restore();
+}
+function packedSnow(g,x,y,rx,ry,strength){
+  g.save();g.translate(x,y);g.scale(rx,ry);
+  const f=g.createRadialGradient(0,0,0,0,0,1);
+  f.addColorStop(0,'rgba(94,86,72,'+strength+')');
+  f.addColorStop(.56,'rgba(109,105,94,'+strength*.62+')');f.addColorStop(1,'transparent');
+  g.fillStyle=f;g.fillRect(-1,-1,2,2);g.restore();
+}
+function workingSurface(p){
+  const w=Math.ceil(p.width*1.66),h=p.key==='wood'?53:76;
+  const c=winterCanvas(w,h),g=c.getContext('2d'),cy=h*.47;
+  artFill(g,'dirt',0,0,w,h);
+  const data=g.getImageData(0,0,w,h),a=data.data;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const u=(x-w*.50)/(w*.52),v=(y-cy)/(h*.48);
+    const crust=vnoise(x+p.x,y+p.y,8),grain=hash2(x+p.x,y+p.y);
+    const wear=clamp(1-u*u-v*v+.58*(crust-.54),0,1);
+    const k=(y*w+x)*4,grey=a[k]*.31+a[k+1]*.58+a[k+2]*.11;
+    a[k]=61+grey*.55;a[k+1]=67+grey*.52;a[k+2]=68+grey*.49;
+    a[k+3]=Math.round(195*wear*wear*(.24+.76*crust)*(.62+.38*grain));
+  }
+  g.putImageData(data,0,0);return c;
+}
+function shelterGround(g,p){
+  const w=p.width,wood=p.key==='wood';
+  g.save();g.translate(p.x,p.y);
+  const soil=p.workBed??=workingSurface(p);
+  g.drawImage(soil,-soil.width/2,-soil.height*.46);
+  // Dry, darker snow beneath the roof, widening at the side people work from.
+  packedSnow(g,0,-5,w*.65,wood?19:31,.60);
+  packedSnow(g,-w*.16,9,w*.57,wood?13:24,.30);
+  const rand=mulberry32(Math.round(p.x+p.y));
+  for(let i=0;i<(wood?39:21);i++){
+    const x=(rand()-.52)*w*1.15,y=rand()*(wood?19:24)-2;
+    if(wood){
+      const len=1+rand()*3.8;
+      beam(g,x,y,x+len,y+(rand()-.5)*3,1+rand(),i%4?'#6f614e9c':'#ad997ca3');
+    }else{
+      const a=rand()*.9;
+      shoreEllipse(g,x,y,2+rand()*4,1.3,'#64727a49',a);
+    }
+  }
+  // The rear edge traps snow; the front edge is scoured by boots and handling timber.
+  g.globalAlpha=.49;
+  snowDrift(g,-w*.42,-14,wood?16:22,5,-.24,14);
+  snowDrift(g,w*.42,-12,wood?18:24,5,-.19,23);
+  g.globalAlpha=1;
+  for(const side of [-1,1]){
+    packedSnow(g,side*w*.40,0,wood?6:5,3,.85);
+    packedSnow(g,side*w*.35,-8,5,2.6,.62);
+  }
+  g.restore();
+}
+function drawShoreFence(g,o){
+  const vertical=o.h>o.w,length=Math.max(o.w,o.h),count=Math.ceil(length/45);
+  g.save();g.translate(o.x+o.w/2,o.y+o.h/2);
+  if(vertical)g.rotate(Math.PI/2);
+  packedSnow(g,0,1,length*.62,8,.48);
+  drawFenceRun(g,{x:-length/2,y:-2,w:length,h:4,material:o.material});
+  for(let i=0;i<count;i++){
+    const x=(i+.5)*length/count-length/2;
+    snowDrift(g,x,4,Math.round(length/count*.56),5+(i%2),-.06,31+i%4);
+  }
+  for(let i=0;i<=count;i++){
+    const x=length*i/count-length/2;
+    snowDrift(g,x-1,4,7,3,.12,17);
+  }
+  g.restore();
+}
 function shoreGround(g){
   const rand=mulberry32(24485);
   // Broken crust follows the width of the lane and thins along its edges.
-  for(const trail of shoreLanes){
+  const workTracks=[
+    [[486.2,133],[485.25,132.35],[484.7,131.95]],
+    [[502,132.5],[503.3,131.82],[505.05,131.88]]
+  ];
+  for(const trail of [...shoreLanes,...workTracks]){
     for(let i=1;i<trail.length;i++){
       const [x,y]=trail[i-1],[u,v]=trail[i],angle=Math.atan2(v-y,u-x);
       const len=Math.hypot(u-x,v-y)*T,dx=Math.cos(angle),dy=Math.sin(angle);
@@ -123,10 +222,23 @@ function shoreGround(g){
   for(const h of HOUSES.filter(h=>h===fishingHouse || h.cabin)){
     const door=h.entrances[0],cx=h.x*T+door.x,edge=h.y*T+door.y;
     const py=edge+(door.ny<0?-19:0);
+    const lip=edge+door.ny*19;
+    packedSnow(g,cx,lip,door.width*.65,20,.45);
+    // Wind piles snow against the sill and exposed foundation but leaves the worn step clear.
+    for(const side of [-1,1]){
+      const post=cx+side*(door.width/2+2);
+      const wallEnd=(side<0?h.x:h.x+h.w)*T;
+      const span=Math.abs(wallEnd-post);
+      snowDrift(g,(wallEnd+post)/2,edge+door.ny*3,Math.round(span*.53),9,0,side+51);
+    }
     artFill(g,'floor_wood',cx-door.width/2-3,py,door.width+6,19);
     for(const v of [4,10,17])beam(g,cx-door.width/2-3,py+v,cx+door.width/2+3,py+v,1.4,'#746859');
+    for(const side of [-1,1]){
+      snowDrift(g,cx+side*door.width/2,lip,12,5,side*.22,side+12);
+      snowDrift(g,cx+side*(door.width/2+3),py+8,6,10,side*.14,side+29);
+    }
   }
-  for(const o of shoreFences)drawFenceRun(g,o);
+  for(const o of shoreFences)drawShoreFence(g,o);
   for(const o of outdoorSeats)drawRoomFitting(g,o);
   const ash=g.createRadialGradient(shoreFire.x,shoreFire.y,5,shoreFire.x,shoreFire.y,29);
   ash.addColorStop(0,'#37312b');ash.addColorStop(.5,'#6f655cb3');ash.addColorStop(1,'#908c8000');
