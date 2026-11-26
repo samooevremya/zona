@@ -62,8 +62,9 @@ function preparePropShadows(){
     if(prop.key==='waterTower'){prop.height=160;prop.foot=.875;prop.depth=prop.y+18;continue;}
     const image=district.images[prop.key];
     prop.height=prop.width*image.height/image.width;
+    if(yardEquipment.has(prop.key)){prepareYardEquipment(prop,image);continue;}
     // The foot line lies below the centre in the photo. Its world position stays fixed.
-    prop.foot=prop.key==='swing'?.79:prop.key==='slide'?.66:prop.key==='gate'?.86:.65;
+    prop.foot=prop.key==='gate'?.86:.65;
     prop.depth=prop.y+prop.height*(1-prop.foot);
     if(prop.key==='netrack' || prop.key==='wood'){
       prop.foot=.88;
@@ -186,7 +187,8 @@ function makeAtlasProps(){
   const x=playYard.x*T,y=playYard.y*T;
   atlasProp('swing',x-29,y,99,.051);
   // The seats and swept space join both A-frames at the player's foot level.
-  for(const u of [-44,44])for(const v of [-15,15])interiorObject('yardUpright',x-29+u,y+v,5,5);
+  for(const sign of [-1,1])for(const [offset,v] of [[33,-10],[46,14]])
+    interiorObject('yardUpright',x-29+sign*offset,y+v,5,5);
   for(const u of [-20,20])interiorObject('yardSeat',x-29+u,y,22,10);
   atlasProp('slide',x+64,y+1,34,.042);
   interiorObject('yardFrame',x+64,y-8,32,62,{fixture:'slide'});
