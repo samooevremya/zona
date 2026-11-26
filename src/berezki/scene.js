@@ -42,7 +42,7 @@ function makeDistrict(){
   makeFishingShore();
   makeWinterStation();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
-  WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE);
+  WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE,shoreFire);
   ANOM0.length=CACHES.length=0;
   makeAtlasProps();
   supplyBox(509*T,358*T,'berezki-canteen',{bread:1,bandage:2});
@@ -52,7 +52,7 @@ function makeDistrict(){
   buildGrids();
 }
 function winterNew(difficulty){
-  return {v:1,difficulty:difficultyKey(difficulty),...district.start,hp:100,min:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
+  return {v:1,difficulty:difficultyKey(difficulty),...(shorePreview?tilePoint(488.2,135.8):district.start),hp:100,min:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
     weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:2},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
@@ -103,7 +103,7 @@ function winterInteractChoices(cand){
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
-  const f=district.heaters.concat(FIRE).find(h=>dE(P,h)<53);
+  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53);
   if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
 }
 function winterUse(n){
@@ -129,7 +129,7 @@ const envSteps=[];let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
   WX.time+=dt;environmentTime+=dt;
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
-  const r=winterFloor(P.x,P.y), warm=[FIRE,...district.heaters].some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
+  const r=winterFloor(P.x,P.y), warm=district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && los(P.x,P.y,f.x,f.y));
   const wet=swampAt(P.x,P.y);
   S.flags.coatWetness=clamp((S.flags.coatWetness||0)+dt*(wet?.05:warm?-.045:r?-.012:-.001),0,1);
   const cooling=(night()?.22:.07)*(1+2*S.flags.coatWetness);
@@ -264,7 +264,7 @@ function winterLandscape(){
   district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
 
-  district.plans=district.levels.map(r=>r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):winterRoom(r));
+  district.plans=district.levels.map(r=>r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
 
 }
 function winterGround(vx,vy,vw,vh){
@@ -287,9 +287,9 @@ function winterRoofs(){
   district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
     if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
-    if(h===fishingHouse){
+    if(h===fishingHouse || h.cabin){
       h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
-      h.storeys=1;h.rooftop=[[2*T-5,2.4*T-7,14,15,.035]];
+      h.storeys=1;h.rooftop=[[(h.cabin?h.w-2:2)*T-5,2.4*T-7,14,15,.035]];
       h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
     }
     const occupied=h===HOUSES[0];
@@ -326,7 +326,7 @@ function winterMini(){
   const s=size/(winterFloor(P.x,P.y)?30:46);mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5,mini:true});
   const room=winterFloor(P.x,P.y);
-  $('mini-distance').textContent=room===stationRoom?'Вокзал':room===fishingRoom?'Изба':room?'Эт. '+room.n:'Улица';
+  $('mini-distance').textContent=room===stationRoom?'Вокзал':room===fishingRoom || villageCabins.includes(room)?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
 }
 async function bootBerezki(){
@@ -359,10 +359,10 @@ async function bootBerezki(){
   qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const temp=r?(r.n===1?2:4):Math.round(-18-28*darkness()/.8);
-    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
-  intro=()=>{msg('Жилой корпус. У входа дежурит смена.','say');save(true);};
+  intro=()=>{msg(shorePreview?'Рыбацкий посёлок. Тропа у навеса спускается ко льду.':'Жилой корпус. У входа дежурит смена.','say');save(true);};
   FAC_N.player=FAC_N.loner='Выживальщики';ITEMS.ar_jacket.n='Подбитая куртка';
   const saveData=loadSave();winterRestore(saveData||winterNew('normal'));
   $('bootlog')?.remove();addEventListener('resize',resize);setupControlEditor();showTitle();requestAnimationFrame(frame);
