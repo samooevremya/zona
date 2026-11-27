@@ -120,10 +120,23 @@ function winterRailBed(){
     const x=rand()*w,y=rand()*h,edge=Math.min(y,h-y);
     if(edge<6 || (edge<15 && rand()<.17))shoreEllipse(g,x,y,1+rand()*5,.6+rand(), '#e2e5e1ad',-.21);
   }
+  // Wind fills the gaps between the ties first. Vary cover along each length
+  // but retain the dark inner edge of each steel head for navigation at night.
+  for(let i=0;i<250;i++){
+    const x=rand()*w,y=rand()*h;
+    const cover=.35+.65*(.5+.5*Math.sin(x/49+Math.sin(x/31)));
+    g.save();g.globalAlpha=.22+.53*cover;
+    g.drawImage(district.snowStamp,x-16,y-4,32+rand()*21,7+rand()*5);g.restore();
+  }
   for(const y of [10,27]){
     const rail=g.createLinearGradient(0,y-1.5,0,y+2.6);
     for(const [at,color] of [[0,'#c3c2b3'],[.27,'#acaba1'],[.5,'#77766e'],[.78,'#665850'],[1,'#444640']])rail.addColorStop(at,color);
     g.fillStyle=rail;g.fillRect(0,y-1.5,w,4.1);
+    for(let x=-9;x<w;){
+      const len=7+rand()*38;
+      beam(g,x,y-.7,x+len,y-.7,1.8,'#d9dedd');
+      x+=len+4+rand()*20;
+    }
   }
   g.globalCompositeOperation='destination-in';const edge=g.createLinearGradient(0,0,0,h);
   for(const [at,a] of [[0,0],[.16,1],[.84,1],[1,0]])edge.addColorStop(at,'rgba(0,0,0,'+a+')');

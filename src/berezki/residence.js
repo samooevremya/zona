@@ -22,13 +22,16 @@ function winterGable(id){
 function stoveStack(h,at){
   return at?[[at.x-h.x*T-6,at.y-h.y*T-6,12,12,17]]:[];
 }
-function residenceWindows(side,storey){
-  const positions=side%2 ? [2.5,5.65,8.5] : [2.6,5,8.1,10.3,14,16,18.65];
-  return positions.map((tile,i)=>({
-    u:tile*T, width:(side%2 && i===1 || !(side%2) && i===6)?22:34,
-    boards:(side*3+i+storey)%4===0?2:1,
-    warm:side===2 && i===(storey===1?1:2) && storey<=3
-  }));
+function residenceWindows(side,storey,abandoned=false){
+  // Keep openings clear of the end of a partition, the guard desk and the stair head.
+  const positions=side%2?[2.65,5.6,8.65]:[2.5,4.75,7.65,10.35,13.65,15.15,18.8];
+  return positions.flatMap((tile,i)=>{
+    if(side===0 && tile>17 || side===2 && storey===1 && Math.abs(tile-12)<1.4)return [];
+    if(!abandoned && storey===1 && side%2 && i===1)return [];
+    const seed=hash2(i+storey*13,side*11+(abandoned?31:0));
+    const take=abandoned || storey>3?(seed<.46?3:seed<.78?4:0):[0,1,5,2,4][Math.floor(seed*5)];
+    return [{u:tile*T,width:(side%2?23:26)+Math.floor(seed*8),boards:take===4?2:0,warm:take===2,take}];
+  });
 }
 function residenceWall(h,side){
   const len=(side%2?h.h:h.w)*T, fh=residenceFloorHeight;
@@ -47,25 +50,12 @@ function residenceWall(h,side){
       const sx=x+rnd()*60,sy=y+11+rnd()*23;
       beam(g,sx,sy,sx+3,sy+8,.9,'#706e64');beam(g,sx+3,sy+8,sx+2,sy+14,.8,'#706e64');
     }
-    for(const win of residenceWindows(side,floor)){
+    for(const win of residenceWindows(side,floor,h.flat?.abandoned)){
       const x=win.u-win.width/2,wy=y+14,w=win.width;
       const stain=g.createLinearGradient(0,wy+46,0,wy+66);
       stain.addColorStop(0,'#56564b66');stain.addColorStop(1,'#56564b00');
       g.fillStyle=stain;g.fillRect(x-1,wy+46,w+2,21);
-      g.fillStyle='#555750';g.fillRect(x-4,wy-4,w+8,53);
-      g.fillStyle='#a49c84';g.fillRect(x-2,wy-2,w+4,48);
-      const glass=g.createLinearGradient(0,wy,0,wy+43);
-      glass.addColorStop(0,win.warm?'#5c4931':'#2d383d');glass.addColorStop(1,win.warm?'#b0935b':'#778388');
-      g.fillStyle=h.flat?.abandoned?'#384144':glass;g.fillRect(x,wy,w,43);
-      if(h.flat?.abandoned && rnd()<.72){
-        g.fillStyle='#1e2628';g.beginPath();g.moveTo(x+2,wy+4);g.lineTo(x+w*.65,wy+12);g.lineTo(x+w*.48,wy+22);g.lineTo(x+w-2,wy+17);g.lineTo(x+w-2,wy+42);g.lineTo(x+2,wy+42);g.fill();
-      }
-      g.fillStyle='#574f42';g.fillRect(win.u-1,wy,3,43);g.fillRect(x,wy+10,w,2);
-      for(let i=0;i<win.boards;i++){
-        const ay=wy+14+i*11,delta=i?3:-4;
-        beam(g,x-1,ay,x+w+1,ay+delta,5,'#6b5947');
-        beam(g,x-1,ay-2,x+w+1,ay+delta-2,1,'#ab9578');
-      }
+      winterSash(g,win.u,wy-1,w+4,44,win.take);
       g.fillStyle='#474a46';g.fillRect(x-4,wy+45,w+8,4);
       g.fillStyle='#d6d9d4';g.fillRect(x-4,wy+44,w+7,2);
     }
@@ -133,21 +123,16 @@ function drawResidenceFace(h,side){
   else ctx.translate(x,y);
   const along=vertical?ty-y:tx-x,across=vertical?tx-x:ty-y;
   if(Math.abs(across)>.01){
-    // Small affine patches follow the local slope of a bay, including its shear.
-    // Their bounds meet on the shared panel edges rather than jumping a few
-    // horizontal pixels between rows at the far end of the building.
-    const rows=h.storeys*3,cols=Math.ceil(tex.width/(3*T));
-    for(let row=0;row<rows;row++){
-      const f=1-row/rows,mid=f-.5/rows,srcY=row*tex.height/rows;
-      for(let col=0;col<cols;col++){
-        const left=col*tex.width/cols,width=tex.width/cols;
-        const shear=along+lift*(left+width/2);
-        const u=left*(1+lift*mid)+along*mid+shear*(f-mid);
-        ctx.save();
-        ctx.transform(1+lift*mid,0,-shear/tex.height,-across/tex.height,u,across*f);
-        ctx.drawImage(tex,left,srcY,width,tex.height/rows,0,0,width+.55,tex.height/rows+.65);
-        ctx.restore();
-      }
+    // Project continuous horizontal courses across the entire face. Adjacent bays
+    // share one scale, so mullions and jambs remain joined as the camera moves.
+    const rows=Math.min(tex.height,Math.max(1,Math.ceil(Math.abs(across)/2)));
+    for(let i=0;i<rows;i++){
+      const f=1-i/rows,mid=f-.5/rows,scale=1+lift*mid,src=i*tex.height/rows;
+      ctx.save();
+      ctx.transform(scale,0,-(along+lift*tex.width/2)/tex.height,-across/tex.height,
+        along*mid+(along+lift*tex.width/2)*(f-mid),across*f);
+      ctx.drawImage(tex,0,src,tex.width,tex.height/rows,0,0,tex.width,tex.height/rows+.12);
+      ctx.restore();
     }
   }
   ctx.restore();
@@ -169,25 +154,6 @@ function drawResidence(h,i){
   }
   const [rx,ry]=residencePoint(x,y,k);
   ctx.drawImage(ROOFS[i],rx,ry,w*(1+k),d*(1+k));
-  for(const [u,v,width,depth,rise] of h.rooftop){
-    const px=x+u,py=y+v;
-    const corners=[[px,py],[px+width,py],[px+width,py+depth],[px,py+depth]];
-    const bottom=corners.map(p=>residencePoint(...p,k)),top=corners.map(p=>residencePoint(...p,k+rise*winterLens));
-    const [bx,by]=bottom[0],bw=width*(1+k),bd=depth*(1+k);
-    ctx.save();ctx.shadowColor='#38434699';ctx.shadowBlur=3;ctx.shadowOffsetX=2;ctx.shadowOffsetY=2;
-    artFill(ctx,'wall_concrete',bx-2,by-2,bw+4,bd+4);ctx.restore();
-    beam(ctx,bx-2,by+bd+1,bx+bw+2,by+bd+1,1.2,'#d1d5cd');
-    for(const [a,b,visible,shade] of [[0,1,cam.y+residenceTilt<py,'#626963'],[1,2,cam.x>px+width,'#5f6665'],[3,2,cam.y+residenceTilt>py+depth,'#85877b'],[0,3,cam.x<px,'#72756c']]){
-      if(!visible)continue;
-      const face=width<=18?'wall_brick':'wall_concrete',A=top[a],B=top[b],D=bottom[a];
-      ctx.save();ctx.transform((B[0]-A[0])/32,(B[1]-A[1])/32,(D[0]-A[0])/22,(D[1]-A[1])/22,A[0],A[1]);
-      artFill(ctx,face,0,0,32,22);ctx.fillStyle=shade+'66';ctx.fillRect(0,0,32,22);ctx.restore();
-    }
-    const [lx,ly]=top[0],ww=width*(1+k+rise*winterLens),dd=depth*(1+k+rise*winterLens);
-    artFill(ctx,'wall_concrete',lx,ly,ww,dd);
-    ctx.fillStyle='#c7ced1be';ctx.fillRect(lx,ly,ww,dd);
-    ctx.strokeStyle='#6c7576';ctx.lineWidth=1;ctx.strokeRect(lx,ly,ww,dd);
-    if(width>40){for(let seam=8;seam<ww;seam+=10)beam(ctx,lx+seam,ly,lx+seam,ly+dd,.8,'#8a9291');}
-    else {ctx.fillStyle='#655c50';ctx.fillRect(lx+1,ly+1,ww-2,dd-2);ctx.fillStyle='#252623';ctx.fillRect(lx+ww*.19,ly+dd*.19,ww*.62,dd*.64);beam(ctx,lx+1,ly+dd-1,lx+ww-2,ly+dd-1,1.3,'#ccd0c8');}
-  }
+  for(const [u,v,width,depth,rise] of h.rooftop)
+    weatheredFlue(ctx,x+u+width/2,y+v+depth/2,k,width,depth,rise);
 }

@@ -137,6 +137,7 @@ function startJump() {
   if (P.st < cost) { msg('Нет сил прыгать: отдышись.'); return; }
   if (swampAt(P.x, P.y)) { msg('В болоте не прыгнешь.'); return; }
   const ml = Math.hypot(IN.moveX, IN.moveY), a = ml > 0.2 ? Math.atan2(IN.moveY, IN.moveX) : P.ang;
+  if(BEREZKI && draggedBody){draggedBody=null;msg('Оставил тело на земле.');}
   P.crouch = 0; P.jumpT = JUMP_T; P.jumpCD = 0.85; P.st -= cost; P.jumpA = a; play(surf(P.x,P.y));
 }
 const JUMP_T = 0.42, JUMP_V = 250;
