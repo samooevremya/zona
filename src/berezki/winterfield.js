@@ -63,7 +63,7 @@ function winterTracks(dt,room){
       || decals.some(d=>!d.burn && traceAlpha(d.t??S.min)>.25 && dE(d,P)<d.r+2)
       || (flags.snowMarks||[]).some(m=>m.type==='drag' && m.blood>.25 && dE(m,P)<8 && traceAlpha(m.t)>.25);
     flags.bloodySteps=blood?7:Math.max(0,(flags.bloodySteps||0)-1);
-    recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',depth:snowAtBoots(P),blood:flags.bloodySteps/7});
+    if(!swampAt(P.x,P.y))recordTrace({x:P.x-Math.sin(a)*winterFootSide*4,y:P.y+Math.cos(a)*winterFootSide*4,a,t:S.min,type:'boot',depth:snowAtBoots(P),blood:flags.bloodySteps/7});
   }
   if(draggedBody){
     const b=draggedBody;
@@ -71,7 +71,7 @@ function winterTracks(dt,room){
     const distance=dE(b,b.trackAt);
     if(distance>=7){
       b.trackDistance=(b.trackDistance||0)+distance;
-      recordTrace({x:b.x,y:b.y,a:Math.atan2(b.y-b.trackAt.y,b.x-b.trackAt.x),t:S.min,type:'drag',blood:clamp(1-b.trackDistance/145,0,1)*.7});
+      if(!swampAt(b.x,b.y))recordTrace({x:b.x,y:b.y,a:Math.atan2(b.y-b.trackAt.y,b.x-b.trackAt.x),t:S.min,type:'drag',blood:clamp(1-b.trackDistance/145,0,1)*.7});
       b.trackAt={x:b.x,y:b.y};
     }
   }
@@ -79,6 +79,7 @@ function winterTracks(dt,room){
 function renderWinterMarks(vx,vy,vw,vh){
   for(const m of S.flags.snowMarks||[]){
     if(m.x<vx-12||m.x>vx+vw+12||m.y<vy-12||m.y>vy+vh+12)continue;
+    if(swampAt(m.x,m.y))continue;
     const alpha=traceAlpha(m.t);if(alpha<=0)continue;
     const drag=m.type==='drag';
     if(m.depth>.04){
@@ -119,7 +120,8 @@ function winterSurface(x,y){
   if(S.flags.onLookout)return 'winterBoard';
   const r=winterFloor(x,y);
   if(r)return r.hamlet||r===fishingRoom||villageCabins.includes(r)||r.kind==='barracks'||(r.block && x<(r.x+16)*T && (y<(r.y+4.4)*T||y>(r.y+6.75)*T))?'winterBoard':'winterConcrete';
-  if(swampAt(x,y))return reedDensity(x,y)>.28?'winterReeds':'winterSlush';
+  const depth=marshDepth(x,y);
+  if(depth>.035)return depth>.38?'stepWater':'winterSlush';
   if(basinRadius(x/T,y/T,lakeShape)<1)return 'winterIce';
   if(y>northFence && y<southFence || S.flags.stationDeck)return 'winterConcrete';
   for(const route of atlasRoutes)for(let i=1;i<route.length;i++){

@@ -40,6 +40,7 @@ const winterResidents=[
 ];
 function winterRestore(d){
   S=d;survDefaults();plusDefaults();
+  delete S.flags.coatWetness;marshRipples.length=0;
   upgradeStationSave(S);upgradeAtlasSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
   S.blow={stage:0};S.flags.warmth??=100;
   if(!S.flags.flatLayout){
@@ -105,7 +106,7 @@ function winterInteractChoices(cand){
 }
 function winterUse(n){
   if(n.k==='baseKindle' || n.k==='pumpKindle' || n.k==='hamletKindle'){
-    S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. Здесь можно просушить одежду.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
+    S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. У печи можно согреться.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
     const from=n.s,to=district.stairs.find(s=>s.room.block===from.room.block && s.room.n===from.room.n+(from.up?1:-1) && s.up!==from.up);
     P.x=to.x;P.y=to.y+1.45*T;cam.x=P.x;cam.y=P.y;G.near=null;msg(to.room.name,'say');
@@ -117,10 +118,6 @@ function winterUse(n){
         S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
         if(result.minutes){
           P.st=100;S.flags.warmth=100;
-          if(n.stove===pumpHeater || n.stove?.room.hamlet){
-            const heated=Math.min(result.minutes,Math.max(0,S.flags[n.stove.flag]-(S.min-result.minutes)));
-            S.flags.coatWetness=Math.max(0,(S.flags.coatWetness||0)-heated*.045);
-          }
           ageRemains();
         }
         closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
@@ -137,10 +134,8 @@ function winterWeather(dt){
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
   const r=winterFloor(P.x,P.y),stove=stoveIn(r);
   const warm=(stoveBurning(stove) && dE(P,stove.at)<90 && los(P.x,P.y,stove.at.x,stove.at.y)) || district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
-  const wet=swampAt(P.x,P.y);
-  S.flags.coatWetness=clamp((S.flags.coatWetness||0)+dt*(wet?.05:warm?-.045:r?-.012:-.001),0,1);
-  const cooling=(night()?.22:.07)*(1+2*S.flags.coatWetness);
-  let thermalRate=-cooling-(wet?(night()?.95:.55):0);
+  const cooling=night()?.22:.07;
+  let thermalRate=-cooling-marshDepth(P.x,P.y)*(night()?.95:.55);
   if(r)thermalRate=stove?-cooling*.4:r.kind || r.abandoned?-cooling*.75:.2;
   if(warm)thermalRate=1.3;
   S.flags.warmth=clamp(S.flags.warmth+dt*thermalRate,0,100);
@@ -153,6 +148,10 @@ function winterWeather(dt){
     for(let i=0;i<20;i++){const x=tx+ri(-6,6),y=ty+ri(-6,6);if(tAt(x,y)===TR){play('frostCrack',x*T,y*T,soundPrefs.nature*.65);break;}}
   }
   if(decals.length)decals=decals.filter(d=>d.t==null || winterFloor(d.x,d.y) || traceAlpha(d.t)>.02);
+  if(!humanMotionOn && !P.jumpT && P.step-(P.ls||0)>32){
+    P.ls=P.step;
+    if(swampAt(P.x,P.y))marshContact(P,P,Math.floor(P.step/32),true);
+  }
   winterTracks(dt,r);
   for(const f of WORLD_FIRES)if(fireLit(f) && ((P.x-f.x)/9)**2+((P.y-f.y)/7)**2<1 && P.alive){
     P.hp-=dt*5;hurtFlash=Math.max(hurtFlash,.12);if(P.hp<=0)kill(P,'fire');
@@ -304,6 +303,7 @@ function winterGround(vx,vy,vw,vh){
     if(r===upper && r.kind && r!==westStore && r.kind!=='guard')driftingBaseSnow(ctx,r);
   });
   renderWinterMarks(vx,vy,vw,vh);
+  drawMarshRipples(ctx,vx,vy,vw,vh);
 }
 function winterRoofOrder(){
   const gap=h=>Math.hypot(Math.max(h.x*T-cam.x,cam.x-(h.x+h.w)*T,0),Math.max(h.y*T-cam.y,cam.y-(h.y+h.h)*T,0));
@@ -388,7 +388,7 @@ async function bootBerezki(){
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const outside=Math.round(-18-28*darkness()/.8);
     const stove=stoveIn(r),temp=stove?(stoveBurning(stove)?3:outside+9):r?.abandoned?outside+4:r?.kind?outside+3:r?(r.n===1?2:4):outside;
-    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%'+(S.flags.coatWetness>=.01?' · одежда мокрая '+Math.round(S.flags.coatWetness*100)+'%':'');
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
   intro=()=>{msg(marshPreview?'Старая водокачка. Тропа по сухой кромке огибает камыши.':basePreview?'Южная дорога. Впереди старые ворота базы.':shorePreview?'Рыбацкий посёлок. Тропа у навеса спускается ко льду.':'Жилой корпус. У входа дежурит смена.','say');save(true);};

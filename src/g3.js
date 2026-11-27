@@ -439,10 +439,10 @@ function updatePlayer(dt) {
   const kg = weight(), over = kg > carryLimit();
   const sprint = !(BEREZKI && draggedBody) && (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
-  let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
+  let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (BEREZKI ? 1-.55*marshDepth(P.x,P.y) : swampAt(P.x,P.y) ? .55 : 1);
   if(BEREZKI && ml>.08)sp*=(1-.34*snowAtBoots(P))*(1-.23*reedDensity(P.x,P.y));
   if(BEREZKI && draggedBody)sp*=.57;
-  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (1-.12*(S.flags.coatWetness||0)) * dt);
+  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (BEREZKI?1:1-.12*(S.flags.coatWetness||0)) * dt);
   if (BIG && !BEREZKI) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
