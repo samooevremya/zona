@@ -1043,14 +1043,13 @@ function render() {
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   const plants=!BEREZKI && livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
   let plantIndex=0;
-  const drawBridge=()=>ctx.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);
   const bridgeVisible=BEREZKI && inView(footbridge.x,(footbridge.south+footbridge.north)/2,200);
   if(bridgeVisible){
     for(const p of raisedScenery)if(p.underDeck && inView(p.x,p.y,80))paintRaisedScenery(ctx,p,false);
-    drawBridge();
+    drawWinterBridge(ctx);
   }
   const winterProps=BEREZKI?[...atlasProps.filter(p=>inView(p.x,p.y,150)),
-    ...raisedScenery.filter(p=>inView(p.x,p.y,80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
+    ...raisedScenery.filter(p=>inView(p.x,p.y,p.radius||80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
     while(winterIndex<winterProps.length && winterProps[winterIndex].depth<(BEREZKI && e===P && S.flags.onLookout?lookout.y+lookout.half+lookout.run+1:e.y))drawAtlasProp(ctx,winterProps[winterIndex++]);
@@ -1062,12 +1061,13 @@ function render() {
       ctx.save();
       if(bridgeVisible && stationUnderpass(e)){
         ctx.beginPath();ctx.rect(vx-100,vy-100,vw+200,vh+200);
-        ctx.rect(footbridge.x-footbridge.width/2,footbridge.north,footbridge.width,footbridge.south-footbridge.north);
+        bridgeOutline(ctx);
         ctx.clip('evenodd');
       }
       const sink=e.jumpT?0:snowAtBoots(e)*3;
       if(e===P && S.flags.onLookout)ctx.translate(...lookoutOffset(e.y));
-      else ctx.translate(0,sink-winterStairLift(e));
+      else if(e===P && S.flags.stationDeck)ctx.translate(...bridgeOffset(e.y));
+      else {const [sx,sy]=winterStairOffset(e);ctx.translate(sx,sink+sy);}
       drawLitHuman(e);ctx.restore();
       if(e===P && S.flags.onLookout)paintLookout(ctx,false,true);
     }

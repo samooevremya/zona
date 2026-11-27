@@ -53,22 +53,36 @@ function makeApartments() {
     }
   }
 }
-function stairwellFloor(g,r){
+function flatStairHeight(r,y){
+  return 16*clamp(1-(y-(r.y+r.stairY)*T)/(2.86*T),0,1);
+}
+function stairwellFloor(g,r,mapView=false){
   const x=(r.x+r.stairX-1.52)*T,y=(r.y+r.stairY)*T,w=3.14*T,len=2.86*T;
-  artFill(g,'floor_concrete',x,y-21,w,len+26);
-  for(const side of [0,1]){
-    const u=x+side*w/2+3,sw=w/2-6;
-    g.fillStyle='#3d4242';g.fillRect(u,y,sw,len);
-    for(let i=0;i<11;i++){
-      const v=y+i*len/11,c=(side?116:79)+(side?-1:1)*i*3;
-      artFill(g,'floor_concrete',u,v,sw,len/11);
-      g.fillStyle='rgba('+c+','+c+','+(c-5)+',.64)';g.fillRect(u,v,sw,len/11);
-      beam(g,u,v+1,u+sw,v+1,1.6,'#b2afa3');beam(g,u,v+3,u+sw,v+3,1.5,'#5a5953');
+  const shift=(v,z)=>raisedOffset(x+w/2,y+len/2,flatStairHeight(r,y+v)+z,mapView);
+  if(!r.stairTreads){
+    const c=winterCanvas(Math.ceil(w),Math.ceil(len)),b=c.getContext('2d');
+    for(const side of [0,1]){
+      const u=side*w/2+3,sw=w/2-6;
+      b.fillStyle='#3d4242';b.fillRect(u,0,sw,len);
+      for(let i=0;i<11;i++){
+        const v=i*len/11,tint=(side?116:79)+(side?-1:1)*i*3;
+        artFill(b,'floor_concrete',u,v,sw,len/11);
+        b.fillStyle='rgba('+tint+','+tint+','+(tint-5)+',.64)';b.fillRect(u,v,sw,len/11);
+        beam(b,u,v+1,u+sw,v+1,1.6,'#b2afa3');beam(b,u,v+3,u+sw,v+3,1.5,'#5a5953');
+      }
     }
+    r.stairTreads=c;
   }
+  const [dx,dy]=shift(0,0);
+  g.save();g.translate(x+dx,y+dy);g.transform(1,0,-dx/len,1-dy/len,0,0);
+  g.drawImage(r.stairTreads,0,0,w,len);g.restore();
   for(const u of [x+1,x+w/2,x+w-1]){
-    for(let v=0;v<=len;v+=19)beam(g,u,y+v,u,y+v-7,2,'#585949');
-    beam(g,u,y-7,u,y+len-7,3,'#796854');
+    for(let v=0;v<=len;v+=19){
+      const [ax,ay]=shift(v,0),[bx,by]=shift(v,14);
+      beam(g,u+ax,y+v+ay,u+bx,y+v+by,2,'#585949');
+    }
+    const [ax,ay]=shift(0,14),[bx,by]=shift(len,14);
+    beam(g,u+ax,y+ay,u+bx,y+len+by,3,'#796854');
   }
 }
 function abandonedFloor(g,r){

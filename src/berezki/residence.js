@@ -1,10 +1,9 @@
 // Dimensions are in the same world pixels as the floor plan. The wall along a
 // stair landing gets smaller panes; the apartment windows follow the room bays.
 const residenceFloorHeight=84;
-const residenceTilt=235;
 function residencePoint(x,y,k){
-  const [u,v]=roofPoint(x,y,k);
-  return [u,v-residenceTilt*k];
+  const [dx,dy]=raisedOffset(x,y,k/winterLens);
+  return [x+dx,y+dy];
 }
 function residenceWindows(side,storey){
   const positions=side%2 ? [2.5,5.65,8.5] : [2.6,5,8.1,10.3,14,16,18.65];
@@ -156,12 +155,12 @@ function drawResidence(h,i){
   for(const [u,v,width,depth,rise] of h.rooftop){
     const px=x+u,py=y+v;
     const corners=[[px,py],[px+width,py],[px+width,py+depth],[px,py+depth]];
-    const bottom=corners.map(p=>residencePoint(...p,k)),top=bottom.map(([x,y])=>[x,y-rise*residenceTilt]);
+    const bottom=corners.map(p=>residencePoint(...p,k)),top=corners.map(p=>residencePoint(...p,k+rise*winterLens));
     for(const [a,b,visible,shade] of [[0,1,cam.y+residenceTilt<py,'#626963'],[1,2,cam.x>px+width,'#5f6665'],[3,2,cam.y+residenceTilt>py+depth,'#85877b'],[0,3,cam.x<px,'#72756c']]){
       if(!visible)continue;
       ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(...bottom[a]);ctx.lineTo(...bottom[b]);ctx.lineTo(...top[b]);ctx.lineTo(...top[a]);ctx.fill();
     }
-    const [lx,ly]=top[0],ww=width*(1+k),dd=depth*(1+k);
+    const [lx,ly]=top[0],ww=width*(1+k+rise*winterLens),dd=depth*(1+k+rise*winterLens);
     artFill(ctx,'wall_concrete',lx,ly,ww,dd);
     ctx.fillStyle='#c7ced1be';ctx.fillRect(lx,ly,ww,dd);
     ctx.strokeStyle='#6c7576';ctx.lineWidth=1;ctx.strokeRect(lx,ly,ww,dd);

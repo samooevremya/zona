@@ -186,11 +186,17 @@ function drawWinterTrees(inView){
   }
   for(const {x,y,size,art} of visibleAtlasTrees()){
     if(!inView(x,y,size))continue;
-    const lift=perspective ? (art.kind==='c1_pine'?.12:.096)*clamp(size/150,.72,1.2) : 0;
-    const [tipX,tipY]=roofPoint(x,y,lift*.68);
-    beam(ctx,x,y,tipX,tipY,art.kind==='c1_pine'?5:4,'#5b5448');
-    if(perspective)drawLayeredCrown(art.crown,x,y,size,size,art.kind);
-    else drawAutumnCrown(art.crown,x,y,size,size);
+    const layers=canopyLayers.get(art.crown);
+    if(!perspective || !layers){drawAutumnCrown(art.crown,x,y,size,size);continue;}
+    // Overhead crown photography has its centre over the trunk at the neutral view.
+    const height=size*(art.kind==='c1_pine'?1.25:1);
+    drawAutumnCrown(layers[0],x,y,size,size);
+    const [dx,dy]=winterParallax(x,y,height*.68);
+    beam(ctx,x,y,x+dx,y+dy,art.kind==='c1_pine'?5:4,'#5b5448');
+    for(let i=1;i<layers.length;i++){
+      const z=height*[0,.25,.63,1][i],[ux,uy]=winterParallax(x,y,z);
+      drawAutumnCrown(layers[i],x+ux,y+uy,size*(1+z*winterLens),size*(1+z*winterLens));
+    }
   }
   ctx.restore();
 }
@@ -261,7 +267,7 @@ function winterRoom(r){
     g.restore();beam(g,x-2,y-11,x+51,y-11,2,'#484038');
   }
   if(r.abandoned)abandonedFloor(g,r);
-  stairwellFloor(g,r);
+  artFill(g,'floor_concrete',(r.x+r.stairX-1.52)*T,(r.y+r.stairY)*T-21,3.14*T,2.86*T+26);
   for(const p of district.heaters.filter(p=>winterFloor(p.x,p.y)===r)){
     const glow=g.createRadialGradient(p.x,p.y,1,p.x,p.y,56);
     glow.addColorStop(0,'rgba(237,145,72,.32)');glow.addColorStop(1,'transparent');
@@ -284,6 +290,7 @@ function winterFloorPlan(r){
   if(!r.furnishedPlan){
     const i=district.levels.indexOf(r),c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
     g.drawImage(district.plans[i],0,0);g.translate(-r.x*T,-r.y*T);
+    if(r.block)stairwellFloor(g,r,true);
     for(const p of raisedScenery)if(p.item && winterFloor(p.x,p.y)===r)paintRaisedScenery(g,p,true);
     r.furnishedPlan=c;
   }
@@ -295,6 +302,7 @@ function winterGround(vx,vy,vw,vh){
   if(!upper || upper.n===1)drawAtlasGround(ctx,vx,vy,vw,vh);
   district.levels.forEach((r,i)=>{
     if(r.n===1 && (!upper || (upper.n===1 && r.kind)) || r===upper)ctx.drawImage(district.plans[i],r.x*T,r.y*T);
+    if(r.block && (r===upper || !upper && r.n===1) && vx+vw>=r.x*T && vx<=(r.x+r.w)*T && vy+vh>=r.y*T && vy<=(r.y+r.h)*T)stairwellFloor(ctx,r);
     if(r===upper && r.kind && r!==westStore && r.kind!=='guard')driftingBaseSnow(ctx,r);
   });
   renderWinterMarks(vx,vy,vw,vh);
@@ -308,7 +316,7 @@ function winterRoofs(){
   for(const h of HOUSES){
     if(h.baseRoom || h.pumpingStation){
       h.storeys=1;h.rooftop=h.baseRoom && h.baseRoom.kind!=='guard'?
-        [[h.w*T*.18,h.h*T*.23,32,23,.053],[h.w*T*.65,h.h*T*.10,26,18,.043],[h.w*T*.80,h.h*T*.74,24,24,.046]]:[];h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
+        [[h.w*T*.18,h.h*T*.23,32,23,25],[h.w*T*.65,h.h*T*.10,26,18,20],[h.w*T*.80,h.h*T*.74,24,24,21]]:[];h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
       h.roofIndex=ROOFS.length;ROOFS.push(baseRoof(h));continue;
     }
     if(h.loadingBay){
@@ -319,12 +327,12 @@ function winterRoofs(){
     if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
     if(h===fishingHouse || h.cabin){
       h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
-      h.storeys=1;h.rooftop=[[(h.cabin?h.w-2:2)*T-5,2.4*T-7,14,15,.035]];
+      h.storeys=1;h.rooftop=[[(h.cabin?h.w-2:2)*T-5,2.4*T-7,14,15,16]];
       h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
     }
     const occupied=h.flat && !h.flat.abandoned;
-    h.rooftop=occupied?[[17.4*T,3.7*T,62,45,.047],[4.9*T,5.9*T,16,15,.029],[11.7*T,2.7*T,16,15,.029]]:
-      [[3*T,2*T,32,21,.02],[16*T,6*T,23,18,.02]];
+    h.rooftop=occupied?[[17.4*T,3.7*T,62,45,22],[4.9*T,5.9*T,16,15,14],[11.7*T,2.7*T,16,15,14]]:
+      [[3*T,2*T,32,21,9],[16*T,6*T,23,18,9]];
     if(h.flat?.n===1)h.residenceWalls=[0,1,2,3].map(side=>residenceWall(h,side));
     h.roofIndex=ROOFS.length;
     ROOFS.push(residenceRoof(h));

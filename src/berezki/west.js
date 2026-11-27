@@ -34,16 +34,9 @@ function walkLookout(e,oldY){
   e.x=clamp(e.x,t.x-half,t.x+half);
   e.y=Math.max(e.y,t.y-t.half+e.r+3);
 }
-// The same optical centre as liftContainer. A tall structure shows more
-// parallax than the box; keep the vertical elevation independent of that lean.
-function lookoutProjection(height,mapView){
-  const t=lookout,k=perspective && !mapView ? .00032*height : 0;
-  const [x,y]=roofPoint(t.x,t.y,k);
-  return [clamp(x-t.x,-height*.078,height*.078),clamp(y-t.y,-height*.055,height*.055)-height*.52];
-}
 function lookoutOffset(y,mapView=false){
   const t=lookout;
-  return lookoutProjection(t.rise*clamp((t.y+t.half+t.run-y)/t.run,0,1),mapView);
+  return raisedOffset(t.x,t.y,t.rise*clamp((t.y+t.half+t.run-y)/t.run,0,1),mapView);
 }
 
 // Crop real weathered boards from the same timber artwork as the village.
@@ -79,7 +72,7 @@ function lookoutBoard(seed,exposed){
 }
 function paintLookout(g,mapView,front=false){
   const t=lookout,h=t.half,d=t.width/2,end=h+t.run;
-  const [ux,uy]=lookoutProjection(1,mapView);
+  const [ux,uy]=raisedOffset(t.x,t.y,1,mapView);
   const joint=(x,y,z)=>[x+ux*z,y+uy*z];
   function timber(a,b,w,exposed,seed){
     const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
