@@ -1,0 +1,40 @@
+/* The artwork is 1609 × 977. All touch regions follow the same physical faceplate. */
+.pager-hardware{display:none}
+.berezki #ov[data-kind=pda]{container-type:size;align-items:center;justify-content:center}
+.berezki #ov[data-kind=pda] .pda{
+  position:relative;display:block;flex:none;box-sizing:border-box;
+  width:min(100cqw,164.68cqh,940px);height:auto;aspect-ratio:1609/977;
+  min-height:0;max-height:none;max-width:none;overflow:visible;
+  padding:0!important;border:0!important;border-image:none!important;border-radius:0;
+  background:transparent url(data:image/webp;base64,__PAGER_SHELL__) center/100% 100% no-repeat;
+  box-shadow:none;filter:drop-shadow(0 4px 5px #0008)
+}
+.berezki #ov[data-kind=pda] .pda-h{display:none}
+.berezki #ov[data-kind=pda] .screen{display:contents}
+.berezki #ov[data-kind=pda] .screen::after{content:none}
+.berezki #ov[data-kind=pda] #pbody{
+  position:absolute;inset:12.1% 9.35% 31.3% 9.35%;box-sizing:border-box;
+  margin:0;padding:9px 12px;min-height:0;max-height:none;border:0;border-radius:1.5% / 3%;
+  overflow:auto;background:#252824;color:#e7e4d4
+}
+.berezki #ov[data-kind=pda] #pbody:has(.pager-glass){padding:0;overflow:hidden}
+.berezki #ov[data-kind=pda] .pager-glass{position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;margin:0;border:0;background:#313936}
+.berezki #ov[data-kind=pda] .pager-hardware,.berezki #ov[data-kind=pda] #ptabs{
+  position:absolute;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;
+  align-items:stretch;gap:0;min-height:44px;padding:0;margin:0;border:0;
+  background:none;box-shadow:none;overflow:visible;transform:translate(-50%,-50%)
+}
+.berezki #ov[data-kind=pda] .pager-headkeys{left:72.5%;top:5.95%;width:max(27.8%,132px);height:10%}
+.berezki #ov[data-kind=pda] .pager-rocker{left:82.45%;top:88.35%;width:max(11.7%,88px);height:13%}
+.berezki #ov[data-kind=pda] #ptabs{left:42.85%;top:88.35%;width:63.1%;height:13%}
+.berezki #ov[data-kind=pda] :is(.pager-hardware,#ptabs)>button{
+  position:relative;display:block;box-sizing:border-box;min-width:44px;min-height:44px;
+  padding:0!important;margin:0;border:0!important;border-image:none!important;border-radius:5px;
+  font-size:0!important;color:transparent!important;background:none!important;box-shadow:none!important;
+  text-shadow:none;cursor:pointer;touch-action:manipulation
+}
+.berezki #ov[data-kind=pda] :is(.pager-hardware,#ptabs)>button:focus-visible{outline:2px solid #f5d59c;outline-offset:-4px}
+.berezki #ov[data-kind=pda] #ptabs>button[aria-selected=true]::after{
+  content:"";position:absolute;bottom:14%;left:50%;width:14px;height:2px;transform:translateX(-50%);
+  background:#725625;border-radius:1px
+}

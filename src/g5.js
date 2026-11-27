@@ -32,6 +32,11 @@ const SND = {
   shell: v => { const f = 4200 + Math.random() * 1500; tn(f, f * 0.98, 0.05, 0.05 * v, 'sine', 0.35); tn(f * 1.3, f * 1.28, 0.04, 0.03 * v, 'sine', 0.47); },
   knife: v => nz(0.09, 3000, 2, 0.35 * v, 'bandpass'),
   click: () => { nz(0.02, 3500, 4, 0.25, 'bandpass'); tn(900, 700, 0.025, 0.08, 'square'); },
+  pagerKey: v => {
+    nz(.016, 1900, .9, .19*v, 'bandpass');
+    tn(370, 160, .032, .085*v, 'triangle');
+    nz(.013, 1050, .8, .06*v, 'lowpass', .025);
+  },
   jam: () => { nz(0.04, 2200, 5, 0.35, 'bandpass'); nz(0.05, 1200, 5, 0.25, 'bandpass', 0.08); },
   beep: v => tn(1900, 1900, 0.05, 0.08 * v, 'square'),
   eat: () => { nz(0.08, 900, 2, 0.15, 'bandpass'); nz(0.08, 700, 2, 0.12, 'bandpass', 0.18); },
@@ -148,7 +153,9 @@ function openPanel(kind, title, tabs) {
   panel?.unmountMap?.();
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
-  ptitle.textContent = title;
+  ptitle.textContent = BEREZKI && kind === 'pda' ? 'Пейджер' : title;
+  if (BEREZKI && kind === 'pda') play('pagerKey');
+  ov.dataset.kind = kind;
   ov.classList.toggle('pause-open', kind==='menu');
   ov.setAttribute('aria-labelledby', kind==='menu'?'pause-heading':'ptitle');
   ov.classList.add('open');
@@ -165,6 +172,9 @@ function drawTabs() {
   });
 }
 function closePanel() { if (!panel) return; panel.unmountMap?.(); const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
+ov.addEventListener('click', e => {
+  if (BEREZKI && panel?.kind === 'pda' && e.target.closest('button:not(:disabled)')) play('pagerKey');
+}, true);
 $('pclose').addEventListener('click', closePanel);
 ov.addEventListener('click', e => { if (e.target === ov && panel?.kind!=='menu') closePanel(); });
 function refresh() {
@@ -423,7 +433,7 @@ function drawMenu() {
     nav.appendChild(el('p','pause-note',IN.touch
       ? 'Левый джойстик — ходьба. Слегка отклони правый стик для прицеливания. Для огня доведи стик до края или коснись врага в режиме стрельбы касанием. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
-    if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
+    if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — '+(BEREZKI?'Пейджер':'КПК')+', Esc — пауза.'));
     nav.appendChild(el('p','pause-note',(BEREZKI?'Автосохранение у костра.':'Игра сохраняется автоматически у костра и у Сидоровича.')+' Вручную можно сохраниться, когда рядом нет врагов.'));
     nav.appendChild(btn('start-primary','Назад',()=>{delete panel.pausePage;drawMenu();card.querySelector('.pause-help').focus();}));
     return;
@@ -878,7 +888,7 @@ function hud(dt) {
     H.msgs.replaceChildren();
     if (message) {
       const line = el('p', message.k);
-      line.append(el('span', 'sender', 'КПК'));
+      line.append(el('span', 'sender', BEREZKI?'Пейджер':'КПК'));
       line.append(document.createTextNode(message.t));
       H.msgs.append(line);
     }

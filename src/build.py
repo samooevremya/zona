@@ -4,12 +4,16 @@ WINTER = MAPFLAG == 'berezki'
 BIGF = WINTER or MAPFLAG == 'big'
 if BIGF: MAPFLAG = 'rc1'
 h=open('head.html',encoding='utf8').read(); b=open('body.html',encoding='utf8').read(); sp=open('sprite.svg',encoding='utf8').read(); av=open('avatar.js',encoding='utf8').read()
+if WINTER: b=b.replace('КПК','Пейджер')
 css=open('ui/ui-theme.css',encoding='utf8').read()+'\n'+open('ui/zona-fixes.css',encoding='utf8').read()+'\n'+open('ui/hud-ref.css',encoding='utf8').read()+'\n'+open('ui/windows.css',encoding='utf8').read(); icons=open('ui/ui-icons.svg',encoding='utf8').read(); bridge=open('ui/ui-bridge.js',encoding='utf8').read()
 import base64
 with open('berezki/menu.webp' if WINTER else 'art/menu/signal-post.webp','rb') as cover:
     menu_css=open('ui/main-menu.css',encoding='utf8').read().replace('__SIGNAL_POST__',base64.b64encode(cover.read()).decode())
 css += '\n'+menu_css
 if WINTER: css += '\n#title.start .start-name,#ov.pause-open .start-name{font-size:clamp(30px,5.7vw,82px);max-width:95vw;letter-spacing:.045em;line-height:1.08}'
+if WINTER:
+    with open('berezki/pager.webp','rb') as shell:
+        css += '\n'+open('ui/winter-pager.css',encoding='utf8').read().replace('__PAGER_SHELL__',base64.b64encode(shell.read()).decode())
 h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')

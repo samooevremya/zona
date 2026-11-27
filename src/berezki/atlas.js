@@ -574,12 +574,21 @@ function bakeSurvey(){
   return c;
 }
 function atlasMapLabels(g,s,u){
-  const detail=s>3*u;
-  g.textAlign='center';g.font='bold '+Math.max(10*u,Math.min(13*u,s*10))+'px Arial';
-  const labels=detail?[...atlasSites,['Лодки',483,115],['Прорубь',491.4,121.4],['Мост',335,220],
+  const labels=s>3*u?[...atlasSites,['Лодки',483,115],['Прорубь',491.4,121.4],['Мост',335,220],
     ['Жилой корпус',517,353],['Детская площадка',523,368],['Заброшенный корпус',517,381]]:atlasSites;
+  g.font='600 '+13*u+'px Arial';
+  g.textAlign='center';g.textBaseline='middle';
+  const occupied=[],h=20*u;
   for(const [name,x,y] of labels){
-    const margin=g.measureText(name).width/2+2*u,cx=clamp(x*s,margin,district.width*s-margin);
-    g.lineWidth=2.8*u;g.strokeStyle='#384247';g.strokeText(name,cx,y*s);g.fillStyle='#f2e8ce';g.fillText(name,cx,y*s);
+    const w=g.measureText(name).width+12*u;
+    const left=clamp(x*s-w/2,0,Math.max(0,district.width*s-w));
+    for(const offset of [0,h+3*u,-h-3*u]){
+      const top=y*s-h/2+offset;
+      if(top<0 || top+h>district.height*s || occupied.some(r=>
+        left<r.right+2*u && left+w>r.left-2*u && top<r.bottom+2*u && top+h>r.top-2*u))continue;
+      g.fillStyle='rgba(29,37,36,.94)';g.beginPath();g.roundRect(left,top,w,h,3*u);g.fill();
+      g.fillStyle='#fff4da';g.fillText(name,left+w/2,top+h/2+.4*u);
+      occupied.push({left,top,right:left+w,bottom:top+h});break;
+    }
   }
 }

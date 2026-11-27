@@ -375,6 +375,7 @@ async function bootBerezki(){
   GRADE.mul='rgb(240,247,251)';
   winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];
+  installPagerKeys();
   drawRoomLights=(g,inView,tint)=>{
     lightShoreHomes(g,inView,tint);
     const stove=stoveIn(winterFloor(P.x,P.y));
@@ -402,14 +403,30 @@ function winterPda(){
   panel.mapBounds=upper?r:{x:0,y:0,w:district.width,h:district.height};
   const b=panel.mapBounds,view=panel.mapView||={zoom:upper?1:3,x:P.x/T-b.x,y:P.y/T-b.y};
   panel.f={ppl:1,loc:1};
-  const box=el('div','kpk-map'),bar=el('div','kpk-bar'),scale=el('span','zl');
-  bar.append(el('span','zl',upper?r.name:'Сотый километр'),
-    btn('chip','−',()=>{view.zoom=clamp(view.zoom/1.6,1,12);refresh();}),scale,
-    btn('chip','+',()=>{view.zoom=clamp(view.zoom*1.6,1,12);refresh();}),
-    btn('chip','Вся карта',()=>{view.x=b.w/2;view.y=b.h/2;view.zoom=1;refresh();}),
-    btn('chip','К игроку',()=>{view.x=P.x/T-b.x;view.y=P.y/T-b.y;view.zoom=upper?2:7;refresh();}));
-  const w=el('div','mapwrap kpk-wrap'),cv=el('canvas');cv.id='bigmap';w.append(cv);
-  box.append(bar,w);pbody.append(box);mountPdaMap(w,cv,panel,[],()=>{},scale);
+  const w=el('div','mapwrap kpk-wrap pager-glass'),cv=el('canvas');cv.id='bigmap';w.append(cv);
+  pbody.append(w);mountPdaMap(w,cv,panel,[],()=>{});
+}
+function installPagerKeys(){
+  const shell=ov.querySelector('.pda');
+  const group=(cls,actions)=>{
+    const row=el('div','pager-hardware '+cls);
+    for(const [name,action] of actions){
+      const key=btn('pager-key',name,action);key.title=name;row.append(key);
+    }
+    shell.append(row);
+  };
+  function navigate(action){
+    const view=panel.mapView,b=panel.mapBounds;
+    if(!view || !b)return;
+    if(action==='all')Object.assign(view,{x:b.w/2,y:b.h/2,zoom:1});
+    else if(action==='player')Object.assign(view,{x:P.x/T-b.x,y:P.y/T-b.y,zoom:winterFloor(P.x,P.y)?.n>1?2:7});
+    else view.zoom=clamp(view.zoom*(action==='in'?1.6:1/1.6),1,12);
+    if(panel.tab!=='map'){panel.tab='map';drawTabs();}
+    refresh();
+  }
+  group('pager-headkeys',[['Вся карта',()=>navigate('all')],['К игроку',()=>navigate('player')],['Закрыть',closePanel]]);
+  group('pager-rocker',[['−',()=>navigate('out')],['+',()=>navigate('in')]]);
+
 }
 function winterCloth(img,part,tone){
   // Keep the original joint anchors and alpha masks. Dye each fabric panel before animation.
