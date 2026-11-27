@@ -316,7 +316,7 @@ function winterRoofs(){
   for(const h of HOUSES){
     if(h.baseRoom || h.pumpingStation){
       h.storeys=1;h.rooftop=h.baseRoom && h.baseRoom.kind!=='guard'?
-        [[h.w*T*.18,h.h*T*.23,32,23,25],[h.w*T*.65,h.h*T*.10,26,18,20],[h.w*T*.80,h.h*T*.74,24,24,21]]:[];h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
+        [[h.w*T*.18,h.h*T*.23,32,23,25],[h.w*T*.65,h.h*T*.10,26,18,20],[h.w*T*.80,h.h*T*.74,24,24,21]]:stoveStack(h,h.pumpingStation?pumpHearth:baseStove);h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
       h.roofIndex=ROOFS.length;ROOFS.push(baseRoof(h));continue;
     }
     if(h.loadingBay){
@@ -327,7 +327,7 @@ function winterRoofs(){
     if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
     if(h===fishingHouse || h.cabin){
       h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
-      h.storeys=1;h.rooftop=h.cabin?.hamlet && !h.cabin.heater?[]:[[(h.cabin?h.w-2:2)*T-5,2.4*T-7,14,15,16]];
+      h.storeys=1;h.rooftop=stoveStack(h,h.cabin?.heater?.at || shoreHomes.find(home=>home.room===(h.cabin||fishingRoom))?.hearth);
       h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
     }
     const occupied=h.flat && !h.flat.abandoned;

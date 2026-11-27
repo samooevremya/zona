@@ -42,7 +42,7 @@ function playRecording(name,volume,x,y){
   if(stereo){stereo.pan.value=x===undefined?0:clamp((x-P.x)/480,-.9,.9);gain.connect(stereo);stereo.connect(master);}
   else gain.connect(master);
   fieldVoices.add(src);src.onended=()=>{fieldVoices.delete(src);src.disconnect();filter.disconnect();gain.disconnect();stereo?.disconnect();};
-  src.start(AC.currentTime+(name==='shell' ? .21 : 0));
+  src.start(AC.currentTime+(name==='shell' ? .21 : name.startsWith('hit') ? .045 : 0));
   return true;
 }
 function roomAcoustics(){

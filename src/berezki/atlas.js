@@ -30,8 +30,10 @@ function basinRadius(x,y,[cx,cy,rx,ry]){
 const neighbouringTrunks=[[1,0],[0,1],[1,1],[-1,1],[2,0],[0,2]];
 function wildTreeAt(x,y){
   const edge=Math.min(Math.abs(x),Math.abs(y),Math.abs(x-district.width),Math.abs(y-district.height));
-  const density=edge<10?.095+.09*(1-edge/10)*vnoise(x-27,y+14,7):.095;
-  return hash2(x,y)<density && !neighbouringTrunks.some(([u,v])=>hash2(x-u,y-v)<density) && vnoise(x,y,13)>.38;
+  const stand=.62*vnoise(x-27,y+14,23)+.38*vnoise(x+17,y-42,8);
+  const density=.042+.17*stand+.04*clamp(1-edge/10,0,1);
+  const rank=hash2(x,y);
+  return rank<density && !neighbouringTrunks.some(([u,v])=>hash2(x-u,y-v)<rank);
 }
 // Exterior scenery samples absolute tile coordinates. The loaded navigation
 // grid alone determines how far an actor can travel in this district.

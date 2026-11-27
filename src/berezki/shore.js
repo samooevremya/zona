@@ -375,7 +375,7 @@ function fishingRoof(h){
   const width=vertical?d:w,depth=vertical?w:d;
   g.save();
   if(vertical){g.translate(w,0);g.rotate(Math.PI/2);}
-  g.drawImage(balancedGable(h.mat==='slate'?'c1_roof_slate':'c1_roof_plank'),0,0,width,depth);
+  g.drawImage(winterGable(h.mat==='slate'?'c1_roof_slate':'c1_roof_plank'),0,0,width,depth);
   const snow=g.createPattern(snowMaterial(),'repeat');snow.setTransform(new DOMMatrix().scale(.42));
   g.fillStyle=snow;g.globalAlpha=h.mat==='slate'?.49:.69;g.fillRect(2,2,width-6,depth-7);g.globalAlpha=1;
   g.fillStyle='#50617633';g.fillRect(2,depth/2,width-6,depth/2-5);

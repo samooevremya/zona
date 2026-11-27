@@ -28,7 +28,7 @@ function startReload() {
   if (W.melee || P.reload > 0) return;
   const m = S.mag[S.weapon] || 0;
   if (m >= W.mag || !cnt(W.ammo)) return;
-  P.reload = W.reload; play(reloadSound(S.weapon));
+  P.reload = W.reload; play(reloadSound(S.weapon,Math.min(W.mag-m,cnt(W.ammo))));
 }
 function finishReload() {
   const W = WP[S.weapon]; if (!W || W.melee) return;
@@ -439,7 +439,7 @@ function updatePlayer(dt) {
   const sprint = !(BEREZKI && draggedBody) && (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   let sp = (sprint ? 190 : P.crouch ? 62 : 118) * (over ? 0.55 : 1) * (swampAt(P.x, P.y) ? 0.55 : 1);
-  if(BEREZKI && ml>.08)sp*=1-.34*snowAtBoots(P);
+  if(BEREZKI && ml>.08)sp*=(1-.34*snowAtBoots(P))*(1-.23*reedDensity(P.x,P.y));
   if(BEREZKI && draggedBody)sp*=.57;
   if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (1-.12*(S.flags.coatWetness||0)) * dt);
   if (BIG && !BEREZKI) {

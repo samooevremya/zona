@@ -54,3 +54,5 @@ THE SOFTWARE.
 В трёх вариантах перезарядки использованы звуки застёжек и металла Kenney. Дубли шагов по асфальту собраны из камня и песка Fantozzi. Звук разделки сочетает ткань Kenney, взмах и влажный шаг TinyWorlds. Исходные записи и лицензии перечислены выше.
 
 «Вальс у переправы» — оригинальная инструментальная пьеса для костра. Разговоры у костров и боевые реплики выводятся текстом.
+
+Winter pump district: reload, surface impact and reed footsteps are new edits of the credited mechanical, wood, stone, leaf and slush field recordings above.
