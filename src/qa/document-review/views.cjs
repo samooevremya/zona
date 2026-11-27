@@ -17,7 +17,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  const positions=[['yard',522.8,369.25],['toe',335,226.60],['fire',520,362.6],['station',325,235.5],['door',336.5,597.1],['flats',518,387],['woods',458.5,155.5],['room',780,17.4],['gun',502.4,134]];
  for(const [id,x,y] of positions){
  await p.evaluate(([x,y,id])=>{Object.assign(__z.P,{x:x*32,y:y*32});Object.assign(__z.cam,{x:x*32,y:y*32});if(id==='gun'){__z.S.weapon='w_obrez';__z.S.mag.w_obrez=2;__z.P.ang=0;const guard=__z.ents.find(e=>e.sid==='shorePost');Object.assign(guard,{x:x*32+40,y:y*32+13,wpn:'w_obrez',ang:Math.PI*.72});}
- __z.clearMsgs();__z.S.min=11*60;__z.S.flags.warmth=100;__z.S.flags.coatWetness=0;for(let i=0;i<20;i++)__z.update(1/30)},[x,y,id]);await p.waitForTimeout(500);
+ __z.clearMsgs();__z.S.min=11*60;__z.S.flags.warmth=100;for(let i=0;i<20;i++)__z.update(1/30)},[x,y,id]);await p.waitForTimeout(500);
  await p.screenshot({path:'src/qa/document-review/'+id+'-'+process.argv[2]+'.jpg',quality:90});
  }
  const checkFire=await p.evaluate(()=>{

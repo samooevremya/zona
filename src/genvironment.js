@@ -170,6 +170,7 @@ function underRainCover(x,y){
   });
 }
 function updateCoat(dt){
+  if(BEREZKI)return;
   const wet=S.flags.coatWetness||0;
   const precip=Math.max(WX.rain,WX.sleet*.55);
   if(!wet && precip<.12)return;

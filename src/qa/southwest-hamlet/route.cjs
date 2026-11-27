@@ -44,9 +44,9 @@ function checks(){
     if(i===1){
       walk(116.25,534.9);z.update(.02);
       assert(z.near?.k==='hamletKindle','Stove prompt: '+z.near?.k);z.interact();
-      S.flags.warmth=65;S.flags.coatWetness=.3;
+      S.flags.warmth=65;
       for(let tick=0;tick<120;tick++)z.update(1/60);
-      assert(S.flags.warmth>65 && S.flags.coatWetness<.3,'Heat and coat');
+      assert(S.flags.warmth>65,'Stove heat');
       z.save(true,1);z.applyState(z.loadSave(1));z.update(.02);
       assert(stoveBurning(r.heater) && !stoveBurning(hamletRooms[0].heater),'Separate stove timers');
       assert(winterFloor(P.x,P.y)===r && z.near?.k==='winterRest','Load inside house');
@@ -65,5 +65,5 @@ function checks(){
   }
   [[205.04,535.04],[279.84,516.56],[322.96,493.68]].forEach(p=>walk(...p));
   assert(P.alive,'Failed to reach base road');
-  return {buildings:approaches.length,stove:true,coat:true,reload:true,crate:true,cabinet:true,throughRoute:true};
+  return {buildings:approaches.length,stove:true,reload:true,crate:true,cabinet:true,throughRoute:true};
 }

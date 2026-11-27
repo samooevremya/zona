@@ -21,26 +21,29 @@ async () => {
   const check=(ok,why)=>{if(!ok)throw Error(why);};
   check(Math.abs(z.P.x/T-183.8)<.1,'Wrong fork');
   z.save(true,1);const start=z.loadSave(1),results=[];
+  start.flags.coatWetness=.85; // Legacy winter slot.
   for(const hour of [11,23]){
     const routeStats=[];
     for(const path of [bank,direct]){
-      z.applyState(structuredClone(start));z.S.min=hour*60;flags().coatWetness=0;flags().warmth=100;
-      const seconds=walk(path),wet=flags().coatWetness,heat=flags().warmth;
-      routeStats.push({seconds:+seconds.toFixed(2),wet:+wet.toFixed(3),heat:+heat.toFixed(2)});
+      z.applyState(structuredClone(start));z.S.min=hour*60;flags().warmth=100;
+      check(!('coatWetness' in flags()),'Legacy wet clothing was restored');
+      const seconds=walk(path),heat=flags().warmth;
+      routeStats.push({seconds:+seconds.toFixed(2),heat:+heat.toFixed(2)});
+      check(!('coatWetness' in flags()),'Water added persistent wetness');
     }
     const [dry,wet]=routeStats;
-    check(dry.wet===0 && wet.wet>.1 && wet.heat<dry.heat && wet.seconds<dry.seconds,JSON.stringify(routeStats));
+    check(wet.heat<dry.heat && wet.seconds<dry.seconds,JSON.stringify(routeStats));
     results.push({hour,dry,wet});
   }
   walk([[205,436],[209.45,435.98]]);
   check(z.near?.k==='pumpKindle','Missing stove '+z.near?.k);
-  z.interact();const heat=flags().warmth,wet=flags().coatWetness;
+  z.interact();const heat=flags().warmth;
   for(let i=0;i<150;i++)z.update(1/60);
-  check(flags().warmth>heat && flags().coatWetness<wet,'Stove failed');
+  check(flags().warmth>heat,'Stove failed');
   z.save(true,1);z.applyState(z.loadSave(1));z.update(.01);
   check(z.near?.k==='winterRest' && !flags().baseStoveUntil,'Stove save isolation');
   z.interact();const rest=[...document.querySelectorAll('button')].find(b=>b.offsetWidth && b.textContent.includes('Отдохнуть · 1 ч'));
-  check(rest,'Missing rest');rest.click();check(flags().coatWetness===0,'Wet after drying');
+  check(rest,'Missing rest');rest.click();check(!('coatWetness' in flags()),'Rest added wetness');
   z.S.min=flags().pumpStoveUntil+1;z.update(.02);check(z.near?.k==='pumpKindle','Stove expiry');
   walk([[205,436],...bank.slice().reverse(),[183.8,434.2]]);
   // Reach all four sides on foot. The raised supply line joins the building
@@ -55,5 +58,5 @@ async () => {
     for(let k=0;k<30;k++)z.map.moveE(probe,0,-2*dir);
     check(Math.abs((probe.y-cy)*dir-o.h/2-probe.r)<.01,'Walked through tower support '+JSON.stringify({o,probe}));
   }
-  return {results,supports:feet.length,returnToFork:true,driedAfterRest:true,stoveReloadAndExpiry:true};
+  return {results,supports:feet.length,returnToFork:true,legacyWetnessRemoved:true,stoveReloadAndExpiry:true};
 }
