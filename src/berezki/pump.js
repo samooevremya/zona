@@ -22,22 +22,42 @@ function inMarshChannel(x,y){
   if(y<369 || y>=440 || x<145 || x>203)return false;
   const [l,r]=channelBanks(y);return x>=l && x<r;
 }
-let channelOutline;
-function paintMarshChannel(g){
-  if(!channelOutline){
-    channelOutline=new Path2D();
-    for(let y=369;y<=440;y+=.25)channelOutline.lineTo(channelBanks(y)[0]*T,y*T);
-    for(let y=440;y>=369;y-=.25)channelOutline.lineTo(channelBanks(y)[1]*T,y*T);
-    channelOutline.closePath();
+// Water depth is continuous across the old navigation tiles. The last few metres
+// of each bank are slush, while channels and hollows hold standing water.
+function marshDepth(x,y){
+  const u=x/T,v=y/T;
+  if(u<73 || u>204 || v<300 || v>441)return 0;
+  let inward=(1-basinRadius(u,v,marshShape))*marshShape[3];
+  if(v>=369 && v<440){
+    const [l,r]=channelBanks(v);
+    inward=Math.max(inward,Math.min(u-l,r-u));
   }
-  g.save();g.clip(channelOutline);
-  g.fillStyle=g.createPattern(district.ice,'repeat');g.globalAlpha=.62;g.fill(channelOutline);
-  g.globalAlpha=1;g.fillStyle='#4d686d54';g.fill(channelOutline);
-  g.strokeStyle=g.createPattern(district.snow,'repeat');
-  for(const [width,opacity] of [[67,.20],[45,.34],[32,.46],[20,.62],[10,.83],[4,1]]){
-    g.lineWidth=width;g.globalAlpha=opacity;g.stroke(channelOutline);
+  if(inward<-.38)return 0;
+  const grain=vnoise(u+32,v-11,1.8);
+  const shore=clamp((inward+(grain-.5)*.72)/1.45,0,1);
+  if(!shore)return 0;
+  return shore*clamp(.28+vnoise(u,v,7)*.58+grain*.28,.16,1);
+}
+// The depth mask is sampled only when baking a terrain chunk. The one-sample
+// apron makes bilinear filtering continuous between neighbouring chunks.
+function paintThaw(g,l,t){
+  const size=atlasChunk,spacing=8,n=size/spacing+2;
+  const mask=winterCanvas(n,n),m=mask.getContext('2d'),pixels=m.createImageData(n,n);
+  let present=false;
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){
+    const d=marshDepth(l+(i-.5)*spacing,t+(j-.5)*spacing);
+    if(!d)continue;
+    present=true;pixels.data[(j*n+i)*4+3]=Math.round(249*Math.pow(d,.59));
   }
-  g.restore();
+  if(!present)return;
+  m.putImageData(pixels,0,0);
+  const c=winterCanvas(size,size),q=c.getContext('2d');
+  const material=q.createPattern(district.images.marshWater,'repeat');
+  material.setTransform(new DOMMatrix().translate(-l,-t).rotate(-13).scale(.68));
+  q.fillStyle=material;q.fillRect(0,0,size,size);
+  q.globalCompositeOperation='destination-in';
+  q.drawImage(mask,-spacing,-spacing,n*spacing,n*spacing);
+  g.drawImage(c,l,t);
 }
 // Shoreline belts have openings at the channel and occasional sheltered islands.
 function reedDensity(x,y){
@@ -51,23 +71,71 @@ function reedDensity(x,y){
   return clamp((band*.78+pocket*.73+vnoise(u,v,2.3)*.2-.52)*1.9,0,1);
 }
 let rushShadow;
+function visitReeds(l,t,r,b,visit){
+  const cell=23;
+  for(let j=Math.floor(t/cell);j<=Math.floor(b/cell);j++)
+    for(let i=Math.floor(l/cell);i<=Math.floor(r/cell);i++){
+      const rand=mulberry32((i*73856093 ^ j*19349663)>>>0);
+      const x=(i+.1+rand()*.8)*cell,y=(j+.1+rand()*.8)*cell,d=reedDensity(x,y);
+      if(rand()>=d)continue;
+      const w=(16+rand()*21)*(.72+d*.4),h=w*(.78+rand()*.51);
+      const flip=rand()<.5?-1:1,angle=(rand()-.5)*.36;
+      visit(x,y,w,h,flip,angle);
+    }
+}
+function reedStand(g,x,y,w,h,flip,angle){
+  g.save();g.translate(x,y);g.scale(flip,1);g.rotate(angle);
+  g.drawImage(district.images.reedStand,-w/2,-h*.94,w,h);g.restore();
+}
 function paintMarshCover(g,l,t,r,b){
-  const cell=23,im=district.images.reedStand;
+  const im=district.images.reedStand;
   if(!rushShadow){
     rushShadow=winterCanvas(im.width,im.height);
     const q=rushShadow.getContext('2d');q.drawImage(im,0,0);
     q.globalCompositeOperation='source-in';q.fillStyle='#35444b';q.fillRect(0,0,im.width,im.height);
   }
-  for(let j=Math.floor((t-35)/cell);j<=Math.floor((b+50)/cell);j++)
-    for(let i=Math.floor((l-45)/cell);i<=Math.floor((r+45)/cell);i++){
-      const rand=mulberry32((i*73856093 ^ j*19349663)>>>0);
-      const x=(i+.1+rand()*.8)*cell,y=(j+.1+rand()*.8)*cell,d=reedDensity(x,y);
-      if(rand()>=d)continue;
-      const w=(16+rand()*22)*(.7+d*.4),h=w*(.62+rand()*.43),flip=rand()<.5?-1:1;
-      g.save();g.translate(x,y);
-      if(SHADOWS){g.save();g.transform(flip,0,-.52,-.39,1,1);g.globalAlpha=.37;g.drawImage(rushShadow,-w/2,-h,w,h);g.restore();}
-      g.scale(flip,1);g.rotate((rand()-.5)*.38);g.drawImage(im,-w/2,-h*.94,w,h);g.restore();
+  visitReeds(l-48,t-35,r+48,b+60,(x,y,w,h,flip,angle)=>{
+    if(SHADOWS){
+      g.save();g.translate(x,y);g.transform(flip,0,-.49,-.32,1,1);
+      g.globalAlpha=.32;g.drawImage(rushShadow,-w/2,-h,w,h);g.restore();
     }
+    reedStand(g,x,y,w,h,flip,angle);
+  });
+}
+function reedsInFront(g,e){
+  if(e.x<72*T || e.x>205*T || e.y<299*T || e.y>443*T)return;
+  // The static silhouettes already live in the terrain cache. Restore only
+  // foreground stems within the part that a passing actor could have covered.
+  g.save();g.beginPath();g.rect(e.x-24,e.y-26,48,53);g.clip();
+  visitReeds(e.x-60,e.y,e.x+60,e.y+82,(x,y,w,h,flip,a)=>{
+    if(y>=e.y && y-h<e.y+27 && Math.abs(x-e.x)<w*.65+24)reedStand(g,x,y,w,h,flip,a);
+  });
+  g.restore();
+}
+const marshRipples=[];
+function marshContact(e,foot,step,fallback=false){
+  const depth=marshDepth(foot.x,foot.y);
+  if(depth<=.035)return;
+  marshRipples.push({x:foot.x,y:foot.y,t:environmentTime,d:depth,a:foot.a??e.ang});
+  if(marshRipples.length>32)marshRipples.shift();
+  if(fallback){const s=surf(foot.x,foot.y);emitFootfall(s);play(s);}
+  if(step%2 && reedDensity(foot.x,foot.y)>.28)play('winterReeds',foot.x,foot.y,.43);
+}
+function drawMarshRipples(g,vx,vy,vw,vh){
+  while(marshRipples.length && environmentTime-marshRipples[0].t>1.25)marshRipples.shift();
+  g.save();
+  for(const p of marshRipples){
+    if(p.x<vx-28||p.y<vy-28||p.x>vx+vw+28||p.y>vy+vh+28)continue;
+    const age=environmentTime-p.t,fade=(1-age/1.25)*p.d;
+    const r=3+age*(8+7*p.d);
+    g.lineWidth=.85;
+    for(const [offset,color] of [[0,'53,65,63'],[1,'198,201,181']]){
+      g.strokeStyle='rgba('+color+','+(.73*fade)+')';
+      g.beginPath();g.ellipse(p.x,p.y+offset,r,r*.72,p.a,.34,3.65);g.stroke();
+      g.beginPath();g.ellipse(p.x,p.y+offset,r*.93,r*.67,p.a,4.3,6.13);g.stroke();
+    }
+  }
+  g.restore();
 }
 function makePumpingStation(){
   const r=pumpRoom;

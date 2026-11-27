@@ -28,7 +28,7 @@ function checkField(){
   }finally{play=oldPlay;}
   let dense=0,clear=0;
   for(let x=175;x<200;x+=.5)for(let y=411;y<438;y+=.5){
-    const d=reedDensity(x*T,y*T);if(d>.72){dense++;ensure(surf(x*T,y*T)==='winterReeds','Missing rustle on reeds');}
+    const d=reedDensity(x*T,y*T);if(d>.72){dense++;ensure(['stepWater','winterSlush'].includes(surf(x*T,y*T)),'Missing water step in reeds');}
     if(swampAt(x*T,y*T)&&d===0)clear++;
   }
   ensure(dense>25 && clear>25,'Banks and open slush');

@@ -533,7 +533,7 @@ function moveE(e, dx, dy) {
   if(BEREZKI && e===P){moveOnStationBridge(e,oldY);walkLookout(e,oldY);}
   collide(e);collide(e);
 }
-const swampAt = (x, y) => tAt(Math.floor(x / T), Math.floor(y / T)) === SW;
+const swampAt = (x, y) => BEREZKI ? marshDepth(x,y)>.035 : tAt(Math.floor(x / T), Math.floor(y / T)) === SW;
 function anomNear(x, y, pad) { for (const a of anoms) if (dst(x, y, a.x, a.y) < a.r + pad) return a; return null; }
 function steer(e, tx, ty, speed, dt) {
   let a = Math.atan2(ty - e.y, tx - e.x);

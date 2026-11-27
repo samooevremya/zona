@@ -386,7 +386,7 @@ function prepareAtlasArt(){
   const fade=brush.createRadialGradient(96,96,39,96,96,96);fade.addColorStop(0,'white');fade.addColorStop(1,'transparent');
   brush.fillStyle=fade;brush.fillRect(0,0,192,192);district.snowStamp=stamp;
   district.sleeperBed=winterRailBed();
-  district.basinPaths=[lakeShape,marshShape].map(([cx,cy,rx,ry])=>{
+  district.basinPaths=[lakeShape].map(([cx,cy,rx,ry])=>{
     const path=new Path2D();
     for(let i=0;i<=240;i++){
       const a=i*Math.PI/120,k=1+.034*Math.sin(5*a)+.023*Math.cos(8*a);
@@ -475,25 +475,13 @@ function atlasTerrainChunk(cx,cy){
       g.lineWidth=w;g.strokeStyle=col;g.stroke(path);
     }
   }
-  if(near(marshShape[0],marshShape[1],62*T)){
-    const wet=district.basinPaths[1];
-    g.save();g.clip(wet);
-    const texture=g.createPattern(district.ice,'repeat');
-    texture.setTransform(new DOMMatrix().rotate(-17).scale(.68));
-    g.globalAlpha=.44;g.fillStyle=texture;g.fill(wet);g.globalAlpha=1;
-    g.fillStyle='#65726c53';g.fill(wet);
-    for(const [w,opacity] of [[11*T,.22],[5*T,.35],[2*T,.49]]){
-      g.strokeStyle=snow;g.lineWidth=w;g.globalAlpha=opacity;g.stroke(wet);
-    }
-    g.restore();
-  }
-  if(l<203*T && r>145*T && t<441*T && b>368*T)paintMarshChannel(g);
-  if(l<203*T && r>73*T && t<441*T && b>300*T)paintMarshCover(g,l,t,r,b);
+  const marsh=l<204*T && r>73*T && t<441*T && b>300*T;
   if(near(329.05,414.55,150))paintRoadCulvert(g);
   if(near(79,121,155))westGround(g);
   if(near(202,434,13*T))pumpYardGround(g);
   if(near(325,583,25*T))paintBaseYard(g);
   drawAtlasRoutes(g,l,t,r,b);roadImprints(g,l,t,r,b);
+  if(marsh){paintThaw(g,l,t);paintMarshCover(g,l,t,r,b);}
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
   if(near(493,132,18*T))shoreGround(g);
   if(near(113,547,24*T))hamletGround(g);
