@@ -79,7 +79,7 @@ function mountPdaMap(w,cv,state,targets,pick,scaleLabel) {
     left=place(width,W,view.x);top=place(height,H,view.y);
     view.x=(W/2-left)/k;view.y=(H/2-top)/k;
     Object.assign(cv.style,{width:width+'px',height:height+'px',transform:'translate('+left+'px,'+top+'px)'});
-    scaleLabel.textContent='×'+Number(view.zoom.toFixed(1));
+    if(scaleLabel)scaleLabel.textContent='×'+Number(view.zoom.toFixed(1));
   }
   function paint(){
     paintFrame=0;if(!cv.isConnected || !w.clientWidth || !w.clientHeight)return;

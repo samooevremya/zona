@@ -11,6 +11,9 @@ with open('berezki/menu.webp' if WINTER else 'art/menu/signal-post.webp','rb') a
     menu_css=open('ui/main-menu.css',encoding='utf8').read().replace('__SIGNAL_POST__',base64.b64encode(cover.read()).decode())
 css += '\n'+menu_css
 if WINTER: css += '\n#title.start .start-name,#ov.pause-open .start-name{font-size:clamp(30px,5.7vw,82px);max-width:95vw;letter-spacing:.045em;line-height:1.08}'
+if WINTER:
+    with open('berezki/pager.webp','rb') as shell:
+        css += '\n'+open('ui/winter-pager.css',encoding='utf8').read().replace('__PAGER_SHELL__',base64.b64encode(shell.read()).decode())
 h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
