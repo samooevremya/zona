@@ -46,6 +46,10 @@ function checks(){
   for(let i=0;i<50;i++)moveE(P,2,0);
   assert(P.x<lookout.x+lookout.half,'Platform edge');
   walk(79,121);walk(79,125.8);assert(!S.flags.onLookout,'Descent');
+  const cache=objs.find(o=>o.stash==='room_winter-tower');
+  walk(81.7,125.8);walk(81.7,122.2);
+  assert(cache && Math.hypot(P.x-cache.x-cache.w/2,P.y-cache.y-cache.h/2)<42,'Tower supplies out of reach');
+  walk(81.7,125.8);walk(79,125.8);
   for(const sign of [-1,1]){
     const dummy={x:lookout.x+sign*55,y:124*T,r:P.r};
     for(let i=0;i<30;i++)moveE(dummy,-sign*2,0);

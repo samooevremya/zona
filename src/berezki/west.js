@@ -34,45 +34,78 @@ function walkLookout(e,oldY){
   e.x=clamp(e.x,t.x-half,t.x+half);
   e.y=Math.max(e.y,t.y-t.half+e.r+3);
 }
-function lookoutOffset(y,mapView=false){
-  const t=lookout,h=t.rise*clamp((t.y+t.half+t.run-y)/t.run,0,1);
-  return raisedOffset(t.x,t.y,h,mapView);
+// The same optical centre as liftContainer. A tall structure shows more
+// parallax than the box; keep the vertical elevation independent of that lean.
+function lookoutProjection(height,mapView){
+  const t=lookout,k=perspective && !mapView ? .00032*height : 0;
+  const [x,y]=roofPoint(t.x,t.y,k);
+  return [clamp(x-t.x,-height*.078,height*.078),clamp(y-t.y,-height*.055,height*.055)-height*.52];
 }
-// Project every joint from its world footing. Drawing the timber grain in
-// the beam's own coordinates keeps even the diagonals continuous as the camera pans.
+function lookoutOffset(y,mapView=false){
+  const t=lookout;
+  return lookoutProjection(t.rise*clamp((t.y+t.half+t.run-y)/t.run,0,1),mapView);
+}
+
+// Crop real weathered boards from the same timber artwork as the village.
+// Cut edges and frost are baked once per board, so moving the camera never
+// changes the grain, the nail heads or the patches of compacted snow.
+const lookoutBoards=new Map();
+function lookoutBoard(seed,exposed){
+  const variant=Math.abs(seed)%24,key=variant+(exposed?24:0);
+  if(lookoutBoards.has(key))return lookoutBoards.get(key);
+  const c=winterCanvas(192,25),b=c.getContext('2d'),rng=mulberry32(271+variant*199);
+  const s=ART.m.sprites.c1_roof_plank,[sx,sy,sw,sh]=s.rect;
+  const u=.31+.64*rng(),v=variant%3===0?.54:.016,strip=.021+rng()*.014;
+  const edge=new Path2D();edge.moveTo(0,1);
+  for(let x=0;x<=192;x+=6)edge.lineTo(x,.7+rng()*1.65);
+  for(let x=192;x>=0;x-=6)edge.lineTo(x,24.8-rng()*1.7);
+  edge.closePath();b.clip(edge);
+  b.save();b.translate(0,25);b.rotate(-Math.PI/2);
+  b.drawImage(ART.images[s.atlas],sx+u*sw,sy+v*sh,sw*strip,sh*.435,0,0,25,192);b.restore();
+  const shade=b.createLinearGradient(0,0,0,25);
+  shade.addColorStop(0,'#ece6d440');shade.addColorStop(.35,'#72655208');shade.addColorStop(.82,'#39352820');shade.addColorStop(1,'#352e2694');
+  b.fillStyle=shade;b.fillRect(0,0,192,25);
+  if(exposed){
+    b.globalAlpha=.6;b.drawImage(district.snowStamp,rng()*125-28,-8-rng()*5,86+rng()*67,20+rng()*10);
+    b.globalAlpha=.34;b.drawImage(district.snowStamp,139+rng()*20,1,63,11);b.globalAlpha=1;
+  }
+  const split=rng()*100,y=5+rng()*14;
+  beam(b,split,y,split+24,y+.5,1,'#423a2c70');
+  for(const x of [6+rng()*3,181+rng()*4]){
+    shoreEllipse(b,x,y+1.2,1.8,1.45,'#927966ae');
+    shoreEllipse(b,x,y,1.25,1.4,'#453f36da');
+  }
+  lookoutBoards.set(key,c);return c;
+}
 function paintLookout(g,mapView,front=false){
   const t=lookout,h=t.half,d=t.width/2,end=h+t.run;
-  const joint=(x,y,z)=>{
-    const [dx,dy]=raisedOffset(t.x,t.y,z,mapView);
-    return [x+dx,y+dy];
-  };
-  function timber(a,b,w,frost=false){
+  const [ux,uy]=lookoutProjection(1,mapView);
+  const joint=(x,y,z)=>[x+ux*z,y+uy*z];
+  function timber(a,b,w,exposed,seed){
     const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
-    g.save();g.translate(...a);g.rotate(Math.atan2(dy,dx));artFill(g,'floor_wood',0,-w/2,len,w);
-    g.fillStyle='#51412e45';g.fillRect(0,-w/2,len,w);
-    beam(g,0,w/2,len,w/2,1.5,'#383733');beam(g,0,-w/2,len,-w/2,frost?2:1,frost?'#cfd1c9':'#a09a88');
-    g.restore();
+    g.save();g.translate(...a);g.rotate(Math.atan2(dy,dx));
+    g.drawImage(lookoutBoard(seed,exposed),0,-w/2,len,w);g.restore();
   }
-  const rail=(x1,y1,x2,y2,z1,z2,w,ice=false)=>timber(joint(x1,y1,z1),joint(x2,y2,z2),w,ice);
+  const rail=(x1,y1,x2,y2,z1,z2,w,ice=false)=>{
+    const seed=Math.round(x1*7+y1*13+x2*19+y2*17+z1*5+z2*3);
+    timber(joint(x1,y1,z1),joint(x2,y2,z2),w,ice,seed);
+  };
   const height=t.rise;
   g.save();g.translate(t.x,t.y);
   if(!front){
     for(const yy of [-h,h])for(const xx of [-h,h]){
-      shoreEllipse(g,xx+2,yy+2,9,4,'#5c615d77');
-      rail(xx,yy,xx*.9,yy*.9,0,height,8);
+      rail(xx,yy,xx*.96,yy*.96,0,height,8.6);
       snowDrift(g,xx-1,yy+2,7,2,-.14,Math.round(xx+yy+151));
     }
     for(const xx of [-h,h]){
-      rail(xx,h,xx*.9,-h*.9,5,height-6,4);
-      rail(xx,-h,xx*.9,h*.9,5,height-6,4);
+      rail(xx,h,xx*.96,-h*.96,5,height-6,4);
+      rail(xx,-h,xx*.96,h*.96,5,height-6,4);
     }
-    rail(-h,h,h*.9,h*.9,4,height-6,4);rail(h,h,-h*.9,h*.9,4,height-6,4);
+    rail(-h,h,h*.96,h*.96,4,height-6,4);rail(h,h,-h*.96,h*.96,4,height-6,4);
     const [left,top]=joint(-h,-h,height);
-    artFill(g,'floor_wood',left,top,2*h,2*h);
-    for(let i=0;i<2*h;i+=10){
-      beam(g,left,top+i,left+2*h,top+i,1.3,'#48443b');
-      beam(g,left+3,top+i+1,left+2*h-1,top+i+1,.7,'#cecfc2');
-      for(const k of [4,2*h-4]){g.fillStyle='#504d44';g.fillRect(left+k,top+i+4,1.3,1.3);}
+    g.fillStyle='#49453b';g.fillRect(left,top,2*h,2*h);
+    for(let i=0;i<8;i++){
+      g.drawImage(lookoutBoard(17+i,true),left,top+i*10-.35,2*h,10.6);
     }
     // A half-height windbreak shelters the back of this open observation stand.
     for(let j=0;j<4;j++)rail(-h,-h,h,-h,height+3+j*5,height+3+j*5,4.8,j===3);
@@ -83,13 +116,14 @@ function paintLookout(g,mapView,front=false){
     rail(-h,-h,h,-h,height+23,height+23,4,true);
     for(const x of [-h,0,h])rail(x,-h,x,-h,height,height+24,4);
     for(const x of [-h,h])rail(x,-h,x,h,height+23,height+23,4,true);
-    for(let i=1;i<=12;i++){
+    for(let i=12;i>=1;i--){
       const f=i/12,yy=end-f*t.run;
       const rear=joint(-d,yy,height*f),nose=joint(-d,yy+t.run/12,height*f);
       const stepDepth=nose[1]-rear[1];
-      artFill(g,'floor_wood',rear[0],rear[1],2*d,stepDepth);
-      beam(g,nose[0],nose[1],nose[0]+2*d,nose[1],2,'#5d5141');
-      beam(g,nose[0]+1,nose[1]-1,nose[0]+2*d-1,nose[1]-1,1.1,'#c3c5bc');
+      const lower=joint(-d,yy+t.run/12,height*(i-1)/12);
+      g.drawImage(lookoutBoard(i+9,false),nose[0],nose[1]-.4,2*d,lower[1]-nose[1]+.9);
+      g.fillStyle='#38352e72';g.fillRect(nose[0],nose[1],2*d,lower[1]-nose[1]);
+      g.drawImage(lookoutBoard(i,true),rear[0]-.4,rear[1]-.4,2*d+.8,stepDepth+1);
     }
     for(const x of [-d,d])rail(x,end,x,h,0,height,4);
   }else{
@@ -107,10 +141,23 @@ function westGround(g){
   const t=lookout;
   const landing=t.y+t.half+t.run;
   for(const side of [-1,1])snowDrift(g,t.x+side*(t.width/2+3),landing+1,10,3,-.12,83+side);
-  if(SHADOWS){
-    const x=t.x+30,y=t.y+16;
-    g.fillStyle='#48566533';g.fillRect(x-t.half,y-t.half,t.half*2,t.half*2);
-    for(const u of [-t.half,t.half])for(const v of [-t.half,t.half])
-      beam(g,t.x+u,t.y+v,x+u,y+v,5,'#4a576338');
+  for(const x of [-t.half,t.half])for(const y of [-t.half,t.half]){
+    const ox=t.x+x,oy=t.y+y;
+    g.save();g.translate(ox+2,oy+1);g.scale(1,.46);
+    const contact=g.createRadialGradient(0,0,1,0,0,11);
+    contact.addColorStop(0,'#3d433e8c');contact.addColorStop(.53,'#55605d42');contact.addColorStop(1,'#66716b00');
+    g.fillStyle=contact;g.fillRect(-11,-11,22,22);g.restore();
+    snowDrift(g,ox-3,oy+2,12,4,-.22,Math.round(192+x+y));
   }
+  if(!SHADOWS)return;
+  // Bake a soft deck shadow, with slit light and slender diagonal stringers,
+  // in ground space. Snow texture stays visible through it.
+  const c=winterCanvas(200,229),b=c.getContext('2d');
+  b.translate(68,68);b.filter='blur(3px)';
+  b.fillStyle='#4453633d';
+  for(let v=-t.half;v<t.half;v+=10)b.fillRect(26-t.half,16+v,t.half*2,8.7);
+  for(const x of [-t.half,t.half])for(const y of [-t.half,t.half])
+    beam(b,x,y,x+26,y+16,4,'#49566850');
+  for(const side of [-1,1])beam(b,side*t.width/2,t.half+t.run,side*t.width/2+26,t.half+16,3,'#4856654a');
+  g.drawImage(c,t.x-68,t.y-68);
 }

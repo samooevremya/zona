@@ -12,12 +12,13 @@ function makeWinterSalvage(){
   for(const [x,y,key,loot] of [
     [524,384,'landing',{candle:1,bandage:1}],[484,130,'nets',{wire:2}],
     [337,233,'platform',{buckle:1}],[153,183,'depot',{wire:1,bread:1}],
-    [82,121,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
+    [80.75,120.75,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
     [253,433,'path',{candle:1}],[114,546,'hut',{bandage:1,candle:1}],
     [339,592,'workshop',{wire:1,buckle:1}],[435,164,'forest',{candle:1,bread:1}],
     [326,492,'road',{buckle:1}],[142,352,'marsh',{wire:1}]]){
-    if(tAt(x,y)===TR)setT(x,y,GR);
-    supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
+    if(tAt(Math.floor(x),Math.floor(y))===TR)setT(Math.floor(x),Math.floor(y),GR);
+    const box=supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
+    if(key==='tower')box.sprite='c1_crate';
   }
   interiorObject('fishingHole',iceHole.x,iceHole.y,22,16);
 }
