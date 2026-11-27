@@ -27,12 +27,25 @@ function basinRadius(x,y,[cx,cy,rx,ry]){
   const u=(x-cx)/rx,v=(y-cy)/ry,a=Math.atan2(v,u);
   return Math.hypot(u,v)/(1+.034*Math.sin(5*a)+.023*Math.cos(8*a));
 }
+const neighbouringTrunks=[[1,0],[0,1],[1,1],[-1,1],[2,0],[0,2]];
+function wildTreeAt(x,y){
+  const edge=Math.min(Math.abs(x),Math.abs(y),Math.abs(x-district.width),Math.abs(y-district.height));
+  const density=edge<10?.095+.09*(1-edge/10)*vnoise(x-27,y+14,7):.095;
+  return hash2(x,y)<density && !neighbouringTrunks.some(([u,v])=>hash2(x-u,y-v)<density) && vnoise(x,y,13)>.38;
+}
+// Exterior scenery samples absolute tile coordinates. The loaded navigation
+// grid alone determines how far an actor can travel in this district.
+function outdoorTreeAt(x,y){
+  if(x>=1 && x<district.width-1 && y>=1 && y<district.height-1)return tAt(x,y)===TR;
+  if(y>=219 && y<235 && x<district.width)return false;
+  return wildTreeAt(x,y) && basinRadius(x,y,lakeShape)>1.02;
+}
 function seedAtlasTerrain(){
   map.fill(VO);
   for(let y=1;y<district.height-1;y++)for(let x=1;x<district.width-1;x++){
     let cell=GR;
     if(basinRadius(x,y,marshShape)<1 || inMarshChannel(x+.5,y+.5))cell=SW;
-    else if(basinRadius(x,y,lakeShape)>1.02 && hash2(x,y)<.095 && ![[1,0],[0,1],[1,1],[-1,1],[2,0],[0,2]].some(([u,v])=>hash2(x-u,y-v)<.095) && vnoise(x,y,13)>.38)cell=TR;
+    else if(basinRadius(x,y,lakeShape)>1.02 && wildTreeAt(x,y))cell=TR;
     setT(x,y,cell);
   }
   // Clear every route shoulder and doorway before planting the woods.
@@ -50,6 +63,7 @@ function seedAtlasTerrain(){
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
   for(const r of [...villageCabins,...hamletRooms])clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
   clear(495,132,7,7);clear(149,178,17,11);clear(75,117,9,11);
+  clear(323,411,6,4);clear(338,206,3,3);clear(124,538,5,6);
   clear(302,566,47,35);clear(186,427,28,14);
 }
 const atlasProps=[];
@@ -177,7 +191,57 @@ function drawAtlasProp(g,p,mapView=false){
     g.restore();
   }
 }
+const pumpCulvert={x:329.05*T,y:414.55*T,half:2.24*T};
+const hamletWoodpile={x:126.15*T,y:540.8*T};
+function makeRouteLandmarks(){
+  for(const side of [-1,1])interiorObject('culvertRim',pumpCulvert.x+side*pumpCulvert.half,pumpCulvert.y+side*4,12,16);
+  for(const [x,y,label] of [[326.2,413.25,'НАСОСНАЯ'],[340.05,207.7,'СКЛАД']]){
+    const post=interiorObject('waypost',x*T,y*T,4,5);
+    post.boardLabel=label;post.west=true;
+  }
+  const pile=hamletWoodpile;
+  interiorObject('woodStack',pile.x,pile.y-5,60,19);
+  atlasProp('wood',pile.x,pile.y+3.5,67,42);
+}
+function paintRoadCulvert(g){
+  const {x,y,half}=pumpCulvert;
+  const spr=ART.m.sprites.c1_trace_pipes,[u,v]=spr.rect;
+  for(const side of [-1,1]){
+    const lip=x+side*half,bed=y+side*4;
+    g.save();g.translate(lip,bed);g.scale(side,1);
+    // Meltwater has cut a shallow ditch into each verge. The packed crown
+    // of the road passes over the pipe and stays clear for walking.
+    const rand=mulberry32(side+71);
+    const count=side<0?17:26,curve=side<0?-.19:.34;
+    for(let n=0;n<count;n++){
+      const along=n*2.65,cy=Math.sin(n*.22)*3+n*curve;
+      packedSnow(g,along,cy,16-n*.25,8-n*.11,.16);
+    }
+    for(let i=0;i<45;i++){
+      const u=rand()*count*2.4,v=rand()*9-4+Math.sin(u*.085)*3+u*curve/2.65;
+      shoreEllipse(g,u,v,1+rand()*3,.35+rand(),i%4?'#89999979':'#c2cdd09c',-.12);
+    }
+    for(const j of [-1,1])snowDrift(g,18,j*9,31,5,j*.12,36+j);
+    // Just the flared mouth of the original rusted pipe is exposed. Its
+    // cut edge points out into the ditch and its sleeve disappears in snow.
+    g.drawImage(ART.images[spr.atlas],u+74,v+75,31,24,-13,-8,18,15);
+    // Stones hold the shoulder above the mouth. Keep the throat and its
+    // shadow clear, with loose fill gathering along the lower rim.
+    for(const [ox,oy,w] of [[-7,-7,11],[-11,4,8],[-3,6.5,7],[8,7,4]]){
+      const sz=w*(.86+.2*rand());
+      ART.draw(g,'c1_rock2',ox,oy,sz,sz*.62);
+      snowDrift(g,ox-1,oy-1,Math.ceil(sz*.38),2,-.15,68+Math.round(w));
+    }
+    snowDrift(g,-11,-2,11,9,-.17,51);
+    for(let j=0;j<13;j++){
+      const ax=8+rand()*40,ay=8+rand()*5;
+      beam(g,ax,ay,ax+rand()*4,ay-2-rand()*6,.7,'#81755b9c');
+    }
+    g.restore();
+  }
+}
 function makeAtlasProps(){
+  makeRouteLandmarks();
   for(const [i,[x,y,angle]] of oldBoats.entries()){
     const width=[106,98,111][i];
     const boat=atlasProp(['boat','skiff','keel'][i],x*T,y*T,width,5,{angle});
@@ -292,9 +356,9 @@ function atlasTree(x,y){
   return {x:(x+.5)*T,y:(y+.5)*T,size,art};
 }
 function* treesInRect(l,t,r,b){
-  for(let y=Math.max(0,Math.floor(t/T));y<=Math.min(district.height-1,Math.floor(b/T));y++)
-    for(let x=Math.max(0,Math.floor(l/T));x<=Math.min(district.width-1,Math.floor(r/T));x++)
-      if(tAt(x,y)===TR)yield atlasTree(x,y);
+  for(let y=Math.floor(t/T);y<=Math.floor(b/T);y++)
+    for(let x=Math.floor(l/T);x<=Math.floor(r/T);x++)
+      if(outdoorTreeAt(x,y))yield atlasTree(x,y);
 }
 function visibleAtlasTrees(){
   const w=VW/(2*Z)+140,h=VH/(2*Z)+140;
@@ -417,6 +481,7 @@ function atlasTerrainChunk(cx,cy){
   }
   if(l<203*T && r>145*T && t<441*T && b>368*T)paintMarshChannel(g);
   if(l<203*T && r>73*T && t<441*T && b>300*T)paintMarshCover(g,l,t,r,b);
+  if(near(329.05,414.55,150))paintRoadCulvert(g);
   if(near(79,121,155))westGround(g);
   if(near(202,434,13*T))pumpYardGround(g);
   if(near(325,583,25*T))paintBaseYard(g);
@@ -456,8 +521,8 @@ function atlasTerrainChunk(cx,cy){
   return c;
 }
 function drawAtlasGround(g,x,y,w,h){
-  for(let j=Math.max(0,Math.floor(y/atlasChunk));j<Math.ceil(Math.min(district.height*T,y+h)/atlasChunk);j++)
-    for(let i=Math.max(0,Math.floor(x/atlasChunk));i<Math.ceil(Math.min(district.width*T,x+w)/atlasChunk);i++){
+  for(let j=Math.floor(y/atlasChunk);j<Math.ceil((y+h)/atlasChunk);j++)
+    for(let i=Math.floor(x/atlasChunk);i<Math.ceil((x+w)/atlasChunk);i++){
       const key=i+','+j;let c=atlasChunks.get(key);
       if(!c)c=atlasTerrainChunk(i,j);else atlasChunks.delete(key);
       atlasChunks.set(key,c);

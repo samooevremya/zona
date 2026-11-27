@@ -1,6 +1,7 @@
 // Short doorstep lanes branch off the loop. The two long approaches meet
 // in the middle, so a traveller can cross the settlement without entering a yard.
 const hamletCross=[113.52,547.36];
+const woodpileTrack=[[122.1,538.55],[122.9,540.25],[124.2,541.7],[125.3,541.65],[126.15,541.35]];
 const hamletLanes=[
   [hamletCross,[108,544],[103,542],[103,539]],
   [[108,544],[114.6,541],[115,537]],
@@ -9,7 +10,8 @@ const hamletLanes=[
   [[103,553],[111,552.2],hamletCross],
   [[111,552.2],[116.7,554.4],[118,558]],
   [[116.7,554.4],[124.3,548],[130,546.7],[130,550]],
-  [[124.3,548],[125.8,545.7]]
+  [[124.3,548],[125.8,545.7]],
+  woodpileTrack
 ];
 const hamletRooms=[
   {name:'Изба у леса',x:99,y:533,w:7,h:6,entry:3,roof:'plank',ridge:'vertical',
@@ -42,7 +44,8 @@ function makeHamlet(){
     if(!r.heater)r.abandoned=true;
   }
   for(const [x,y,w,h] of [[98,540.7,3,.16],[105.4,540.7,1.7,.16],[121,536,.16,3.6],
-    [96.8,553.5,3.6,.16],[106,553.5,2.2,.16],[124.2,554,.16,4],[124.2,558,2.4,.16]]){
+    [96.8,553.5,3.6,.16],[106,553.5,2.2,.16],[124.2,554,.16,4],[124.2,558,2.4,.16],
+    [124.9,539.6,3,.16],[127.9,539.6,.16,2.4]]){
     hamletFences.push(addObj({k:'fence',material:'picket',solid:1,x:x*T,y:y*T,w:w*T,h:h*T}));
   }
   putFurniture('bench',117.5*T,538*T,0,'hamlet-yard');
