@@ -11,31 +11,39 @@ function fencePanel(wood,width,variant){
   g.scale(3,3);
   const rand=mulberry32(171+variant);
   if(wood){
-    for(const y of [9,21]){
-      g.fillStyle='#534c41';g.fillRect(0,y,width,3);
-      g.fillStyle='#a0947c';g.fillRect(0,y,width,.8);
+    for(const y of [10,22]){
+      g.save();g.translate(0,y);g.rotate((rand()-.5)*.026);
+      g.drawImage(lookoutBoard(9+variant,false),0,-1.5,width,3.4);g.restore();
     }
-    const count=Math.round(width/5.6);
+    const count=Math.round(width/5.8);
     for(let i=0;i<count;i++){
-      const x=i*width/count+.6,top=2+rand()*3,w=width/count-1.45;
-      artFill(g,'floor_wood',x,top,w,height-top-1);
-      g.fillStyle=['#645a4866','#76695084','#655e5277'][i%3];g.fillRect(x,top,w,height-top-1);
-      beam(g,x+w-.5,top,x+w-.5,height-1,.85,'#443f37');
-      beam(g,x,top,x+w-.8,top+.5,1.3,'#d0cfc2');
-      for(const y of [10,22]){g.fillStyle='#554e43';g.fillRect(x+w/2,y,.8,1);}
+      const x=i*width/count+rand()*.9,w=width/count*(.56+.32*rand());
+      const top=1+rand()*5.2,bottom=height-rand()*2,lean=(rand()-.5)*.09;
+      g.save();g.translate(x,top);g.rotate(lean);
+      g.beginPath();g.moveTo(0,1.5);g.lineTo(w*.32,0);g.lineTo(w*.84,rand()*1.4);
+      g.lineTo(w,2);g.lineTo(w,bottom-top);g.lineTo(.4,bottom-top-.7);g.closePath();g.clip();
+      g.rotate(Math.PI/2);
+      const grain=lookoutBoard(variant*7+i,i%4===1);
+      g.drawImage(grain,16+i,1,149,23,0,-w,bottom-top,w);
+      g.restore();
     }
   }else{
-    g.save();g.beginPath();g.rect(0,3,width,height-5);g.clip();
-    for(let x=-height;x<width+height;x+=7){
-      beam(g,x,2,x+height*.48,height,.78,'#636963');
-      beam(g,x,2,x-height*.48,height,.72,'#777a70');
+    // Slack mesh is darker at the knots and sags between its tied ends.
+    g.save();g.beginPath();g.rect(0,2,width,height-4);g.clip();
+    for(let col=-height;col<width+height;col+=6.5){
+      for(const side of [-1,1]){
+        g.strokeStyle=rand()<.36?'#625b4ac4':'#6b736ede';g.lineWidth=.65+rand()*.25;g.beginPath();
+        for(let row=0;row<=8;row++){
+          const y=row*height/8,x=col+side*y*.52;
+          g.lineTo(x,y+1.8*Math.sin(clamp(x/width,0,1)*Math.PI)+.35*Math.sin(col+row));
+        }
+        g.stroke();
+      }
     }
     g.restore();
-    for(const y of [2,height-3])beam(g,0,y,width,y,1.3,'#56574f');
   }
-  g.fillStyle=wood?'#5f5341':'#565a55';g.fillRect(0,0,wood?3.8:2.5,height);
-  g.fillStyle='#a8a292';g.fillRect(.4,0,1,height);
-  g.fillStyle='#d5d7d0';g.fillRect(0,0,wood?4:3,1.6);
+  g.save();g.translate(1,0);g.rotate(Math.PI/2);
+  g.drawImage(lookoutBoard(17+variant,false),0,wood?-2.8:-1.5,height,wood?4.4:2.8);g.restore();
   fencePanels.set(key,c);return c;
 }
 function buildRaisedScenery(){
@@ -50,7 +58,7 @@ function buildRaisedScenery(){
   }
   for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost' || o.k==='waterMain'){
     const x=o.x+o.w/2,y=o.y+o.h/2;
-    raisedScenery.push({item:o,x,y,depth:y+o.h*.24,radius:Math.max(o.w,o.h)/2+24,height:o.k==='waterMain'?8:fittingHeight[o.fitting]||28});
+    raisedScenery.push({item:o,x,y,depth:y+o.h*.24,radius:Math.max(o.w,o.h)/2+24,height:o.k==='waterMain'?18:fittingHeight[o.fitting]||28});
   }
   raisedScenery.sort((a,b)=>a.depth-b.depth);
 }
@@ -76,10 +84,13 @@ function paintRaisedScenery(g,p,mapView){
     g.transform(vx,vy,-sx/h,-dy/h,sx,dy);
     g.drawImage(p.panel,0,0,p.span+.15,h);g.restore();
     const x=p.x-vx*d,y=p.y-vy*d;
-    beam(g,x,y,x+sx,y+dy,p.wood?3.8:2.5,'#605c50');
-    // Keep the thickness of an edge-on panel visible across its entire span.
-    beam(g,x+sx,y+dy,x+vx*p.span+sx,y+vy*p.span+dy,p.wood?2.2:1.4,p.wood?'#91897a':'#7e837b');
-    beam(g,x+sx-1.4,y+dy,x+sx+1.5,y+dy,1.8,'#dadad0');
+    // The actual top-down timber and wire cutouts retain the fence thickness
+    // when the raised face is edge-on to the camera.
+    g.save();g.translate(x+sx,y+dy+1);if(p.vertical)g.rotate(Math.PI/2);
+    const id=p.wood?'c1_fence_picket':'c1_fence_mesh';
+    const art=ART.m.sprites[id],[ax,ay,aw,ah]=art.rect;
+    g.drawImage(ART.images[art.atlas],ax,ay,aw,ah,0,-1.6,p.span+.15,p.wood?4.1:3.2);
+    g.restore();
     return;
   }
   if(p.item.k==='waypost'){stationSign(g,p.x,p.y,p.item.boardLabel,false,p.item.west,mapView);return;}
@@ -90,7 +101,14 @@ function paintRaisedScenery(g,p,mapView){
     for(const point of [a,b]){
       const [u,v]=raisedOffset(...point,p.height,mapView);point[0]+=u;point[1]+=v;
     }
-    supplyPipe(g,...a,...b,false);return;
+    if(o.piers)for(const x of o.piers)pipePier(g,x,p.y,mapView);
+    supplyPipe(g,...a,...b,false);
+    if(o.piers)for(const x of o.piers){
+      const [ox,oy]=raisedOffset(x,p.y,p.height,mapView);
+      beam(g,x+ox,p.y+oy-3.5,x+ox,p.y+oy+4.1,2.6,'#4b4238');
+      beam(g,x+ox-.6,p.y+oy-3,x+ox-.6,p.y+oy+2.8,.7,'#aa9a81');
+    }
+    return;
   }
   // Cast shadows and feet stay on the footprint. Broad faces carry wood grain
   // from the same interior material as the original raster top.
