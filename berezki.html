@@ -953,7 +953,7 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
     </div>
   </div>
   <div class="topbtns zh-top">
-    <button type="button" class="rust" id="t-pda">КПК</button>
+    <button type="button" class="rust" id="t-pda">Пейджер</button>
     <button type="button" class="rust" id="t-inv">Рюкзак</button>
     <button type="button" class="rust" id="t-menu">Меню</button>
   </div>
@@ -961,7 +961,7 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
   <button type="button" id="det" aria-label="Фонарь" aria-pressed="true" title="Фонарь (L)"><svg aria-hidden="true" viewBox="0 0 28 28"><g transform="rotate(42 14 14)"><path fill="currentColor" d="M9 5h10v5l-2.5 3.5V23a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-9.5L9 10z"/><path d="M9.5 8h9M13.5 16v5" fill="none" stroke="#39382e" stroke-width="1.4"/><path class="beam" d="M10 2 9 0m5 2V0m4 2 1-2" stroke="currentColor" stroke-linecap="round" stroke-width="1.6"/></g></svg></button>
   <div id="field-feedback" role="status"></div>
   <button type="button" class="prompt zh-p rust" id="prompt"></button>
-  <div class="keys">E действие · Shift бег · C присесть · V прыжок · L фонарик · R перезарядка · F болт · G граната · Q аптечка · B бинт · I рюкзак · M КПК</div>
+  <div class="keys">E действие · Shift бег · C присесть · V прыжок · L фонарик · R перезарядка · F болт · G граната · Q аптечка · B бинт · I рюкзак · M Пейджер</div>
 </div>
 <div class="touch zt">
   <div class="joy" id="joy" aria-hidden="true"><i class="ar u"></i><i class="ar d"></i><i class="ar l"></i><i class="ar r"></i><b id="joyk"></b></div>
@@ -980,7 +980,7 @@ addEventListener('unhandledrejection',function(e){var r=e.reason;show('Ошиб�
 <div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="ptitle">
   <div class="menu-card" id="pause-card"></div>
   <div class="pda">
-    <div class="pda-h"><h2><span class="led"></span><span id="ptitle">КПК</span></h2><button type="button" class="x" id="pclose">Закрыть</button></div>
+    <div class="pda-h"><h2><span class="led"></span><span id="ptitle">Пейджер</span></h2><button type="button" class="x" id="pclose">Закрыть</button></div>
     <div class="screen"><div class="tabs" id="ptabs" role="tablist"></div><div class="body" id="pbody"></div></div>
   </div>
 </div>
@@ -15048,6 +15048,11 @@ const SND = {
   shell: v => { const f = 4200 + Math.random() * 1500; tn(f, f * 0.98, 0.05, 0.05 * v, 'sine', 0.35); tn(f * 1.3, f * 1.28, 0.04, 0.03 * v, 'sine', 0.47); },
   knife: v => nz(0.09, 3000, 2, 0.35 * v, 'bandpass'),
   click: () => { nz(0.02, 3500, 4, 0.25, 'bandpass'); tn(900, 700, 0.025, 0.08, 'square'); },
+  pagerKey: v => {
+    nz(.016, 1900, .9, .19*v, 'bandpass');
+    tn(370, 160, .032, .085*v, 'triangle');
+    nz(.013, 1050, .8, .06*v, 'lowpass', .025);
+  },
   jam: () => { nz(0.04, 2200, 5, 0.35, 'bandpass'); nz(0.05, 1200, 5, 0.25, 'bandpass', 0.08); },
   beep: v => tn(1900, 1900, 0.05, 0.08 * v, 'square'),
   eat: () => { nz(0.08, 900, 2, 0.15, 'bandpass'); nz(0.08, 700, 2, 0.12, 'bandpass', 0.18); },
@@ -15189,7 +15194,8 @@ function openPanel(kind, title, tabs) {
   panel?.unmountMap?.();
   panel = { kind: kind, tab: tabs ? tabs[0][0] : null, tabs: tabs, sel: null, hint: '' };
   pbody.replaceChildren(); pbody.scrollTop=0;
-  ptitle.textContent = title;
+  ptitle.textContent = BEREZKI && kind === 'pda' ? 'Пейджер' : title;
+  if (BEREZKI && kind === 'pda') play('pagerKey');
   ov.classList.toggle('pause-open', kind==='menu');
   ov.setAttribute('aria-labelledby', kind==='menu'?'pause-heading':'ptitle');
   ov.classList.add('open');
@@ -15206,6 +15212,9 @@ function drawTabs() {
   });
 }
 function closePanel() { if (!panel) return; panel.unmountMap?.(); const k = panel.kind; panel = null; ov.classList.remove('open','pause-open'); if (k === 'trader' || k === 'trade') save(true); }
+ov.addEventListener('click', e => {
+  if (BEREZKI && panel?.kind === 'pda' && e.target.closest('button:not(:disabled)')) play('pagerKey');
+}, true);
 $('pclose').addEventListener('click', closePanel);
 ov.addEventListener('click', e => { if (e.target === ov && panel?.kind!=='menu') closePanel(); });
 function refresh() {
@@ -15464,7 +15473,7 @@ function drawMenu() {
     nav.appendChild(el('p','pause-note',IN.touch
       ? 'Левый джойстик — ходьба. Слегка отклони правый стик для прицеливания. Для огня доведи стик до края или коснись врага в режиме стрельбы касанием. Для бега удерживай кнопку бега, для смены оружия коснись его панели.'
       : 'WASD — движение, Shift — бег, C — присесть, V — прыжок. Мышь — прицел и огонь, R — перезарядка, E — взаимодействие.'));
-    if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — КПК, Esc — пауза.'));
+    if (!IN.touch) nav.appendChild(el('p','pause-note','F — болт, G — граната, Q — аптечка, I — рюкзак, M — '+(BEREZKI?'Пейджер':'КПК')+', Esc — пауза.'));
     nav.appendChild(el('p','pause-note',(BEREZKI?'Автосохранение у костра.':'Игра сохраняется автоматически у костра и у Сидоровича.')+' Вручную можно сохраниться, когда рядом нет врагов.'));
     nav.appendChild(btn('start-primary','Назад',()=>{delete panel.pausePage;drawMenu();card.querySelector('.pause-help').focus();}));
     return;
@@ -15919,7 +15928,7 @@ function hud(dt) {
     H.msgs.replaceChildren();
     if (message) {
       const line = el('p', message.k);
-      line.append(el('span', 'sender', 'КПК'));
+      line.append(el('span', 'sender', BEREZKI?'Пейджер':'КПК'));
       line.append(document.createTextNode(message.t));
       H.msgs.append(line);
     }
@@ -19392,13 +19401,22 @@ function bakeSurvey(){
   return c;
 }
 function atlasMapLabels(g,s,u){
-  const detail=s>3*u;
-  g.textAlign='center';g.font='bold '+Math.max(10*u,Math.min(13*u,s*10))+'px Arial';
-  const labels=detail?[...atlasSites,['Лодки',483,115],['Прорубь',491.4,121.4],['Мост',335,220],
+  const labels=s>3*u?[...atlasSites,['Лодки',483,115],['Прорубь',491.4,121.4],['Мост',335,220],
     ['Жилой корпус',517,353],['Детская площадка',523,368],['Заброшенный корпус',517,381]]:atlasSites;
+  g.font='600 '+13*u+'px Arial';
+  g.textAlign='center';g.textBaseline='middle';
+  const occupied=[],h=20*u;
   for(const [name,x,y] of labels){
-    const margin=g.measureText(name).width/2+2*u,cx=clamp(x*s,margin,district.width*s-margin);
-    g.lineWidth=2.8*u;g.strokeStyle='#384247';g.strokeText(name,cx,y*s);g.fillStyle='#f2e8ce';g.fillText(name,cx,y*s);
+    const w=g.measureText(name).width+12*u;
+    const left=clamp(x*s-w/2,0,Math.max(0,district.width*s-w));
+    for(const offset of [0,h+3*u,-h-3*u]){
+      const top=y*s-h/2+offset;
+      if(top<0 || top+h>district.height*s || occupied.some(r=>
+        left<r.right+2*u && left+w>r.left-2*u && top<r.bottom+2*u && top+h>r.top-2*u))continue;
+      g.fillStyle='rgba(29,37,36,.94)';g.beginPath();g.roundRect(left,top,w,h,3*u);g.fill();
+      g.fillStyle='#fff4da';g.fillText(name,left+w/2,top+h/2+.4*u);
+      occupied.push({left,top,right:left+w,bottom:top+h});break;
+    }
   }
 }
 
