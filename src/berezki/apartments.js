@@ -3,8 +3,8 @@ function makeApartments() {
   for(const abandoned of [false,true]){
     const last=abandoned?5:3;
     for(let n=1;n<=last;n++){
-      const x=n===1?506:n%2===0?770:810;
-      const y=n===1?(abandoned?375:349):abandoned?(n<=3?100:140):12;
+      const x=n===1?407:n%2===0?770:810;
+      const y=n===1?(abandoned?302:276):abandoned?(n<=3?100:140):12;
       const r={x,y,w:22,h:11,n,abandoned,block:abandoned?'empty':'living',name:(abandoned?'Заброшенный корпус':'Жилой корпус')+' · этаж '+n};
       house(x,y,r.w,r.h,n===1?[[11,10],[12,10]]:[],CO,0,n===1?'conc':'none');
       if(n===1){const h=HOUSES.at(-1);h.storeys=5;h.flat=r;buildEntrances(h);}
@@ -16,15 +16,15 @@ function makeApartments() {
       if(n===1 && !abandoned){
         wall(9,1,.22,4.5);wall(9,7.8,.22,2.2);stove(5,6);
         fit('supper',3,3.5);fit('bench',3,2.4);fit('supper',6.9,8);fit('bench',7,9);
-        fit('desk',14.8,8.6);fit('cabinet',15.5,2);fit('rack',2.1,7.35);
+        fit('desk',14.8,8.6);fit('cabinet',15.5,2);fit('rack',1.48,7.35,Math.PI/2);
       }else{
         r.drifts=[];
         for(const [bay,u] of [1,6,11].entries()){
-          if(bay){wall(u,1,.22,3.55);wall(u,6.6,.22,3.4);}
+          if(bay){wall(u,1,.22,3.55);wall(abandoned && n===1 && bay===2?u-.22:u,6.6,.22,3.4);}
           for(const [side,v] of [[0,4.45],[1,6.55]]){
             if(abandoned && n===1 && bay===2 && side===1){
               // Former vestibule connects the street doorway straight to the corridor.
-              wall(13.5,6.55,.24,3.45);fit('pallet',15.15,8.9);continue;
+              wall(13,6.55,.24,3.45);fit('pallet',15.15,8.9);continue;
             }
             wall(u,v,2.75,.24);wall(u+4.35,v,.65,.24);
             const z=side?8.65:2.3;
@@ -41,11 +41,17 @@ function makeApartments() {
       wall(16.1,1,.24,3.6);wall(16.1,6.65,.24,3.35);
       // Parallel half-flights reach the shared north landing. The player walks on the treads.
       r.stairX=18.55;r.stairY=1.04;
-      for(const offset of [-1.52,0,1.52])wall(r.stairX+offset,r.stairY,.10,2.85);
+      r.flights=[];
+      const edges=new Set();
       for(const up of [false,true]){
-        if(up?n===last:n===1)continue;
-        district.stairs.push({room:r,up,...tilePoint(x+r.stairX+(up?.8:-.72),y+r.stairY+.35)});
+        const blocked=up && !abandoned && n===last;
+        if(up?n===last && !blocked:n===1)continue;
+        const flight={room:r,up,blocked,...tilePoint(x+r.stairX+(up?.81:-.71),y+r.stairY+.35)};
+        r.flights.push(flight);
+        if(!blocked)district.stairs.push(flight);
+        edges.add(up?1.52:-1.52);edges.add(0);
       }
+      for(const offset of edges)wall(r.stairX+offset,r.stairY,.10,2.86);
       if(n===3 && !abandoned){
         fit('cupboard',r.stairX+.82,r.stairY+1.70,Math.PI/2);
         fit('cabinet',r.stairX+.78,r.stairY+.87);fit('pallet',r.stairX+.74,r.stairY+.20);
@@ -53,36 +59,34 @@ function makeApartments() {
     }
   }
 }
-function flatStairHeight(r,y){
-  return 37*clamp(1-(y-(r.y+r.stairY)*T)/(2.86*T),0,1);
+function stairRise(f,y){
+  const start=(f.room.y+f.room.stairY)*T;
+  return (f.up?45:-45)*clamp(1-(y-start)/(2.86*T),0,1);
 }
 function stairwellFloor(g,r,mapView=false){
-  const x=(r.x+r.stairX-1.52)*T,y=(r.y+r.stairY)*T,w=3.14*T,len=2.86*T;
-  const shift=(v,z)=>raisedOffset(x+w/2,y+len/2,flatStairHeight(r,y+v)+z,mapView);
-  if(!r.stairTreads){
-    const c=winterCanvas(Math.ceil(w),Math.ceil(len)),b=c.getContext('2d');
-    for(const side of [0,1]){
-      const u=side*w/2+3,sw=w/2-6;
-      b.fillStyle='#3d4242';b.fillRect(u,0,sw,len);
-      for(let i=0;i<11;i++){
-        const v=i*len/11,tint=(side?116:79)+(side?-1:1)*i*3;
-        artFill(b,'floor_concrete',u,v,sw,len/11);
-        b.fillStyle='rgba('+tint+','+tint+','+(tint-5)+',.29)';b.fillRect(u,v,sw,len/11);
-        beam(b,u,v+1,u+sw,v+1,2.2,'#bab7a8');beam(b,u,v+3,u+sw,v+3,2.8,'#514f48');
+  const y=(r.y+r.stairY)*T,len=2.86*T,w=1.42*T;
+  for(const f of r.flights){
+    const x=f.x-w/2;
+    function offset(v,extra=0){return raisedOffset(f.x,y+len/2,stairRise(f,y+v)+extra,mapView);}
+    const [dx,dy]=offset(0);
+    g.save();g.translate(x+dx,y+dy);g.transform(1,0,-dx/len,1-dy/len,0,0);
+    artFill(g,'floor_concrete',0,0,w,len);
+    for(let i=0;i<12;i++){
+      const v=i*len/12,depth=1-i/12;
+      g.fillStyle=f.up?'rgba(181,177,158,.15)':'rgba(28,32,34,'+(.14+.66*depth)+')';
+      g.fillRect(0,v,w,len/12+.25);
+      beam(g,0,v+1,w,v+1,1.8,f.up?'#bcb8a6':'#807e72');
+      beam(g,0,v+3,w,v+3,2.4,f.up?'#615e54':'#45453f');
+    }
+    g.restore();
+    for(const u of [x,x+w]){
+      for(let i=0;i<=4;i++){
+        const v=len*i/4,[ax,ay]=offset(v),[bx,by]=offset(v,15);
+        beam(g,u+ax,y+v+ay,u+bx,y+v+by,2,'#5c574a');
       }
+      const [ax,ay]=offset(0,15),[bx,by]=offset(len,15);
+      beam(g,u+ax,y+ay,u+bx,y+len+by,3,'#84735a');
     }
-    r.stairTreads=c;
-  }
-  const [dx,dy]=shift(0,0);
-  g.save();g.translate(x+dx,y+dy);g.transform(1,0,-dx/len,1-dy/len,0,0);
-  g.drawImage(r.stairTreads,0,0,w,len);g.restore();
-  for(const u of [x+1,x+w/2,x+w-1]){
-    for(let v=0;v<=len;v+=19){
-      const [ax,ay]=shift(v,0),[bx,by]=shift(v,14);
-      beam(g,u+ax,y+v+ay,u+bx,y+v+by,2,'#585949');
-    }
-    const [ax,ay]=shift(0,14),[bx,by]=shift(len,14);
-    beam(g,u+ax,y+ay,u+bx,y+len+by,3,'#796854');
   }
 }
 function abandonedFloor(g,r){
@@ -119,4 +123,34 @@ function abandonedFloor(g,r){
     beam(g,u,v,u+5+rand()*17,v+rand()*8,1+rand()*2,i%3?'#948777':'#b6bbaf');
   }
   g.restore();
+}
+
+// Align the backs of tall storage units to a solid wall. Leave the original
+// stash identity intact and keep doorways, the stair blockade and other fittings clear.
+function alignWinterStorage(){
+  for(const o of objs){
+    if(!['rack','cupboard','cabinet','bedroll','desk'].includes(o.fitting) || o.workbench)continue;
+    const cx=o.x+o.w/2,cy=o.y+o.h/2,r=winterFloor(cx,cy);
+    if(!r || r.block && cx>(r.x+16)*T)continue;
+    const wide=Math.max(o.w,o.h),thin=Math.min(o.w,o.h),options=[];
+    const left=(r.x+1)*T,right=(r.x+r.w-1)*T,top=(r.y+1)*T,bottom=(r.y+r.h-1)*T;
+    for(const [axis,boundary,sign] of [['x',left,1],['x',right,-1],['y',top,1],['y',bottom,-1]]){
+      const vertical=axis==='x',w=vertical?thin:wide,h=vertical?wide:thin;
+      const x=vertical?boundary+(sign>0?1:-1-w):clamp(cx-w/2,left+1,right-1-w);
+      const y=vertical?clamp(cy-h/2,top+1,bottom-1-h):boundary+(sign>0?1:-1-h);
+      const distance=Math.hypot(x+w/2-cx,y+h/2-cy);
+      if(distance>2.35*T)continue;
+      const rect={x,y,w,h};
+      // Check both back corners against the actual wall tiles (entrances have gaps).
+      const backed=[.02,.98].every(t=>{
+        const bx=vertical?boundary-sign*2:x+w*t,by=vertical?y+h*t:boundary-sign*2;
+        return [CO,BR].includes(tAt(Math.floor(bx/T),Math.floor(by/T)));
+      });
+      if(!backed || objs.some(other=>other!==o && other.solid && x<other.x+other.w+1 && x+w>other.x-1 && y<other.y+other.h+1 && y+h>other.y-1))continue;
+      const [,aw,ah]=roomFittings[o.fitting];
+      options.push({...rect,distance,angle:(aw>ah)===vertical?Math.PI/2:0});
+    }
+    options.sort((a,b)=>a.distance-b.distance);
+    if(options.length){const {x,y,w,h,angle}=options[0];Object.assign(o,{x,y,w,h,angle});}
+  }
 }

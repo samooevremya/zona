@@ -1,26 +1,26 @@
 // Coordinates are in walking tiles. Display, collision and tracks use the same survey.
 const atlasSites=[
-  ['Замёрзшее озеро',362.56,80.96],['Охотничья вышка',80.08,124.08],['Склад',158.4,189.2],
-  ['Рыбацкий посёлок',499,133],['Сотый километр',325,234],['Замёрзшее болото',134.64,342.32],
-  ['Берёзки',518,378],['Старая водокачка',206.8,442.64],['Хутор',113.52,547.36],
-  ['Разрушенная военная база',325,568]
+  ['Замёрзшее озеро',294.34,62.5],['Охотничья вышка',62.08,98.08],['Склад',132.4,152.2],
+  ['Рыбацкий посёлок',400,107],['Сотый километр',260,189],['Замёрзшее болото',116.64,269.32],
+  ['Берёзки',419,305],['Старая водокачка',170.8,355.64],['Хутор',95.52,435.36],
+  ['Разрушенная военная база',260,456]
 ];
-const baseRoad=[[325,568],[322.96,493.68],[329.12,415.36],[322.08,338.8],[326.48,282.48],[325,238],[325,234.1]];
+const baseRoad=[[260,456],[257.96,392.62],[264.12,332.03],[257.08,265.8],[261.48,225.22],[260,193],[260,189.1]];
 const atlasRoutes=[
   baseRoad,
-  [[322.08,338.8],[368.72,344.08],[427.68,360.8],[483.12,365.2],[503,364],[518,362],[518,360]],
-  [[503,364],[509,367],[517,369],[522,370]],
-  [[335,219.5],[341.44,209.44],[372.24,192.72],[404.8,185.68],[432.96,161.92],[466.4,145.2],[481,136],[491,132.8]],
-  [[341.44,209.44],[279.84,201.52],[218.24,196.24],[158.4,189.2],[152,189.35],[149.3,188.75],[146.5,186.6],[118.8,166.32],[83,127.7],[79,125.8],[79,124.8]],
-  [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
-  [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
-  [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
-  ...shoreLanes,...baseLanes,...pumpPaths,...hamletLanes,[[158.4,189.2],[157.5,186.5]]
+  [[257.08,265.8],[298.78,271.08],[341.31,287.8],[384.12,292.2],[404,291],[419,289],[419,287]],
+  [[404,291],[410,294],[418,296],[423,297]],
+  [[270,174.5],[276.44,164.44],[301.32,154.19],[324.81,148.68],[345.12,130.45],[369.24,119.2],[382,110],[392,106.8]],
+  [[276.44,164.44],[219.73,156.52],[181.04,154.58],[132.4,152.2],[126,152.35],[123.3,151.75],[120.86,149.6],[100.8,133.24],[65,101.7],[61,99.8],[61,98.8]],
+  [[264.12,332.03],[226.37,335.07],[203.15,345.96],[170.8,355.64],[142.83,383.4],[119.79,409.22],[95.52,435.36]],
+  [[203.15,345.96],[180.48,321.89],[151.44,295.72],[116.64,269.32]],
+  [[257.96,392.62],[219.73,408.61],[169.04,423.04],[95.52,435.36]],
+  ...shoreLanes,...baseLanes,...pumpPaths,...hamletLanes,[[132.4,152.2],[131.5,149.5]]
 ];
-const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
-const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
-const playYard={x:523,y:368};
-const gatePosts=[[321.6,568],[328.4,568]];
+const lakeShape=[290.27,62.86,122.5,59.14],marshShape=[117.52,270.2,46,31];
+const oldBoats=[[383.3,96.3,.29],[386,93.9,.33],[387.6,91.3,.25]];
+const playYard={x:424,y:295};
+const gatePosts=[[256.6,456],[263.4,456]];
 const atlasChunks=new Map(),atlasChunk=512;
 
 function basinRadius(x,y,[cx,cy,rx,ry]){
@@ -39,7 +39,7 @@ function wildTreeAt(x,y){
 // grid alone determines how far an actor can travel in this district.
 function outdoorTreeAt(x,y){
   if(x>=1 && x<district.width-1 && y>=1 && y<district.height-1)return tAt(x,y)===TR;
-  if(y>=219 && y<235 && x<district.width)return false;
+  if(y>=174 && y<190 && x<district.width)return false;
   return wildTreeAt(x,y) && basinRadius(x,y,lakeShape)>1.02;
 }
 function seedAtlasTerrain(){
@@ -62,11 +62,11 @@ function seedAtlasTerrain(){
       for(let j=0;j<=n;j++)clear(x+(u-x)*j/n-3,y+(v-y)*j/n-3,6,6);
     }
   }
-  clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
+  clear(1,174,district.width-2,16);clear(404,273,29,43);clear(383,92,19,18);
   for(const r of [...villageCabins,...hamletRooms])clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
-  clear(495,132,7,7);clear(149,178,17,11);clear(75,117,9,11);
-  clear(323,411,6,4);clear(338,206,3,3);clear(124,538,5,6);
-  clear(302,566,47,35);clear(186,427,28,14);
+  clear(396,106,7,7);clear(123,141,17,11);clear(57,91,9,11);
+  clear(258,329.52,6,4);clear(273,161,3,3);clear(106,426,5,6);
+  clear(237,454,47,35);clear(150,340,28,14);
 }
 const atlasProps=[];
 function atlasProp(key,x,y,width,worldHeight,{angle=0,flip=1}={}){
@@ -197,11 +197,11 @@ function drawAtlasProp(g,p,mapView=false){
     g.restore();
   }
 }
-const pumpCulvert={x:329.05*T,y:414.55*T,half:2.24*T};
-const hamletWoodpile={x:126.15*T,y:540.8*T};
+const pumpCulvert={x:264.05*T,y:331.56*T,half:2.24*T};
+const hamletWoodpile={x:108.15*T,y:428.8*T};
 function makeRouteLandmarks(){
   for(const side of [-1,1])interiorObject('culvertRim',pumpCulvert.x+side*pumpCulvert.half,pumpCulvert.y+side*4,12,16);
-  for(const [x,y,label] of [[326.2,413.25,'НАСОСНАЯ'],[340.05,207.7,'СКЛАД']]){
+  for(const [x,y,label] of [[261.2,330.81,'НАСОСНАЯ'],[275.05,162.7,'СКЛАД']]){
     const post=interiorObject('waypost',x*T,y*T,4,5);
     post.boardLabel=label;post.west=true;
   }
@@ -269,10 +269,10 @@ function makeAtlasProps(){
     interiorObject('yardFrame',x-94,y+94+offset-4,w,h,{fixture:'roundabout'});
   atlasProp('seesaw',x+71,y+98,102,33);
   interiorObject('yardFrame',x+71,y+96,99,19,{fixture:'seesaw'});
-  atlasProp('baseLorry',320.55*T,580.6*T,124,56);
-  interiorObject('parkedLorry',320.55*T,580.6*T-8,117,46);
+  atlasProp('baseLorry',255.55*T,468.6*T,124,56);
+  interiorObject('parkedLorry',255.55*T,468.6*T-8,117,46);
   for(const [gx,gy] of gatePosts){
-    const sign=gx<325?-1:1;
+    const sign=gx<260?-1:1;
     atlasProp('gate',gx*T,gy*T,87,53,{flip:-sign});
     interiorObject('gatePier',gx*T,gy*T,22,22);
     for(let step=0;step<7;step++){
@@ -282,7 +282,7 @@ function makeAtlasProps(){
   }
   atlasProp('netrack',netRack.x,netRack.y+10,89,46);
   atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,22);
-  const pile=tilePoint(505.8,131.35);
+  const pile=tilePoint(406.8,105.35);
   atlasProp('wood',pile.x,pile.y+6,54,38);
   interiorObject('woodStack',pile.x,pile.y,51,16);
   atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h-1,67,42);
@@ -334,7 +334,7 @@ function compactOldPosition(x,y){
   if(x>=360 && x<=380 && y>=639 && y<=650)return [x-44,y-77];
   return [x*.88,y*.88];
 }
-function upgradeAtlasSave(d){
+function upgradeAtlasV2(d){
   upgradePrototypeAtlas(d);
   if(d.flags.atlasLayout>=2)return;
   for(const e of [d,...d.dyn.npcs,...(d.flags.fieldBodies||[])]){
@@ -358,6 +358,49 @@ function upgradeAtlasSave(d){
     d.fog=Array.from(bytes,b=>String.fromCharCode(48+b)).join('');
   }
   d.flags.atlasLayout=2;
+}
+// Coordinates inside settlements move together. Only the unbuilt intervals contract.
+const winterSurveyX=[[0,0],[72,54],[136,118],[147,121],[167,141],[182,146],[215,179],[293,228],[351,286],[473,374],[537,438],[669,535]];
+const winterSurveyY=[[0,0],[114,88],[147,121],[177,140],[191,154],[200,155],[240,195],[337,264],[391,318],[424,337],[447,360],[530,418],[601,489],[651,521]];
+function surveyAxis(value,knots){
+  for(let i=1;i<knots.length;i++){
+    const [end,to]=knots[i];
+    if(value<=end){
+      const [start,from]=knots[i-1];return from+(value-start)*(to-from)/(end-start);
+    }
+  }
+  const [end,to]=knots.at(-1);return value-end+to;
+}
+function upgradeAtlasSave(d){
+  upgradeAtlasV2(d);
+  if(d.flags.atlasLayout>=3)return;
+  function move(p){
+    if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x>=760*T)return;
+    p.x=surveyAxis(p.x/T,winterSurveyX)*T;p.y=surveyAxis(p.y/T,winterSurveyY)*T;
+  }
+  for(const e of [d,...d.dyn.npcs,...(d.flags.fieldBodies||[]),...(d.flags.snowMarks||[])]){
+    move(e);move(e.deathSpot);move(e.trackAt);
+  }
+  for(const key of Object.keys(d.flags)){
+    const match=/^(contents_cupboard_|st_cupboard_|hutStove)(\d+)([_x])(\d+)$/.exec(key);
+    if(!match)continue;
+    const unit=match[1]==='hutStove'?1:T;
+    const pos={x:Number(match[2])*T/unit,y:Number(match[4])*T/unit};move(pos);
+    const dest=match[1]+Math.round(pos.x*unit/T)+match[3]+Math.round(pos.y*unit/T);
+    if(dest!==key){d.flags[dest]=d.flags[key];delete d.flags[key];}
+  }
+  if(d.fog){
+    const bytes=new Uint8Array(Math.ceil(MW*MH/6));
+    const xs=Array.from({length:MW},(_,i)=>i>=760?i:Math.floor(surveyAxis(i+.5,winterSurveyX)));
+    const ys=Array.from({length:MH},(_,i)=>Math.floor(surveyAxis(i+.5,winterSurveyY)));
+    for(let i=0;i<Math.min(MW*MH,d.fog.length*6);i++){
+      if(!((d.fog.charCodeAt(Math.floor(i/6))-48)&(1<<(i%6))))continue;
+      const x=i%MW,j=(x>=760?Math.floor(i/MW):ys[Math.floor(i/MW)])*MW+xs[x];
+      bytes[Math.floor(j/6)]|=1<<(j%6);
+    }
+    d.fog=Array.from(bytes,b=>String.fromCharCode(48+b)).join('');
+  }
+  d.flags.atlasLayout=3;
 }
 function atlasTree(x,y){
   const h=hash2(x+91,y-77),size=68+49*hash2(x-18,y+29);
@@ -476,16 +519,16 @@ function atlasTerrainChunk(cx,cy){
       g.lineWidth=w;g.strokeStyle=col;g.stroke(path);
     }
   }
-  const marsh=l<204*T && r>73*T && t<441*T && b>300*T;
-  if(near(329.05,414.55,150))paintRoadCulvert(g);
-  if(near(79,121,155))westGround(g);
-  if(near(202,434,13*T))pumpYardGround(g);
-  if(near(325,583,25*T))paintBaseYard(g);
+  const marsh=l<169*T && r>55*T && t<355*T && b>237*T;
+  if(near(264.05,331.56,150))paintRoadCulvert(g);
+  if(near(61,95,155))westGround(g);
+  if(near(166,347,13*T))pumpYardGround(g);
   drawAtlasRoutes(g,l,t,r,b);roadImprints(g,l,t,r,b);
+  if(near(260,471,25*T))paintBaseYard(g);
   if(marsh){paintThaw(g,l,t);paintMarshCover(g,l,t,r,b);}
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
-  if(near(493,132,18*T))shoreGround(g);
-  if(near(113,547,24*T))hamletGround(g);
+  if(near(394,106,18*T))shoreGround(g);
+  if(near(95,435,24*T))hamletGround(g);
   if(near(playYard.x,playYard.y,230)){
     paintPlaygroundSnow(g,0,0);paintPlaygroundSnow(g,-40,94);paintPlaygroundSnow(g,60,98);
   }
@@ -568,8 +611,8 @@ function bakeSurvey(){
   return c;
 }
 function atlasMapLabels(g,s,u){
-  const labels=s>3*u?[...atlasSites,['Лодки',483,115],['Прорубь',491.4,121.4],['Мост',335,220],
-    ['Жилой корпус',517,353],['Детская площадка',523,368],['Заброшенный корпус',517,381]]:atlasSites;
+  const labels=s>3*u?[...atlasSites,['Лодки',384,89],['Прорубь',392.4,95.4],['Мост',270,175],
+    ['Жилой корпус',418,280],['Детская площадка',424,295],['Заброшенный корпус',418,308]]:atlasSites;
   g.font='600 '+13*u+'px Arial';
   g.textAlign='center';g.textBaseline='middle';
   const occupied=[],h=20*u;

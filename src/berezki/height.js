@@ -1,8 +1,8 @@
 // Raised scenery lives on the actor depth list. Ground plans and collision keep
 // the original footprints while the camera sees the sides of rails and posts.
 const raisedScenery=[];
-const fittingHeight={bench:9,rack:29,cabinet:26,desk:12,stove:22,bedroll:3,supper:13,
-  pallet:4,cupboard:32,files:10,stool:8,sack:9};
+const fittingHeight={bench:9,rack:40,cabinet:32,desk:12,stove:22,bedroll:3,supper:13,
+  pallet:4,cupboard:42,files:10,stool:8,sack:9};
 const fencePanels=new Map();
 function fencePanel(wood,width,variant){
   const key=[wood,width,variant].join('/');
@@ -139,9 +139,48 @@ function paintRaisedScenery(g,p,mapView){
   if(['bench','supper','desk','stool'].includes(o.fitting)){
     for(const u of [.13,.87])for(const v of [.2,.8])
       beam(g,x+w*u,y+h*v,x+w*u+dx,y+h*v+dy,2.5,'#5e5140');
-  }else if(o.fitting!=='sack'){
+  }else if(o.fitting!=='sack' && o.fitting!=='rack'){
     const edge=dx<0?x+w:x;
     side(edge,y,edge,y+h,'#655d50');side(x,y+h,x+w,y+h,o.fitting==='stove'?'#534d46':'#736752');
+  }
+  if(o.fitting==='rack'){
+    const vertical=h>w;
+    // Open timber shelves share the same feet and lens as the surrounding walls.
+    for(const [u,v] of [[1,1],[w-2,1],[1,h-2],[w-2,h-2]]){
+      beam(g,x+u,y+v,x+u+dx,y+v+dy,2.7,'#514b3e');
+    }
+    for(const t of [.12,.53,.96]){
+      const sx=x+dx*t,sy=y+dy*t;
+      const wood=lookoutBoard(11,false);
+      g.save();g.translate(sx+(vertical?w:0),sy);
+      if(vertical)g.rotate(Math.PI/2);
+      const length=vertical?h:w,depth=vertical?w:h;
+      g.drawImage(wood,0,0,length,depth);
+      beam(g,0,depth-1,length,depth-1,2,'#584c3c');
+      beam(g,0,depth-2,length,depth-2,.8,'#9e9078');
+      // Two trays of contents from the original photographed shelving unit.
+      if(t<.96)g.drawImage(ART.images.roomFittings,130,21,85,43,2,2,length-4,depth-5);
+      else{
+        const [ax,ay,aw,ah]=roomFittings.files[0];
+        g.drawImage(ART.images.roomFittings,ax,ay,aw,ah,length*.44,2,length*.42,depth*.47);
+      }
+      g.restore();
+    }
+    for(const u of [1,w-2])beam(g,x+u,y+h-2,x+u+dx,y+h-2+dy,2.1,'#726552');
+    g.restore();return;
+  }
+  if(['cupboard','cabinet'].includes(o.fitting)){
+    // The storage atlas contains the upright front. Project it onto the visible
+    // face and give the top its own timber or steel surface.
+    const vertical=h>w;
+    const ax=vertical?(dx>0?x:x+w):x,ay=vertical?y:y+h;
+    const span=vertical?h:w;
+    g.save();g.transform(vertical?0:1,vertical?1:0,-dx/p.height,-dy/p.height,ax+dx,ay+dy);
+    g.drawImage(ART.images.roomFittings,...roomFittings[o.fitting][0],0,0,span,p.height);
+    g.restore();
+    artFill(g,o.fitting==='cabinet'?'wall_concrete':'floor_wood',x+dx,y+dy,w,h);
+    g.fillStyle=o.fitting==='cabinet'?'#55594d7d':'#67574160';g.fillRect(x+dx,y+dy,w,h);
+    beam(g,x+dx,y+h+dy,x+w+dx,y+h+dy,1.3,'#a29a8491');g.restore();return;
   }
   g.translate(dx,dy);
   if(o.fitting==='supper' || o.fitting==='desk'){
@@ -197,10 +236,8 @@ function cutawayWalls(r,plan){
 function paintCutWall(g,p,mapView){
   const o=p.wall||p.item;
   const {x,y,w,h}=o;
-  // Lower the cut surface locally when it would otherwise cover the
-  // player immediately behind a wall. Door positions and collision stay fixed.
-  const gap=mapView?Infinity:Math.hypot(P.x-clamp(P.x,x,x+w),P.y-clamp(P.y,y,y+h));
-  const height=p.height*(.31+.69*clamp((gap-8)/32,0,1));
+  // Shared vertices must meet at the same height, including the ends of the jambs.
+  const height=30;
   if(SHADOWS){
     g.save();g.shadowColor='#29261e6a';g.shadowBlur=3;g.shadowOffsetX=1.2;g.shadowOffsetY=1.7;
     g.fillStyle='#4a44375a';g.fillRect(x+.5,y+.5,w-1,h-1);g.restore();

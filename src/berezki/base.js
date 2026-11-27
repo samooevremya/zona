@@ -1,21 +1,21 @@
 // The approach road ends at the existing gate. Keep the whole compound south of it.
 const baseRooms=[
-  {kind:'guard',name:'Караульная',x:312,y:570,w:8,h:6,doors:[[7,2],[7,3]],
+  {kind:'guard',name:'Караульная',x:247,y:458,w:8,h:6,doors:[[7,2],[7,3]],
     fittings:[['stove',2,2],['desk',5,1.8],['bench',3.6,4.3],['rack',1.8,4.1]]},
-  {kind:'barracks',name:'Казарма',x:331,y:570,w:13,h:8,doors:[[0,3],[0,4]],
+  {kind:'barracks',name:'Казарма',x:266,y:458,w:13,h:8,doors:[[0,3],[0,4]],
     fittings:[['bedroll',2.5,1.9,1],['bedroll',5.3,1.9,1],['bedroll',8.1,1.9,1],
       ['cupboard',10.8,2.2,0,{ar_jacket:1}],['bench',3.3,6],['desk',10.4,5.85],['bedroll',6.7,6,1]]},
-  {kind:'stores',name:'Вещевой склад',x:307,y:585,w:12,h:8,doors:[[11,3],[11,4]],
+  {kind:'stores',name:'Вещевой склад',x:242,y:473,w:12,h:8,doors:[[11,3],[11,4]],
     fittings:[['rack',2.2,2.2],['rack',5.4,2.2],['pallet',8.7,2.2],['rack',2,5.5],
       ['cabinet',8.6,5.8,0,{cans:2,bandage:1}],['sack',5.4,5.8]]},
-  {kind:'hangar',name:'Ремонтный ангар',x:329,y:585,w:15,h:10,
+  {kind:'hangar',name:'Ремонтный ангар',x:264,y:473,w:15,h:10,
     doors:[[6,0],[7,0],[8,0],[6,9],[7,9],[8,9]],fittings:[['desk',2.4,2.1],['rack',2,7.7],
       ['cabinet',12.8,2.2,0,{bandage:1}],['pallet',12.7,7.3],['files',11,7.5]]}
 ];
 const baseFences=[];
-const baseLanes=[[[325,568],[325,573],[324,582],[324,589],[324,596],[336.5,597],[336.5,595]],
-  [[320,573],[325,573],[331,574]],[[324,589],[319,589]],[[324,582],[336.5,581.5],[336.5,585]]];
-const baseStove=tilePoint(314,572);
+const baseLanes=[[[260,456],[260,461],[259,470],[259,477],[259,484],[271.5,485],[271.5,483]],
+  [[255,461],[260,461],[266,462]],[[259,477],[254,477]],[[259,470],[271.5,469.5],[271.5,473]]];
+const baseStove=tilePoint(249,460);
 const baseHeater={at:baseStove,flag:'baseStoveUntil',room:baseRooms[0],action:'baseKindle'};
 function stoveIn(room){return room===baseRooms[0]?baseHeater:room===pumpRoom?pumpHeater:room?.heater;}
 function stoveBurning(stove){return stove && (S.flags[stove.flag]||0)>S.min;}
@@ -31,8 +31,8 @@ function makeBase(){
     if(r.kind==='hangar')interiorObject('servicePit',(r.x+4.2)*T,(r.y+5)*T,1.25*T,3*T);
   }
   // The gap in the western fence is a second way back into the yard.
-  for(const [x,y,w,h] of [[304,568,17.6,.16],[328.4,568,18.6,.16],[347,568,.16,30],
-    [304,598,43.16,.16],[304,568,.16,11],[304,582,.16,16]])
+  for(const [x,y,w,h] of [[239,456,17.6,.16],[263.4,456,18.6,.16],[282,456,.16,30],
+    [239,486,43.16,.16],[239,456,.16,11],[239,470,.16,16]])
     baseFences.push(addObj({k:'fence',material:'stationMesh',x:x*T,y:y*T,w:w*T,h:h*T,solid:1}));
 }
 // The same floor atlas and furniture footprints are used in the scene and PDA.
@@ -140,13 +140,23 @@ function paintBaseYard(g){
       beam(b,i,j,i+84,j+1,1.5,'#565853a3');beam(b,i,j,i,j+48,1,'#646259aa');
     }
     for(const [x,y] of [[100,122],[121,147],[575,108]])beam(b,x,y,x+24,y+13,1,'#434743');
+    // Expose disconnected islands of concrete under wind-packed powder.
+    const snow=winterCanvas(w,h),sg=snow.getContext('2d');
+    sg.fillStyle=district.surface.powder;sg.fillRect(0,0,w,h);
+    const pixels=sg.getImageData(0,0,w,h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const cover=.7*vnoise(x+384,y+126,97)+.3*vnoise(x+32,y,29);
+      pixels.data[(y*w+x)*4+3]=255*clamp((cover-.25)*2.8,.10,.97);
+    }
+    sg.putImageData(pixels,0,0);b.drawImage(snow,0,0);
     b.globalCompositeOperation='destination-in';
-    b.save();b.scale(w/2,h/2);const edge=b.createRadialGradient(1,1,.3,1,1,1);
-    edge.addColorStop(0,'#fff');edge.addColorStop(.75,'#fffc');edge.addColorStop(1,'transparent');
-    b.fillStyle=edge;b.fillRect(0,0,2,2);b.restore();baseApron=c;
+    b.save();b.translate(w/2,h/2);b.scale(w/2,h/2);
+    const mask=b.createRadialGradient(0,0,.52,0,0,1);
+    mask.addColorStop(0,'white');mask.addColorStop(1,'transparent');b.fillStyle=mask;b.fillRect(-1,-1,2,2);b.restore();
+    baseApron=c;
   }
-  g.drawImage(baseApron,313*T,577*T);
-  snowDrift(g,320.1*T,581.1*T,46,11,-.08,488);
+  g.drawImage(baseApron,248*T,465*T);
+  snowDrift(g,255.1*T,469.1*T,46,11,-.08,488);
   for(const r of baseRooms){
     snowDrift(g,(r.x+.8)*T,(r.y+r.h)*T,41,10,-.12,r.x);
     snowDrift(g,(r.x+r.w)*T,(r.y+.7)*T,19,8,-.35,r.y);

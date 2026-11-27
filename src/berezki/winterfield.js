@@ -12,12 +12,12 @@ function makeWinterSalvage(){
   for(const [id,gain] of [['loadShellOne',.57],['hitTimber',.55],['hitMasonry',.53],['hitSteel',.49],['hitSoil',.4]])recordings[id]=[gain,id];
   recordings.frostCrack=[.14,'winterCreak'];
   for(const [x,y,key,loot] of [
-    [524,384,'landing',{candle:1,bandage:1}],[484,130,'nets',{wire:2}],
-    [337,233,'platform',{buckle:1}],[153,183,'depot',{wire:1,bread:1}],
-    [80.75,120.75,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
-    [253,433,'path',{candle:1}],[127,552,'hut',{bandage:1,candle:1}],
-    [339,592,'workshop',{wire:1,buckle:1}],[435,164,'forest',{candle:1,bread:1}],
-    [326,492,'road',{buckle:1}],[142,352,'marsh',{wire:1}]]){
+    [425,311,'landing',{candle:1,bandage:1}],[385,104,'nets',{wire:2}],
+    [272,188,'platform',{buckle:1}],[127,146,'depot',{wire:1,bread:1}],
+    [62.75,94.75,'tower',{buckle:1,cans:1}],[169,354,'pump',{wire:2}],
+    [202.87,346,'path',{candle:1}],[109,440,'hut',{bandage:1,candle:1}],
+    [274,480,'workshop',{wire:1,buckle:1}],[346.59,131.77,'forest',{candle:1,bread:1}],
+    [261,391.45,'road',{buckle:1}],[119.64,279,'marsh',{wire:1}]]){
     if(tAt(Math.floor(x),Math.floor(y))===TR)setT(Math.floor(x),Math.floor(y),GR);
     const box=supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
     if(key==='tower')box.sprite='c1_crate';
@@ -103,7 +103,7 @@ function winterWitness(victim){
   for(const e of ents){
     if(!e.protectedResident || !e.alive || dE(e,victim)>315 || !seesActor(e,victim,true))continue;
     const guard=ents.filter(n=>n!==victim && n!==P && n.alive && !n.protectedResident && n.fac==='loner' && dE(n,e)<400).sort((a,b)=>dE(e,a)-dE(e,b))[0];
-    const shelter=e.sid==='cook'?tilePoint(509.5,354.5):tilePoint(e.sid==='housekeeper'?503:483,e.sid==='housekeeper'?128:140);
+    const shelter=e.sid==='cook'?tilePoint(410.5,281.5):tilePoint(e.sid==='housekeeper'?404:384,e.sid==='housekeeper'?102:114);
     e.flight={until:S.min+16,guard:guard?.sid,shelter};e.sit=0;
     sayLine(e,guard?'На помощь!':'Скорее в дом!');
   }
@@ -134,9 +134,10 @@ function winterSurface(x,y){
 
 function winterStairOffset(e){
   const r=winterFloor(e.x,e.y);if(!r?.block)return [0,0];
-  const x=e.x/T-r.x-r.stairX,y=e.y/T-r.y-r.stairY;
-  if(Math.abs(x)>=1.55 || y<0 || y>2.86)return [0,0];
-  return raisedOffset((r.x+r.stairX+.05)*T,(r.y+r.stairY+1.43)*T,flatStairHeight(r,e.y));
+  const f=r.flights.find(s=>Math.abs(e.x-s.x)<.75*T);
+  const y=(r.y+r.stairY)*T;
+  if(!f || e.y<y || e.y>y+2.86*T)return [0,0];
+  return raisedOffset(f.x,y+1.43*T,stairRise(f,e.y));
 }
 function winterCoatTone(e){return e.winterTone || (e===P || e.sid==='mitya'?'slate':['cook','housekeeper','anya'].includes(e.sid)?'ochre':'ash');}
 const winterDeadArt=new WeakMap();

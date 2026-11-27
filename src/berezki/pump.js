@@ -1,34 +1,34 @@
 // The drainage channel runs south from the existing marsh. Its banks supply both
 // the terrain mask and the waterline rendered into the outdoor tiles and survey.
-const pumpRoom={x:203,y:431,w:9,h:7,n:1,name:'Насосная',doors:[[0,4],[0,5]],roof:'slate'};
-const pumpTower=tilePoint(194.85,432.35),pumpHearth=tilePoint(210.55,436.25);
+const pumpRoom={x:167,y:344,w:9,h:7,n:1,name:'Насосная',doors:[[0,4],[0,5]],roof:'slate'};
+const pumpTower=tilePoint(158.85,345.35),pumpHearth=tilePoint(174.55,349.25);
 const pumpHeater={at:pumpHearth,flag:'pumpStoveUntil',room:pumpRoom,action:'pumpKindle'};
 const towerFeet=[[-35,-18],[35,-18],[-35,18],[35,18]];
-const marshFork=[183.8,434.2],pumpDoor=[203.5,436];
-const marshCrossing=[marshFork,[192,434.5],[197.8,435.6],[200.6,436],pumpDoor];
-const marshBank=[marshFork,[183.7,437.6],[185.7,440.8],[188.2,444.2],[194.7,445.6],[200.7,443.4],[201.5,440],[201.3,436.55],[201.8,436],pumpDoor];
+const marshFork=[147.8,347.2],pumpDoor=[167.5,349];
+const marshCrossing=[marshFork,[156,347.5],[161.8,348.6],[164.6,349],pumpDoor];
+const marshBank=[marshFork,[147.7,350.6],[149.7,353.8],[152.2,357.2],[158.7,358.6],[164.7,356.4],[165.5,353],[165.3,349.55],[165.8,349],pumpDoor];
 const pumpPaths=[marshCrossing,marshBank,
-  [[172.48,480.48],[179,458],[184.6,446],marshFork],
-  [[134.64,342.32],[149,368],[166.5,390],[179.2,409],[185.2,423.2],marshFork],
-  [[206.8,442.64],[201.5,440]]];
+  [[142.83,383.4],[145,367.69],[148.6,359],marshFork],
+  [[116.64,269.32],[123,295],[140.5,317],[145.07,328.36],[149.2,336.54],marshFork],
+  [[170.8,355.64],[165.5,353]]];
 function channelBanks(y){
-  const u=(y-369)/71;
-  const center=152+43*u+1.8*Math.sin(u*12);
+  const u=(y-296)/57;
+  const center=126+33*u+1.8*Math.sin(u*12);
   const radius=(3.8+1.45*Math.sin(u*15)+1.1*Math.cos(u*31))*Math.sqrt(clamp((1-u)*15,0,1));
   const tip=clamp((1-u)*12,0,1);
   return [center-radius+tip*.36*Math.sin(y*1.25),center+radius+tip*.39*Math.sin(y*1.4)];
 }
 function inMarshChannel(x,y){
-  if(y<369 || y>=440 || x<145 || x>203)return false;
+  if(y<296 || y>=353 || x<118 || x>167)return false;
   const [l,r]=channelBanks(y);return x>=l && x<r;
 }
 // Water depth is continuous across the old navigation tiles. The last few metres
 // of each bank are slush, while channels and hollows hold standing water.
 function marshDepth(x,y){
   const u=x/T,v=y/T;
-  if(u<73 || u>204 || v<300 || v>441)return 0;
+  if(u<55 || u>169 || v<237 || v>355)return 0;
   let inward=(1-basinRadius(u,v,marshShape))*marshShape[3];
-  if(v>=369 && v<440){
+  if(v>=296 && v<353){
     const [l,r]=channelBanks(v);
     inward=Math.max(inward,Math.min(u-l,r-u));
   }
@@ -62,9 +62,9 @@ function paintThaw(g,l,t){
 // Shoreline belts have openings at the channel and occasional sheltered islands.
 function reedDensity(x,y){
   const u=x/T,v=y/T;
-  if(u<73 || u>204 || v<300 || v>441 || !swampAt(x,y))return 0;
+  if(u<55 || u>169 || v<237 || v>355 || !swampAt(x,y))return 0;
   let shore;
-  if(v>=369 && inMarshChannel(u,v)){
+  if(v>=296 && inMarshChannel(u,v)){
     const [l,r]=channelBanks(v);shore=Math.abs(2*(u-l)/(r-l)-1);
   }else shore=basinRadius(u,v,marshShape);
   const pocket=vnoise(u+24,v-11,5),band=clamp((shore-.48)*2.8,0,1);
@@ -103,7 +103,7 @@ function paintMarshCover(g,l,t,r,b){
   });
 }
 function reedsInFront(g,e){
-  if(e.x<72*T || e.x>205*T || e.y<299*T || e.y>443*T)return;
+  if(e.x<54*T || e.x>169*T || e.y<236*T || e.y>356*T)return;
   // The static silhouettes already live in the terrain cache. Restore only
   // foreground stems within the part that a passing actor could have covered.
   g.save();g.beginPath();g.rect(e.x-24,e.y-26,48,53);g.clip();

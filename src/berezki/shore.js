@@ -1,21 +1,21 @@
 // Both the worn track in the snow and the resident's route use these landings.
-const shoreX=443,shoreY=114;
+const shoreX=344,shoreY=88;
 const fishingTrack=[[46.9,14.4],[48,16.6],[48,18.8],[52.9,18.8],[53.2,12],[51.8,9.2],[48.4,8]].map(([x,y])=>[shoreX+x,shoreY+y]);
 const iceHole=tilePoint(shoreX+48.4,shoreY+7.4);
 const fishingRoom={x:shoreX+44,y:shoreY+11,w:8,h:7,n:1};
 const villageCabins=[
-  {x:480,y:138,w:7,h:5,n:1,doors:[[3,0],[4,0]],roof:'plank',ridge:'vertical',name:'Западная изба'},
-  {x:499,y:125,w:8,h:6,n:1,doors:[[2,5],[3,5]],roof:'slate',name:'Восточная изба'}
+  {x:381,y:112,w:7,h:5,n:1,doors:[[3,0],[4,0]],roof:'plank',ridge:'vertical',name:'Западная изба'},
+  {x:400,y:99,w:8,h:6,n:1,doors:[[2,5],[3,5]],roof:'slate',name:'Восточная изба'}
 ];
-const shoreFire=tilePoint(497.6,135.25);
-const netRack=tilePoint(484.5,131.2);
+const shoreFire=tilePoint(398.6,109.25);
+const netRack=tilePoint(385.5,105.2);
 const shoreLanes=[
-  [[481,136],[484,135.9],[488.1,134.4],[491,132.8]],
-  [[484,135.9],[484,138]],
-  [[488.1,134.4],[492,134.9],[495.6,133.9],[499.3,133.4],[502,132.5],[502,131]],
-  [[495.6,133.9],[496.1,135.6],[497.2,136.55],[499.1,135.7],[499.3,133.4]],
-  [[488.1,134.4],[486.2,133],[483,133.1],[482.6,130.9],[483.1,129.3],[483.2,124.4]],
-  [[483.2,124.4],[486.5,122.2],[488.9,121.6],[491.4,121.4]]
+  [[382,110],[385,109.9],[389.1,108.4],[392,106.8]],
+  [[385,109.9],[385,112]],
+  [[389.1,108.4],[393,108.9],[396.6,107.9],[400.3,107.4],[403,106.5],[403,105]],
+  [[396.6,107.9],[397.1,109.6],[398.2,110.55],[400.1,109.7],[400.3,107.4]],
+  [[389.1,108.4],[387.2,107],[384,107.1],[383.6,104.9],[384.1,103.3],[384.2,98.4]],
+  [[384.2,98.4],[387.5,96.2],[389.9,95.6],[392.4,95.4]]
 ];
 const shoreFences=[];
 let fishingHouse,woodStack;
@@ -26,13 +26,13 @@ function makeVillageYards(){
     district.levels.push(r);
   }
   for(const [x,y,w,h] of [
-    [478,138.85,.96,.16],[486,136.55,3,.16],[478,138.85,.16,4.2],
-    [488.84,136.55,.16,2.4],
+    [379,112.85,.96,.16],[387,110.55,3,.16],[379,112.85,.16,4.2],
+    [389.84,110.55,.16,2.4],
     // Leave open snow between the corner posts and the eaves, including projected height.
-    [498.3,132.85,2.35,.16],[504.3,132.85,6,.16],[510.14,127.7,.16,5.31]
+    [399.3,106.85,2.35,.16],[405.3,106.85,6,.16],[411.14,101.7,.16,5.31]
 
   ])shoreFences.push(addObj({k:'fence',material:'picket',solid:1,x:x*T,y:y*T,w:w*T,h:h*T}));
-  for(const [x,y,angle] of [[497.5,137.45,0],[500.55,135.25,Math.PI/2]])
+  for(const [x,y,angle] of [[398.5,111.45,0],[401.55,109.25,Math.PI/2]])
     putFurniture('bench',x*T,y*T,angle,'shore-court');
   interiorObject('netShelter',netRack.x,netRack.y-5,78,25);
   for(const side of [-1,1])interiorObject('netFoot',netRack.x+side*36,netRack.y+10,5,7);
@@ -47,7 +47,7 @@ function makeFishingShore(){
   partition(shoreX+46.75,shoreY+15.7,.17,1.3,'timber');
   partition(shoreX+49.15,shoreY+15.7,.17,1.3,'timber');
   furnishShoreHomes();
-  woodStack=interiorObject('woodStack',488.4*T,132.45*T,60,19);
+  woodStack=interiorObject('woodStack',389.4*T,106.45*T,60,19);
 }
 function fishRoutine(e,dt){
   const last=fishingTrack.length-1;
@@ -73,28 +73,28 @@ function fishRoutine(e,dt){
 // A stop's clock starts when the resident arrives, never while the path is blocked.
 const shoreJobs={
   fisher:[
-    [489.9,128.4,3,'home'],[491,130.6],[491,132.8],[488.1,134.4],[486.2,133],
-    [484.55,131.85,16,'net'],[486.2,133],[488.1,134.4],[492,134.9],
-    [495.6,133.9],[496.1,135.7],[497.5,136.62,7,'warm'],
-    [496.1,135.7],[495.6,133.9],[492,134.9],[488.1,134.4],[491,132.8],[491,130.6]
+    [390.9,102.4,3,'home'],[392,104.6],[392,106.8],[389.1,108.4],[387.2,107],
+    [385.55,105.85,16,'net'],[387.2,107],[389.1,108.4],[393,108.9],
+    [396.6,107.9],[397.1,109.7],[398.5,110.62,7,'warm'],
+    [397.1,109.7],[396.6,107.9],[393,108.9],[389.1,108.4],[392,106.8],[392,104.6]
   ],
   housekeeper:[
-    [503.4,128.6,5,'home'],[502,131.45],[502.55,132.65,8,'sweep'],[501.1,133.1,7,'sweep'],
-    [499.3,133.5],[499.58,135.2,5,'warm'],[499.3,133.5],[502,131.45]
+    [404.4,102.6,5,'home'],[403,105.45],[403.55,106.65,8,'sweep'],[402.1,107.1,7,'sweep'],
+    [400.3,107.5],[400.58,109.2,5,'warm'],[400.3,107.5],[403,105.45]
   ],
   anya:[
-    [482.2,140.2,2,'home'],[483.6,137.6],[483.7,135.7,2,'play'],[487.2,134.9],
-    [490.8,135.65,2,'play'],[494.3,136],[496.35,136.6,3,'warm'],[490.2,136.5],[484,136.5],[483.6,137.6]
+    [383.2,114.2,2,'home'],[384.6,111.6],[384.7,109.7,2,'play'],[388.2,108.9],
+    [391.8,109.65,2,'play'],[395.3,110],[397.35,110.6,3,'warm'],[391.2,110.5],[385,110.5],[384.6,111.6]
   ],
   mitya:[
-    [485.5,140.75,3,'home'],[484.5,138],[484.7,136.3],[487.7,135.25,2,'play'],
-    [490.1,136.1],[493.3,135.75,2,'play'],[496.25,135.15,3,'warm'],[490.8,135.65],[484.5,136.2],[484.5,138]
+    [386.5,114.75,3,'home'],[385.5,112],[385.7,110.3],[388.7,109.25,2,'play'],
+    [391.1,110.1],[394.3,109.75,2,'play'],[397.25,109.15,3,'warm'],[391.8,109.65],[385.5,110.2],[385.5,112]
   ],
   shorePatrol:[
-    [494.4,133.2,6,'watch'],[488.1,134.4],[483.2,135.3,4,'watch'],[482.6,130.9],
-    [483.1,128.6,5,'watch'],[486.2,133],[492,134.9],[498.65,136.25,5,'warm']
+    [395.4,107.2,6,'watch'],[389.1,108.4],[384.2,109.3,4,'watch'],[383.6,104.9],
+    [384.1,102.6,5,'watch'],[387.2,107],[393,108.9],[399.65,110.25,5,'warm']
   ],
-  shorePost:[[481.8,134.5,4,'watch']]
+  shorePost:[[382.8,108.5,4,'watch']]
 };
 const shoreHours={fisher:[7,18],housekeeper:[7.2,18.65],anya:[8,18.1],mitya:[8.15,18.32]};
 function shoreRoutine(e,dt){
@@ -151,10 +151,10 @@ function shoreRoutine(e,dt){
 
 function restoreShoreFooting(actor){
   const room=winterFloor(actor.x,actor.y);
-  const nearShore=actor.x>477*T && actor.x<512*T && actor.y>120*T && actor.y<146*T;
+  const nearShore=actor.x>378*T && actor.x<413*T && actor.y>94*T && actor.y<120*T;
   const nearStation=actor.x>platform.x && actor.x<platform.x+platform.w && actor.y>platform.y && actor.y<platform.y+platform.h;
-  const nearPump=actor.x>193*T && actor.x<213*T && actor.y>426*T && actor.y<441*T;
-  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation && !nearPump && !(actor.x>303*T && actor.x<348*T && actor.y>567*T && actor.y<599*T)) || clearFooting(actor.x,actor.y,actor.r))return;
+  const nearPump=actor.x>157*T && actor.x<177*T && actor.y>339*T && actor.y<354*T;
+  if((actor===P && S.flags.stationDeck) || (!room && !nearShore && !nearStation && !nearPump && !(actor.x>238*T && actor.x<283*T && actor.y>455*T && actor.y<487*T)) || clearFooting(actor.x,actor.y,actor.r))return;
   // Slots saved on a newly occupied footprint resume at its closest free spot.
   let best=null,gap=Infinity;
   const tx=Math.floor(actor.x/T),ty=Math.floor(actor.y/T);
@@ -265,9 +265,9 @@ function shoreGround(g){
   const rand=mulberry32(24485);
   // Broken crust follows the width of the lane and thins along its edges.
   const workTracks=[
-    [[486.2,133],[485.25,132.35],[484.7,131.95]],
-    [[502,132.5],[503.3,132.04],[507.8,132.04],[508.95,130.75]],
-    [[483,133.1],[482.6,130.9],[483.2,128.7],[484.6,128.4]]
+    [[387.2,107],[386.25,106.35],[385.7,105.95]],
+    [[403,106.5],[404.3,106.04],[408.8,106.04],[409.95,104.75]],
+    [[384,107.1],[383.6,104.9],[384.2,102.7],[385.6,102.4]]
   ];
   for(const trail of [...shoreLanes,...workTracks]){
     for(let i=1;i<trail.length;i++){
