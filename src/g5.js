@@ -155,6 +155,7 @@ function openPanel(kind, title, tabs) {
   pbody.replaceChildren(); pbody.scrollTop=0;
   ptitle.textContent = BEREZKI && kind === 'pda' ? 'Пейджер' : title;
   if (BEREZKI && kind === 'pda') play('pagerKey');
+  ov.dataset.kind = kind;
   ov.classList.toggle('pause-open', kind==='menu');
   ov.setAttribute('aria-labelledby', kind==='menu'?'pause-heading':'ptitle');
   ov.classList.add('open');
