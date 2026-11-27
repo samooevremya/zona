@@ -70,6 +70,9 @@ function wallTexture(h, side, len, wood, kind) {
     g.fillRect(l - 3, 22, w + 6, 66);
     g.fillStyle = '#211f1a';
     g.fillRect(l, 25, w, 63);
+    if(BEREZKI && (h.cabin || h===fishingHouse)){
+      beam(g,l+1,26,l+1,87,2,'#998a72');continue;
+    }
     g.fillStyle = '#4f483a';
     g.fillRect(l + 1, 27, w * .27, 59);
     if(BEREZKI && h.baseRoom){
@@ -84,6 +87,12 @@ function wallTexture(h, side, len, wood, kind) {
     const u = (i + .43 + .14*rand()) * len / n;
     if (ds.some(d => Math.abs(d.u - u) < d.w * (BEREZKI && (h.loadingBay || h.baseRoom?.kind==='hangar')?1:.5) + 18)) continue;
     panes[side].push(u);
+    if(BEREZKI){
+      const broken=h.baseRoom?.kind && h.baseRoom.kind!=='guard' || h.cabin?.abandoned;
+      const options=broken?[3,4,3,0]:wood?[0,1,2,4,5]:[0,1,3,4];
+      const take=options[Math.floor(rand()*options.length)],w=wood?24+rand()*6:27+rand()*8;
+      winterSash(g,u,18+rand()*4,w,34+rand()*4,take);continue;
+    }
     let l = u - 13;
     g.fillStyle = '#252623';
     g.fillRect(l - 3, 19, 32, 36);

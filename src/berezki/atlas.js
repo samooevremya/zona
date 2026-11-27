@@ -75,6 +75,7 @@ function atlasProp(key,x,y,width,worldHeight,{angle=0,flip=1}={}){
 }
 function preparePropShadows(){
   for(const prop of atlasProps){
+    if(prop.key==='gate'){prop.height=84;prop.foot=.5;prop.depth=prop.y+26;continue;}
     if(prop.key==='waterTower'){prop.height=160;prop.foot=.875;prop.depth=prop.y+18;continue;}
     const image=district.images[prop.key];
     prop.height=prop.width*image.height/image.width;
@@ -157,6 +158,7 @@ function paintFrozenBerth(g,p){
 function paintPropShadow(g,p){
   if(!SHADOWS || p.burial)return;
   if(yardEquipment.has(p.key)){paintEquipment(g,p,true,true);return;}
+  if(p.key==='gate'){drawBaseGate(g,p,true,true);return;}
   if(p.key==='waterTower'){
     for(const [dx,dy] of towerFeet)beam(g,p.x+dx,p.y+dy,p.x+dx+29,p.y+dy+16,3,'#48566840');
     shoreEllipse(g,p.x+42,p.y+23,42,26,'#49586a40',.2);return;
@@ -174,6 +176,7 @@ function paintPropShadow(g,p){
 function drawAtlasProp(g,p,mapView=false){
   if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);paintYardFooting(g,p,true);return;}
   if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
+  if(p.key==='gate'){drawBaseGate(g,p,mapView);return;}
   if(p.westDeck){paintLookout(g,mapView);if(mapView || !S.flags.onLookout)paintLookout(g,mapView,true);return;}
   if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
@@ -269,9 +272,12 @@ function makeAtlasProps(){
   interiorObject('parkedLorry',320.55*T,580.6*T-8,117,46);
   for(const [gx,gy] of gatePosts){
     const sign=gx<325?-1:1;
-    atlasProp('gate',gx*T+sign*28,gy*T,91,62,{flip:sign});
+    atlasProp('gate',gx*T,gy*T,87,53,{flip:-sign});
     interiorObject('gatePier',gx*T,gy*T,22,22);
-    interiorObject('gateLeaf',gx*T+sign*42,gy*T,61,5);
+    for(let step=0;step<7;step++){
+      const t=(step+.5)/7;
+      interiorObject('gateLeaf',gx*T-sign*(9+32*t),gy*T+2+49*t,6.4,8.5);
+    }
   }
   atlasProp('netrack',netRack.x,netRack.y+10,89,46);
   atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,22);
@@ -504,10 +510,7 @@ function atlasTerrainChunk(cx,cy){
   }
   for(const fire of [district.fire,shoreFire])if(near(fire.x/T,fire.y/T,25))for(let i=0;i<12;i++)
     shoreEllipse(g,fire.x+14*Math.cos(i*Math.PI/6),fire.y+11*Math.sin(i*Math.PI/6),4.5,3.8,i%2?'#665e50':'#827b6a',i*.52);
-  if(near(518,360,70)){
-    const x=518*T,y=360*T;artFill(g,'floor_concrete',x-35,y,70,17);
-    for(const h of [3,9,16])beam(g,x-35,y+h,x+35,y+h,1.3,'#857f74');
-  }
+  for(const h of HOUSES)if(h.flat?.n===1 && near(h.x+h.w/2,h.y+h.h,80))apartmentPorch(g,h);
   for(const tree of treesInRect(l-100,t-100,r+100,b+100)){
     const {x,y,size,art}=tree;g.save();g.translate(x,y);
     const rand=mulberry32(Math.floor(x*37+y));

@@ -43,11 +43,11 @@ async () => {
     if(i===2)break;
     if(i===0){walk(521.5,354.5);straight(x+18,y+5.6);}
     else straight(x+17.83,y+5.6);
-    straight(x+19.35,y+5.6);straight(x+19.35,y+2.6);stairs(true);
+    straight(x+19.35,y+5.6);straight(x+19.35,y+1.48);stairs(true);
   }
   for(const [x,y] of floors.slice(1).reverse()){
     if(x===770){straight(x+19.35,y+5.6);straight(x+17.83,y+5.6);}
-    straight(x+17.83,y+2.6);stairs(false);
+    straight(x+17.83,y+1.48);stairs(false);
   }
   straight(525.35,354.6);straight(518,354.6);straight(518,362);
   return {outside:z.P.y>360*32,occupiedStoreys:3,residents:z.ents.filter(e=>e!==z.P).length};

@@ -84,6 +84,12 @@ function ageRemains(){
 }
 function drawBones(o){
   const g=ctx;g.save();g.translate(o.x,o.y);g.rotate(o.ang);
+  if(BEREZKI && o.kind==='human'){
+    const im=district.images.remains,length=42,w=length*im.width/im.height;
+    g.rotate(Math.PI/2);
+    g.shadowColor='#232722a8';g.shadowBlur=1.3;g.shadowOffsetY=1.1;g.shadowOffsetX=.7;
+    g.drawImage(im,-w/2,-length/2,w,length);g.restore();return;
+  }
   const length=o.kind==='human'?12:o.kind==='boar'?11:8;
   g.lineCap='round';g.strokeStyle='#555044';g.lineWidth=2.8;
   for(const color of ['#514b3e','#a39679']){

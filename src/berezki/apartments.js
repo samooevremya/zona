@@ -40,21 +40,21 @@ function makeApartments() {
       }
       wall(16.1,1,.24,3.6);wall(16.1,6.65,.24,3.35);
       // Parallel half-flights reach the shared north landing. The player walks on the treads.
-      r.stairX=18.55;r.stairY=2.25;
+      r.stairX=18.55;r.stairY=1.04;
       for(const offset of [-1.52,0,1.52])wall(r.stairX+offset,r.stairY,.10,2.85);
       for(const up of [false,true]){
         if(up?n===last:n===1)continue;
         district.stairs.push({room:r,up,...tilePoint(x+r.stairX+(up?.8:-.72),y+r.stairY+.35)});
       }
       if(n===3 && !abandoned){
-        fit('cupboard',r.stairX+.82,3.95,Math.PI/2);
-        fit('cabinet',r.stairX+.78,3.12);fit('pallet',r.stairX+.74,2.45);
+        fit('cupboard',r.stairX+.82,r.stairY+1.70,Math.PI/2);
+        fit('cabinet',r.stairX+.78,r.stairY+.87);fit('pallet',r.stairX+.74,r.stairY+.20);
       }
     }
   }
 }
 function flatStairHeight(r,y){
-  return 16*clamp(1-(y-(r.y+r.stairY)*T)/(2.86*T),0,1);
+  return 37*clamp(1-(y-(r.y+r.stairY)*T)/(2.86*T),0,1);
 }
 function stairwellFloor(g,r,mapView=false){
   const x=(r.x+r.stairX-1.52)*T,y=(r.y+r.stairY)*T,w=3.14*T,len=2.86*T;
@@ -67,8 +67,8 @@ function stairwellFloor(g,r,mapView=false){
       for(let i=0;i<11;i++){
         const v=i*len/11,tint=(side?116:79)+(side?-1:1)*i*3;
         artFill(b,'floor_concrete',u,v,sw,len/11);
-        b.fillStyle='rgba('+tint+','+tint+','+(tint-5)+',.64)';b.fillRect(u,v,sw,len/11);
-        beam(b,u,v+1,u+sw,v+1,1.6,'#b2afa3');beam(b,u,v+3,u+sw,v+3,1.5,'#5a5953');
+        b.fillStyle='rgba('+tint+','+tint+','+(tint-5)+',.29)';b.fillRect(u,v,sw,len/11);
+        beam(b,u,v+1,u+sw,v+1,2.2,'#bab7a8');beam(b,u,v+3,u+sw,v+3,2.8,'#514f48');
       }
     }
     r.stairTreads=c;
