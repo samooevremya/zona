@@ -4,6 +4,7 @@ WINTER = MAPFLAG == 'berezki'
 BIGF = WINTER or MAPFLAG == 'big'
 if BIGF: MAPFLAG = 'rc1'
 h=open('head.html',encoding='utf8').read(); b=open('body.html',encoding='utf8').read(); sp=open('sprite.svg',encoding='utf8').read(); av=open('avatar.js',encoding='utf8').read()
+if WINTER: b=b.replace('КПК','Пейджер')
 css=open('ui/ui-theme.css',encoding='utf8').read()+'\n'+open('ui/zona-fixes.css',encoding='utf8').read()+'\n'+open('ui/hud-ref.css',encoding='utf8').read()+'\n'+open('ui/windows.css',encoding='utf8').read(); icons=open('ui/ui-icons.svg',encoding='utf8').read(); bridge=open('ui/ui-bridge.js',encoding='utf8').read()
 import base64
 with open('berezki/menu.webp' if WINTER else 'art/menu/signal-post.webp','rb') as cover:

@@ -1,0 +1,58 @@
+/* Review overlay applied to the running game only while making reference captures. */
+#ov.concept {
+ --trim:#86785b;--ink:#e8e0cb;--face:#42443b;--edge:#252823;
+ --fastener:radial-gradient(circle at 13px 13px,#211f19 0 1px,#a29a7b 1.5px,#5e5d50 3px,#242720 4px,transparent 5px);
+}
+#ov.concept .pda {
+ box-sizing:border-box; width:min(660px,96vw)!important;height:min(540px,95dvh)!important;
+ max-height:none!important;max-width:none!important;padding:8px 14px 11px!important;
+ border:3px solid #302f27!important;border-image:none!important;border-radius:19px;
+ background:var(--fastener),repeating-linear-gradient(103deg,#ffffff03 0 1px,transparent 1px 4px),linear-gradient(118deg,var(--face),#56574a 45%,var(--edge))!important;
+ box-shadow:inset 0 2px 2px #a19f87,inset 0 -4px 3px #141813,0 10px 24px #0009!important;
+}
+#ov.concept .pda-h {min-height:46px;padding:0 0 3px 14px;border:0;background:none}
+#ov.concept .pda-h h2 {font:700 19px/1.2 'Arial Narrow',Arial,sans-serif;letter-spacing:.08em;color:var(--ink);text-shadow:0 1px #181b17}
+#ov.concept .led{background:#d4b76e;box-shadow:0 0 4px #b6a36d}
+#ov.concept .screen {border:0;padding:0;background:none;min-width:0;gap:5px;overflow:hidden}
+#ov.concept #pbody {padding:0;margin:0;min-height:0;min-width:0;border:0;overflow:hidden;background:none}
+#ov.concept #pbody .kpk-map {padding:0;margin:0;background:none;border:0;gap:5px}
+#ov.concept .kpk-wrap {box-sizing:border-box;border:3px solid #222621;outline:1px solid #74776a;outline-offset:-1px;border-radius:5px;background:#313a37}
+#ov.concept #ptabs {display:flex;gap:4px;border:0;padding:0;margin:0;background:none}
+#ov.concept button {box-sizing:border-box;min-width:44px!important;min-height:44px!important;padding:0 10px!important;max-height:none;
+ font:600 13px/1.1 Arial,sans-serif!important;color:var(--ink)!important;text-transform:none;letter-spacing:.02em;
+ border:1px solid #20231e!important;border-image:none!important;border-radius:5px!important;background:linear-gradient(165deg,#56594e,#343831)!important;
+ box-shadow:inset 0 1px #848579,inset 0 -2px #242823,0 1px 2px #1e211c!important}
+#ov.concept #ptabs button[aria-selected=true]{color:#f8df9b!important;background:linear-gradient(#4e4937,#363529)!important;box-shadow:inset 0 -3px #c0a36a!important}
+#ov.concept .kpk-bar {flex-wrap:nowrap;align-items:center;gap:5px;padding:0;border:0;background:none;min-width:0}
+#ov.concept .kpk-bar .zl {font:600 12px Arial;color:var(--ink);white-space:nowrap}
+#ov.concept .kpk-bar .zl:first-child{flex:1;text-align:left;padding-left:7px}
+#ov.concept .kpk-bar button::after {display:none}
+#ov.field .kpk-map {flex-direction:column-reverse}
+#ov.fold {--face:#5b4b3d;--edge:#302d27}
+#ov.fold .pda {width:min(600px,96vw)!important;border-radius:12px!important}
+#ov.fold #pbody .kpk-map{flex-direction:column-reverse;gap:7px}
+#ov.fold .kpk-wrap {border-width:5px;border-color:#403a31}
+#ov.fold .kpk-bar {border-top:8px solid #2c2c27;padding-top:5px;box-shadow:inset 0 2px #a39a87;background:linear-gradient(90deg,#766b56 0 4%,#4e4b40 4% 96%,#766b56 96%);padding-inline:7px}
+#ov.fold #ptabs button{border-radius:11px!important}
+#ov.console {--face:#454e50;--edge:#262c2b}
+#ov.console .pda {width:min(760px,97vw)!important;height:min(475px,95dvh)!important;border-radius:10px}
+#ov.console .screen {display:grid;grid-template-columns:minmax(0,1fr) 105px;grid-template-rows:minmax(0,1fr);column-gap:9px}
+#ov.console #pbody {grid-column:1;grid-row:1;display:flex}
+#ov.console #ptabs {grid-column:2;grid-row:1;flex-direction:column;justify-content:center;padding:5px 2px;border-left:2px groove #747568}
+#ov.console #ptabs button{flex:0 0 44px}
+#ov.console #pbody .kpk-map{flex-direction:column-reverse}
+@media(max-height:500px){
+ #ov.concept .pda{height:98dvh!important;width:min(620px,98vw)!important;padding:3px 9px 7px!important}
+ #ov.fold .pda{width:min(525px,98vw)!important}
+ #ov.console .pda{width:min(715px,98vw)!important}
+ #ov.concept .pda-h{min-height:44px;padding-bottom:0}
+}
+#ov.field #pbody .kpk-map{display:grid;grid-template-columns:88px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:6px}
+#ov.field .kpk-bar{flex-direction:column;justify-content:center;gap:2px}
+#ov.field .kpk-bar .zl:first-child{display:none}
+#ov.field .kpk-bar .zl{flex:0}
+#ov.field .kpk-bar button{width:100%}
+#ov.field .kpk-wrap{height:100%}
+#ov.fold .kpk-bar{position:relative;margin-top:4px}
+#ov.fold .kpk-bar:before,#ov.fold .kpk-bar:after{content:'';position:absolute;top:-12px;width:14%;height:10px;border:1px solid #272721;border-radius:4px;background:repeating-linear-gradient(90deg,transparent 0 5px,#26282466 5px 6px),linear-gradient(#45463f,#999789 35%,#666558 58%,#333530);box-shadow:0 1px 2px #0008}
+#ov.fold .kpk-bar:before{left:9%}#ov.fold .kpk-bar:after{right:9%}
