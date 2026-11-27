@@ -140,6 +140,7 @@ function texturedFace(a, b, k, tex, light) {
   ctx.restore();
 }
 function roofLift(h){
+  if (BEREZKI && h.residenceWalls)return winterLens*48*h.storeys;
   if (h.storeys) return .105 * h.storeys;
   return houseHeight*(h.ruin ? .72 : h.mat==='depot' ? 1.55 : h.w*T<110 ? .68 : h.w*T>300 ? 1.12 : 1);
 }
@@ -148,7 +149,11 @@ function clipRoofsFromLight(g,x,y,w,h,inView){
     const width=house.w*T,height=house.h*T,left=house.x*T,top=house.y*T;
     if(house.a<.52 || !inView(left+width/2,top+height/2,Math.max(width,height)*.64+40))continue;
     const lift=perspective && ART?roofLift(house):0,[u,v]=roofPoint(left-3,top-3,lift);
-    const roofY=house.residenceWalls && lift?v-residenceTilt*lift:v;
+    if(BEREZKI && house.residenceWalls && lift){
+      const [rx,ry]=residencePoint(left,top,lift);
+      g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(rx,ry,width*(1+lift),height*(1+lift));g.clip('evenodd');continue;
+    }
+    const roofY=v;
     g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(u,roofY,(width+6)*(1+lift),(height+6)*(1+lift));g.clip('evenodd');
   }
 }
@@ -567,8 +572,7 @@ function paintHills(g) {
 // Fade the deck locally underfoot as with house roofs, so the gate and actors remain readable.
 function liftContainer(o, paint) {
   const height = o.k === 'safe' ? .026 : .014, x = o.x + o.w / 2, y = o.y + o.h / 2;
-  const [u, v] = roofPoint(x, y, height);
-  const dx = u - x, dy = v - y;
+  const [dx,dy]=BEREZKI ? winterParallax(x,y,o.k==='safe'?28:18) : [(x-cam.x)*height,(y-cam.y)*height];
   ctx.save();
   ctx.translate(dx * .4, dy * .4);
   paint(o);

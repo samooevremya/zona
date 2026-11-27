@@ -128,11 +128,11 @@ function winterSurface(x,y){
   return 'winterPowder';
 }
 
-function winterStairLift(e){
-  if(e===P && S.flags.stationDeck)return clamp(Math.min(e.y-footbridge.north,footbridge.south-e.y)/(2.5*T),0,1)*12;
-  const r=winterFloor(e.x,e.y);if(!r?.block)return 0;
+function winterStairOffset(e){
+  const r=winterFloor(e.x,e.y);if(!r?.block)return [0,0];
   const x=e.x/T-r.x-r.stairX,y=e.y/T-r.y-r.stairY;
-  return Math.abs(x)<1.55 && y>=0 && y<=2.85?(1-y/2.85)*8:0;
+  if(Math.abs(x)>=1.55 || y<0 || y>2.86)return [0,0];
+  return raisedOffset((r.x+r.stairX+.05)*T,(r.y+r.stairY+1.43)*T,flatStairHeight(r,e.y));
 }
 function winterCoatTone(e){return e.winterTone || (e===P || e.sid==='mitya'?'slate':['cook','housekeeper','anya'].includes(e.sid)?'ochre':'ash');}
 const winterDeadArt=new WeakMap();

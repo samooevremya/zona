@@ -79,7 +79,7 @@ function makePumpingStation(){
   }
   const x=(r.x+4)*T,y=(r.y+2.55)*T;
   interiorObject('pumpMachinery',x,y-4,46,32);
-  atlasProp('waterTower',pumpTower.x,pumpTower.y,120,.14);
+  atlasProp('waterTower',pumpTower.x,pumpTower.y,120,190);
   for(const [dx,dy] of towerFeet)interiorObject('towerFoot',pumpTower.x+dx,pumpTower.y+dy,11,11);
   // Insulated supply line runs beside the building above the entrance.
   const px=pumpTower.x+35,py=pumpTower.y+7,ex=(r.x+4)*T,ey=(r.y+1.55)*T;
@@ -91,8 +91,8 @@ function preparePumpArt(){
   c.getContext('2d').drawImage(ART.images[s.atlas],...s.rect,0,0,w,h);
   district.images.pumpMotor=c;
 }
-function supplyPipe(g,x1,y1,x2,y2){
-  beam(g,x1+2,y1+3,x2+2,y2+3,10,'#49515766');
+function supplyPipe(g,x1,y1,x2,y2,shadow=true){
+  if(shadow)beam(g,x1+2,y1+3,x2+2,y2+3,10,'#49515766');
   beam(g,x1,y1,x2,y2,9,'#504d43');beam(g,x1,y1-1,x2,y2-1,6,'#8e8271');
   beam(g,x1-1,y1-2,x2-1,y2-2,2.6,'#cbd0c9');
   const horizontal=x1!==x2,dist=Math.hypot(x2-x1,y2-y1);
@@ -103,7 +103,10 @@ function supplyPipe(g,x1,y1,x2,y2){
 }
 function pumpYardGround(g){
   const x=pumpTower.x,y=pumpTower.y,px=(pumpRoom.x+4)*T;
-  supplyPipe(g,x+35,y+7,px,y+7);supplyPipe(g,px,y+7,px,(pumpRoom.y+1.55)*T);
+  if(SHADOWS){
+    beam(g,x+37,y+10,px+2,y+10,10,'#49515766');
+    beam(g,px+2,y+10,px+2,(pumpRoom.y+1.55)*T+3,10,'#49515766');
+  }
   for(const [dx,dy] of towerFeet){
     shoreEllipse(g,x+dx,y+dy,10,7,'#5f696c70');
     artFill(g,'wall_concrete',x+dx-5.5,y+dy-5.5,11,11);
@@ -179,8 +182,8 @@ function waterTankArt(){
   towerTank=c;return c;
 }
 function drawWaterTower(g,p,mapView){
-  const dx=perspective&&!mapView?clamp((p.x-cam.x)*.019,-4,4):0;
-  const dy=perspective&&!mapView?clamp((p.y-cam.y)*.016,-3,3):0;
+  const bearingHeight=68;
+  const [dx,dy]=winterParallax(p.x,p.y,bearingHeight/winterTilt,mapView);
   g.save();g.translate(p.x,p.y);
   const upright=(x,y,a,b,w)=>{
     beam(g,x,y,a,b,w,'#46473f');
@@ -189,9 +192,8 @@ function drawWaterTower(g,p,mapView){
   };
   // The front crossbeam seats under the tank at both posts. The curved rim
   // projects beyond that beam in the centre while all feet stay on their pads.
-  const bearingHeight=68;
   for(const y of [-18,18]){
-    const ey=y-bearingHeight+dy*.7,shift=dx*.7;
+    const ey=y-bearingHeight+dy,shift=dx;
     upright(-35,y,35+shift,ey,2.4);upright(35,y,-35+shift,ey,2.4);
     for(const x of [-35,35]){
       upright(x,y,x+shift,ey,5.1);
@@ -199,7 +201,7 @@ function drawWaterTower(g,p,mapView){
     }
     upright(-35+shift,ey,35+shift,ey,4);
   }
-  for(const x of [-35,35])upright(x,-18,x+dx*.7,18-bearingHeight+dy*.7,2.1);
+  for(const x of [-35,35])upright(x,-18,x+dx,18-bearingHeight+dy,2.1);
   // Canvas origin of the tank is the centre of the eaves.
   g.drawImage(waterTankArt(),dx-52,dy-99-63,104,140);
   const lx=24,top=dy-76;

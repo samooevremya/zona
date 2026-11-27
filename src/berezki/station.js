@@ -213,8 +213,36 @@ function paintStationBridge(g){
   g.restore();
 }
 
-// The deck is cached; the guard rails above it lean with the same projection
-// as the station mesh. Draw the posts from their actual attachment to the deck.
+// At either landing z=0. The deck, its occlusion mask, the rail feet
+// and the actor all follow the same two flights and level middle span.
+function bridgeOffset(y,mapView=false){
+  const b=footbridge;
+  const z=24*clamp(Math.min(y-b.north,b.south-y)/(2.5*T),0,1);
+  return raisedOffset(b.x,(b.north+b.south)/2,z,mapView);
+}
+function bridgeSections(){
+  const b=footbridge;return [b.north-8,b.north,b.north+2.5*T,b.south-2.5*T,b.south,b.south+8];
+}
+function drawWinterBridge(g,mapView=false){
+  const b=footbridge,c=district.bridgeArt,left=b.x-b.width/2-5,ys=bridgeSections();
+  for(let i=1;i<ys.length;i++){
+    const y=ys[i-1],span=ys[i]-y,[x0,y0]=bridgeOffset(y,mapView),[x1,y1]=bridgeOffset(ys[i],mapView);
+    g.save();g.translate(left+x0,y+y0);
+    g.transform(1,0,(x1-x0)/span,1+(y1-y0)/span,0,0);
+    g.drawImage(c,0,y-ys[0],c.width,span,0,0,c.width,span);
+    g.restore();
+  }
+}
+function bridgeOutline(g){
+  const b=footbridge,ys=bridgeSections().slice(1,-1);
+  for(const side of [-1,1]){
+    for(const y of (side<0?ys:ys.slice().reverse())){
+      const [dx,dy]=bridgeOffset(y),x=b.x+side*b.width/2+dx;
+      if(side<0 && y===ys[0])g.moveTo(x,y+dy);else g.lineTo(x,y+dy);
+    }
+  }
+  g.closePath();
+}
 function paintBridgeRails(g,mapView=false){
   const b=footbridge,span=b.south-b.north,count=Math.ceil(span/24);
   for(const sign of [-1,1]){
@@ -222,8 +250,8 @@ function paintBridgeRails(g,mapView=false){
     let previous=null;
     for(let i=0;i<=count;i++){
       const y=b.north+span*i/count,[dx,dy]=raisedOffset(x,y,22,mapView);
-      const top=[x+dx,y+dy];
-      beam(g,x,y,...top,2.7,'#62594d');
+      const [ux,uy]=bridgeOffset(y,mapView),top=[x+ux+dx,y+uy+dy];
+      beam(g,x+ux,y+uy,...top,2.7,'#62594d');
       if(previous){
         beam(g,...previous,...top,2.6,'#766e60');
         beam(g,previous[0],previous[1]-.6,top[0],top[1]-.6,.95,'#c9cbc2');
