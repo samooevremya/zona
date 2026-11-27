@@ -1173,18 +1173,40 @@ function newGameControls(nav,label,buttonClass,initialLevel='normal') {
   const describe=()=>{ note.textContent=DIFFICULTIES[select.value].note; };
   select.onchange=describe; describe();
   field.append(select);
-  group.append(field,note,btn(buttonClass,label,()=>{
+  const startButton=btn(buttonClass,label,()=>{
     audioInit(); applyState(freshS(select.value));
     if (panel) closePanel();
     if (title.open) hideTitle();
     intro();
-  }));
+  });
+  if (BEREZKI && !panel && title.el.classList.contains('start')) {
+    const choices=el('details','start-level');
+    const summary=el('summary','','Сложность · '+DIFFICULTIES[select.value].name);
+    select.addEventListener('change',()=>{summary.textContent='Сложность · '+DIFFICULTIES[select.value].name;});
+    choices.append(summary,field,note);
+    nav.append(startButton,choices);
+    return;
+  }
+  group.append(field,note,startButton);
   nav.append(group);
 }
 function showTitle(kind) {
   resetInput();
   title.open = true; title.el.classList.add('open'); document.body.classList.add('title-open');
   const c = $('tcard'); c.textContent = ''; c.classList.toggle('death', kind === 'death'); title.el.classList.toggle('start', kind !== 'death');
+  if (BEREZKI && kind === 'death') {
+    const glass=el('section','death-glass');
+    const heading=el('h1','','Связь потеряна');
+    const records=el('nav','death-records');
+    records.setAttribute('aria-label','Загрузка сохранения');
+    glass.append(heading,records);
+    c.appendChild(glass);
+    slotPicker(records,false,()=>showTitle(),'В главное меню');
+    glass.addEventListener('click',e=>{
+      if(e.target.closest('button:enabled')) play('pagerKey');
+    },true);
+    return;
+  }
   if (kind === 'death') {
     const h = el('h1', '', BEREZKI?'Путь окончен':'Зона забрала'); h.appendChild(el('span', '', BEREZKI?'Берёзки':'ещё одного')); c.appendChild(h);
     c.appendChild(el('div', 'tape'));
@@ -1203,9 +1225,19 @@ function showTitle(kind) {
   }));
   newGameControls(nav,'Новая игра',saved?'':'start-primary');
   if(saved || MANUAL_SLOTS.some(i=>loadSave(i)))nav.appendChild(btn('','Загрузить сохранение',()=>slotPicker(nav,false,()=>showTitle())));
-  nav.appendChild(btn('','Управление',openControlEditor));
-  nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));
-  nav.appendChild(btn('','Звук',()=>soundSettings(nav,()=>showTitle())));
+  const settings=()=>{
+    nav.replaceChildren();
+    nav.appendChild(btn('','Управление',openControlEditor));
+    nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,settings)));
+    nav.appendChild(btn('','Звук',()=>soundSettings(nav,settings)));
+    nav.appendChild(btn('','Назад',()=>showTitle()));
+  };
+  if(BEREZKI) nav.appendChild(btn('','Настройки',settings));
+  else {
+    nav.appendChild(btn('','Управление',openControlEditor));
+    nav.appendChild(btn('','Стрельба',()=>showFireSettings(nav,()=>showTitle())));
+    nav.appendChild(btn('','Звук',()=>soundSettings(nav,()=>showTitle())));
+  }
   c.append(title.name,nav);
 }
 function goFull() {   // на весь экран там, где браузер это умеет (Android, iPad, компьютер); на iPhone — через «На экран Домой»

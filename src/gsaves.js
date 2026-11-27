@@ -1,7 +1,7 @@
 // The original key remains the rolling autosave. Manual snapshots have independent keys.
 const MANUAL_SLOTS=[1,2,3];
 function slotKey(slot){return slot?KEY+'-slot-'+slot:KEY;}
-function slotPicker(nav,writing,back){
+function slotPicker(nav,writing,back,backLabel='Назад'){
   nav.replaceChildren();
   const status=el('p','pause-note',writing?'Выберите слот для записи':'Выберите сохранение');
   status.setAttribute('role','status');nav.appendChild(status);
@@ -21,5 +21,5 @@ function slotPicker(nav,writing,back){
       nav.append(btn('','Заменить',()=>write(slot)),btn('','Отмена',()=>slotPicker(nav,true,back)));
     },!writing && !d));
   }
-  nav.appendChild(btn('','Назад',back));
+  nav.appendChild(btn('',backLabel,back));
 }
