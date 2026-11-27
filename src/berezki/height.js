@@ -39,7 +39,7 @@ function fencePanel(wood,width,variant){
   fencePanels.set(key,c);return c;
 }
 function buildRaisedScenery(){
-  for(const f of [...shoreFences,...trackFences,...baseFences]){
+  for(const f of [...shoreFences,...hamletFences,...trackFences,...baseFences]){
     const vertical=f.h>f.w,wood=f.material==='picket',len=Math.max(f.w,f.h);
     const count=Math.ceil(len/(wood?43:52)),span=len/count;
     for(let i=0;i<count;i++){
