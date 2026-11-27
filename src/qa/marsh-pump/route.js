@@ -32,7 +32,7 @@ async () => {
     check(dry.wet===0 && wet.wet>.1 && wet.heat<dry.heat && wet.seconds<dry.seconds,JSON.stringify(routeStats));
     results.push({hour,dry,wet});
   }
-  walk([[205,436],[209.1,436.8]]);
+  walk([[205,436],[209.45,435.98]]);
   check(z.near?.k==='pumpKindle','Missing stove '+z.near?.k);
   z.interact();const heat=flags().warmth,wet=flags().coatWetness;
   for(let i=0;i<150;i++)z.update(1/60);

@@ -100,7 +100,7 @@ OUT = 'index_big.html' if BIGF else 'index.html' if MAPFLAG == 'rc1' else 'index
 if WINTER:
     OUT='../berezki.html'
     h='\n'.join(line for line in h.split('\n') if 'href="https://fonts.' not in line)
-    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','groundscan','lakeIce','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit']})+';'
+    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','groundscan','lakeIce','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit','tankShell','mainPipe','reedStand']})+';'
     b=b.replace('ЗОНА<span class="start-region">КОРДОН','МЕРЗЛОТА<span class="start-region">СОТЫЙ КИЛОМЕТР')
     h=h.replace('<title>'+h.split('<title>')[1].split('</title>')[0]+'</title>','<title>Мерзлота</title>')
 open(OUT,'w',encoding='utf8').write(h+sp+"\n"+icons+"\n"+b+"\n<script>window.ZONA_MAP="+repr(MAPFLAG)+";"+("window.ZONA_BIG=1;" if BIGF else "")+"\n"+art+"\n</script>\n<script>\n"+js+"</script>\n</body>\n</html>\n")

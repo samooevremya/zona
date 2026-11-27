@@ -119,7 +119,7 @@ function stationRoof(){
   front.save();front.translate(7*T,18);stationSign(front,0,0,'ВОКЗАЛ · СОТЫЙ КИЛОМЕТР',true);front.restore();
   h.storeys=1;h.rooftop=[];
   const c=winterCanvas(w,d),g=c.getContext('2d');
-  g.drawImage(balancedGable('c1_roof_slate'),0,0,w,d);
+  g.drawImage(winterGable('c1_roof_slate'),0,0,w,d);
   const snow=g.createPattern(snowMaterial(),'repeat');snow.setTransform(new DOMMatrix().scale(.5));
   g.globalAlpha=.59;g.fillStyle=snow;g.fillRect(2,2,w-5,d-6);g.globalAlpha=1;
   g.fillStyle='#41506530';g.fillRect(2,d/2,w-5,d/2-4);
@@ -128,7 +128,7 @@ function stationRoof(){
   const cx=7*T;
   for(const s of [-1,1]){
     g.save();g.beginPath();g.moveTo(cx,d*.38);g.lineTo(cx+s*48,d*.73);g.lineTo(cx+s*48,d-3);g.lineTo(cx,d-3);g.closePath();g.clip();
-    g.translate(cx,d*.7);g.rotate(Math.PI/2);g.drawImage(balancedGable('c1_roof_slate'),-d*.36,-49,d*.72,98);
+    g.translate(cx,d*.7);g.rotate(Math.PI/2);g.drawImage(winterGable('c1_roof_slate'),-d*.36,-49,d*.72,98);
     g.globalAlpha=.42;g.fillStyle=snow;g.fillRect(-d*.36,-49,d*.72,98);g.restore();
   }
   return c;

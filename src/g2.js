@@ -706,7 +706,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
       if(Math.abs(lateral)<4.2 && along>=near && along<=far)hit=along-Math.sqrt(4.2**2-lateral**2);
     }
     const solids=walkSolids.get(cell),props=propCells.get(cell);
-    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k)) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
+    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
     if(props)for(const p of props){
       if(vision==='light' && p.vaultable)continue;
@@ -791,11 +791,12 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
   if (sh!==P) noteGunfight(sh,target);
   // Дробины одного выстрела считаются одним попаданием по своим.
   const shot = sh === P ? { fight:P.gunfight, id:(P.shotId=(P.shotId || 0)+1) } : null;
+  let impactHeard=false;
   for (let k = 0; k < n; k++) {
     const a = shots ? shots[k].a : ang + (Math.random() - 0.5) * 2 * spread, r = shots ? shots[k].r : shotTrace(sh, a, W), ca = r.ca, sa = r.sa, best = r.best, bt = r.t;
     const ex = sh.x + ca * bt, ey = sh.y + sa * bt;
     if (bt > mzT + 0.5 && !blocked) tracers.push({ x0: mz.x, y0: mz.y, x1: ex, y1: ey, life: 0.07, w: n > 1 ? 1 : 1.6 });
-    if(r.box && sh===P && r.box.k==='crate'){surfaceImpact(ex,ey,ca,sa,r.box);breakCrate(r.box);continue;}
+    if(r.box && sh===P && r.box.k==='crate'){surfaceImpact(ex,ey,ca,sa,r.box,!impactHeard);impactHeard=true;breakCrate(r.box);continue;}
     if (best && coverBlocks(best, sh.x, sh.y) && chance(best === P ? 0.6 : 0.5)) {
       const cx = best.x - ca * 22, cy = best.y - sa * 22;
       if (tracers.length && tracers[tracers.length - 1].x1 === ex) { tracers[tracers.length - 1].x1 = cx; tracers[tracers.length - 1].y1 = cy; }
@@ -805,11 +806,11 @@ function fire(sh, ang, W, spread, target = sh.tgt) {
       const fall = n > 1 ? clamp(1.3 - Math.max(0, bt - ballOff(sh)) / W.range, 0.3, 1) : 1;
       hurt(best, W.dmg * fall * rnd(0.85, 1.15), sh, a, shot);
       if (sh===P) { P.hitT=.2; P.impact={x:ex,y:ey,kill:!best.alive}; }
-    } else if (r.wall) surfaceImpact(ex,ey,ca,sa,r.box);
+    } else if (r.wall) {surfaceImpact(ex,ey,ca,sa,r.box,!impactHeard);impactHeard=true;}
   }
   flashes.push({ x: fx, y: fy, a: ang, life: 0.06 });
   play(W.snd || 'p', sh.x, sh.y);
-  if (sh === P && !W.pellets) play('shell', sh.x, sh.y);
+  if (!BEREZKI && sh === P && !W.pellets) play('shell', sh.x, sh.y);
   shake(sh === P ? (W.pellets ? 4 : 1.5) : 0);
   ents.forEach(e => {
     if (e === sh || !e.alive || e === P || e.captive) return;

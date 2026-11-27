@@ -8,6 +8,8 @@ function makeWinterSalvage(){
   for(const surface of ['Powder','Packed','Ice','Slush','Board','Concrete']){
     recordings['winter'+surface]=[.34,'winter'+surface+'1','winter'+surface+'2','winter'+surface+'3'];
   }
+  recordings.winterReeds=[.39,'winterReeds1','winterReeds2'];
+  for(const [id,gain] of [['loadShellOne',.57],['hitTimber',.55],['hitMasonry',.53],['hitSteel',.49],['hitSoil',.4]])recordings[id]=[gain,id];
   recordings.frostCrack=[.14,'winterCreak'];
   for(const [x,y,key,loot] of [
     [524,384,'landing',{candle:1,bandage:1}],[484,130,'nets',{wire:2}],
@@ -117,7 +119,7 @@ function winterSurface(x,y){
   if(S.flags.onLookout)return 'winterBoard';
   const r=winterFloor(x,y);
   if(r)return r.hamlet||r===fishingRoom||villageCabins.includes(r)||r.kind==='barracks'||(r.block && x<(r.x+16)*T && (y<(r.y+4.4)*T||y>(r.y+6.75)*T))?'winterBoard':'winterConcrete';
-  if(swampAt(x,y))return 'winterSlush';
+  if(swampAt(x,y))return reedDensity(x,y)>.28?'winterReeds':'winterSlush';
   if(basinRadius(x/T,y/T,lakeShape)<1)return 'winterIce';
   if(y>northFence && y<southFence || S.flags.stationDeck)return 'winterConcrete';
   for(const route of atlasRoutes)for(let i=1;i<route.length;i++){

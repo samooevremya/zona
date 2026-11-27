@@ -5,6 +5,23 @@ function residencePoint(x,y,k){
   const [dx,dy]=raisedOffset(x,y,k/winterLens);
   return [x+dx,y+dy];
 }
+const winterRoofSkins=new Map();
+function winterGable(id){
+  if(winterRoofSkins.has(id))return winterRoofSkins.get(id);
+  const src=balancedGable(id),w=src.width,h=src.height,skin=winterCanvas(w,h),g=skin.getContext('2d');
+  g.drawImage(src,0,0);
+  // Restore the roof courses beneath the chimney embedded in the source photograph.
+  const start=Math.round(w*(id==='c1_roof_slate'?.68:.12)),span=Math.round(w*.23);
+  const source=start+(id==='c1_roof_slate'?-1:1)*Math.round(w*.34);
+  for(let i=0;i<span;i++){
+    g.globalAlpha=Math.min(1,i/7,(span-i)/7);
+    g.drawImage(src,source+i,0,1,h,start+i,0,1,h);
+  }
+  winterRoofSkins.set(id,skin);return skin;
+}
+function stoveStack(h,at){
+  return at?[[at.x-h.x*T-6,at.y-h.y*T-6,12,12,17]]:[];
+}
 function residenceWindows(side,storey){
   const positions=side%2 ? [2.5,5.65,8.5] : [2.6,5,8.1,10.3,14,16,18.65];
   return positions.map((tile,i)=>({
@@ -156,15 +173,21 @@ function drawResidence(h,i){
     const px=x+u,py=y+v;
     const corners=[[px,py],[px+width,py],[px+width,py+depth],[px,py+depth]];
     const bottom=corners.map(p=>residencePoint(...p,k)),top=corners.map(p=>residencePoint(...p,k+rise*winterLens));
+    const [bx,by]=bottom[0],bw=width*(1+k),bd=depth*(1+k);
+    ctx.save();ctx.shadowColor='#38434699';ctx.shadowBlur=3;ctx.shadowOffsetX=2;ctx.shadowOffsetY=2;
+    artFill(ctx,'wall_concrete',bx-2,by-2,bw+4,bd+4);ctx.restore();
+    beam(ctx,bx-2,by+bd+1,bx+bw+2,by+bd+1,1.2,'#d1d5cd');
     for(const [a,b,visible,shade] of [[0,1,cam.y+residenceTilt<py,'#626963'],[1,2,cam.x>px+width,'#5f6665'],[3,2,cam.y+residenceTilt>py+depth,'#85877b'],[0,3,cam.x<px,'#72756c']]){
       if(!visible)continue;
-      ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(...bottom[a]);ctx.lineTo(...bottom[b]);ctx.lineTo(...top[b]);ctx.lineTo(...top[a]);ctx.fill();
+      const face=width<=18?'wall_brick':'wall_concrete',A=top[a],B=top[b],D=bottom[a];
+      ctx.save();ctx.transform((B[0]-A[0])/32,(B[1]-A[1])/32,(D[0]-A[0])/22,(D[1]-A[1])/22,A[0],A[1]);
+      artFill(ctx,face,0,0,32,22);ctx.fillStyle=shade+'66';ctx.fillRect(0,0,32,22);ctx.restore();
     }
     const [lx,ly]=top[0],ww=width*(1+k+rise*winterLens),dd=depth*(1+k+rise*winterLens);
     artFill(ctx,'wall_concrete',lx,ly,ww,dd);
     ctx.fillStyle='#c7ced1be';ctx.fillRect(lx,ly,ww,dd);
     ctx.strokeStyle='#6c7576';ctx.lineWidth=1;ctx.strokeRect(lx,ly,ww,dd);
     if(width>40){for(let seam=8;seam<ww;seam+=10)beam(ctx,lx+seam,ly,lx+seam,ly+dd,.8,'#8a9291');}
-    else {ctx.fillStyle='#565b59';ctx.fillRect(lx+ww*.25,ly+dd*.25,ww*.50,dd*.50);}
+    else {ctx.fillStyle='#655c50';ctx.fillRect(lx+1,ly+1,ww-2,dd-2);ctx.fillStyle='#252623';ctx.fillRect(lx+ww*.19,ly+dd*.19,ww*.62,dd*.64);beam(ctx,lx+1,ly+dd-1,lx+ww-2,ly+dd-1,1.3,'#ccd0c8');}
   }
 }
