@@ -245,10 +245,8 @@ function winterRoom(r){
       const y=vertical?win.u:(side===2?h-15:15);
       g.translate(ox+x,oy+y);
       if(vertical)g.rotate(Math.PI/2);
-      g.fillStyle='#49473e';g.fillRect(-length/2-2,-6,length+4,13);
-      g.fillStyle=win.warm?'#928267':'#647275';g.fillRect(-length/2,-4,length,8);
-      for(let i=0;i<win.boards;i++)beam(g,-length/2,-3+i*5,length/2,i*5,3,'#847058');
-      g.fillStyle='#a39b85';g.fillRect(-length/2-2,5,length+4,2);g.restore();
+      winterSash(g,0,-5,length,10,win.take);
+      g.restore();
     }
   }
   if(r.n===1){

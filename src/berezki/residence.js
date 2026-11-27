@@ -30,7 +30,7 @@ function residenceWindows(side,storey,abandoned=false){
     if(!abandoned && storey===1 && side%2 && i===1)return [];
     const seed=hash2(i+storey*13,side*11+(abandoned?31:0));
     const take=abandoned || storey>3?(seed<.46?3:seed<.78?4:0):[0,1,5,2,4][Math.floor(seed*5)];
-    return [{u:tile*T,width:(side%2?23:26)+Math.floor(seed*8),boards:take===4?2:0,warm:take===2,take}];
+    return [{u:tile*T,width:(side%2?23:26)+Math.floor(seed*8),take}];
   });
 }
 function residenceWall(h,side){
