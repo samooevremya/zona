@@ -72,14 +72,14 @@ function drawLampShadows(inView){
 
 function hitSurface(x,y,dx,dy,box){
   const p={x:x+dx*.7,y:y+dy*.7,r:.8},tx=Math.floor(p.x/T),ty=Math.floor(p.y/T),cell=ty*MW+tx;
-  let kind=box?.k;
+  let kind=box?.material||box?.fitting||box?.k;
   if(!kind){
     const solid=walkSolids.get(cell)?.find(o=>o.solid && p.x>=o.x-1 && p.x<=o.x+o.w+1 && p.y>=o.y-1 && p.y<=o.y+o.h+1);
-    kind=solid?.material||solid?.k||propCells.get(cell)?.find(o=>touchesProp(o,p))?.id||'';
+    kind=solid?.material||solid?.fitting||solid?.k||propCells.get(cell)?.find(o=>touchesProp(o,p))?.id||'';
   }
-  if(/crate|stockade|picket|log|bench|plank|stump|wood|sleeper/.test(kind))return 'wood';
-  if(/concrete|pier|rock|stone/i.test(kind))return 'stone';
-  if(/car|wagon|barrel|metal|bus|drum|barrier|steel|fence|tank|truck|pipe/i.test(kind))return 'metal';
+  if(/crate|stockade|picket|log|bench|plank|stump|wood|sleeper|cupboard|desk|chair|pallet|timber|spruce|birch|pine|tree/i.test(kind))return 'wood';
+  if(/concrete|pier|rock|stone|pipeFoot|towerFoot/i.test(kind))return 'stone';
+  if(/car|wagon|barrel|metal|bus|drum|barrier|steel|fence|tank|truck|pipe|waterMain|stove|pumpMachinery/i.test(kind))return 'metal';
   const tile=tAt(tx,ty);
   if(tile===TR)return 'wood';
   if(tile===CO)return 'stone';
@@ -90,9 +90,11 @@ function hitSurface(x,y,dx,dy,box){
   return tile===RA?'metal':'earth';
 }
 const impactColors={wood:['#ba9466','#806044'],brick:['#b68a72','#907465'],stone:['#bbb7a3','#969487'],metal:['#ffcf80','#ffe4ac'],earth:['#968671','#84755f']};
-function surfaceImpact(x,y,dx,dy,box){
-  if(!P || dE(P,{x,y})>970 || parts.length>200)return;
+function surfaceImpact(x,y,dx,dy,box,audible=false){
+  if(!P || dE(P,{x,y})>970)return;
   const material=hitSurface(x,y,dx,dy,box),colors=impactColors[material];
+  if(BEREZKI && audible)play(({wood:'hitTimber',brick:'hitMasonry',stone:'hitMasonry',metal:'hitSteel',earth:'hitSoil'})[material],x,y);
+  if(parts.length>200)return;
   for(let i=0;i<4;i++){
     const speed=rnd(26,material==='metal'?160:92),angle=Math.atan2(-dy,-dx)+rnd(-1.2,1.2);
     parts.push({x:x-dx,y:y-dy,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rnd(.12,.30),c:colors[i%2],

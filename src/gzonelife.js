@@ -113,7 +113,7 @@ function drawFlyingCrow(c){
   g.beginPath();g.ellipse(0,0,4.5,1.8,0,0,7);g.ellipse(3.8,-.2,1.6,1.4,0,0,7);g.fill();
   g.beginPath();g.moveTo(4.8,-.8);g.lineTo(7,.1);g.lineTo(4.8,.5);g.fill();g.restore();
 }
-function reloadSound(id){return WP[id]?.ammo==='a12'?'loadShell':compatibleRifle(id)?'loadRifle':'loadPistol';}
+function reloadSound(id,rounds=2){return WP[id]?.ammo==='a12'?(BEREZKI && rounds===1?'loadShellOne':'loadShell'):compatibleRifle(id)?'loadRifle':'loadPistol';}
 
 const campStories=[
   ['У кого вчера часы утащили?','У меня. Теперь вор точно знает, сколько ему осталось.'],

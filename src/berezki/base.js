@@ -115,8 +115,7 @@ function baseRoof(h){
   artFill(g,'wall_concrete',0,0,w,d);
   const rand=mulberry32(h.x*317+h.y);
   g.fillStyle=r.kind==='hangar'?'#655c5199':'#77796770';g.fillRect(0,0,w,d);
-  const sprite=ART.m.sprites[r.kind==='hangar'?'c1_roof_hangar':'c1_roof_office'];
-  g.drawImage(ART.images[sprite.atlas],...sprite.rect,0,0,w,d);
+  g.drawImage(winterGable('c1_roof_slate'),0,0,w,d);
   const rib=r.kind==='hangar'?10:24;
   for(let x=3;x<w;x+=rib){
     beam(g,x,0,x,d,2,'#403e3666');beam(g,x+2,0,x+2,d,1,'#cec9b499');
@@ -140,11 +139,6 @@ function baseRoof(h){
     g.restore();
   }
   g.strokeStyle='#7d8076';g.lineWidth=4;g.strokeRect(2,2,w-4,d-4);
-  if(r.kind==='guard' || r===pumpRoom){
-    const x=r===pumpRoom?pumpHearth.x-r.x*T:2*T,y=r===pumpRoom?pumpHearth.y-r.y*T:2*T;
-    g.fillStyle='#605e54';g.fillRect(x-7,y-8,16,16);
-    shoreEllipse(g,x,y,6,6,'#323532');shoreEllipse(g,x-1,y-1,4,4,'#141916');
-  }
   return c;
 }
 let baseApron;
