@@ -15,7 +15,7 @@ function makeDistrict(){
   makeApartments();
   makeFishingShore();
   makeWinterStation();
-  makeBase();makePumpingStation();makeWesternSites();
+  makeBase();makePumpingStation();makeWesternSites();makeHamlet();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE,shoreFire);
   ANOM0.length=CACHES.length=0;
@@ -95,7 +95,7 @@ function winterInteractChoices(cand){
     const lit=stoveBurning(stove);
     cand(dE(P,stove.at),{k:lit?'winterRest':stove.action,stove,label:lit?'Согреться у печи':'Растопить печь'});
   }
-  if(room?.n>1 || shoreHomes.some(home=>home.room===room))for(const o of objs){
+  if(room?.n>1 || room?.heater || shoreHomes.some(home=>home.room===room))for(const o of objs){
     if(o.fitting!=='bedroll')continue;
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
@@ -104,20 +104,20 @@ function winterInteractChoices(cand){
   if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
 }
 function winterUse(n){
-  if(n.k==='baseKindle' || n.k==='pumpKindle'){
-    S.flags[n.stove.flag]=S.min+8*60;msg(n.stove===pumpHeater?'Дрова занялись. Здесь можно просушить одежду.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
+  if(n.k==='baseKindle' || n.k==='pumpKindle' || n.k==='hamletKindle'){
+    S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. Здесь можно просушить одежду.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
     const from=n.s,to=district.stairs.find(s=>s.room.block===from.room.block && s.room.n===from.room.n+(from.up?1:-1) && s.up!==from.up);
     P.x=to.x;P.y=to.y+1.45*T;cam.x=P.x;cam.y=P.y;G.near=null;msg(to.room.name,'say');
   }else if(n.k==='winterRest'){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
-    dialog({n:n.bed?'Лежанка':'У огня',grp:n.stove?n.stove.room.name:shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
+    dialog({n:n.bed?'Лежанка':'У огня',grp:n.stove?n.stove.room.name:winterFloor(P.x,P.y)?.hamlet?'Хутор':shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
       ...[1,3,8].map(h=>({t:'Отдохнуть · '+h+' ч',fn:()=>{
         const result=restPreview(h,n.bed?'sleep':'rest');
         S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
         if(result.minutes){
           P.st=100;S.flags.warmth=100;
-          if(n.stove===pumpHeater){
+          if(n.stove===pumpHeater || n.stove?.room.hamlet){
             const heated=Math.min(result.minutes,Math.max(0,S.flags[n.stove.flag]-(S.min-result.minutes)));
             S.flags.coatWetness=Math.max(0,(S.flags.coatWetness||0)-heated*.045);
           }
@@ -282,7 +282,7 @@ function winterLandscape(){
   district.bridgeArt=winterCanvas(Math.ceil(bridge.width+10),Math.ceil(bridge.south-bridge.north+16));
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
 
-  district.plans=district.levels.map(r=>r===pumpRoom?pumpFloor(r):r.kind?baseInterior(r):r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
+  district.plans=district.levels.map(r=>r.hamlet?hamletFloor(r):r===pumpRoom?pumpFloor(r):r.kind?baseInterior(r):r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
   district.plans.forEach((plan,i)=>thawAtDoor(district.levels[i],plan));
 
 }
@@ -327,7 +327,7 @@ function winterRoofs(){
     if(h===stationHouse){h.roofIndex=ROOFS.length;ROOFS.push(stationRoof());continue;}
     if(h===fishingHouse || h.cabin){
       h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,true,'timber'));
-      h.storeys=1;h.rooftop=[[(h.cabin?h.w-2:2)*T-5,2.4*T-7,14,15,16]];
+      h.storeys=1;h.rooftop=h.cabin?.hamlet && !h.cabin.heater?[]:[[(h.cabin?h.w-2:2)*T-5,2.4*T-7,14,15,16]];
       h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
     }
     const occupied=h.flat && !h.flat.abandoned;
@@ -363,7 +363,7 @@ function winterMini(){
   const s=size/(winterFloor(P.x,P.y)?30:46);mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#222829';mctx.fillRect(0,0,size,size);
   mctx.translate(size/2-P.x/T*s,size/2-P.y/T*s);winterMap(mctx,s,false,{u:1.5,mini:true});
   const room=winterFloor(P.x,P.y);
-  $('mini-distance').textContent=room===pumpRoom || room?.kind?room.name:room===stationRoom?'Вокзал':room===fishingRoom || villageCabins.includes(room)?'Изба':room?'Эт. '+room.n:'Улица';
+  $('mini-distance').textContent=room===pumpRoom || room?.kind || room?.hamlet?room.name:room===stationRoom?'Вокзал':room===fishingRoom || villageCabins.includes(room)?'Изба':room?'Эт. '+room.n:'Улица';
   $('mini-people').textContent=ents.filter(e=>e!==P && e.alive && dE(e,P)<520).length;
 }
 async function bootBerezki(){

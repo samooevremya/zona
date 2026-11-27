@@ -301,30 +301,31 @@ function shoreGround(g){
     const a=rand()*6.28;shoreEllipse(g,x+Math.cos(a)*(12+rand()*5),y+Math.sin(a)*(9+rand()*5),1+rand()*2,1,'#e5ebe9',a);
   }
   beam(g,x+12,y+11,x+5,y-1,1.7,'#775d45');
-  for(const h of HOUSES.filter(h=>h===fishingHouse || h.cabin)){
-    const door=h.entrances[0],cx=h.x*T+door.x,edge=h.y*T+door.y;
-    const py=edge+(door.ny<0?-19:0);
-    const lip=edge+door.ny*19;
-    packedSnow(g,cx,lip,door.width*.65,20,.45);
-    // Wind piles snow against the sill and exposed foundation but leaves the worn step clear.
-    for(const side of [-1,1]){
-      const post=cx+side*(door.width/2+2);
-      const wallEnd=(side<0?h.x:h.x+h.w)*T;
-      const span=Math.abs(wallEnd-post);
-      snowDrift(g,(wallEnd+post)/2,edge+door.ny*3,Math.round(span*.53),9,0,side+51);
-    }
-    artFill(g,'floor_wood',cx-door.width/2-3,py,door.width+6,19);
-    for(const v of [4,10,17])beam(g,cx-door.width/2-3,py+v,cx+door.width/2+3,py+v,1.4,'#746859');
-    for(const side of [-1,1]){
-      snowDrift(g,cx+side*door.width/2,lip,12,5,side*.22,side+12);
-      snowDrift(g,cx+side*(door.width/2+3),py+8,6,10,side*.14,side+29);
-    }
-  }
+  for(const h of HOUSES)if(h===fishingHouse || villageCabins.includes(h.cabin))paintCabinThreshold(g,h);
   for(const o of shoreFences)drawShoreFence(g,o);
   for(const o of shoreFences)paintFenceFooting(g,o,-Infinity,Infinity);
   const ash=g.createRadialGradient(shoreFire.x,shoreFire.y,5,shoreFire.x,shoreFire.y,29);
   ash.addColorStop(0,'#37312b');ash.addColorStop(.5,'#6f655cb3');ash.addColorStop(1,'#908c8000');
   g.fillStyle=ash;g.fillRect(shoreFire.x-29,shoreFire.y-29,58,58);
+}
+function paintCabinThreshold(g,h){
+  const door=h.entrances[0],cx=h.x*T+door.x,edge=h.y*T+door.y;
+  const py=edge+(door.ny<0?-19:0);
+  const lip=edge+door.ny*19;
+  packedSnow(g,cx,lip,door.width*.65,20,.45);
+  // Wind piles snow against the sill and exposed foundation but leaves the worn step clear.
+  for(const side of [-1,1]){
+    const post=cx+side*(door.width/2+2);
+    const wallEnd=(side<0?h.x:h.x+h.w)*T;
+    const span=Math.abs(wallEnd-post);
+    snowDrift(g,(wallEnd+post)/2,edge+door.ny*3,Math.round(span*.53),9,0,side+51);
+  }
+  artFill(g,'floor_wood',cx-door.width/2-3,py,door.width+6,19);
+  for(const v of [4,10,17])beam(g,cx-door.width/2-3,py+v,cx+door.width/2+3,py+v,1.4,'#746859');
+  for(const side of [-1,1]){
+    snowDrift(g,cx+side*door.width/2,lip,12,5,side*.22,side+12);
+    snowDrift(g,cx+side*(door.width/2+3),py+8,6,10,side*.14,side+29);
+  }
 }
 function cabinFloor(r){
   const c=winterCanvas(r.w*T,r.h*T),g=c.getContext('2d');
@@ -333,7 +334,7 @@ function cabinFloor(r){
     artFill(g,'floor_wood',x*T,y*T,T,T);
     g.fillStyle='#493f3480';g.fillRect(x*T,y*T,T,T);
   }
-  paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));
+  if(!r.hamlet)paintCabinTextiles(g,shoreHomes.find(home=>home.room===r));
   return c;
 }
 function fishingInterior(r){

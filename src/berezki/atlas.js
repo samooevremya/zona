@@ -15,7 +15,7 @@ const atlasRoutes=[
   [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
   [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
   [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
-  ...shoreLanes,...baseLanes,...pumpPaths,[[158.4,189.2],[157.5,186.5]]
+  ...shoreLanes,...baseLanes,...pumpPaths,...hamletLanes,[[158.4,189.2],[157.5,186.5]]
 ];
 const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
 const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
@@ -48,7 +48,7 @@ function seedAtlasTerrain(){
     }
   }
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
-  for(const r of villageCabins)clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
+  for(const r of [...villageCabins,...hamletRooms])clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
   clear(495,132,7,7);clear(149,178,17,11);clear(75,117,9,11);
   clear(302,566,47,35);clear(186,427,28,14);
 }
@@ -423,6 +423,7 @@ function atlasTerrainChunk(cx,cy){
   drawAtlasRoutes(g,l,t,r,b);roadImprints(g,l,t,r,b);
   if(b>northFence-4*T && t<southFence+8*T)paintStationGround(g,l,r);
   if(near(493,132,18*T))shoreGround(g);
+  if(near(113,547,24*T))hamletGround(g);
   if(near(playYard.x,playYard.y,230)){
     paintPlaygroundSnow(g,0,0);paintPlaygroundSnow(g,-40,94);paintPlaygroundSnow(g,60,98);
   }

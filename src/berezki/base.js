@@ -17,7 +17,7 @@ const baseLanes=[[[325,568],[325,573],[324,582],[324,589],[324,596],[336.5,597],
   [[320,573],[325,573],[331,574]],[[324,589],[319,589]],[[324,582],[336.5,581.5],[336.5,585]]];
 const baseStove=tilePoint(314,572);
 const baseHeater={at:baseStove,flag:'baseStoveUntil',room:baseRooms[0],action:'baseKindle'};
-function stoveIn(room){return room===baseRooms[0]?baseHeater:room===pumpRoom?pumpHeater:null;}
+function stoveIn(room){return room===baseRooms[0]?baseHeater:room===pumpRoom?pumpHeater:room?.heater;}
 function stoveBurning(stove){return stove && (S.flags[stove.flag]||0)>S.min;}
 function makeBase(){
   for(const r of baseRooms){
