@@ -701,7 +701,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
     if(tileBlocks(i,j))return near;
     const cell=j*MW+i,far=Math.min(nextX,nextY,limit);
     let hit=Infinity;
-    if(BEREZKI && vision==='light' && map[cell]===TR){
+    if(BEREZKI && from!==P && vision==='light' && map[cell]===TR){
       const u=(i+.5)*T-x,v=(j+.5)*T-y,along=u*dx+v*dy,lateral=u*dy-v*dx;
       if(Math.abs(lateral)<4.2 && along>=near && along<=far)hit=along-Math.sqrt(4.2**2-lateral**2);
     }

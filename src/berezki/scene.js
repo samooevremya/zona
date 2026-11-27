@@ -280,7 +280,10 @@ function winterLandscape(){
   const bg=district.bridgeArt.getContext('2d');bg.translate(-bridge.x+bridge.width/2+5,-bridge.north+8);paintStationBridge(bg);
 
   district.plans=district.levels.map(r=>r.hamlet?hamletFloor(r):r===pumpRoom?pumpFloor(r):r.kind?baseInterior(r):r===stationRoom?stationInterior(r):r===fishingRoom?fishingInterior(r):villageCabins.includes(r)?cabinFloor(r):winterRoom(r));
-  district.plans.forEach((plan,i)=>thawAtDoor(district.levels[i],plan));
+  district.plans.forEach((plan,i)=>{
+    const room=district.levels[i];
+    thawAtDoor(room,plan);room.cutWalls=cutawayWalls(room,plan);
+  });
 
 }
 function winterFloorPlan(r){
@@ -447,4 +450,40 @@ function winterPortrait(e){
   const bg=g.createRadialGradient(57,43,2,60,60,83);bg.addColorStop(0,'#625e50');bg.addColorStop(1,'#292c2a');
   g.fillStyle=bg;g.fillRect(0,0,120,120);g.translate(60,61);g.scale(3.35,3.35);g.rotate(Math.PI/2-e.ang);g.translate(-e.x,-e.y);
   drawHuman(e,g);return c;
+}
+
+// Keep the player's beam on its own light mask. A tree can interrupt that
+// beam without darkening a nearby hearth or casting into the unlit half-plane.
+let winterBeamMask, lastWinterBeam;
+function winterFlashlight(g,source){
+  const radius=330,half=.42;
+  const mask=winterBeamMask ||= winterCanvas(radius,radius);
+  const brush=mask.getContext('2d'),left=source.x-radius,top=source.y-radius;
+  if(lastWinterBeam && lastWinterBeam.x===source.x && lastWinterBeam.y===source.y &&
+    lastWinterBeam.angle===source.ang && lastWinterBeam.rev===navRevision && lastWinterBeam.shadows===SHADOWS){
+    g.drawImage(mask,left,top,radius*2,radius*2);return;
+  }
+  lastWinterBeam={x:source.x,y:source.y,angle:source.ang,rev:navRevision,shadows:SHADOWS};
+  brush.setTransform(.5,0,0,.5,-left*.5,-top*.5);
+  brush.clearRect(left,top,radius*2,radius*2);
+  castLight(brush,source,source.ang,half,radius,.95);
+  if(SHADOWS && !winterFloor(source.x,source.y)){
+    brush.save();brush.globalCompositeOperation='destination-out';
+    for(const tree of treesInRect(left,top,left+2*radius,top+2*radius)){
+      const dx=tree.x-source.x,dy=tree.y-source.y,dist=Math.hypot(dx,dy);
+      if(dist<1 || dist>=radius)continue;
+      const angle=Math.atan2(dy,dx);
+      if(Math.abs(angD(source.ang,angle))>half+Math.atan2(tree.size*.25,dist))continue;
+      const length=Math.min(radius-dist+16,tree.size*(1.05+39/Math.max(26,dist)));
+      brush.save();brush.translate(tree.x,tree.y);brush.rotate(angle);
+      brush.globalAlpha=.66;
+      brush.drawImage(tree.art.shadow,length*.15,-tree.size*.32,length,tree.size*.64);
+      const shade=brush.createLinearGradient(0,0,length*.64,0);
+      shade.addColorStop(0,'#000');shade.addColorStop(1,'transparent');
+      brush.fillStyle=shade;brush.beginPath();brush.ellipse(length*.31,0,length*.33,2.3,0,0,Math.PI*2);brush.fill();
+      brush.restore();
+    }
+    brush.restore();
+  }
+  g.drawImage(mask,left,top,radius*2,radius*2);
 }

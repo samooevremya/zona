@@ -6,7 +6,7 @@ const pumpHeater={at:pumpHearth,flag:'pumpStoveUntil',room:pumpRoom,action:'pump
 const towerFeet=[[-35,-18],[35,-18],[-35,18],[35,18]];
 const marshFork=[183.8,434.2],pumpDoor=[203.5,436];
 const marshCrossing=[marshFork,[192,434.5],[197.8,435.6],[200.6,436],pumpDoor];
-const marshBank=[marshFork,[183.7,437.6],[185.7,440.8],[188.2,444.2],[194.7,445.6],[200.7,443.4],[201.5,440],[201.5,437],pumpDoor];
+const marshBank=[marshFork,[183.7,437.6],[185.7,440.8],[188.2,444.2],[194.7,445.6],[200.7,443.4],[201.5,440],[201.3,436.55],[201.8,436],pumpDoor];
 const pumpPaths=[marshCrossing,marshBank,
   [[172.48,480.48],[179,458],[184.6,446],marshFork],
   [[134.64,342.32],[149,368],[166.5,390],[179.2,409],[185.2,423.2],marshFork],
