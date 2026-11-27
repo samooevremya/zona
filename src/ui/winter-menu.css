@@ -1,0 +1,87 @@
+/* Leave the artwork visible between menu entries. The brighter stripe follows focus. */
+.berezki :is(#title.start,#ov.pause-open){
+  background-position:center;background-size:cover;
+  padding:max(14px,env(safe-area-inset-top)) max(6vw,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(4vw,env(safe-area-inset-left));
+}
+html[data-station-view="platform"] #title.start{--signal-scene:var(--station-platform)}
+html[data-station-view="bridge"] #title.start{--signal-scene:var(--station-bridge)}
+.berezki #title.start{background-image:linear-gradient(90deg,transparent 38%,#0a111640 58%,#080e14de),var(--signal-scene)}
+.berezki #ov.pause-open{background:linear-gradient(90deg,#182b371a 15%,#11212b66 51%,#09131ef0)}
+.berezki :is(#title.start,#ov.pause-open) .menu-card{
+  position:relative;width:clamp(260px,29vw,430px);max-width:100%;max-height:100%;box-sizing:border-box;
+  gap:clamp(18px,4vh,38px);padding:8px 4px;border:0;background:none;box-shadow:none
+}
+.berezki :is(#title.start,#ov.pause-open) .start-name,.berezki #pause-card .pause-caption{
+  position:static;margin:0;font:900 clamp(34px,4.6vw,74px)/1 Impact,"Arial Narrow",sans-serif;letter-spacing:.055em;color:#e9e4d5;text-shadow:0 2px 6px #101519
+}
+.berezki :is(#title.start,#ov.pause-open) .start-region{display:block;margin:9px 0 0;font:600 clamp(12px,1.1vw,17px)/1.2 monospace;letter-spacing:.19em;color:#cad2cf}
+.berezki .start-region:before{content:none}
+.berezki #pause-card .start-name{display:none}
+.berezki #pause-card .pause-caption{font-size:clamp(24px,2.8vw,43px);letter-spacing:.04em}
+.berezki :is(#title.start,#ov.pause-open) .start-nav{display:grid;gap:2px;border:0;text-align:left}
+.berezki :is(#title.start,#ov.pause-open) .start-nav button,.berezki #ov.pause-open .pause-help,.berezki .start-level summary{
+  position:relative;isolation:isolate;box-sizing:border-box;display:flex;align-items:center;min-height:44px;padding:8px 14px;
+  border:0;border-radius:0;box-shadow:none;background:none;color:#eeeade;text-align:left;
+  font:700 clamp(18px,1.65vw,26px)/1.15 "Arial Narrow","Roboto Condensed",Arial,sans-serif;
+  text-shadow:0 1px 4px #111820;letter-spacing:.025em;cursor:pointer
+}
+.berezki :is(#title.start,#ov.pause-open) .start-nav button:is(:hover,:focus-visible,.start-primary){
+  background:none;color:#172020;text-shadow:none;outline:none
+}
+.berezki :is(#title.start,#ov.pause-open) .start-nav button:is(:hover,:focus-visible,.start-primary):before{
+  content:"";position:absolute;z-index:-1;inset:3px 4px 3px 0;opacity:.96;
+  background:linear-gradient(105deg,#d9dbcee8,#dddccfe8),var(--signal-scene) center 82%/cover;
+  clip-path:polygon(1.4% 5%,23% 3%,48% 6%,72% 1%,99.5% 4%,98.2% 30%,99.1% 33%,97.8% 60%,98.5% 62%,97.2% 92%,76% 96%,62% 93%,40% 99%,19% 95%,0 98%,1.6% 63%,.8% 58%,1.7% 39%,.7% 37%)
+}
+.berezki .start-nav:has(button:enabled:is(:hover,:focus-visible)) .start-primary:not(:hover,:focus-visible){color:#eeeade;text-shadow:0 1px 4px #111820}
+.berezki .start-nav:has(button:enabled:is(:hover,:focus-visible)) .start-primary:not(:hover,:focus-visible):before{opacity:0}
+.berezki .start-level{order:1;margin-top:8px}
+.berezki .start-level summary,.berezki #ov.pause-open .pause-help{color:#c2cbc9;font:500 15px/1.2 monospace}
+.berezki .start-level summary:before{content:"";border:4px solid transparent;border-left-color:currentColor}
+.berezki .start-level[open] summary:before{transform:rotate(90deg)}
+.berezki .start-level summary::-webkit-details-marker{display:none}
+.berezki .start-level .difficulty-label,.berezki .start-level .difficulty-note{padding:3px 14px;background:#101b21cf}
+.berezki #ov.pause-open .pause-help{position:static;align-self:flex-start}
+.berezki :is(#title.start,#ov.pause-open) button:disabled{opacity:.58;pointer-events:none}
+.berezki #ov.pause-open .pause-help:focus-visible,.berezki .start-level summary:focus-visible{outline:1px solid #e1cc9f}
+.berezki #title.start:has(#bootlog){align-items:flex-end;justify-content:flex-start;background-image:linear-gradient(0deg,#0a131bd6,transparent 40%),var(--signal-scene)}
+.berezki #title.start .menu-card:has(#bootlog){background:none;box-shadow:none;border:0;gap:8px;width:auto;margin:0 0 1.5vh;padding:8px}
+.berezki #title.start #bootlog{padding:12px 0 0;border-color:#bcc6bd70;font:15px/1.2 monospace;min-height:36px}
+.berezki #title:has(.death){
+  background:var(--station-desk) center/cover no-repeat;align-items:flex-end;justify-content:center;
+  padding:0 max(4vw,env(safe-area-inset-right)) max(4vh,env(safe-area-inset-bottom)) max(4vw,env(safe-area-inset-left));
+}
+.berezki #tcard.death{
+  position:relative;display:block;width:min(82vw,126vh,850px);max-width:100%;height:auto;aspect-ratio:1609/749;
+  background:var(--pager-shell) center top/100% auto no-repeat;border:0;border-radius:0;box-shadow:none;
+  filter:drop-shadow(2px 9px 6px #100e0dc9)
+}
+.berezki .death-glass{
+  position:absolute;inset:14.5% 9.15% 10.5%;padding:clamp(8px,1.4vw,18px) clamp(12px,2.2vw,30px);
+  box-sizing:border-box;overflow:auto;border-radius:2% / 5%;scrollbar-width:thin;scrollbar-color:#968969 #222923;
+  color:#eddbc0;background-color:#202b24;
+  background-image:linear-gradient(90deg,#21271ff7 5%,#22271fc7 45%,#23261f44),var(--station-platform);
+  background-position:center,center 60%;background-size:cover;
+  box-shadow:inset 0 0 12px #070b097a;font:15px/1.25 'Courier New',monospace
+}
+.berezki .death-glass h1{font:bold clamp(20px,2.6vw,32px)/1.1 'Courier New',monospace;letter-spacing:.015em;text-transform:none;color:#e4cb99;text-shadow:0 0 5px #ddae572e;margin:0 0 7px}
+.berezki .death-records{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px 5px}
+.berezki .death-records>*{grid-column:1/-1}
+.berezki .death-records .pause-note{font:inherit;color:#c4cdbb;margin-bottom:3px}
+.berezki .death-records button{
+  min-height:44px;padding:5px 10px;border:0;border-bottom:1px solid #bfc89a36;border-radius:0;box-shadow:none;text-transform:none;text-align:left;
+  color:#e1d1a8;background:#15221d77;font:inherit;letter-spacing:0
+}
+.berezki .death-records button:disabled{grid-column:auto;font-size:.85em;color:#b9c4b7;opacity:1;background:transparent}
+.berezki .death-records button:enabled:is(:hover,:focus-visible){outline:1px solid #eccb8e;outline-offset:-1px;background:#435040}
+.berezki .death-records button:last-child{color:#c5c8b2}
+@media(orientation:landscape) and (max-height:540px){
+  .berezki :is(#title.start,#ov.pause-open) .menu-card{padding:6px 8px;gap:6px;width:clamp(265px,36vw,360px)}
+  .berezki #ov.pause-open #pause-card{gap:4px}
+  .berezki #tcard.death{width:min(85vw,150vh)}
+}
+@media(orientation:portrait){
+  .berezki :is(#title.start,#ov.pause-open){justify-content:center;align-items:flex-end;background-position:38% center}
+  .berezki #title:has(.death){align-items:center;padding:0}
+  .berezki #tcard.death{width:100vw}
+}
