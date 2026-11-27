@@ -64,7 +64,7 @@ function baseInterior(r){
     for(const u of [6.2,8.75])for(let j=0;j<32;j++)
       beam(g,u*T,j*10,u*T+1,j*10+8,2.2,'#514c4138');
   }
-  if(r.kind && r.kind!=='guard'){
+  if(r!==westStore && r.kind && r.kind!=='guard'){
     const u=r.kind==='stores'?.62:.73,v=r.kind==='barracks'?.64:.42;
     g.save();g.globalAlpha=.76;g.translate(u*w,v*h);g.rotate(-.33);
     g.drawImage(district.snowStamp,-55,-31,110,62);g.restore();
@@ -128,7 +128,7 @@ function baseRoof(h){
     g.save();g.globalAlpha=.36;g.drawImage(district.snowStamp,x-l/2,y-l*.19,l,l*.38);g.restore();
   }
   beam(g,0,d*.5,w,d*.5,4,'#666960');beam(g,0,d*.5-1,w,d*.5-1,2,'#dddcd1');
-  if(r.kind && r.kind!=='guard'){
+  if(r!==westStore && r.kind && r.kind!=='guard'){
     // Remove a ragged section of roof so the real floor and broken rafters show through.
     const cx=w*(r.kind==='stores'?.62:.73),cy=d*(r.kind==='barracks'?.64:.42);
     const hole=baseBreach(r,w,d);g.lineWidth=6;g.strokeStyle='#59554a';g.stroke(hole);

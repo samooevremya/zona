@@ -11,13 +11,14 @@ function makeWinterSalvage(){
   recordings.frostCrack=[.14,'winterCreak'];
   for(const [x,y,key,loot] of [
     [524,384,'landing',{candle:1,bandage:1}],[484,130,'nets',{wire:2}],
-    [337,233,'platform',{buckle:1}],[158,190,'depot',{wire:1,bread:1}],
-    [81,126,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
+    [337,233,'platform',{buckle:1}],[153,183,'depot',{wire:1,bread:1}],
+    [80.75,120.75,'tower',{buckle:1,cans:1}],[205,441,'pump',{wire:2}],
     [253,433,'path',{candle:1}],[114,546,'hut',{bandage:1,candle:1}],
     [339,592,'workshop',{wire:1,buckle:1}],[435,164,'forest',{candle:1,bread:1}],
     [326,492,'road',{buckle:1}],[142,352,'marsh',{wire:1}]]){
-    if(tAt(x,y)===TR)setT(x,y,GR);
-    supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
+    if(tAt(Math.floor(x),Math.floor(y))===TR)setT(Math.floor(x),Math.floor(y),GR);
+    const box=supplyBox((x+.5)*T,(y+.5)*T,'winter-'+key,loot);
+    if(key==='tower')box.sprite='c1_crate';
   }
   interiorObject('fishingHole',iceHole.x,iceHole.y,22,16);
 }
@@ -52,7 +53,7 @@ function winterTracks(dt,room){
     flags.snowMarks=(flags.snowMarks||[]).filter(p=>traceAlpha(p.t)>.005);
     flags.markSweep=S.min+30;
   }
-  if(room || S.flags.stationDeck || P.jumpT){stepDistance=P.step;return;}
+  if(room || S.flags.onLookout || S.flags.stationDeck || P.jumpT){stepDistance=P.step;return;}
   if(P.step-stepDistance>18){
     stepDistance=P.step;const a=Math.atan2(IN.moveY,IN.moveX);
     winterFootSide=-winterFootSide;
@@ -113,6 +114,7 @@ function fleeWitness(e,dt){
   return true;
 }
 function winterSurface(x,y){
+  if(S.flags.onLookout)return 'winterBoard';
   const r=winterFloor(x,y);
   if(r)return r===fishingRoom||villageCabins.includes(r)||r.kind==='barracks'||(r.block && x<(r.x+16)*T && (y<(r.y+4.4)*T||y>(r.y+6.75)*T))?'winterBoard':'winterConcrete';
   if(swampAt(x,y))return 'winterSlush';
@@ -126,11 +128,11 @@ function winterSurface(x,y){
   return 'winterPowder';
 }
 
-function winterStairLift(e){
-  if(e===P && S.flags.stationDeck)return clamp(Math.min(e.y-footbridge.north,footbridge.south-e.y)/(2.5*T),0,1)*12;
-  const r=winterFloor(e.x,e.y);if(!r?.block)return 0;
+function winterStairOffset(e){
+  const r=winterFloor(e.x,e.y);if(!r?.block)return [0,0];
   const x=e.x/T-r.x-r.stairX,y=e.y/T-r.y-r.stairY;
-  return Math.abs(x)<1.55 && y>=0 && y<=2.85?(1-y/2.85)*8:0;
+  if(Math.abs(x)>=1.55 || y<0 || y>2.86)return [0,0];
+  return raisedOffset((r.x+r.stairX+.05)*T,(r.y+r.stairY+1.43)*T,flatStairHeight(r,e.y));
 }
 function winterCoatTone(e){return e.winterTone || (e===P || e.sid==='mitya'?'slate':['cook','housekeeper','anya'].includes(e.sid)?'ochre':'ash');}
 const winterDeadArt=new WeakMap();

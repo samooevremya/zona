@@ -11,11 +11,11 @@ const atlasRoutes=[
   [[322.08,338.8],[368.72,344.08],[427.68,360.8],[483.12,365.2],[503,364],[518,362],[518,360]],
   [[503,364],[509,367],[517,369],[522,370]],
   [[335,219.5],[341.44,209.44],[372.24,192.72],[404.8,185.68],[432.96,161.92],[466.4,145.2],[481,136],[491,132.8]],
-  [[341.44,209.44],[279.84,201.52],[218.24,196.24],[158.4,189.2],[118.8,166.32],[80.08,124.08]],
+  [[341.44,209.44],[279.84,201.52],[218.24,196.24],[158.4,189.2],[118.8,166.32],[83,127.7],[79,125.8],[79,124.8]],
   [[329.12,415.36],[290.4,420.64],[253.44,432.96],[206.8,442.64],[172.48,480.48],[142.56,517.44],[113.52,547.36]],
   [[253.44,432.96],[217.36,397.76],[187.44,368.72],[134.64,342.32]],
   [[322.96,493.68],[279.84,516.56],[205.04,535.04],[113.52,547.36]],
-  ...shoreLanes,...baseLanes,...pumpPaths
+  ...shoreLanes,...baseLanes,...pumpPaths,[[158.4,189.2],[157.5,186.5]]
 ];
 const lakeShape=[366.96,80.08,153.12,73.92],marshShape=[135.52,343.2,57.2,38.72];
 const oldBoats=[[482.3,122.3,.29],[485,119.9,.33],[486.6,117.3,.25]];
@@ -49,12 +49,12 @@ function seedAtlasTerrain(){
   }
   clear(1,219,district.width-2,16);clear(503,346,29,43);clear(482,118,19,18);
   for(const r of villageCabins)clear(r.x-1.5,r.y-1.5,r.w+3,r.h+3);
-  clear(495,132,7,7);
+  clear(495,132,7,7);clear(149,178,17,11);clear(75,117,9,11);
   clear(302,566,47,35);clear(186,427,28,14);
 }
 const atlasProps=[];
-function atlasProp(key,x,y,width,lift,{angle=0,flip=1}={}){
-  const p={key,x,y,width,lift,angle,flip};
+function atlasProp(key,x,y,width,worldHeight,{angle=0,flip=1}={}){
+  const p={key,x,y,width,worldHeight,angle,flip};
   atlasProps.push(p);return p;
 }
 function preparePropShadows(){
@@ -158,13 +158,15 @@ function paintPropShadow(g,p){
 function drawAtlasProp(g,p,mapView=false){
   if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);paintYardFooting(g,p,true);return;}
   if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
+  if(p.westDeck){paintLookout(g,mapView);if(mapView || !S.flags.onLookout)paintLookout(g,mapView,true);return;}
   if(p.item || p.panel){paintRaisedScenery(g,p,mapView);return;}
   const h=p.height;
-  const k=perspective && !mapView?p.lift:0;
-  const [topX,topY]=roofPoint(p.x,p.y,k);
-  const shearX=clamp(topX-p.x,-h*.24,h*.24),shearY=clamp(topY-p.y,-h*.18,h*.18);
-  g.save();g.translate(p.x,p.y);g.rotate(p.angle);
-  g.transform(p.flip,0,-shearX/h,1-shearY/h,0,0);
+  const [dx,dy]=winterParallax(p.x,p.y,p.worldHeight,mapView);
+  // Rotate the photograph first in world space. A sideways boat must still
+  // lean away from the camera in world axes, with its ice line held in place.
+  const cs=Math.cos(p.angle),sn=Math.sin(p.angle),rise=h*p.foot;
+  g.save();g.translate(p.x,p.y);
+  g.transform(cs*p.flip,sn*p.flip,-sn-dx/rise,cs-dy/rise,0,0);
   g.drawImage(p.exposed||district.images[p.key],-p.width/2,-p.foot*h,p.width,h);g.restore();
   if(p.key==='netrack' || p.key==='wood'){
     // Foreground crust stays at ground level when the roof shifts with the camera.
@@ -178,39 +180,39 @@ function drawAtlasProp(g,p,mapView=false){
 function makeAtlasProps(){
   for(const [i,[x,y,angle]] of oldBoats.entries()){
     const width=[106,98,111][i];
-    const boat=atlasProp(['boat','skiff','keel'][i],x*T,y*T,width,.004,{angle});
+    const boat=atlasProp(['boat','skiff','keel'][i],x*T,y*T,width,5,{angle});
     boat.burial=[.24,.37,.29][i];
     // Three short sections follow the tapered, angled hull without filling its bounding box.
     for(const [offset,len,depth] of [[-.32,.24,19],[0,.40,27],[.32,.23,17]])
       interiorObject('beachedBoat',boat.x+Math.cos(angle)*offset*width,boat.y+Math.sin(angle)*offset*width,len*width,depth);
   }
   const x=playYard.x*T,y=playYard.y*T;
-  atlasProp('swing',x-29,y,99,.051);
+  atlasProp('swing',x-29,y,99,75);
   // The seats and swept space join both A-frames at the player's foot level.
   for(const sign of [-1,1])for(const [offset,v] of [[33,-10],[46,14]])
     interiorObject('yardUpright',x-29+sign*offset,y+v,5,5);
   for(const u of [-20,20])interiorObject('yardSeat',x-29+u,y,22,10);
-  atlasProp('slide',x+64,y+1,34,.042);
+  atlasProp('slide',x+64,y+1,34,56);
   interiorObject('yardFrame',x+64,y-8,32,62,{fixture:'slide'});
-  atlasProp('roundabout',x-94,y+94,81,.021);
+  atlasProp('roundabout',x-94,y+94,81,29);
   for(const [offset,w,h] of [[-22,48,16],[0,77,32],[22,48,16]])
     interiorObject('yardFrame',x-94,y+94+offset-4,w,h,{fixture:'roundabout'});
-  atlasProp('seesaw',x+71,y+98,102,.023);
+  atlasProp('seesaw',x+71,y+98,102,33);
   interiorObject('yardFrame',x+71,y+96,99,19,{fixture:'seesaw'});
-  atlasProp('baseLorry',320.55*T,580.6*T,124,.022);
+  atlasProp('baseLorry',320.55*T,580.6*T,124,56);
   interiorObject('parkedLorry',320.55*T,580.6*T-8,117,46);
   for(const [gx,gy] of gatePosts){
     const sign=gx<325?-1:1;
-    atlasProp('gate',gx*T+sign*28,gy*T,91,.045,{flip:sign});
+    atlasProp('gate',gx*T+sign*28,gy*T,91,62,{flip:sign});
     interiorObject('gatePier',gx*T,gy*T,22,22);
     interiorObject('gateLeaf',gx*T+sign*42,gy*T,61,5);
   }
-  atlasProp('netrack',netRack.x,netRack.y+10,89,.044);
-  atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,.022);
+  atlasProp('netrack',netRack.x,netRack.y+10,89,46);
+  atlasProp('roastspit',shoreFire.x,shoreFire.y+2,47,22);
   const pile=tilePoint(505.8,131.35);
-  atlasProp('wood',pile.x,pile.y+6,54,.019);
+  atlasProp('wood',pile.x,pile.y+6,54,38);
   interiorObject('woodStack',pile.x,pile.y,51,16);
-  atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h-1,67,.023);
+  atlasProp('wood',woodStack.x+woodStack.w/2,woodStack.y+woodStack.h-1,67,42);
 
 }
 function atlasPlace(x,y){
@@ -415,6 +417,7 @@ function atlasTerrainChunk(cx,cy){
   }
   if(l<203*T && r>145*T && t<441*T && b>368*T)paintMarshChannel(g);
   if(l<203*T && r>73*T && t<441*T && b>300*T)paintMarshCover(g,l,t,r,b);
+  if(near(79,121,155))westGround(g);
   if(near(202,434,13*T))pumpYardGround(g);
   if(near(325,583,25*T))paintBaseYard(g);
   drawAtlasRoutes(g,l,t,r,b);roadImprints(g,l,t,r,b);
@@ -497,7 +500,7 @@ function bakeSurvey(){
     const {x,y,size,art}=tree;g.drawImage(art.crown,x-size/2,y-size/2,size,size);
   }
   for(const p of [...raisedScenery,...atlasProps])drawAtlasProp(g,p,true);
-  g.drawImage(district.bridgeArt,footbridge.x-footbridge.width/2-5,footbridge.north-8);paintBridgeRails(g,true);
+  drawWinterBridge(g,true);paintBridgeRails(g,true);
   for(const h of HOUSES)if(h.x<district.width){
     g.shadowColor='#374859aa';g.shadowBlur=2;g.shadowOffsetX=2;g.shadowOffsetY=3;
     g.drawImage(ROOFS[h.roofIndex],h.x*T,h.y*T,h.w*T,h.h*T);

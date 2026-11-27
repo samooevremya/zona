@@ -48,22 +48,28 @@ function buildRaisedScenery(){
       raisedScenery.push({panel,wood,vertical,span,x,y,depth:y,underDeck:f.underDeck});
     }
   }
-  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost'){
+  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost' || o.k==='waterMain'){
     const x=o.x+o.w/2,y=o.y+o.h/2;
-    raisedScenery.push({item:o,x,y,depth:y+o.h*.24,height:fittingHeight[o.fitting]||28});
+    raisedScenery.push({item:o,x,y,depth:y+o.h*.24,radius:Math.max(o.w,o.h)/2+24,height:o.k==='waterMain'?8:fittingHeight[o.fitting]||28});
   }
   raisedScenery.sort((a,b)=>a.depth-b.depth);
 }
-function raisedOffset(x,y,h,mapView){
-  const k=perspective&&!mapView?h*.00125:0;
-  return [clamp((x-cam.x)*k,-h*.45,h*.45)-h*.13,
-    clamp((y-cam.y)*k,-h*.30,h*.30)-h*.50];
+// World pixels of height. Photographed props already contain the neutral
+// view of their sides; only constructed geometry needs the static elevation.
+const winterLens=.00032,winterTilt=.52,residenceTilt=winterTilt/winterLens;
+function winterParallax(x,y,height,mapView=false){
+  if(mapView || !perspective || height===0)return [0,0];
+  const k=height*winterLens;
+  return [(x-cam.x)*k,(y-cam.y)*k];
+}
+function raisedOffset(x,y,height,mapView=false){
+  const [dx,dy]=winterParallax(x,y,height,mapView);
+  return [dx,dy-height*winterTilt];
 }
 function paintRaisedScenery(g,p,mapView){
   if(p.panel){
     const h=p.wood?28:43,d=p.span/2;
     const [dx,dy]=raisedOffset(p.x,p.y,h,mapView);
-    // Slight side view keeps a lengthwise fence readable even on the camera axis.
     const sx=dx;
     const vx=p.vertical?0:1,vy=p.vertical?1:0;
     g.save();g.translate(p.x-vx*d,p.y-vy*d);
@@ -71,11 +77,21 @@ function paintRaisedScenery(g,p,mapView){
     g.drawImage(p.panel,0,0,p.span+.15,h);g.restore();
     const x=p.x-vx*d,y=p.y-vy*d;
     beam(g,x,y,x+sx,y+dy,p.wood?3.8:2.5,'#605c50');
+    // Keep the thickness of an edge-on panel visible across its entire span.
+    beam(g,x+sx,y+dy,x+vx*p.span+sx,y+vy*p.span+dy,p.wood?2.2:1.4,p.wood?'#91897a':'#7e837b');
     beam(g,x+sx-1.4,y+dy,x+sx+1.5,y+dy,1.8,'#dadad0');
     return;
   }
   if(p.item.k==='waypost'){stationSign(g,p.x,p.y,p.item.boardLabel,false,p.item.west,mapView);return;}
   const o=p.item,[dx,dy]=raisedOffset(p.x,p.y,p.height,mapView);
+  if(o.k==='waterMain'){
+    const vertical=o.h>o.w;
+    const a=vertical?[p.x,o.y]:[o.x,p.y],b=vertical?[p.x,o.y+o.h]:[o.x+o.w,p.y];
+    for(const point of [a,b]){
+      const [u,v]=raisedOffset(...point,p.height,mapView);point[0]+=u;point[1]+=v;
+    }
+    supplyPipe(g,...a,...b,false);return;
+  }
   // Cast shadows and feet stay on the footprint. Broad faces carry wood grain
   // from the same interior material as the original raster top.
   const x=o.x+1,y=o.y+1,w=o.w-2,h=o.h-2;

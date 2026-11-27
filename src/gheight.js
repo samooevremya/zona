@@ -65,7 +65,7 @@ function wallTexture(h, side, len, wood, kind) {
                  .map(e => ({u: side % 2 ? e.y : e.x, w: e.width}));
   for (const door of ds) {
     const w = Math.min(door.w, len - 4), l = door.u - w / 2;
-    if(BEREZKI && h.baseRoom?.kind==='hangar')continue;
+    if(BEREZKI && (h.loadingBay || h.baseRoom?.kind==='hangar'))continue;
     g.fillStyle = '#766b56';
     g.fillRect(l - 3, 22, w + 6, 66);
     g.fillStyle = '#211f1a';
@@ -82,7 +82,7 @@ function wallTexture(h, side, len, wood, kind) {
   const panes=(h.facadePanes ||= []);panes[side]=[];
   for (let i = 0, n = Math.max(1, Math.floor(len / 65)); i < n; i++) {
     const u = (i + .43 + .14*rand()) * len / n;
-    if (ds.some(d => Math.abs(d.u - u) < d.w * (BEREZKI && h.baseRoom?.kind==='hangar'?1:.5) + 18)) continue;
+    if (ds.some(d => Math.abs(d.u - u) < d.w * (BEREZKI && (h.loadingBay || h.baseRoom?.kind==='hangar')?1:.5) + 18)) continue;
     panes[side].push(u);
     let l = u - 13;
     g.fillStyle = '#252623';
@@ -111,7 +111,7 @@ function wallTexture(h, side, len, wood, kind) {
   }
   g.fillStyle = 'rgba(50,44,36,.55)';
   g.fillRect(0, 79, len, 9);
-  if(BEREZKI && h.baseRoom?.kind==='hangar')for(const d of ds)paintHangarGate(g,d);
+  if(BEREZKI && (h.loadingBay || h.baseRoom?.kind==='hangar'))for(const d of ds)paintHangarGate(g,d);
   const dim = g.createLinearGradient(0, 0, 0, 88);
   dim.addColorStop(0, 'rgba(23,21,16,.64)');
   dim.addColorStop(.22, 'rgba(23,21,16,.10)');
@@ -140,6 +140,7 @@ function texturedFace(a, b, k, tex, light) {
   ctx.restore();
 }
 function roofLift(h){
+  if (BEREZKI && h.residenceWalls)return winterLens*48*h.storeys;
   if (h.storeys) return .105 * h.storeys;
   return houseHeight*(h.ruin ? .72 : h.mat==='depot' ? 1.55 : h.w*T<110 ? .68 : h.w*T>300 ? 1.12 : 1);
 }
@@ -148,7 +149,11 @@ function clipRoofsFromLight(g,x,y,w,h,inView){
     const width=house.w*T,height=house.h*T,left=house.x*T,top=house.y*T;
     if(house.a<.52 || !inView(left+width/2,top+height/2,Math.max(width,height)*.64+40))continue;
     const lift=perspective && ART?roofLift(house):0,[u,v]=roofPoint(left-3,top-3,lift);
-    const roofY=house.residenceWalls && lift?v-residenceTilt*lift:v;
+    if(BEREZKI && house.residenceWalls && lift){
+      const [rx,ry]=residencePoint(left,top,lift);
+      g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(rx,ry,width*(1+lift),height*(1+lift));g.clip('evenodd');continue;
+    }
+    const roofY=v;
     g.beginPath();g.rect(x-4,y-4,w+8,h+8);g.rect(u,roofY,(width+6)*(1+lift),(height+6)*(1+lift));g.clip('evenodd');
   }
 }
@@ -567,8 +572,7 @@ function paintHills(g) {
 // Fade the deck locally underfoot as with house roofs, so the gate and actors remain readable.
 function liftContainer(o, paint) {
   const height = o.k === 'safe' ? .026 : .014, x = o.x + o.w / 2, y = o.y + o.h / 2;
-  const [u, v] = roofPoint(x, y, height);
-  const dx = u - x, dy = v - y;
+  const [dx,dy]=BEREZKI ? winterParallax(x,y,o.k==='safe'?28:18) : [(x-cam.x)*height,(y-cam.y)*height];
   ctx.save();
   ctx.translate(dx * .4, dy * .4);
   paint(o);

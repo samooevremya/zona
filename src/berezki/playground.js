@@ -86,23 +86,28 @@ function prepareYardEquipment(p,source){
   }
   sg.putImageData(mask,0,0);
   const out=winterCanvas(w+pad*2,h+pad*2),og=out.getContext('2d');
-  p.yard={w,h,pad,scale,rgba,z,grounded:c,shadow,out,og,pixels:og.createImageData(out.width,out.height)};
+  p.yard={w,h,pad,shadowPad:pad,scale,rgba,z,grounded:c,shadow,out,og,pixels:og.createImageData(out.width,out.height)};
   p.foot=1-cfg.front/p.height;p.depth=p.y+cfg.front;
 }
 function paintEquipment(g,p,mapView,shadow=false){
   const a=p.yard,cfg=equipmentProfile[p.key];
-  const x=p.x-p.width/2-a.pad/a.scale,y=p.y-p.foot*p.height-a.pad/a.scale;
+  const x=p.x-p.width/2,y=p.y-p.foot*p.height;
   if(shadow){
     g.save();g.globalAlpha*=.25;g.filter='blur(1.6px)';
-    g.drawImage(a.shadow,x,y,a.shadow.width/a.scale,a.shadow.height/a.scale);g.restore();return;
+    g.drawImage(a.shadow,x-a.shadowPad/a.scale,y-a.shadowPad/a.scale,a.shadow.width/a.scale,a.shadow.height/a.scale);g.restore();return;
   }
   if(mapView || !perspective){
     g.drawImage(a.grounded,p.x-p.width/2,p.y-p.foot*p.height,p.width,p.height);return;
   }
   // The camera changes relief only by a few pixels. Cache the warped raster until
   // a half-pixel boundary is crossed. Absolute world position remains continuous.
-  const dx=Math.round(clamp((p.x-cam.x)*.001,-.15,.15)*cfg.rise*a.scale);
-  const dy=Math.round(clamp((p.y-cam.y)*.00075,-.085,.085)*cfg.rise*a.scale);
+  const [ux,uy]=winterParallax(p.x,p.y,p.worldHeight,mapView);
+  const dx=Math.round(ux*a.scale),dy=Math.round(uy*a.scale);
+  if(Math.max(Math.abs(dx),Math.abs(dy))>a.pad){
+    a.pad=Math.max(Math.abs(dx),Math.abs(dy))+8;
+    a.out.width=a.w+a.pad*2;a.out.height=a.h+a.pad*2;
+    a.pixels=a.og.createImageData(a.out.width,a.out.height);
+  }
   if(a.dx!==dx || a.dy!==dy){
     a.dx=dx;a.dy=dy;
     const {w,h,pad,z,rgba,pixels}=a,dst=pixels.data,stride=pixels.width;
@@ -120,5 +125,5 @@ function paintEquipment(g,p,mapView,shadow=false){
     }
     a.og.putImageData(pixels,0,0);
   }
-  g.drawImage(a.out,x,y,a.out.width/a.scale,a.out.height/a.scale);
+  g.drawImage(a.out,x-a.pad/a.scale,y-a.pad/a.scale,a.out.width/a.scale,a.out.height/a.scale);
 }
