@@ -83,7 +83,13 @@ function makePumpingStation(){
   for(const [dx,dy] of towerFeet)interiorObject('towerFoot',pumpTower.x+dx,pumpTower.y+dy,11,11);
   // Insulated supply line runs beside the building above the entrance.
   const px=pumpTower.x+35,py=pumpTower.y+7,ex=(r.x+4)*T,ey=(r.y+1.55)*T;
-  interiorObject('waterMain',(px+ex)/2,py,ex-px,8);
+  const feed=interiorObject('waterMain',(px+ex)/2,py,ex-px,8);
+  feed.piers=[];
+  for(const u of [.28,.60,.9]){
+    const x=px+u*(ex-px);
+    interiorObject('pipeFoot',x,py,12,13);
+    feed.piers.push(x);
+  }
   interiorObject('waterMain',ex,(py+ey)/2,8,ey-py);
 }
 function preparePumpArt(){
@@ -91,15 +97,39 @@ function preparePumpArt(){
   c.getContext('2d').drawImage(ART.images[s.atlas],...s.rect,0,0,w,h);
   district.images.pumpMotor=c;
 }
+let winterPipeSkin;
+function ironPipeSkin(){
+  if(winterPipeSkin)return winterPipeSkin;
+  const c=winterCanvas(64,16),g=c.getContext('2d');
+  const sprite=ART.m.sprites.c1_trace_pipes,[x,y]=sprite.rect;
+  // Unroll a strip from the weathered straight pipe. Its seam, oxidation and
+  // round shading stay fixed to the metal as the pipe changes direction.
+  g.rotate(-.22);g.translate(-22,-62);
+  g.drawImage(ART.images[sprite.atlas],x,y,116,115,0,0,116,115);
+  winterPipeSkin=c;return c;
+}
 function supplyPipe(g,x1,y1,x2,y2,shadow=true){
   if(shadow)beam(g,x1+2,y1+3,x2+2,y2+3,10,'#49515766');
-  beam(g,x1,y1,x2,y2,9,'#504d43');beam(g,x1,y1-1,x2,y2-1,6,'#8e8271');
-  beam(g,x1-1,y1-2,x2-1,y2-2,2.6,'#cbd0c9');
-  const horizontal=x1!==x2,dist=Math.hypot(x2-x1,y2-y1);
-  for(let step=5;step<dist;step+=25){
-    const x=x1+(x2-x1)*step/dist,y=y1+(y2-y1)*step/dist;
-    beam(g,x-(horizontal?0:4),y-(horizontal?4:0),x+(horizontal?0:4),y+(horizontal?4:0),2,'#635f53');
+  const length=Math.hypot(x2-x1,y2-y1);
+  g.save();g.translate(x1,y1);g.rotate(Math.atan2(y2-y1,x2-x1));
+  const skin=ironPipeSkin();
+  for(let x=0;x<length;x+=32){
+    const span=Math.min(32,length-x);
+    g.drawImage(skin,0,0,span*2,16,x,-4,span,8);
   }
+  g.restore();
+}
+function pipePier(g,x,y,mapView){
+  const [sx,sy]=raisedOffset(x,y,13,mapView);
+  g.save();g.translate(x,y);
+  if(SHADOWS)shoreEllipse(g,3,4,10,4,'#47515a52',.2);
+  for(const [xa,ya,xb,yb] of [[-6,6,6,6],[6,6,6,-6],[-6,-6,-6,6]]){
+    g.save();g.beginPath();g.moveTo(xa,ya);g.lineTo(xb,yb);g.lineTo(xb+sx,yb+sy);g.lineTo(xa+sx,ya+sy);g.closePath();g.clip();
+    artFill(g,'wall_concrete',-12,-18,27,29);g.fillStyle='#514e454f';g.fill();g.restore();
+  }
+  artFill(g,'floor_concrete',sx-6,sy-6,12,12);
+  snowDrift(g,-5,5,7,3,-.17,94);
+  g.restore();
 }
 function pumpYardGround(g){
   const x=pumpTower.x,y=pumpTower.y,px=(pumpRoom.x+4)*T;

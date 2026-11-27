@@ -45,15 +45,15 @@ function nearWinterRoute(x,y,buffer){
   return false;
 }
 function forestBank(cx,cy){
-  if(cx<0||cy<0||cx*snowCell>=district.width*T||cy*snowCell>=district.height*T)return null;
-  const key=cy*256+cx;
+  const inside=cx>=0 && cy>=0 && cx*snowCell<district.width*T && cy*snowCell<district.height*T;
+  const key=inside?cy*256+cx:cx+','+cy;
   if(forestBanks.has(key))return forestBanks.get(key);
   let bank=null;
   const rand=mulberry32(Math.floor(hash2(cx+39,cy)*4294967296));
   const left=cx*snowCell,top=cy*snowCell;
   for(let n=0;n<10;n++){
     const tx=Math.floor((left+rand()*snowCell)/T),ty=Math.floor((top+rand()*snowCell)/T);
-    if(tAt(tx,ty)!==TR)continue;
+    if(!outdoorTreeAt(tx,ty))continue;
     const x=(tx+.5)*T+20+rand()*22,y=(ty+.5)*T+10+rand()*16;
     const rx=48+rand()*49,ry=16+rand()*24,margin=rx/T+1;
     if(ty>214 && ty<236 || basinRadius(tx,ty,lakeShape)<1.06 || basinRadius(tx,ty,marshShape)<1.15 ||
@@ -133,7 +133,7 @@ function winterRailBed(){
 // Vary the width of the packed shoulders and the lateral position of wheel ruts.
 // These paths are built once. Their coordinates continue across terrain chunks.
 function winterRoadBed(route,index){
-  const width=index===0?108:index===1?72:44,samples=[];
+  const width=index===0?108:index===1?72:route===woodpileTrack?29:44,samples=[];
   let distance=0;
   for(let i=1;i<route.length;i++){
     const [a,b]=route[i-1],[c,d]=route[i],dx=(c-a)*T,dy=(d-b)*T,len=Math.hypot(dx,dy);
@@ -145,6 +145,7 @@ function winterRoadBed(route,index){
     }
     distance+=len;
   }
+  if(route===woodpileTrack)for(const p of samples)p.w*=clamp((distance-p.s)/29,.12,1);
   const shoulder=ratio=>{
     const path=new Path2D();
     for(const side of [1,-1]){

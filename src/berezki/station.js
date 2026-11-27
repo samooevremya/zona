@@ -23,7 +23,7 @@ function makeWinterStation(){
   fence(0,district.width*T,northFence,true);
   fence(0,r.x*T,southFence);fence((r.x+r.w)*T,district.width*T,southFence);
   for(const x of [20,41])putFurniture('bench',(stationX+x)*T,(stationY+25.05)*T,0,'station-platform');
-  for(const [x,y,label,west] of [[stationX+36.8,stationY+25.6,'К ОЗЕРУ',false],[2.8,stationY+24.6,'ПЕРЕГОН ЗАКРЫТ',true]]){
+  for(const [x,y,label,west] of [[stationX+36.8,stationY+25.6,'К ОЗЕРУ',false],[2.8,stationY+24.6,'ЗАПАДНЫЙ ПЕРЕГОН',true]]){
     const post=interiorObject('waypost',x*T,y*T,4,5);
     post.boardLabel=label;post.west=west;
   }
@@ -35,6 +35,20 @@ function makeWinterStation(){
     const back=y===b.north?y+length:y;
     addObj({k:'stairBack',x:b.x-b.width/2,y:back-2,w:b.width,h:4,solid:1,underDeck:true});
   }
+}
+// The adjoining stretch uses the same panel width and phase as the two
+// existing fence runs. It is scenery outside the currently loaded cells.
+function westRailPanels(left,right,top,bottom){
+  const panels=[];
+  if(left>=0 || bottom<northFence-50 || top>southFence+50)return panels;
+  for(const f of trackFences){
+    if(f.x!==0)continue;
+    const y=f.y+f.h/2,span=f.w/Math.ceil(f.w/52);
+    for(let i=Math.floor(left/span)-1;i<Math.min(0,Math.ceil(right/span));i++){
+      panels.push({panel:fencePanel(false,Math.ceil(span),(i%4+4)%4),span,x:(i+.5)*span,y,depth:y,underDeck:f.underDeck});
+    }
+  }
+  return panels;
 }
 function stationUnderpass(e){
   const b=footbridge;
@@ -119,35 +133,56 @@ function stationRoof(){
   }
   return c;
 }
+const stationBoards=new Map();
+function letteredBoard(label,mounted,west){
+  const key=[label,mounted,west].join('/');
+  if(stationBoards.has(key))return stationBoards.get(key);
+  const scale=3,w=Math.ceil(label.length*(mounted?4.7:4.8))+9,h=mounted?14:12;
+  const c=winterCanvas(w*scale,h*scale),g=c.getContext('2d'),rand=mulberry32(label.charCodeAt(0)+label.length);
+  g.scale(scale,scale);g.beginPath();g.moveTo(.6,1.4);
+  for(let x=2;x<w-1;x+=2.6)g.lineTo(x,.7+rand()*.7);
+  g.lineTo(w-.7,1.5);g.lineTo(w-.4,h-2);g.lineTo(w-3,h-1.4);
+  for(let x=w-4;x>0;x-=3.7)g.lineTo(x,h-.7-rand()*.8);
+  g.closePath();g.clip();
+  g.drawImage(lookoutBoard(label.length+3,false),0,0,w,h);
+  g.fillStyle='#5e645623';g.fillRect(0,0,w,h);
+  // Worn stencil paint sits on the grain. The little pointed mark is painted
+  // on the board, leaving its sawn end and the fastening nails exposed.
+  g.font='bold '+(mounted?8:8.1)+'px Arial';g.textAlign='center';g.textBaseline='middle';
+  g.fillStyle='#d2cbb7';g.fillText(label,w/2+(mounted?0:west?2.2:-2.2),h*.53,w-(mounted?6:11));
+  if(!mounted){
+    const x=west?4:w-4,d=west?-1:1;
+    g.beginPath();g.moveTo(x+d*2,h*.50);g.lineTo(x-d*1.4,h*.31);g.lineTo(x-d*1.4,h*.70);g.closePath();g.fill();
+  }
+  for(let i=0;i<w*1.8;i++){
+    g.fillStyle=i%4?'#554e3e49':'#b0aa9350';
+    g.fillRect(rand()*w,rand()*h,.45+rand()*1.3,.25+rand()*.33);
+  }
+  for(const x of [2,w-2])shoreEllipse(g,x,h*.72,.65,.62,'#514237');
+  stationBoards.set(key,c);return c;
+}
 function stationSign(g,x,y,label,mounted=false,west=false,mapView=false){
+  const face=letteredBoard(label,mounted,west),w=face.width/3,h=face.height/3;
+  const [dx,dy]=mounted?[0,0]:raisedOffset(x,y,30,mapView);
   g.save();g.translate(x,y);
   if(!mounted){
-    shoreEllipse(g,4,2,8,2,'#47494147',.33);
-    const [dx,dy]=raisedOffset(x,y,36,mapView);
-    beam(g,0,1,dx,dy-8,4.3,'#504b3d');
-    beam(g,-1,1,dx-1,dy-8,1.2,'#a29983');
-    g.translate(dx,dy-4);
+    packedSnow(g,0,1,10,4,.34);
+    if(SHADOWS)beam(g,1,1,11,7,2.6,'#58606554');
+    const lean=west?-.85:.75;
+    g.save();g.translate(dx+lean,dy-h*.4);
+    const ex=-dx-lean,ey=-dy+h*.4;
+    g.rotate(Math.atan2(ey,ex));g.drawImage(lookoutBoard(18,false),0,-1.9,Math.hypot(ex,ey)+1,3.8);g.restore();
+    snowDrift(g,-1.1,1.2,6,2.5,-.2,84);
   }
-  g.font='bold 8px Georgia';g.textBaseline='middle';g.textAlign='center';
-  const w=Math.ceil(g.measureText(label).width)+12,l=-w/2,r=w/2;
-  const shape=new Path2D();
-  shape.moveTo(l,-7);shape.lineTo(r,-7);
-  if(!mounted && !west)shape.lineTo(r+8,-1);
-  shape.lineTo(r,6);shape.lineTo(l,6);
-  if(!mounted && west)shape.lineTo(l-8,-1);shape.closePath();
-  g.save();g.clip(shape);artFill(g,'floor_wood',l-8,-8,w+16,16);
-  g.fillStyle=mounted?'#46483d85':'#64594365';g.fill(shape);
-  beam(g,l,4,r,4,.8,'#322e255c');beam(g,l,-6,r,-6,1,'#c2beb087');
-  g.fillStyle='#d4cbb8';g.fillText(label,0,-.2);
-  for(const u of [l+2,r-2])shoreEllipse(g,u,1,.85,.85,'#3c392f');
-  g.restore();g.lineWidth=.8;g.strokeStyle='#49463d';g.stroke(shape);g.restore();
+  g.translate(dx,dy-(mounted?0:h*.42));g.rotate(mounted?0:west?-.045:.032);
+  g.drawImage(face,-w/2,-h/2,w,h);g.restore();
 }
 function paintStationGround(g,left,right){
   g.save();
-  const start=Math.max(0,Math.floor(left/T)),end=Math.min(district.width,Math.ceil(right/T));
+  const start=Math.floor(left/T),end=Math.min(district.width,Math.ceil(right/T));
   for(const line of [21.05,22.65]){
     const y=(stationY+line)*T;
-    for(let i=start;i<end;i++)g.drawImage(district.sleeperBed,(i%16)*T,0,T,38,i*T,y-19,T,38);
+    for(let i=start;i<end;i++)g.drawImage(district.sleeperBed,((i%16+16)%16)*T,0,T,38,i*T,y-19,T,38);
     if(end===district.width){
       const x=(district.width-1.05)*T;
       for(const dy of [-8,8])beam(g,x-19,y+dy,x,y+dy,3,'#575046');
@@ -160,7 +195,13 @@ function paintStationGround(g,left,right){
   for(let x=p.x;x<p.x+p.w;x+=32){
     beam(g,x,p.y,x,p.y+p.h,1,'#64645a');beam(g,x,p.y+4,x+27,p.y+4,2,'#d2c8aa');
   }
-  for(const f of trackFences)paintFenceFooting(g,f,left,right);
+  for(const f of trackFences){
+    paintFenceFooting(g,f,left,right);
+    if(f.x===0 && left<0){
+      const span=f.w/Math.ceil(f.w/52),n=Math.ceil(-left/span)+1;
+      paintFenceFooting(g,{...f,x:-n*span,w:n*span},left,Math.min(0,right));
+    }
+  }
   const doorX=(stationX+29)*T;
   artFill(g,'floor_concrete',doorX-35,(stationY+32)*T,70,18);
   for(const i of [4,10,16])beam(g,doorX-35,(stationY+32)*T+i,doorX+35,(stationY+32)*T+i,1.2,'#68695f');

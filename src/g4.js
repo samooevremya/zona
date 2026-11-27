@@ -934,7 +934,9 @@ function render() {
     let tx = P.x, ty = P.y;
     if (!IN.touch && P.alive) { const w = screenToWorld(IN.mx, IN.my); tx += clamp(w.x - P.x, -260, 260) * 0.22; ty += clamp(w.y - P.y, -260, 260) * 0.22; }
     cam.x = lerp(cam.x, tx, 0.12); cam.y = lerp(cam.y, ty, 0.12);
-    cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
+    if(!BEREZKI || P.x>=district.width*T){
+      cam.x = clamp(cam.x, VW / 2 / Z, WW - VW / 2 / Z); cam.y = clamp(cam.y, VH / 2 / Z, WH - VH / 2 / Z);
+    }
   }
   if (SID_SHOP && P && inBunker(P.x, P.y)) {
     cam.x = shopCamera(cam.x, STAIRS.x-SHOP_ROOM.width*T/2, SHOP_ROOM.width*T, VW/Z);
@@ -1048,7 +1050,7 @@ function render() {
     for(const p of raisedScenery)if(p.underDeck && inView(p.x,p.y,80))paintRaisedScenery(ctx,p,false);
     drawWinterBridge(ctx);
   }
-  const winterProps=BEREZKI?[...atlasProps.filter(p=>inView(p.x,p.y,150)),
+  const winterProps=BEREZKI?[...westRailPanels(vx,vx+vw,vy,vy+vh),...atlasProps.filter(p=>inView(p.x,p.y,150)),
     ...raisedScenery.filter(p=>inView(p.x,p.y,p.radius||80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
