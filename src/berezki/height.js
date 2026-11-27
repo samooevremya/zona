@@ -27,23 +27,15 @@ function fencePanel(wood,width,variant){
       g.drawImage(grain,16+i,1,149,23,0,-w,bottom-top,w);
       g.restore();
     }
+    g.save();g.translate(1,0);g.rotate(Math.PI/2);
+    g.drawImage(lookoutBoard(17+variant,false),0,-2.8,height,4.4);g.restore();
   }else{
-    // Slack mesh is darker at the knots and sags between its tied ends.
-    g.save();g.beginPath();g.rect(0,2,width,height-4);g.clip();
-    for(let col=-height;col<width+height;col+=6.5){
-      for(const side of [-1,1]){
-        g.strokeStyle=rand()<.36?'#625b4ac4':'#6b736ede';g.lineWidth=.65+rand()*.25;g.beginPath();
-        for(let row=0;row<=8;row++){
-          const y=row*height/8,x=col+side*y*.52;
-          g.lineTo(x,y+1.8*Math.sin(clamp(x/width,0,1)*Math.PI)+.35*Math.sin(col+row));
-        }
-        g.stroke();
-      }
-    }
+    const bay=district.images.wireBay;
+    g.save();
+    if(variant%2){g.translate(width,0);g.scale(-1,1);}
+    g.drawImage(bay,0,0,bay.width*.97,bay.height,0,0,width,height);
     g.restore();
   }
-  g.save();g.translate(1,0);g.rotate(Math.PI/2);
-  g.drawImage(lookoutBoard(17+variant,false),0,wood?-2.8:-1.5,height,wood?4.4:2.8);g.restore();
   fencePanels.set(key,c);return c;
 }
 function buildRaisedScenery(){
@@ -56,7 +48,7 @@ function buildRaisedScenery(){
       raisedScenery.push({panel,wood,vertical,span,x,y,depth:y,underDeck:f.underDeck});
     }
   }
-  for(const o of objs)if(o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost' || o.k==='waterMain'){
+  for(const o of objs)if(o.k==='openLeaf' || o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost' || o.k==='waterMain'){
     const x=o.x+o.w/2,y=o.y+o.h/2;
     raisedScenery.push({item:o,x,y,depth:y+o.h*.24,radius:Math.max(o.w,o.h)/2+24,height:o.k==='waterMain'?18:fittingHeight[o.fitting]||28});
   }
@@ -75,6 +67,7 @@ function raisedOffset(x,y,height,mapView=false){
   return [dx,dy-height*winterTilt];
 }
 function paintRaisedScenery(g,p,mapView){
+  if(p.item?.k==='openLeaf'){paintOpenLeaf(g,p.item,mapView);return;}
   if(p.panel){
     const h=p.wood?28:43,d=p.span/2;
     const [dx,dy]=raisedOffset(p.x,p.y,h,mapView);

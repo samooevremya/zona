@@ -1211,7 +1211,8 @@ function render() {
       drawRoomLights(lctx,inView,false);
       for(const pane of windows)windowGlow(lctx,pane,false);
       for(const f of WORLD_FIRES)if(fireLit(f) && inView(f.x,f.y,200))
-        castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
+        if(BEREZKI)winterFireBounce(lctx,f,false,dk);
+        else castLight(lctx,f,0,Math.PI,f===FIRE?205:170,.83+.10*Math.sin(S.min*7));
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120))
         castLight(lctx,lamp,0,Math.PI,120,.85);
     }
@@ -1240,7 +1241,8 @@ function render() {
         ctx.fillStyle='#e8c588';ctx.fillRect(l.x-2.5,l.y+1,5,1.6);
       }
       for(const f of WORLD_FIRES)if(fireLit(f) && inView(f.x,f.y,205))
-        castLight(ctx,f,0,Math.PI,f===FIRE?205:170,dk*.22,'255,150,60');
+        if(BEREZKI)winterFireBounce(ctx,f,true,dk);
+        else castLight(ctx,f,0,Math.PI,f===FIRE?205:170,dk*.22,'255,150,60');
       drawRoomLights(ctx,inView,true);
       for(const pane of windows)windowGlow(ctx,pane,true);
       if(villageLit())for(const lamp of villageBulbs())if(inView(lamp.x,lamp.y,120)){

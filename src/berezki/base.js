@@ -31,7 +31,7 @@ function makeBase(){
     if(r.kind==='hangar')interiorObject('servicePit',(r.x+4.2)*T,(r.y+5)*T,1.25*T,3*T);
   }
   // The gap in the western fence is a second way back into the yard.
-  for(const [x,y,w,h] of [[304,568,16.3,.16],[329.7,568,17.3,.16],[347,568,.16,30],
+  for(const [x,y,w,h] of [[304,568,17.6,.16],[328.4,568,18.6,.16],[347,568,.16,30],
     [304,598,43.16,.16],[304,568,.16,11],[304,582,.16,16]])
     baseFences.push(addObj({k:'fence',material:'stationMesh',x:x*T,y:y*T,w:w*T,h:h*T,solid:1}));
 }
@@ -50,17 +50,7 @@ function baseInterior(r){
   }
   if(r.kind==='hangar'){
     const x=(4.2-.625)*T,y=3.5*T,pw=1.25*T,ph=3*T;
-    artFill(g,'wall_concrete',x-3,y-3,pw+6,ph+6);
-    const depth=g.createLinearGradient(x,y,x+pw,y+7);
-    depth.addColorStop(0,'#181c1b');depth.addColorStop(.68,'#484941');depth.addColorStop(1,'#737268');
-    g.fillStyle=depth;g.fillRect(x,y,pw,ph);
-    for(let i=0;i<6;i++){
-      beam(g,x,y+i*16,x+6,y+i*16+4,1,'#b5a58b88');
-      beam(g,x+7,y+i*16+4,x+pw-5,y+i*16+4,.7,'#625c4e');
-    }
-    beam(g,x-1,y,x-1,y+ph,2,'#977c59');
-    beam(g,x+pw+1,y,x+pw+1,y+ph,2,'#483c31');
-    for(let j=1;j<=5;j++)beam(g,x+4,y+j*4,x+pw-4,y+j*4,2,'#918575');
+    pitCover(g,x,y,pw,ph);
     for(const u of [6.2,8.75])for(let j=0;j<32;j++)
       beam(g,u*T,j*10,u*T+1,j*10+8,2.2,'#514c4138');
   }

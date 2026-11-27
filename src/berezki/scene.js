@@ -15,7 +15,7 @@ function makeDistrict(){
   makeApartments();
   makeFishingShore();
   makeWinterStation();
-  makeBase();makePumpingStation();makeWesternSites();makeHamlet();
+  makeBase();makePumpingStation();makeWesternSites();makeHamlet();cabinDoors();
   Object.assign(FIRE,district.fire);Object.assign(FIRE2,district.heaters[0]);Object.assign(LESSER_FIRE,FIRE);
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE,shoreFire);
   ANOM0.length=CACHES.length=0;
@@ -237,7 +237,7 @@ function winterRoom(r){
     g.fillStyle='rgba(36,33,29,.33)';g.fillRect(x,y,T,T);
   }
   for(let side=0;side<4;side++){
-    for(const win of residenceWindows(side,r.n)){
+    for(const win of residenceWindows(side,r.n,r.abandoned)){
       const length=win.width;
       g.save();
       const vertical=side%2;
@@ -245,17 +245,15 @@ function winterRoom(r){
       const y=vertical?win.u:(side===2?h-15:15);
       g.translate(ox+x,oy+y);
       if(vertical)g.rotate(Math.PI/2);
-      g.fillStyle='#49473e';g.fillRect(-length/2-2,-6,length+4,13);
-      g.fillStyle=win.warm?'#928267':'#647275';g.fillRect(-length/2,-4,length,8);
-      for(let i=0;i<win.boards;i++)beam(g,-length/2,-3+i*5,length/2,i*5,3,'#847058');
-      g.fillStyle='#a39b85';g.fillRect(-length/2-2,5,length+4,2);g.restore();
+      winterSash(g,0,-5,length,10,win.take);
+      g.restore();
     }
   }
   if(r.n===1){
-    const entrance=HOUSES[0].entrances[0],cx=ox+entrance.x;
-    artFill(g,'floor_concrete',cx-37,oy+h-79,74,78);
-    g.fillStyle='#48453c';g.fillRect(cx-24,oy+h-51,48,30);
-    for(let v=0;v<29;v+=4)beam(g,cx-23,oy+h-50+v,cx+23,oy+h-50+v,1.2,'#7b7561');
+    const cx=ox+12*T,edge=oy+h;
+    // A worn sill separates the existing paving from the porch outside.
+    artFill(g,'floor_wood',cx-T,edge-5,2*T,5);
+    beam(g,cx-T,edge-1,cx+T,edge-1,1.2,'#797467');
   }
   // Quilts hang over the cold inner face, with visible stitching and uneven hems.
   for(const u of r.abandoned?[]:[2.6,8.1,14]){
@@ -267,7 +265,7 @@ function winterRoom(r){
     g.restore();beam(g,x-2,y-11,x+51,y-11,2,'#484038');
   }
   if(r.abandoned)abandonedFloor(g,r);
-  artFill(g,'floor_concrete',(r.x+r.stairX-1.52)*T,(r.y+r.stairY)*T-21,3.14*T,2.86*T+26);
+
   for(const p of district.heaters.filter(p=>winterFloor(p.x,p.y)===r)){
     const glow=g.createRadialGradient(p.x,p.y,1,p.x,p.y,56);
     glow.addColorStop(0,'rgba(237,145,72,.32)');glow.addColorStop(1,'transparent');
@@ -315,8 +313,9 @@ function winterRoofs(){
   district.exteriors=HOUSES.slice();
   for(const h of HOUSES){
     if(h.baseRoom || h.pumpingStation){
-      h.storeys=1;h.rooftop=h.baseRoom && h.baseRoom.kind!=='guard'?
-        [[h.w*T*.18,h.h*T*.23,32,23,25],[h.w*T*.65,h.h*T*.10,26,18,20],[h.w*T*.80,h.h*T*.74,24,24,21]]:stoveStack(h,h.pumpingStation?pumpHearth:baseStove);h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
+      h.storeys=1;
+      h.rooftop=stoveStack(h,h.pumpingStation?pumpHearth:h.baseRoom.kind==='guard'?baseStove:null);
+      h.residenceWalls=[0,1,2,3].map(side=>wallTexture(h,side,(side%2?h.h:h.w)*T,false,'concrete'));
       h.roofIndex=ROOFS.length;ROOFS.push(baseRoof(h));continue;
     }
     if(h.loadingBay){
@@ -331,8 +330,7 @@ function winterRoofs(){
       h.roofIndex=ROOFS.length;ROOFS.push(fishingRoof(h));continue;
     }
     const occupied=h.flat && !h.flat.abandoned;
-    h.rooftop=occupied?[[17.4*T,3.7*T,62,45,22],[4.9*T,5.9*T,16,15,14],[11.7*T,2.7*T,16,15,14]]:
-      [[3*T,2*T,32,21,9],[16*T,6*T,23,18,9]];
+    h.rooftop=occupied?[[4.85*T,5.85*T,13,13,20],[11.9*T,3.3*T,12,12,17]]:[];
     if(h.flat?.n===1)h.residenceWalls=[0,1,2,3].map(side=>residenceWall(h,side));
     h.roofIndex=ROOFS.length;
     ROOFS.push(residenceRoof(h));
