@@ -1,7 +1,7 @@
 // Raised scenery lives on the actor depth list. Ground plans and collision keep
 // the original footprints while the camera sees the sides of rails and posts.
 const raisedScenery=[];
-const fittingHeight={bench:9,rack:29,cabinet:26,desk:15,stove:22,bedroll:3,supper:15,
+const fittingHeight={bench:9,rack:29,cabinet:26,desk:12,stove:22,bedroll:3,supper:13,
   pallet:4,cupboard:32,files:10,stool:8,sack:9};
 const fencePanels=new Map();
 function fencePanel(wood,width,variant){
@@ -48,9 +48,13 @@ function buildRaisedScenery(){
       raisedScenery.push({panel,wood,vertical,span,x,y,depth:y,underDeck:f.underDeck});
     }
   }
-  for(const o of objs)if(o.k==='openLeaf' || o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost' || o.k==='waterMain'){
+  for(const o of objs)if(o.k==='crate' || o.k==='openLeaf' || o.k==='roomFitting' || o.k==='partition' || o.k==='pumpMachinery' || o.k==='waypost' || o.k==='waterMain'){
     const x=o.x+o.w/2,y=o.y+o.h/2;
-    raisedScenery.push({item:o,x,y,depth:y+o.h*.24,radius:Math.max(o.w,o.h)/2+24,height:o.k==='waterMain'?18:fittingHeight[o.fitting]||28});
+    // A seated-height surface can only hide boots along its rear edge.
+    // Keep the standing actor's head and shoulders in front at contact.
+    const low=['bench','supper','desk','stool','pallet','bedroll','files'].includes(o.fitting);
+    const height=o.k==='waterMain'?18:o.k==='crate'?14:o.k==='partition'?43:fittingHeight[o.fitting]||28;
+    raisedScenery.push({item:o,x,y,depth:low?o.y-16:y+o.h*.24,radius:Math.max(o.w,o.h)/2+height,height});
   }
   raisedScenery.sort((a,b)=>a.depth-b.depth);
 }
@@ -68,6 +72,13 @@ function raisedOffset(x,y,height,mapView=false){
 }
 function paintRaisedScenery(g,p,mapView){
   if(p.item?.k==='openLeaf'){paintOpenLeaf(g,p.item,mapView);return;}
+  if(p.item?.k==='crate'){
+    if(!p.item.broken)paintWinterCrate(g,p,mapView);
+    return;
+  }
+  if(p.item?.k==='partition'){
+    paintCutWall(g,p,mapView);return;
+  }
   if(p.panel){
     const h=p.wood?28:43,d=p.span/2;
     const [dx,dy]=raisedOffset(p.x,p.y,h,mapView);
@@ -76,6 +87,15 @@ function paintRaisedScenery(g,p,mapView){
     g.save();g.translate(p.x-vx*d,p.y-vy*d);
     g.transform(vx,vy,-sx/h,-dy/h,sx,dy);
     g.drawImage(p.panel,0,0,p.span+.15,h);g.restore();
+    // Each bay has a physical post from cap to soil, even edge-on.
+    const footX=p.x-vx*d,footY=p.y-vy*d;
+    beam(g,footX,footY,footX+sx,footY+dy,p.wood?3.4:2.4,p.wood?'#635747':'#635e54');
+    beam(g,footX-.7,footY-1,footX+sx-.7,footY+dy,1,p.wood?'#978774':'#99978a');
+    shoreEllipse(g,footX,footY+.4,3.5,1.5,'#8e97998f',.13);
+    g.save();g.globalAlpha=.72;
+    snowDrift(g,footX-.8,footY+.9,4,1.7,-.08,9);
+    if(p.wood)snowDrift(g,footX+vx*d*.92,footY+vy*d*.92+.7,6,1.65,p.vertical?1.28:-.16,15);
+    g.restore();
     const x=p.x-vx*d,y=p.y-vy*d;
     // The actual top-down timber and wire cutouts retain the fence thickness
     // when the raised face is edge-on to the camera.
@@ -109,12 +129,11 @@ function paintRaisedScenery(g,p,mapView){
   g.save();
   if(SHADOWS){
     g.fillStyle='#33322d39';
-    if(o.k==='partition')g.fillRect(o.x,o.y+1,o.w+1,o.h+1);
-    else g.fillRect(x+3,y+4,w,h);
+    g.fillRect(x+2,y+2,w,h);
   }
   const side=(a,b,c,d,color)=>{
     g.beginPath();g.moveTo(a,b);g.lineTo(c,d);g.lineTo(c+dx,d+dy);g.lineTo(a+dx,b+dy);g.closePath();g.save();g.clip();
-    artFill(g,o.k==='partition'||o.fitting==='stove'?'wall_concrete':'floor_wood',x-Math.abs(dx)-2,y-Math.abs(dy)-2,w+Math.abs(dx)*2+4,h+Math.abs(dy)*2+4);
+    artFill(g,o.fitting==='stove'?'wall_concrete':'floor_wood',x-Math.abs(dx)-2,y-Math.abs(dy)-2,w+Math.abs(dx)*2+4,h+Math.abs(dy)*2+4);
     g.fillStyle=color;g.globalAlpha=.54;g.fill();g.restore();
   };
   if(['bench','supper','desk','stool'].includes(o.fitting)){
@@ -137,7 +156,7 @@ function paintRaisedScenery(g,p,mapView){
     }
   }
   if(o.k==='pumpMachinery')g.drawImage(district.images.pumpMotor,o.x-2,o.y-3,o.w+4,o.h+6);
-  else if(o.k==='partition'){artFill(g,'wall_concrete',o.x,o.y,o.w,o.h);g.strokeStyle='#77756a';g.lineWidth=.8;g.strokeRect(o.x,o.y,o.w,o.h);}else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
+  else {drawRoomFitting(g,o);if(o.cabinHome)cabinFittingDetail(g,o);if(o.workbench)baseBenchTools(g,o);}
   g.restore();
 }
 function paintFenceFooting(g,f,left,right){
@@ -146,10 +165,101 @@ function paintFenceFooting(g,f,left,right){
   for(let i=first;i<count;i++){
     const x=f.x+(vertical?f.w/2:i*step),y=f.y+(vertical?i*step:f.h/2);
     if(x>right+20)break;
-    if(SHADOWS){
-      beam(g,x+1,y+1,x+9,y+12,2.5,'#4d535e52');
-      beam(g,x+8,y+10,x+8+(vertical?0:step),y+10+(vertical?step:0),1.9,'#54616d30');
-    }
-    shoreEllipse(g,x,y,4.2,2.3,'#7379777a',.22);
+    const endX=x+(vertical?0:step),endY=y+(vertical?step:0);
+    if(SHADOWS)beam(g,x,y+.8,endX,endY+.8,3.3,'#54616d40');
+    shoreEllipse(g,x,y,4.2,2.0,'#74797470',.15);
   }
+}
+
+// Wall runs use the collision tiles, including every doorway and breach.
+// Cropping the lid from the room plan also keeps each sill on its own wall.
+function cutawayWalls(r,plan){
+  const walls=[];
+  for(const side of [0,1,2,3]){
+    const vertical=side%2===1,begin=vertical?1:0,end=vertical?r.h-1:r.w;
+    let start=begin;
+    for(let i=begin;i<=end;i++){
+      const tx=vertical?(side===1?r.w-1:0):i,ty=vertical?i:(side===2?r.h-1:0);
+      const tile=i<end?tAt(r.x+tx,r.y+ty):null;
+      if(tile===CO || tile===BR)continue;
+      if(i>start){
+        const x=(r.x+(vertical?tx:start))*T,y=(r.y+(vertical?start:ty))*T;
+        const w=(vertical?1:i-start)*T,h=(vertical?i-start:1)*T;
+        const timber=r.hamlet || r===fishingRoom || villageCabins.includes(r);
+        const wall={x,y,w,h,material:timber?'timber':'concrete',room:r,plan};
+        walls.push({wall,x:x+w/2,y:y+h/2,depth:y+h*.55,radius:Math.max(w,h)/2+60,height:38});
+      }
+      start=i+1;
+    }
+  }
+  return walls;
+}
+function paintCutWall(g,p,mapView){
+  const o=p.wall||p.item;
+  const {x,y,w,h}=o;
+  // Lower the cut surface locally when it would otherwise cover the
+  // player immediately behind a wall. Door positions and collision stay fixed.
+  const gap=mapView?Infinity:Math.hypot(P.x-clamp(P.x,x,x+w),P.y-clamp(P.y,y,y+h));
+  const height=p.height*(.31+.69*clamp((gap-8)/32,0,1));
+  if(SHADOWS){
+    g.save();g.shadowColor='#29261e6a';g.shadowBlur=3;g.shadowOffsetX=1.2;g.shadowOffsetY=1.7;
+    g.fillStyle='#4a44375a';g.fillRect(x+.5,y+.5,w-1,h-1);g.restore();
+  }
+  const corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+  const elevated=corners.map(([u,v])=>{
+    const [dx,dy]=raisedOffset(u,v,height,mapView);return [u+dx,v+dy];
+  });
+  const material=o.material==='timber'?'floor_wood':o.material==='brick'?'wall_brick':'wall_concrete';
+  for(let i=0;i<4;i++){
+    const j=(i+1)%4,[ax,ay]=corners[i],[bx,by]=corners[j],[tx,ty]=elevated[i];
+    const ex=bx-ax,ey=by-ay,length=Math.hypot(ex,ey);
+    if(ex*(ty-ay)-ey*(tx-ax)<=0)continue;
+    // Project the vertical face from its actual toe to its coping.
+    const [ux,uy]=elevated[j];
+    g.save();g.beginPath();g.moveTo(ax,ay);g.lineTo(bx,by);g.lineTo(ux,uy);g.lineTo(tx,ty);g.closePath();g.clip();
+    g.transform(ex/length,ey/length,(ax-tx)/height,(ay-ty)/height,tx,ty);
+    artFill(g,material,-2,-1,length+5,height+3);
+    const shade=g.createLinearGradient(0,0,0,height);
+    shade.addColorStop(0,'#443c3030');shade.addColorStop(.78,'#302e2a49');shade.addColorStop(1,'#211e1be0');
+    g.fillStyle=shade;g.fillRect(-2,0,length+5,height);
+    if(o.material==='timber')for(let v=7;v<height;v+=8)beam(g,0,v,length,v,1.15,'#362e26a8');
+    g.restore();
+  }
+  const [[lx,ly],[rx],[,by]]=elevated;
+  if(o.plan)g.drawImage(o.plan,x-o.room.x*T,y-o.room.y*T,w,h,lx,ly,rx-lx,by-ly);
+  else{
+    // Exposed aggregate or end grain at the section cut reads differently
+    // from the paving beside it, even looking straight down a long wall.
+    artFill(g,material,lx,ly,rx-lx,by-ly);
+    g.fillStyle=o.material==='timber'?'#8b765667':'#b1a99476';
+    g.fillRect(lx,ly,rx-lx,by-ly);
+    const vertical=h>w,run=vertical?h:w;
+    for(let n=17;n<run;n+=32){
+      const u=vertical?lx:lx+n,v=vertical?ly+n:ly;
+      beam(g,u,v,u+(vertical?rx-lx-1:.9),v+(vertical?.65:by-ly-1),.8,'#72695b91');
+    }
+  }
+  g.lineWidth=1.3;g.strokeStyle='#514c43';g.strokeRect(lx+.55,ly+.55,rx-lx-1.1,by-ly-1.1);
+  beam(g,lx+1,ly+1,rx-1,ly+1,1.25,'#b1a99a');
+}
+function paintWinterCrate(g,p,mapView){
+  const o=p.item,w=o.w-1,h=o.h-1,x=p.x-w/2,y=p.y-h/2;
+  const [dx,dy]=raisedOffset(p.x,p.y,p.height,mapView);
+  const lid=o.sprite|| (o.stash?'c1_crate_army':'c1_crate');
+  g.save();
+  if(SHADOWS)shoreEllipse(g,p.x,p.y+h*.34,w*.57,h*.29,'#322e286e',0);
+  function face(ax,ay,bx,by,tint){
+    const length=Math.hypot(bx-ax,by-ay);
+    g.save();g.transform((bx-ax)/length,(by-ay)/length,-dx/p.height,-dy/p.height,ax+dx,ay+dy);
+    g.fillStyle='#4e4938';g.fillRect(0,0,length,p.height);
+    g.drawImage(lookoutBoard(8,false),0,0,length,p.height);
+    g.fillStyle=tint;g.fillRect(0,0,length,p.height);
+    g.fillStyle='#37382d';g.fillRect(0,p.height-1.7,length,1.7);
+    for(const f of [.12,.86]){g.fillStyle='#3c392dc7';g.fillRect(f*length,0,1.45,p.height);}
+    g.restore();
+  }
+  const side=dx>0?x:x+w;
+  face(side,y,side,y+h,'#363c2bb5');face(x,y+h,x+w,y+h,'#55583b99');
+  ART.draw(g,lid,p.x+dx,p.y+dy,w,h,0);
+  g.restore();
 }

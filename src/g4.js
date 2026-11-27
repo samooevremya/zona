@@ -1018,7 +1018,7 @@ function render() {
       if(perspective && !o.broken && (o.k==='locker'||o.k==='safe')) liftContainer(o,containerDraw);
       else containerDraw(o);
     }
-    else if (o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
+    else if (!BEREZKI && o.k === 'crate' && !(shopVisible && o.shopStack) && inView(o.x, o.y, 40)) {
       containerContact(o);
       if(perspective) liftContainer(o,crateDraw); else crateDraw(o);
     }
@@ -1051,7 +1051,7 @@ function render() {
     for(const p of raisedScenery)if(p.underDeck && inView(p.x,p.y,80))paintRaisedScenery(ctx,p,false);
     drawWinterBridge(ctx);
   }
-  const winterProps=BEREZKI?[...westRailPanels(vx,vx+vw,vy,vy+vh),...atlasProps.filter(p=>inView(p.x,p.y,150)),
+  const winterProps=BEREZKI?[...(winterFloor(P.x,P.y)?.cutWalls||[]).filter(p=>inView(p.x,p.y,p.radius)),...westRailPanels(vx,vx+vw,vy,vy+vh),...atlasProps.filter(p=>inView(p.x,p.y,Math.max(p.width,p.height)+20)),
     ...raisedScenery.filter(p=>inView(p.x,p.y,p.radius||80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
@@ -1204,7 +1204,8 @@ function render() {
     lctx.setTransform(unit,0,0,unit,origin[0],origin[1]);
     if(!shopVisible && !loft)clipRoofsFromLight(lctx,vx,vy,vw,vh,inView);
     if(P.alive){
-      if(S.torch===false)castLight(lctx,P,0,Math.PI,60,.45);
+      if(BEREZKI){if(S.torch!==false)winterFlashlight(lctx,P);}
+      else if(S.torch===false)castLight(lctx,P,0,Math.PI,60,.45);
       else {castLight(lctx,P,0,Math.PI,95,.75);castLight(lctx,P,P.ang,.42,330,.95);}
     }
     for(const e of vis)if(e!==P && e.kind==='human' && !e.sit && !e.captive && e.fac!=='bandit' && e.sid!=='sid')

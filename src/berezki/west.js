@@ -17,7 +17,7 @@ function makeWesternSites(){
   // prevent side entry onto the flight, and share its exact physical edges.
   interiorObject('lookoutFrame',x,y,2*half,2*half,{belowLookout:true});
   for(const sign of [-1,1])interiorObject('lookoutRail',x+sign*width/2,y+half+run/2,4,run,{belowLookout:true});
-  raisedScenery.push({westDeck:true,x,y,depth:y+half+run-1});
+  raisedScenery.push({westDeck:true,x,y,radius:half+Math.max(run,lookout.rise)+16,depth:y+half+run-1});
 }
 function walkLookout(e,oldY){
   const t=lookout,edge=t.y+t.half,foot=edge+t.run;
