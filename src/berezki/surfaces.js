@@ -56,7 +56,7 @@ function forestBank(cx,cy){
     if(!outdoorTreeAt(tx,ty))continue;
     const x=(tx+.5)*T+20+rand()*22,y=(ty+.5)*T+10+rand()*16;
     const rx=48+rand()*49,ry=16+rand()*24,margin=rx/T+1;
-    if(ty>214 && ty<236 || basinRadius(tx,ty,lakeShape)<1.06 || basinRadius(tx,ty,marshShape)<1.15 ||
+    if(ty>169 && ty<191 || basinRadius(tx,ty,lakeShape)<1.06 || basinRadius(tx,ty,marshShape)<1.15 ||
         inMarshChannel(tx,ty) || nearWinterRoute(x,y,rx) ||
         district.levels.some(r=>tx>=r.x-margin && tx<=r.x+r.w+margin && ty>=r.y-margin && ty<=r.y+r.h+margin))break;
     const angle=-.42+rand()*.48;

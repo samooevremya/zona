@@ -1,8 +1,8 @@
 // The public trail passes in front of the loading bay. Its two retracted steel
 // leaves run along the wall, leaving three full tiles clear between the jambs.
-const westStore={name:'Западный склад',kind:'warehouse',n:1,x:151,y:180,w:13,h:7,
+const westStore={name:'Западный склад',kind:'warehouse',n:1,x:125,y:143,w:13,h:7,
   doors:[[5,6],[6,6],[7,6]]};
-const lookout={x:79*T,y:121*T,half:40,run:92,width:45,rise:105};
+const lookout={x:61*T,y:95*T,half:40,run:92,width:45,rise:105};
 function makeWesternSites(){
   const r=westStore;
   house(r.x,r.y,r.w,r.h,r.doors,CO,0,'slate');

@@ -1,8 +1,8 @@
 // The winter district plugs into the Cordon movement, combat, roof, HUD and inventory systems.
 // Upper storeys occupy enclosed map cells. A save position therefore identifies its floor.
 const district = {
-  width:669, height:651, levels:[], images:{}, plans:[], stairs:[], heaters:[],
-  fire:tilePoint(520,362.6), start:tilePoint(518,357)
+  width:535, height:521, levels:[], images:{}, plans:[], stairs:[], heaters:[],
+  fire:tilePoint(421,289.6), start:tilePoint(419,284)
 };
 function winterCanvas(w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -20,23 +20,24 @@ function makeDistrict(){
   WORLD_FIRES.splice(0,WORLD_FIRES.length,FIRE,shoreFire);
   ANOM0.length=CACHES.length=0;
   makeAtlasProps();
-  supplyBox(509*T,358*T,'berezki-canteen',{bread:1,bandage:2});
+  supplyBox(410*T,285*T,'berezki-canteen',{bread:1,bandage:2});
   makeWinterSalvage();
+  alignWinterStorage();
   buildGrids();
 }
 const fishingNames=['Илья','Павел','Денис','Макар','Никита','Олег','Тимофей','Юрий','Артём','Борис','Антон','Василий'];
 function winterNew(difficulty){
-  return {v:1,difficulty:difficultyKey(difficulty),...(marshPreview?tilePoint(...marshFork):basePreview?tilePoint(325,566.8):shorePreview?tilePoint(488.2,135.8):district.start),hp:100,min:marshPreview||basePreview?660:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
-    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:2,fisherName:fishingNames[ri(0,fishingNames.length-1)]},campaign:{stage:'district',wounds:{}},
+  return {v:1,difficulty:difficultyKey(difficulty),...(marshPreview?tilePoint(...marshFork):basePreview?tilePoint(260,454.8):shorePreview?tilePoint(389.2,109.8):district.start),hp:100,min:marshPreview||basePreview?660:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
+    weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:3,fisherName:fishingNames[ri(0,fishingNames.length-1)]},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
 const winterResidents=[
-  ['warden','Агат',516,362.5,'w_obrez'],['door','Савва',519.7,357.6,'w_pm'],
-  ['cook','Тамара',509.5,354.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
+  ['warden','Агат',417,289.5,'w_obrez'],['door','Савва',420.7,284.6,'w_pm'],
+  ['cook','Тамара',410.5,281.5,'knife'],['tenant','Глеб',778.4,17.5,'knife'],
   ['fisher',null,...fishingTrack[0],'knife'],
-  ['housekeeper','Вера',503.4,128.6,'knife'],['anya','Аня',482.2,140.2,'knife'],
-  ['mitya','Митя',485.5,140.75,'knife'],['shorePatrol','Григорий',494.4,133.2,'w_obrez'],
-  ['shorePost','Семён',481.8,134.5,'w_pm']
+  ['housekeeper','Вера',404.4,102.6,'knife'],['anya','Аня',383.2,114.2,'knife'],
+  ['mitya','Митя',386.5,114.75,'knife'],['shorePatrol','Григорий',395.4,107.2,'w_obrez'],
+  ['shorePost','Семён',382.8,108.5,'w_pm']
 ];
 function winterRestore(d){
   S=d;survDefaults();plusDefaults();
@@ -89,7 +90,7 @@ function winterRestore(d){
   stepDistance=0;winterFootSide=1;deathT=0;hurtFlash=0;armyAngry=false;MSGS=[];radioQueue.length=0;
 }
 function winterInteractChoices(cand){
-  for(const s of district.stairs){const d=dE(P,s);if(d<32)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
+  for(const s of district.stairs){const d=dE(P,s);if(d<30 && Math.abs(P.x-s.x)<.7*T)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
   const room=winterFloor(P.x,P.y);
   const stove=stoveIn(room);
   if(stove && dE(P,stove.at)<53 && los(P.x,P.y,stove.at.x,stove.at.y)){
@@ -109,7 +110,7 @@ function winterUse(n){
     S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. У печи можно согреться.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
     const from=n.s,to=district.stairs.find(s=>s.room.block===from.room.block && s.room.n===from.room.n+(from.up?1:-1) && s.up!==from.up);
-    P.x=to.x;P.y=to.y+1.45*T;cam.x=P.x;cam.y=P.y;G.near=null;msg(to.room.name,'say');
+    P.x=to.x;P.y=(to.room.y+to.room.stairY+3.18)*T;cam.x=P.x;cam.y=P.y;G.near=null;msg(to.room.name,'say');
   }else if(n.k==='winterRest'){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
     dialog({n:n.bed?'Лежанка':'У огня',grp:n.stove?n.stove.room.name:winterFloor(P.x,P.y)?.hamlet?'Хутор':shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
@@ -228,6 +229,7 @@ function winterRoom(r){
   if(r.n===1 && !r.abandoned){winterPaving(g,'boards',T,T,8*T,h-2*T);rug(2*T,6.6*T,2.5*T,2.2*T);}
   else{
     for(const y of [T,6.8*T])winterPaving(g,'boards',T,y,15*T,3*T);
+    if(r.abandoned && r.n===1)winterPaving(g,'slab',11*T,6.55*T,2*T,3.45*T);
     if(!r.abandoned)for(const x of [3.2,8.2,13.2])rug(x*T,1.7*T,T*1.55,T*1.25);
   }
   const ox=r.x*T,oy=r.y*T;g.translate(-ox,-oy);
