@@ -320,6 +320,11 @@ body.is-touch .touch .s4 { right: 0; bottom: 84px; } body.is-touch .touch .s6 { 
 .zh-bar.hp .bar i{background:linear-gradient(#ff6a55,#c22016 60%,#8a140d)}
 .zh-bar.st .bar i{background:linear-gradient(#7cc4ff,#2a7cc8 60%,#1a4f86)}
 .zh-bar.fd .bar i{background:linear-gradient(#f3d27a,#c99620 60%,#866010)}
+.zh-bar.warmth{color:#dbc08f}.zh-bar.warmth.chilled{color:#acd0df}
+.zh-bar.warmth .bar{position:relative}
+.zh-bar.warmth .bar::after{content:"";position:absolute;left:var(--frost-mark);top:0;bottom:0;width:1px;background:#eadab39c}
+.zh-bar.warmth .bar i{background:linear-gradient(#e9c18a,#b2874b 60%,#785631)}
+.zh-bar.warmth.chilled .bar i{background:linear-gradient(#b5d6df,#799bad 60%,#536d7f)}
 .zh-bar .bar.low i{animation:zhlow 1s infinite}@keyframes zhlow{50%{opacity:.35}}
 .zh-bar b{font:700 12px "Arial Narrow",Arial;min-width:20px;text-align:right;font-variant-numeric:tabular-nums}
 .zh-st{position:absolute;left:138px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
@@ -16669,8 +16674,10 @@ function winterShelter(e){
   return room;
 }
 function winterRoomWarm(room){
-  if(stoveIn(room))return !!stoveBurning(stoveIn(room));
-  return !!room&&(room.block==='living'||room.kind==='barracks'||district.heaters.some(h=>winterFloor(h.x,h.y)===room)||stoveBurning(stoveIn(room)));
+  if(!room||room.abandoned)return false;
+  const stove=stoveIn(room);
+  if(stove)return !!stoveBurning(stove);
+  return room.block==='living'||room.kind==='barracks'||district.heaters.some(h=>winterFloor(h.x,h.y)===room);
 }
 const windVectors=[[0,1,'севера'],[-1,0,'востока'],[0,-1,'юга'],[1,0,'запада']];
 // Use the movement graph itself: an entrance can have several usable landing tiles.
@@ -16763,12 +16770,15 @@ function stormSnowArt(){
   winterSnowArt=c;return c;
 }
 function winterScreenEffects(){
-  const s=S.flags.blizzard,cold=clamp((40-S.flags.warmth)/40,0,1),cover=s?.cover||0;
+  const threshold=thermalBalance.frostStarts;
+  const s=S.flags.blizzard,cold=S.flags.warmth<=threshold?lerp(.06,1,1-S.flags.warmth/threshold):0,cover=s?.cover||0;
   if(cold||cover){
     if(!winterFrostArt){
       const c=winterCanvas(640,360),g=c.getContext('2d'),rand=mulberry32(77301);
+      // Four edge bands of this depth occupy the configured fraction of the screen.
+      const band=(1-Math.sqrt(1-thermalBalance.maxFrostArea))/2;
       for(let i=0;i<3100;i++){
-        const side=i%4,u=rand(),v=rand()**2*.097,x=(side===0?v:side===1?1-v:u)*640,y=(side===2?v:side===3?1-v:u)*360;
+        const side=i%4,u=rand(),v=rand()**2*band,x=(side===0?v:side===1?1-v:u)*640,y=(side===2?v:side===3?1-v:u)*360;
         g.strokeStyle='rgba(222,235,240,'+(.25+.58*rand())+')';g.lineWidth=.4+rand();
         const a=rand()*6.28,l=2+rand()*10;beam(g,x,y,x+l*Math.cos(a),y+l*Math.sin(a),g.lineWidth,g.strokeStyle);
       }
@@ -16795,12 +16805,16 @@ function winterScreenEffects(){
 let warmthBar;
 function winterStatus(){
   if(!warmthBar){
-    warmthBar=H.fd.closest('.zh-bar').cloneNode(true);warmthBar.classList.remove('fd');warmthBar.title='Тепло';
-    warmthBar.querySelector('svg').innerHTML='<path d="M9 4a3 3 0 0 1 6 0v10a5 5 0 1 1-6 0z"/>';
+    warmthBar=H.fd.closest('.zh-bar').cloneNode(true);warmthBar.classList.replace('fd','warmth');warmthBar.title='Тепло';
+    warmthBar.setAttribute('role','meter');warmthBar.setAttribute('aria-label','Запас тепла');
+    warmthBar.setAttribute('aria-valuemin','0');warmthBar.setAttribute('aria-valuemax','100');
+    warmthBar.style.setProperty('--frost-mark',thermalBalance.frostStarts+'%');
+    warmthBar.querySelector('svg').innerHTML='<path d="M9 4a3 3 0 0 1 6 0v9a5.3 5.3 0 1 1-6 0z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 8h2v7.4a2.8 2.8 0 1 1-2 0z" fill="currentColor"/>';
     warmthBar.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));H.fd.closest('.zh-bar').before(warmthBar);
   }
   const w=S.flags.warmth,bar=warmthBar.querySelector('i');bar.style.width=w+'%';
-  bar.style.background='color-mix(in srgb, #de9049 '+w+'%, #62a6de)';warmthBar.querySelector('b').textContent=Math.round(w);
+  warmthBar.classList.toggle('chilled',w<=thermalBalance.frostStarts);
+  warmthBar.querySelector('b').textContent=Math.round(w);warmthBar.setAttribute('aria-valuenow',Math.round(w));
 }
 function winterExert(dt,moving,sprint,attempt,depth){
   const deep=depth>.35;
@@ -16813,6 +16827,82 @@ function winterExert(dt,moving,sprint,attempt,depth){
   }
   if(P.winded&&P.st>=20)P.winded=false;
   if(P.heavyBreath>0 && S.min>=(P.nextBreath||0)){play('breath',P.x,P.y,.52);P.nextBreath=S.min+1.25;}
+}
+
+// Temperatures use Celsius. The world clock advances one game minute per real second.
+const thermalBalance={
+  dawn:4,day:8,dusk:18,night:22,dayRange:[-38,-30],nightRange:[-50,-38],roomRange:[-2,5],
+  maxChangePerHour:4,baseCold:-30,lossPerMinute:10,extraLossPerDegree:.75,
+  roomGainAtMin:.4,roomGainPerDegree:.05,fireGain:1.5,fireRadius:90,
+  frostStarts:40,maxFrostArea:1/3
+};
+function thermalRange(minute,inside){
+  const b=thermalBalance;
+  if(inside)return b.roomRange;
+  const hour=minute%1440/60;
+  let daylight=0;
+  if(hour>=b.dawn&&hour<b.day)daylight=(hour-b.dawn)/(b.day-b.dawn);
+  else if(hour>=b.day&&hour<b.dusk)daylight=1;
+  else if(hour>=b.dusk&&hour<b.night)daylight=(b.night-hour)/(b.night-b.dusk);
+  return b.nightRange.map((value,i)=>lerp(value,b.dayRange[i],daylight));
+}
+function nextThermalHour(track,start,from,inside){
+  const end=(Math.floor(start/60)+1)*60;
+  const [min,max]=thermalRange(end,inside);
+  const reach=thermalBalance.maxChangePerHour*(end-start)/60;
+  const low=Math.ceil(10*Math.max(min,from-reach)-1e-8);
+  const high=Math.floor(10*Math.min(max,from+reach)+1e-8);
+  const previous=Math.round(from*10),skip=high>low&&previous>=low&&previous<=high;
+  const random=mulberry32(track.seed^Math.imul(end/60,0x45d9f3b));
+  let target=low+Math.floor(random()*(high-low+1-Number(skip)));
+  if(skip&&target>=previous)target++;
+  Object.assign(track,{start,end,from,to:target/10});
+}
+function thermalTrackAt(key,minute){
+  const tracks=S.flags.temperatures||={};
+  const inside=key!=='street';
+  let track=tracks[key];
+  if(!track||minute<track.start){
+    const [min,max]=thermalRange(minute,inside);
+    track=tracks[key]={seed:ri(0,0x7fffffff)};
+    const initial=ri(Math.ceil(min*10-1e-8),Math.floor(max*10+1e-8))/10;
+    nextThermalHour(track,minute,initial,inside);
+  }
+  while(minute>=track.end)nextThermalHour(track,track.end,track.to,inside);
+  return lerp(track.from,track.to,(minute-track.start)/(track.end-track.start));
+}
+function roomClimateKey(room,x,y){
+  const root=room.x+','+room.y;
+  if(room.block!=='living')return root;
+  const u=x/T-room.x,v=y/T-room.y;
+  if(u>=16.1)return root+'/stairs';
+  if(room.n===1)return root+(u<9?'/canteen':'/hall');
+  if(v>=4.45&&v<=6.55)return root+'/hall';
+  return root+'/flat'+clamp(Math.floor((u-1)/5),0,2)+(v<4.45?'N':'S');
+}
+function ambientAt(room,x,y,heated=winterRoomWarm(room)){
+  const outside=thermalTrackAt('street',S.min);
+  return heated?thermalTrackAt(roomClimateKey(room,x,y),S.min):outside;
+}
+function thermalRate(temp,heated,byFire){
+  const b=thermalBalance;
+  const rate=heated?b.roomGainAtMin+b.roomGainPerDegree*(temp-b.roomRange[0]):
+    -(b.lossPerMinute+b.extraLossPerDegree*(b.baseCold-temp))/60;
+  return byFire?Math.max(rate,b.fireGain):rate;
+}
+function winterHeatTick(dt,room){
+  const heated=winterRoomWarm(room);
+  const temp=ambientAt(room,P.x,P.y,heated);
+  const byFire=WORLD_FIRES.some(f=>dE(P,f)<thermalBalance.fireRadius&&fireLit(f)&&
+    winterFloor(f.x,f.y)===room&&los(P.x,P.y,f.x,f.y));
+  const rate=thermalRate(temp,heated,byFire),before=S.flags.warmth;
+  S.flags.warmth=clamp(before+dt*rate,0,100);
+  P.byHeat=heated||byFire;
+  if(S.flags.warmth===0&&rate<0&&P.alive){
+    const exposed=Math.max(0,dt-before/-rate);
+    P.hp-=exposed*.4;
+    if(P.hp<=0)kill(P,'cold');
+  }
 }
 
 let layingFire=null;
@@ -20713,7 +20803,7 @@ function winterRestore(d){
   S=d;survDefaults();plusDefaults();
   delete S.flags.coatWetness;marshRipples.length=0;
   upgradeStationSave(S);upgradeAtlasSave(S);restoreKit();resetCampAudio();resetInput();resetEnvironment();
-  S.blow={stage:0};S.flags.warmth??=100;
+  S.blow={stage:0};S.flags.warmth??=100;thermalTrackAt('street',S.min);
   if(!S.flags.flatLayout){
     if(d.x>=770*T && d.x<832*T && d.y>=49*T && d.y<60*T)Object.assign(d,tilePoint(828.1,17.6));
     S.flags.flatLayout=1;
@@ -20831,6 +20921,7 @@ function sleepWinterHours(hours){
     }
     S.min+=dt;winterStormTick(dt,true);
   }
+  thermalTrackAt('street',S.min);
   S.food=Math.max(0,S.food-slept*foodPerHour);
   P.hp=Math.min(100,P.hp+slept*healthPerHour);P.st=100;
   ageRemains();winterWildTick();cleanExpiredCrates();
@@ -20840,16 +20931,10 @@ let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
   WX.time+=dt;environmentTime+=dt;
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
-  const r=winterFloor(P.x,P.y),stove=stoveIn(r);
-  const warm=(stoveBurning(stove) && dE(P,stove.at)<90 && los(P.x,P.y,stove.at.x,stove.at.y)) || district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
-  const roof=winterShelter(P),heated=winterRoomWarm(roof);
-  const storm=S.flags.blizzard?.stage;
-  const exposure=roof?(night()?.07:.05):(night()?.22:.07)+marshDepth(P.x,P.y)*.55;
-  const rate=warm||heated?1.75:-exposure*(!roof&&storm==='warning'?2.2:1);
-  S.flags.warmth=clamp(S.flags.warmth+dt*rate,0,100);
-  P.byHeat=!!(warm||heated);
-  if(!P.byHeat&&S.flags.warmth===0&&P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
-  tickFieldFire(dt);winterStormTick(dt);winterWildTick();cleanExpiredCrates();
+  const r=winterFloor(P.x,P.y);
+  tickFieldFire(dt);winterStormTick(dt);
+  if(P.alive)winterHeatTick(dt,r);
+  winterWildTick();cleanExpiredCrates();
   WX.wind=.36+.15*Math.sin(S.min*.041)+.09*Math.sin(S.min*.15);
   mixRecordedRain();
   if(!r && S.min>=(S.flags.frostSoundAt||0)){
@@ -21101,8 +21186,7 @@ async function bootBerezki(){
   drawGround=winterGround;drawMapTo=winterMap;drawMini=winterMini;
   qList=winterJobs;qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
-    const outside=Math.round(-18-28*darkness()/.8);
-    const temp=winterRoomWarm(r)?3:r?outside+(r.abandoned?4:8):outside;
+    const temp=Math.round(ambientAt(r,P.x,P.y));
     const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%'+(P.byHeat?' · ♨':'');
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
