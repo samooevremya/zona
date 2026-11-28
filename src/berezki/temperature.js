@@ -1,7 +1,7 @@
 // Temperatures use Celsius. The world clock advances one game minute per real second.
 const thermalBalance={
   dawn:4,day:8,dusk:18,night:22,dayRange:[-38,-30],nightRange:[-50,-38],roomRange:[-2,5],
-  maxChangePerHour:4,baseCold:-30,lossPerMinute:10,extraLossPerDegree:.75,
+  warningWindLoss:.25,maxChangePerHour:4,baseCold:-30,lossPerMinute:10,extraLossPerDegree:.75,
   roomGainAtMin:.4,roomGainPerDegree:.05,fireGain:1.5,fireRadius:90,
   frostStarts:40,maxFrostArea:1/3
 };
@@ -64,7 +64,10 @@ function winterHeatTick(dt,room){
   const temp=ambientAt(room,P.x,P.y,heated);
   const byFire=WORLD_FIRES.some(f=>dE(P,f)<thermalBalance.fireRadius&&fireLit(f)&&
     winterFloor(f.x,f.y)===room&&los(P.x,P.y,f.x,f.y));
-  const rate=thermalRate(temp,heated,byFire),before=S.flags.warmth;
+  let rate=thermalRate(temp,heated,byFire);
+  const s=S.flags.blizzard;
+  if(rate<0&&s?.stage==='warning'&&!winterShelter(P))rate*=1+thermalBalance.warningWindLoss*stormStrength(s)/.84;
+  const before=S.flags.warmth;
   S.flags.warmth=clamp(before+dt*rate,0,100);
   P.byHeat=heated||byFire;
   if(S.flags.warmth===0&&rate<0&&P.alive){

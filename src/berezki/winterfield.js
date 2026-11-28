@@ -97,13 +97,8 @@ function renderWinterMarks(vx,vy,vw,vh){
   }
 }
 function snowScreen(){
-  if(winterFloor(P.x,P.y)||!snowing(S.min))return;
-  const time=environmentTime;ctx.save();ctx.fillStyle='#e2e6e9';ctx.globalAlpha=.54;
-  for(let i=1;i<95;i++){
-    const x=(i*197+time*(13+i%7))%(VW+12),y=(i*127+time*(35+i%29))%(VH+8);
-    ctx.fillRect(x,y,i%3?1.1:2,1.8);
-  }
-  ctx.restore();
+  if(winterShelter(P)||stormStrength(S.flags.blizzard)>0||!snowing(S.min))return;
+  winterSkySnow(0,.34,1,false);
 }
 function winterWitness(victim){
   for(const e of ents){

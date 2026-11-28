@@ -320,11 +320,10 @@ body.is-touch .touch .s4 { right: 0; bottom: 84px; } body.is-touch .touch .s6 { 
 .zh-bar.hp .bar i{background:linear-gradient(#ff6a55,#c22016 60%,#8a140d)}
 .zh-bar.st .bar i{background:linear-gradient(#7cc4ff,#2a7cc8 60%,#1a4f86)}
 .zh-bar.fd .bar i{background:linear-gradient(#f3d27a,#c99620 60%,#866010)}
-.zh-bar.warmth{color:#dbc08f}.zh-bar.warmth.chilled{color:#acd0df}
+.zh-bar.warmth{--heat-tint:100%;color:color-mix(in srgb,#dbc08f var(--heat-tint),#acd0df)}
 .zh-bar.warmth .bar{position:relative}
 .zh-bar.warmth .bar::after{content:"";position:absolute;left:var(--frost-mark);top:0;bottom:0;width:1px;background:#eadab39c}
-.zh-bar.warmth .bar i{background:linear-gradient(#e9c18a,#b2874b 60%,#785631)}
-.zh-bar.warmth.chilled .bar i{background:linear-gradient(#b5d6df,#799bad 60%,#536d7f)}
+.zh-bar.warmth .bar i{background:linear-gradient(color-mix(in srgb,#e9c18a var(--heat-tint),#b5d6df),color-mix(in srgb,#b2874b var(--heat-tint),#799bad) 60%,color-mix(in srgb,#785631 var(--heat-tint),#536d7f))}
 .zh-bar .bar.low i{animation:zhlow 1s infinite}@keyframes zhlow{50%{opacity:.35}}
 .zh-bar b{font:700 12px "Arial Narrow",Arial;min-width:20px;text-align:right;font-variant-numeric:tabular-nums}
 .zh-st{position:absolute;left:138px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
@@ -16732,23 +16731,39 @@ function stormRoute(e){
   }
   return null;
 }
+const frontExposureLimit=2;
+function stormStrength(s){
+  if(!s||s.stage==='calm')return s?.release||0;
+  if(s.stage==='front')return 1;
+  const start=s.start??s.until-60;
+  return .12+.72*clamp((S.min-start)/Math.max(1,s.until-start),0,1);
+}
 function winterStormTick(dt,sleeping=false){
   const f=S.flags,s=f.blizzard||={stage:'calm',until:S.min+ri(540,1080),dir:0,cover:0};
   if(s.stage==='calm'&&S.min>=s.until){
     const route=winterShelter(P)?{seconds:0}:stormRoute(P);
     if(!route){s.until=S.min+20;return;}
-    s.dir=ri(0,3);s.stage='warning';s.until=S.min+Math.max(60,route.seconds*1.7+8);
+    s.dir=s.start==null?ri(0,3):(s.dir+ri(1,3))%4;s.start=S.min;s.exposure=0;s.stage='warning';s.until=S.min+Math.max(60,route.seconds*1.7+8);
     bulletin('Метель с '+windVectors[s.dir][2]+'. Укройтесь в здании до удара фронта.');play('beep');
     for(const e of ents)if(e.alive&&e!==P&&e.kind==='human'&&!winterShelter(e))e.stormRefuge=stormRoute(e)?.to;
   }else if(s.stage==='warning'&&S.min>=s.until){
     s.stage='front';s.until=S.min+30;play('winterGust');bulletin('Фронт метели. Оставайтесь в укрытии.');
   }else if(s.stage==='front'&&S.min>=s.until){
-    s.stage='calm';s.until=S.min+ri(720,1800);bulletin('Метель стихла. Можно выходить.');
+    s.stage='calm';s.release=1;s.exposure=0;s.until=S.min+ri(720,1800);bulletin('Метель стихла. Можно выходить.');
     for(const e of ents)delete e.stormRefuge;
   }
-  if(s.stage==='front')for(const e of ents)if(e.alive&&!e.wildId&&!winterShelter(e))kill(e,'blizzard');
-  const outside=!winterShelter(P);
-  s.cover=clamp(s.cover+dt*(outside&&s.stage!=='calm'?.026:winterRoomWarm(winterShelter(P))?-.085:-.055),0,1);
+  const shelter=winterShelter(P),outside=!shelter;
+  if(s.stage==='calm')s.release=Math.max(0,(s.release||0)-dt/7);
+  if(s.stage==='front'){
+    // Residents keep the existing front rules. The player has a short uninterrupted exposure window.
+    for(const e of ents)if(e!==P&&e.alive&&!e.wildId&&!winterShelter(e))kill(e,'blizzard');
+    s.exposure=outside?Math.min(frontExposureLimit,(s.exposure||0)+dt):0;
+    if(s.exposure>=frontExposureLimit-1e-8&&P.alive)kill(P,'blizzard');
+  }else s.exposure=0;
+  const target=outside&&s.stage!=='calm'?(s.stage==='front'?1:.09+.64*stormStrength(s)):0;
+  const delta=target-s.cover;
+  const speed=delta>0?(s.stage==='front'?2.5:.052):winterRoomWarm(shelter)?1/12:1/18;
+  s.cover+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);
   if(!sleeping&&s.stage!=='calm'&&(!s.soundAt||S.min>=s.soundAt)){play('winterGust',undefined,undefined,s.stage==='front'?1:.65);s.soundAt=S.min+4;}
 }
 function winterWindMove(mx,my){
@@ -16756,23 +16771,12 @@ function winterWindMove(mx,my){
   if(!s||s.stage==='calm'||winterShelter(P))return 0;
   const [x,y]=windVectors[s.dir];return mx*x+my*y;
 }
-let winterFrostArt,winterSnowArt;
-function stormSnowArt(){
-  if(winterSnowArt)return winterSnowArt;
-  const c=winterCanvas(640,360),g=c.getContext('2d'),random=mulberry32(92833);
-  for(let i=0;i<2100;i++){
-    const side=i%4,u=random(),depth=random()**2*(.05+.085*Math.sin(17*u+side)**2);
-    const x=(side===0?depth:side===1?1-depth:u)*c.width,y=(side===2?depth:side===3?1-depth:u)*c.height;
-    const radius=.6+random()**2*6,fleck=g.createRadialGradient(x,y,0,x,y,radius);
-    fleck.addColorStop(0,'rgba(224,231,229,.58)');fleck.addColorStop(1,'rgba(203,218,224,0)');
-    g.fillStyle=fleck;g.fillRect(x-radius,y-radius,radius*2,radius*2);
-  }
-  winterSnowArt=c;return c;
-}
+let winterFrostArt;
 function winterScreenEffects(){
   const threshold=thermalBalance.frostStarts;
   const s=S.flags.blizzard,cold=S.flags.warmth<=threshold?lerp(.06,1,1-S.flags.warmth/threshold):0,cover=s?.cover||0;
-  if(cold||cover){
+  if(s&&stormStrength(s)>0&&!winterShelter(P))drawBlowingSnow(s,stormStrength(s));
+  if(cold){
     if(!winterFrostArt){
       const c=winterCanvas(640,360),g=c.getContext('2d'),rand=mulberry32(77301);
       // Four edge bands of this depth occupy the configured fraction of the screen.
@@ -16784,23 +16788,11 @@ function winterScreenEffects(){
       }
       winterFrostArt=c;
     }
-    ctx.save();const extent=Math.max(cold,cover),margin=(1-extent)*.09;
-    ctx.globalAlpha=Math.max(cold**.8,cover*.85);
+    ctx.save();const extent=cold,margin=(1-extent)*.09;
+    ctx.globalAlpha=cold**.8;
     ctx.drawImage(winterFrostArt,-VW*margin,-VH*margin,VW*(1+2*margin),VH*(1+2*margin));ctx.restore();
   }
-  if(cover){
-    ctx.save();ctx.globalAlpha=cover;
-    ctx.drawImage(stormSnowArt(),0,0,VW,VH);ctx.restore();
-  }
-  if(!s||s.stage==='calm'||winterShelter(P))return;
-  const [wx,wy]=windVectors[s.dir],front=s.stage==='front',fade=front?.85:.12+cover*.32;
-  ctx.save();ctx.fillStyle='rgba(198,209,215,'+fade+')';ctx.fillRect(0,0,VW,VH);
-  const sky=ctx.createLinearGradient(VW*(1-wx)/2,VH*(1-wy)/2,VW*(1+wx)/2,VH*(1+wy)/2);
-  sky.addColorStop(0,'#495866a6');sky.addColorStop(1,'#bfcdd100');ctx.fillStyle=sky;ctx.fillRect(0,0,VW,VH);
-  for(let i=0;i<(front?180:100);i++){
-    const t=environmentTime*(110+i%53),x=((i*173+wx*t)%(VW+24)+VW+24)%(VW+24)-12,y=((i*97+(wy+.22)*t)%(VH+24)+VH+24)%(VH+24)-12;
-    beam(ctx,x,y,x+wx*9,y+wy*9+2,1+i%3,'#dde5e9aa');
-  }ctx.restore();
+  if(cover)stormGlass(cover);
 }
 let warmthBar;
 function winterStatus(){
@@ -16813,7 +16805,8 @@ function winterStatus(){
     warmthBar.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));H.fd.closest('.zh-bar').before(warmthBar);
   }
   const w=S.flags.warmth,bar=warmthBar.querySelector('i');bar.style.width=w+'%';
-  warmthBar.classList.toggle('chilled',w<=thermalBalance.frostStarts);
+  const tint=Math.round(clamp(w,0,100)*4)/4+'%';
+  if(warmthBar.style.getPropertyValue('--heat-tint')!==tint)warmthBar.style.setProperty('--heat-tint',tint);
   warmthBar.querySelector('b').textContent=Math.round(w);warmthBar.setAttribute('aria-valuenow',Math.round(w));
 }
 function winterExert(dt,moving,sprint,attempt,depth){
@@ -16829,10 +16822,112 @@ function winterExert(dt,moving,sprint,attempt,depth){
   if(P.heavyBreath>0 && S.min>=(P.nextBreath||0)){play('breath',P.x,P.y,.52);P.nextBreath=S.min+1.25;}
 }
 
+// Airborne snow moves with the wind. Ice on the screen stays fixed when the camera turns.
+let stormArt;
+function stormMaterials(){
+  if(stormArt)return stormArt;
+  const random=mulberry32(72513);
+  const flakes=Array.from({length:8},(_,i)=>{
+    const c=winterCanvas(32,24),g=c.getContext('2d');
+    g.translate(16,12);g.rotate((random()-.5)*.6);
+    for(let j=0;j<10;j++){
+      const x=(random()-.5)*13,y=(random()-.5)*8,r=2+random()*4;
+      const grad=g.createRadialGradient(x,y,0,x,y,r);
+      grad.addColorStop(0,i<3?'#e0e8ecd9':'#ecf1f2ad');grad.addColorStop(.48,'#e4ecef76');grad.addColorStop(1,'#d0dce400');
+      g.fillStyle=grad;g.fillRect(x-r,y-r,r*2,r*2);
+    }
+    return c;
+  });
+  const particles=Array.from({length:260},(_,i)=>({u:random(),v:random(),z:.25+.75*random(),phase:random()*6.28,flake:flakes[i%flakes.length]}));
+  const fog=winterCanvas(256,128),fg=fog.getContext('2d');
+  // Repeat the translucent wisps across both seams of the wind texture.
+  for(let i=0;i<64;i++){
+    const x=random()*256,y=random()*128,rx=18+random()*66,ry=3+random()*11;
+    for(const dx of [-256,0,256])for(const dy of [-128,0,128]){
+      fg.save();fg.translate(x+dx,y+dy);fg.scale(rx,ry);
+      const g=fg.createRadialGradient(0,0,0,0,0,1);
+      g.addColorStop(0,'#ecf1f347');g.addColorStop(.5,'#dce6e91c');g.addColorStop(1,'#dce6e900');
+      fg.fillStyle=g;fg.fillRect(-1,-1,2,2);fg.restore();
+    }
+  }
+  const ice=winterCanvas(768,432),ig=ice.getContext('2d'),pixels=ig.createImageData(768,432);
+  for(let y=0;y<432;y++)for(let x=0;x<768;x++){
+    const n=.56*vnoise(x+13,y,43)+.3*vnoise(x,y+81,14)+.14*random(),k=(y*768+x)*4;
+    pixels.data[k]=156+81*n;pixels.data[k+1]=174+69*n;pixels.data[k+2]=184+62*n;pixels.data[k+3]=255;
+  }
+  ig.putImageData(pixels,0,0);
+  for(let i=0;i<1150;i++){
+    const x=random()*768,y=random()*432,a=vnoise(x,y,74)*7+random()*.75,r=3+random()**2*21;
+    const dx=Math.cos(a),dy=Math.sin(a);
+    ig.strokeStyle='rgba(241,247,248,'+(.14+.46*random())+')';ig.lineWidth=.45+random()*.7;
+    ig.beginPath();ig.moveTo(x,y);ig.lineTo(x+dx*r,y+dy*r);
+    for(let j=1;j<8;j++){
+      const u=j/8,px=x+dx*r*u,py=y+dy*r*u,twig=(1-u)*r*.44;
+      for(const side of [-1,1]){ig.moveTo(px,py);ig.lineTo(px+twig*(dx-dy*side),py+twig*(dy+dx*side));}
+    }
+    ig.stroke();
+  }
+  for(let i=0;i<4300;i++){
+    const x=random()*768,y=random()*432,z=vnoise(x,y,32),w=3+random()**2*18;
+    ig.globalAlpha=.14+z*.68;ig.drawImage(flakes[i%8],x,y,w,w*.71);
+  }
+  // A second layer freezes at the margins first, leaving the centre readable during warning.
+  const rim=winterCanvas(768,432),rg=rim.getContext('2d');
+  rg.drawImage(ice,0,0);rg.globalCompositeOperation='destination-in';
+  const mask=winterCanvas(192,108),mg=mask.getContext('2d'),m=mg.createImageData(192,108);
+  for(let y=0;y<108;y++)for(let x=0;x<192;x++){
+    const edge=Math.min(x/192,(191-x)/192,y/108,(107-y)/108);
+    m.data[(y*192+x)*4+3]=255*clamp(1-edge/(.09+.17*vnoise(x,y,11)),0,1)**1.6;
+  }
+  mg.putImageData(m,0,0);rg.drawImage(mask,0,0,768,432);
+  return stormArt={fog,ice,rim,particles};
+}
+function winterSkySnow(level,wx,wy,storm){
+  const {particles}=stormMaterials(),t=environmentTime;
+  const release=storm&&S.flags.blizzard.stage==='calm'?level:1;
+  const count=Math.min(particles.length,Math.round((storm?65+185*level:59)*clamp(VW*VH/340000,.7,1.5)));
+  ctx.save();
+  for(let i=0;i<count;i++){
+    const p=particles[i],z=p.z,speed=(storm?180:43)*z,twist=Math.sin(t*(.85+z)+p.phase);
+    const spanX=VW+40,spanY=VH+40;
+    const dx=t*speed*wx+twist*(storm?8:17)-cam.x*z*.035;
+    const dy=t*speed*wy+Math.cos(t*.8+p.phase)*(storm?7:4)-cam.y*z*.035;
+    const x=((p.u*spanX+dx)%spanX+spanX)%spanX-20,y=((p.v*spanY+dy)%spanY+spanY)%spanY-20;
+    const w=3+(storm?22:19)*z*z,h=w*(.61+.24*twist);
+    ctx.globalAlpha=release*(.35+.5*z)*(storm?.55+.45*level:1);
+    ctx.drawImage(p.flake,x-w/2,y-h/2,w,h);
+  }
+  ctx.restore();
+}
+function drawBlowingSnow(s,power){
+  const [wx,wy]=windVectors[s.dir],t=environmentTime,fade=s.stage==='calm'?power:1;
+  ctx.save();
+  // The bank arrives from upwind. Long, travelling bands cross towards the lee.
+  ctx.translate(VW/2,VH/2);ctx.rotate(Math.atan2(wy,wx));
+  const w=wx?VW:VH,h=wx?VH:VW,left=-w/2,top=-h/2;
+  const sky=ctx.createLinearGradient(left,0,w/2,0);
+  sky.addColorStop(0,'#647784');sky.addColorStop(.38,'#a7b6c0');sky.addColorStop(1,'#d4dde000');
+  ctx.globalAlpha=fade*(.22+.61*power);ctx.fillStyle=sky;ctx.fillRect(left,top,w,h);
+  const tex=stormMaterials().fog;
+  for(let i=0;i<2;i++){
+    const width=w*(.7+i*.28),height=h*(.53+i*.2),offset=(t*(55+i*37))%width;
+    ctx.globalAlpha=fade*(.23+.6*power)*(i?.74:1);
+    for(let x=left+offset-width;x<w/2;x+=width)for(let y=top-height*i*.35;y<h/2;y+=height)
+      ctx.drawImage(tex,x,y,width+.6,height+.6);
+  }
+  ctx.restore();
+  winterSkySnow(power,wx,wy,true);
+}
+function stormGlass(cover){
+  const {ice,rim}=stormMaterials();ctx.save();
+  ctx.globalAlpha=Math.min(1,cover*1.65);ctx.drawImage(rim,0,0,VW,VH);
+  ctx.globalAlpha=cover**2.65*.985;ctx.drawImage(ice,0,0,VW,VH);ctx.restore();
+}
+
 // Temperatures use Celsius. The world clock advances one game minute per real second.
 const thermalBalance={
   dawn:4,day:8,dusk:18,night:22,dayRange:[-38,-30],nightRange:[-50,-38],roomRange:[-2,5],
-  maxChangePerHour:4,baseCold:-30,lossPerMinute:10,extraLossPerDegree:.75,
+  warningWindLoss:.25,maxChangePerHour:4,baseCold:-30,lossPerMinute:10,extraLossPerDegree:.75,
   roomGainAtMin:.4,roomGainPerDegree:.05,fireGain:1.5,fireRadius:90,
   frostStarts:40,maxFrostArea:1/3
 };
@@ -16895,7 +16990,10 @@ function winterHeatTick(dt,room){
   const temp=ambientAt(room,P.x,P.y,heated);
   const byFire=WORLD_FIRES.some(f=>dE(P,f)<thermalBalance.fireRadius&&fireLit(f)&&
     winterFloor(f.x,f.y)===room&&los(P.x,P.y,f.x,f.y));
-  const rate=thermalRate(temp,heated,byFire),before=S.flags.warmth;
+  let rate=thermalRate(temp,heated,byFire);
+  const s=S.flags.blizzard;
+  if(rate<0&&s?.stage==='warning'&&!winterShelter(P))rate*=1+thermalBalance.warningWindLoss*stormStrength(s)/.84;
+  const before=S.flags.warmth;
   S.flags.warmth=clamp(before+dt*rate,0,100);
   P.byHeat=heated||byFire;
   if(S.flags.warmth===0&&rate<0&&P.alive){
@@ -17943,13 +18041,8 @@ function renderWinterMarks(vx,vy,vw,vh){
   }
 }
 function snowScreen(){
-  if(winterFloor(P.x,P.y)||!snowing(S.min))return;
-  const time=environmentTime;ctx.save();ctx.fillStyle='#e2e6e9';ctx.globalAlpha=.54;
-  for(let i=1;i<95;i++){
-    const x=(i*197+time*(13+i%7))%(VW+12),y=(i*127+time*(35+i%29))%(VH+8);
-    ctx.fillRect(x,y,i%3?1.1:2,1.8);
-  }
-  ctx.restore();
+  if(winterShelter(P)||stormStrength(S.flags.blizzard)>0||!snowing(S.min))return;
+  winterSkySnow(0,.34,1,false);
 }
 function winterWitness(victim){
   for(const e of ents){
@@ -21170,6 +21263,7 @@ async function bootBerezki(){
     const im=new Image();im.src=url;await im.decode();district.images[id]=im;
   })]);
   await loadCrateArt();
+  stormMaterials();
   GRADE.mul='rgb(240,247,251)';
   winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];

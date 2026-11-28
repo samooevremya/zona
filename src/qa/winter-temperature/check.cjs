@@ -53,7 +53,18 @@ function checks(){
   Object.assign(P,outdoors);Object.assign(fire,{x:P.x+6,y:P.y,flame:S.min+60});S.flags.warmth=0;P.hp=80;winterHeatTick(60,undefined);
   check(near(S.flags.warmth,90)&&P.hp===80,'костёр на улице за минуту');
   P.x+=200;winterHeatTick(1,undefined);check(S.flags.warmth<90&&!P.byHeat,'выход из зоны огня');
-  WORLD_FIRES.pop();delete S.flags.temperatures;S.min=813.5;
+  WORLD_FIRES.pop();S.flags.blizzard={stage:'warning',start:S.min-59.9,until:S.min+.1,dir:0,cover:.4};
+  S.flags.warmth=50;winterHeatTick(1,undefined);check(50-S.flags.warmth>25/60*1.24,'ветровое охлаждение перед фронтом');
+  Object.assign(P,tilePoint(abandoned.x+3,abandoned.y+3));S.flags.warmth=50;winterHeatTick(1,abandoned);
+  check(near(50-S.flags.warmth,25/60),'стены защищают от ветрового охлаждения');
+  Object.assign(P,outdoors);for(let dir=0;dir<4;dir++){
+    S.flags.blizzard.dir=dir;const [x,y]=windVectors[dir];
+    check(winterWindMove(x,y)===1 && winterWindMove(-x,-y)===-1,'попутный и встречный ветер '+dir);
+  }
+  const colors=new Set();
+  for(const w of [0,25,39,40,41,75,100]){S.flags.warmth=w;winterStatus();colors.add(getComputedStyle(warmthBar.querySelector('i')).backgroundImage);}
+  check(colors.size===7,'семь различных оттенков шкалы, включая переход через 40');
+  S.flags.blizzard.stage='calm';delete S.flags.temperatures;S.min=813.5;
   const t=ambientAt(room,room.x*T+100,room.y*T+100),tracks=structuredClone(S.flags.temperatures);
   S.min+=179;const resumed=ambientAt(room,room.x*T+100,room.y*T+100);
   S.flags.temperatures=tracks;S.min-=179;
@@ -64,7 +75,7 @@ function checks(){
   check(near(S.flags.warmth,23.4)&&JSON.stringify(S.flags.temperatures)===weather,'загрузка слота без скачка');
   delete slot.flags.temperatures;applyState(slot);check(Number.isFinite(ambientAt(undefined,P.x,P.y))&&near(S.flags.warmth,23.4),'старое сохранение');
   Object.assign(P,outdoors);WORLD_FIRES.push({...fire,x:P.x,y:P.y,flame:S.min+30});
-  S.flags.blizzard={stage:'front',until:S.min+10,cover:0,dir:0};winterWeather(.02);
+  S.flags.blizzard={stage:'front',until:S.min+10,cover:0,dir:0};winterWeather(1);check(P.alive,'секунда у огня под фронтом');winterWeather(1);
   check(!P.alive,'фронт метели имеет приоритет у огня');
   return passed;
 }
