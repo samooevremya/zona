@@ -1,7 +1,22 @@
 let layingFire=null;
+const coldAshMinutes=30;
+function clearColdFires(){
+  const fires=S.flags.campfires;
+  if(!fires)return;
+  for(let i=fires.length-1;i>=0;i--){
+    const f=fires[i];
+    if(f.unburnt || f.embers>S.min)continue;
+    const cooled=f.embers || (f.extinguishedAt??=S.min);
+    if(S.min<cooled+coldAshMinutes)continue;
+    fires.splice(i,1);
+    const j=WORLD_FIRES.indexOf(f);
+    if(j>=0)WORLD_FIRES.splice(j,1);
+  }
+}
 function restoreFieldFires(){
   layingFire=null;
   for(let i=WORLD_FIRES.length-1;i>=0;i--)if(WORLD_FIRES[i].field)WORLD_FIRES.splice(i,1);
+  clearColdFires();
   for(const f of S.flags.campfires||[])WORLD_FIRES.push(f);
 }
 function fireSpot(){
@@ -24,6 +39,7 @@ function strikeFire(f){
   layingFire={f,x:P.x,y:P.y,t:0,struck:false};P.crouch=1;
 }
 function tickFieldFire(dt){
+  clearColdFires();
   if(!layingFire||layingFire.placing)return;
   const a=layingFire;
   if(!P.alive||Math.hypot(IN.moveX,IN.moveY)>.08||dE(P,a)>2){layingFire=null;msg('Розжиг прерван.');return;}
@@ -68,7 +84,7 @@ function drawFireActions(){
       take('wood',1);f.flame=Math.max(S.min,f.flame)+60;
       f.fuelSpan=f.flame-S.min;f.embers=f.flame+30;
     },!cnt('wood'));
-    action('Засыпать снегом',()=>{f.flame=f.embers=0;f.unburnt=false;});
+    action('Засыпать снегом',()=>{f.flame=f.embers=0;f.unburnt=false;f.extinguishedAt=S.min;});
   }else if(f.unburnt){
     action(cnt('matches')?'Разжечь · 1 спичка':'Разжечь · нет спичек',()=>strikeFire(f),!cnt('matches'));
     action('Забрать дрова',()=>{

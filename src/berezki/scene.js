@@ -115,23 +115,19 @@ function winterInteractChoices(cand){
   const room=winterFloor(P.x,P.y);
   const stove=stoveIn(room);
   if(stove && dE(P,stove.at)<53 && los(P.x,P.y,stove.at.x,stove.at.y)){
-    const lit=stoveBurning(stove);
-    cand(dE(P,stove.at),{k:lit?'winterRest':stove.action,stove,label:lit?'Согреться у печи':'Растопить печь'});
+    if(!stoveBurning(stove))cand(dE(P,stove.at),{k:stove.action,stove,label:'Растопить печь'});
   }
   if(room?.n>1 || room?.heater || shoreHomes.some(home=>home.room===room))for(const o of objs){
     if(o.fitting!=='bedroll')continue;
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
-  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53 && winterFloor(h.x,h.y)===room && los(P.x,P.y,h.x,h.y));
-  if(f)cand(dE(P,f),{k:'winterRest',label:'Погреться у огня'});
 }
 function winterUse(n){
   if(fireAction(n))return true;
   if(n.k==='searchFind'){openLoot(n.f);return true;}
   if(n.k==='takeFind'){if(collectStock(n.f,n.id,n.f.loot[n.id])){play('pick');save(true);}return true;}
   if(n.k==='talk'&&n.e.service){winterService(n.e);return true;}
-  if(n.k==='winterRest'&&!n.bed){msg('Ты греешься. Для сна нужна лежанка.');return true;}
   if(n.k==='baseKindle' || n.k==='pumpKindle' || n.k==='hamletKindle'){
     S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. У печи можно согреться.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
@@ -170,7 +166,7 @@ function sleepWinterHours(hours){
   thermalTrackAt('street',S.min);
   S.food=Math.max(0,S.food-slept*foodPerHour);
   P.hp=Math.min(100,P.hp+slept*healthPerHour);P.st=100;
-  ageRemains();winterWildTick();cleanExpiredCrates();
+  clearColdFires();ageRemains();winterWildTick();cleanExpiredCrates();
   if(S.food<1e-8){S.food=0;msg('Ты проснулся от голода.','bad');}
 }
 let stepDistance=0,winterFootSide=1;
@@ -574,6 +570,7 @@ function winterFlashlight(g,source){
   castLight(brush,source,source.ang,half,radius,.95);
   if(SHADOWS && !winterFloor(source.x,source.y)){
     brush.save();brush.globalCompositeOperation='destination-out';
+    for(const p of atlasProps)if(p.yard)paintYardBeamShadow(brush,p,source,radius,half);
     for(const tree of treesInRect(left,top,left+2*radius,top+2*radius)){
       const dx=tree.x-source.x,dy=tree.y-source.y,dist=Math.hypot(dx,dy);
       if(dist<1 || dist>=radius)continue;

@@ -706,7 +706,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
       if(Math.abs(lateral)<4.2 && along>=near && along<=far)hit=along-Math.sqrt(4.2**2-lateral**2);
     }
     const solids=walkSolids.get(cell),props=propCells.get(cell);
-    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || (from===P && (S.flags.onLookout&&o.belowLookout || S.flags.stationDeck&&o.underDeck)) || ((from===FIRE || from===shoreFire) && (o.fitting==='bench' || o.k==='spitPost')) || ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
+    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || (from===P && (S.flags.onLookout&&o.belowLookout || S.flags.stationDeck&&o.underDeck)) || ((from===FIRE || from===shoreFire) && (o.fitting==='bench' || o.k==='spitPost')) || ['yardUpright','yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
     if(props)for(const p of props){
       if(vision==='light' && p.vaultable)continue;

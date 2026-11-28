@@ -34,7 +34,9 @@ function snowDepth(t){
   const block=Math.floor(t/320),storm=snowWindow(block);
   return block+clamp((t-storm.start)/storm.length,0,1);
 }
-function snowing(t){const s=snowWindow(Math.floor(t/320));return t>=s.start && t<s.start+s.length;}
+function snowing(t){
+  if(S.flags.testWeather && t<S.flags.testWeather.until)return S.flags.testWeather.mode==='snow';
+  const s=snowWindow(Math.floor(t/320));return t>=s.start && t<s.start+s.length;}
 function traceAlpha(t){return clamp(1-(snowDepth(S.min)-snowDepth(t))*2.15,0,1);}
 function recordTrace(mark){
   const recent=S.flags.snowMarks||=[];

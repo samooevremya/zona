@@ -100,3 +100,17 @@ html[data-station-view="bridge"] #title.start{--signal-scene:var(--station-bridg
 #ov[data-kind=fieldFire] .body {display:grid;gap:3px;padding:3px;overflow:auto}
 #ov[data-kind=fieldFire] .body button {min-height:44px;text-align:left;padding:5px 12px}
 #ov[data-kind=fieldFire] .body button:disabled {opacity:.65}
+
+.field-admin{display:grid;gap:10px;max-width:720px;margin:auto}
+.field-admin .admin-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #686457;padding:8px}
+.field-admin legend{padding:0 5px;color:#d9c49b}
+.field-admin .chip,.field-admin input,.field-admin select{min-height:44px;min-width:44px;box-sizing:border-box;font:inherit}
+.field-admin input,.field-admin select{background:#22241f;color:#eee5d2;border:1px solid #746f5e;padding:4px 8px;max-width:100%}
+.field-admin input[type=number]{width:7em}
+.field-admin .admin-status{color:#e7c889;margin:0}
+
+.field-admin .admin-status:empty{display:none}
+@media(min-width:700px){
+  .field-admin{grid-template-columns:auto auto}
+  .field-admin .admin-status,.field-admin form,.field-admin fieldset:nth-of-type(-n+2){grid-column:1/-1}
+}
