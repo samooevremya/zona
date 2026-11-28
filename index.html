@@ -1023,6 +1023,21 @@ html[data-station-view="bridge"] #title.start{--signal-scene:var(--station-bridg
   .berezki #tcard.death{width:100vw}
 }
 
+/* A short field action list keeps the hearth visible during interaction. */
+#ov.open[data-kind=fieldFire] {
+  align-items:flex-end; justify-content:center; background:transparent;
+  padding:8px 12px max(12px,env(safe-area-inset-bottom));
+}
+#ov[data-kind=fieldFire] .pda {
+  width:min(310px,96vw); height:auto; min-height:0; max-height:95%;
+  padding:5px; border:1px solid #786c50; background:#272923f5;
+}
+#ov[data-kind=fieldFire] .pda-h {min-height:44px;display:flex;align-items:center}
+#ov[data-kind=fieldFire] .screen {flex:initial;min-height:0}
+#ov[data-kind=fieldFire] .body {display:grid;gap:3px;padding:3px;overflow:auto}
+#ov[data-kind=fieldFire] .body button {min-height:44px;text-align:left;padding:5px 12px}
+#ov[data-kind=fieldFire] .body button:disabled {opacity:.65}
+
 </style>
 <script>(() => {
   const views = ['window', 'platform', 'bridge'];
@@ -2972,7 +2987,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
       if(Math.abs(lateral)<4.2 && along>=near && along<=far)hit=along-Math.sqrt(4.2**2-lateral**2);
     }
     const solids=walkSolids.get(cell),props=propCells.get(cell);
-    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || ((from===FIRE || from===shoreFire) && (o.fitting==='bench' || o.k==='spitPost')) || ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
+    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || (from===P && (S.flags.onLookout&&o.belowLookout || S.flags.stationDeck&&o.underDeck)) || ((from===FIRE || from===shoreFire) && (o.fitting==='bench' || o.k==='spitPost')) || ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
     if(props)for(const p of props){
       if(vision==='light' && p.vaultable)continue;
@@ -5846,7 +5861,12 @@ function render() {
     lctx.setTransform(unit,0,0,unit,origin[0],origin[1]);
     if(!shopVisible && !loft)clipRoofsFromLight(lctx,vx,vy,vw,vh,inView);
     if(P.alive){
-      if(BEREZKI){if(S.torch!==false)winterFlashlight(lctx,P);}
+      if(BEREZKI){
+        if(S.torch!==false){
+          const [dx,dy]=S.flags.onLookout?lookoutOffset(P.y):S.flags.stationDeck?bridgeOffset(P.y):winterStairOffset(P);
+          lctx.save();lctx.translate(dx,dy);winterFlashlight(lctx,P);lctx.restore();
+        }
+      }
       else if(S.torch===false)castLight(lctx,P,0,Math.PI,60,.45);
       else {castLight(lctx,P,0,Math.PI,95,.75);castLight(lctx,P,P.ang,.42,330,.95);}
     }
@@ -7950,7 +7970,8 @@ function restLabel(verb, minutes, ctx) {
 }
 function restBlock(h) {
   if (S.bleed > 0) return BEREZKI?'Сначала останови кровь бинтом.':'Сначала останови кровь: перевяжись или используй аптечку.';
-  if (S.food < REST.danger + REST.food) return 'Слишком голоден, чтобы отдыхать: сытость ' + Math.round(S.food) + '. Сначала поешь.';
+  if(BEREZKI && S.food<20)return 'Чтобы лечь спать, нужна сытость хотя бы 20%.';
+  if (!BEREZKI && S.food < REST.danger + REST.food) return 'Слишком голоден, чтобы отдыхать: сытость ' + Math.round(S.food) + '. Сначала поешь.';
   if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 520)) return 'Рядом враги, не до отдыха.';
   return '';
 }
@@ -8775,7 +8796,7 @@ function drawInv2() {
       refresh();
     }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
-    if(BEREZKI&&id==='wood')row.appendChild(btn('go','Развести костёр',chooseFireSite));
+    if(BEREZKI&&id==='wood')row.appendChild(btn('go','Уложить дрова',chooseFireSite));
     if (id==='energy' || it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', ['energy','coffee','tea'].includes(id) ? 'Выпить' : FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
       if (beltCount(id)) {
@@ -12455,7 +12476,7 @@ function containerOnRay(sh,ca,sa,limit){
 }
 // Количество хранится в обычном loot. План запоминает место каждой отдельной вещи.
 const GROUND_REACH = 34;
-const groundBundle = id => id === 'money' || ITEMS[id]?.ammo;
+const groundBundle = id => id === 'money' || ITEMS[id]?.ammo || (BEREZKI && id==='matches');
 function scatterGroundItems(o) {
   const ids=[];
   for (const [id,count] of Object.entries(o.loot)) {
@@ -12489,7 +12510,13 @@ function scatterGroundItems(o) {
 function groundItems(o) {
   if (o.kind==='sack') return o.groundItems ||= scatterGroundItems(o);
   const layouts=S.flags.groundItems ||= {};
-  return layouts[o.stash] ||= scatterGroundItems(o);
+  const drops=layouts[o.stash] ||= scatterGroundItems(o);
+  // Old winter crates scattered one marker per match. Keep one for the remaining box.
+  if(BEREZKI && drops.some(d=>d.id==='matches')){
+    const first=drops.findIndex(d=>d.id==='matches');
+    for(let i=drops.length-1;i>=first;i--)if(drops[i].id==='matches' && (i!==first||!o.loot.matches))drops.splice(i,1);
+  }
+  return drops;
 }
 function forgetGroundItems(o) {
   const layouts=S.flags.groundItems;
@@ -12533,7 +12560,8 @@ function drawGroundItems(o) {
   for(const drop of groundItems(o)) {
     const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop);
     const frame=G3.pack?.manifest.items?.[id];
-    const im=detectorImages[id] || lesserSprites[id] || (frame && packImage(frame.file));
+    const winterImage=BEREZKI && fieldFindImage(id);
+    const im=winterImage || detectorImages[id] || lesserSprites[id] || (frame && packImage(frame.file));
     ctx.save(); ctx.translate(x-dx*remaining,y-dy*remaining-5*Math.sin(Math.PI*flight));
     if (G.near?.drop===drop) {
       ctx.strokeStyle='rgba(234,207,143,.85)'; ctx.lineWidth=1.2; ctx.beginPath();
@@ -14402,8 +14430,9 @@ const beamCache=new WeakMap();
 function lightFootprint(source,angle,half,radius) {
   let slots=beamCache.get(source);
   if(!slots){slots=new Map();beamCache.set(source,slots);}
+  const deck=BEREZKI && source===P && (S.flags.onLookout?'tower':S.flags.stationDeck?'bridge':'');
   const cached=slots.get(radius);
-  if(cached && cached.x===source.x && cached.y===source.y && cached.angle===angle && cached.half===half && cached.rev===navRevision)return cached.path;
+  if(cached && cached.x===source.x && cached.y===source.y && cached.angle===angle && cached.half===half && cached.rev===navRevision && cached.deck===deck)return cached.path;
   const path=new Path2D(),full=half>=Math.PI,steps=full?44:22;
   const reach=a=>npcBarrier(source,Math.cos(a),Math.sin(a),radius,null,'light');
   const point=(a,r)=>path.lineTo(source.x+Math.cos(a)*r,source.y+Math.sin(a)*r);
@@ -14421,7 +14450,7 @@ function lightFootprint(source,angle,half,radius) {
     const b=angle-half+half*2*i/steps,s=reach(b);
     edge(a,r,b,s,3);a=b;r=s;
   }
-  path.closePath();slots.set(radius,{x:source.x,y:source.y,angle,half,rev:navRevision,path});return path;
+  path.closePath();slots.set(radius,{x:source.x,y:source.y,angle,half,rev:navRevision,deck,path});return path;
 }
 function castLight(g,source,angle,half,radius,strength,tint){
   if(BEREZKI && source.kind && source!==P && winterFloor(source.x,source.y)!==winterFloor(P.x,P.y))return;
@@ -15449,7 +15478,7 @@ function refresh() {
   }
   pbody.textContent = '';
   if (panel.hint) pbody.appendChild(el('p', 'hint', panel.hint));
-  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
+  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, fieldFire: BEREZKI && drawFireActions, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
   for (const sel of selectors) {
     const node = pbody.querySelector(sel);
     if (node && positions[sel]) node.scrollTop = positions[sel];
@@ -16287,6 +16316,11 @@ function enemyUnderFinger(x,y) {
 cv.addEventListener('pointerdown', e => {
   audioInit();
   if (panel || title.open) return;
+  if(BEREZKI && P?.alive && !layingFire && e.button===0){
+    const target=screenToWorld(e.clientX,e.clientY);
+    const fire=(S.flags.campfires||[]).find(f=>dE(f,target)<17 && canReachFire(f));
+    if(fire){e.preventDefault();openFireActions(fire);return;}
+  }
   if (e.pointerType === 'mouse') { setTouch(false); IN.mx = e.clientX; IN.my = e.clientY; if (e.button === 0) IN.fire = true; return; }
   setTouch(true);
   const s = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, a: P.ang };
@@ -16691,7 +16725,7 @@ function stormRoute(e){
   }
   return null;
 }
-function winterStormTick(dt){
+function winterStormTick(dt,sleeping=false){
   const f=S.flags,s=f.blizzard||={stage:'calm',until:S.min+ri(540,1080),dir:0,cover:0};
   if(s.stage==='calm'&&S.min>=s.until){
     const route=winterShelter(P)?{seconds:0}:stormRoute(P);
@@ -16705,10 +16739,10 @@ function winterStormTick(dt){
     s.stage='calm';s.until=S.min+ri(720,1800);bulletin('Метель стихла. Можно выходить.');
     for(const e of ents)delete e.stormRefuge;
   }
-  if(s.stage==='front')for(const e of ents)if(e.alive&&!winterShelter(e))kill(e,'blizzard');
+  if(s.stage==='front')for(const e of ents)if(e.alive&&!e.wildId&&!winterShelter(e))kill(e,'blizzard');
   const outside=!winterShelter(P);
   s.cover=clamp(s.cover+dt*(outside&&s.stage!=='calm'?.026:winterRoomWarm(winterShelter(P))?-.085:-.055),0,1);
-  if(s.stage!=='calm'&&(!s.soundAt||S.min>=s.soundAt)){play('winterGust',undefined,undefined,s.stage==='front'?1:.65);s.soundAt=S.min+4;}
+  if(!sleeping&&s.stage!=='calm'&&(!s.soundAt||S.min>=s.soundAt)){play('winterGust',undefined,undefined,s.stage==='front'?1:.65);s.soundAt=S.min+4;}
 }
 function winterWindMove(mx,my){
   const s=S.flags.blizzard;
@@ -16791,7 +16825,6 @@ function fireSpot(){
   return {x:P.x+Math.cos(P.ang)*35,y:P.y+Math.sin(P.ang)*35};
 }
 function fireSiteProblem(p){
-  if(!cnt('matches'))return 'В рюкзаке нет спичек.';
   if(!cnt('wood'))return 'Нужна стопка сухих дров.';
   if(winterFloor(p.x,p.y)||stationUnderpass(P)||S.flags.stationDeck||S.flags.onLookout)return 'Нужно открытое место на земле.';
   if(forestDepth(p.x,p.y)>.35)return 'Здесь слишком глубокий снег.';
@@ -16801,12 +16834,11 @@ function fireSiteProblem(p){
 }
 function chooseFireSite(){
   if(layingFire?.placing){layingFire=null;closePanel();msg('Выбор места отменён.');return;}
-  if(!cnt('matches')){msg('Для костра нужны спички.','bad');return;}
   closePanel();layingFire={placing:true};msg('Повернись к ровному месту и подтверди действие.');
 }
 function strikeFire(f){
   if(!cnt('matches')){msg('Спички закончились.','bad');return;}
-  layingFire={f,x:P.x,y:P.y,t:0,struck:false};P.crouch=1;msg('Укладываешь дрова…');
+  layingFire={f,x:P.x,y:P.y,t:0,struck:false};P.crouch=1;
 }
 function tickFieldFire(dt){
   if(!layingFire||layingFire.placing)return;
@@ -16818,20 +16850,52 @@ function tickFieldFire(dt){
     take('matches',1);a.struck=true;play('click');
   }
   if(a.t>=3){
-    if(Math.random()<.8){a.f.unburnt=false;a.f.flame=S.min+60;a.f.embers=a.f.flame+30;play('pick');msg('Дрова занялись.');}
+    if(Math.random()<.8){a.f.unburnt=false;a.f.flame=S.min+60;a.f.embers=a.f.flame+30;a.f.fuelSpan=60;play('pick');}
     else msg('Спичка погасла. Дрова остались на месте.');
     layingFire=null;save(true);
   }
 }
 function fireChoices(cand){
   if(layingFire?.placing){
-    const problem=fireSiteProblem(fireSpot());cand(-510,{k:'fireSite',label:problem||'Уложить дрова и разжечь'});return;
+    const problem=fireSiteProblem(fireSpot());cand(-510,{k:'fireSite',label:problem||'Уложить дрова'});return;
   }
   if(layingFire){cand(-510,{k:'fireCancel',label:'Прервать розжиг'});return;}
   for(const f of S.flags.campfires||[]){
-    if(dE(P,f)>58||!los(P.x,P.y,f.x,f.y))continue;
-    cand(dE(P,f)-15,{k:'fieldFire',f,label:f.flame>S.min?'Костёр · '+Math.ceil(f.flame-S.min)+' с':f.embers>S.min?'Тлеющие угли':f.unburnt?'Попробовать снова · 1 спичка':'Холодное кострище'});
+    if(!canReachFire(f))continue;
+    cand(dE(P,f)-15,{k:'fieldFire',f,label:f.unburnt?'Дрова · действия':'Костёр · действия'});
   }
+}
+function canReachFire(f){
+  return dE(P,f)<=58 && los(P.x,P.y,f.x,f.y) && !stationUnderpass(P) && !S.flags.stationDeck && !S.flags.onLookout;
+}
+function openFireActions(f){
+  openPanel('fieldFire',f.unburnt?'Стопка дров':'Костёр');
+  panel.fire=f;refresh();
+}
+function drawFireActions(){
+  const f=panel.fire;
+  function action(label,fn,disabled=false){
+    pbody.appendChild(btn('chip',label,()=>{
+      if(!canReachFire(f)||!S.flags.campfires.includes(f)){closePanel();return;}
+      closePanel();fn();save(true);
+    },disabled));
+  }
+  if(f.embers>S.min){
+    action('Подбросить дрова',()=>{
+      take('wood',1);f.flame=Math.max(S.min,f.flame)+60;
+      f.fuelSpan=f.flame-S.min;f.embers=f.flame+30;
+    },!cnt('wood'));
+    action('Засыпать снегом',()=>{f.flame=f.embers=0;f.unburnt=false;});
+  }else if(f.unburnt){
+    action(cnt('matches')?'Разжечь · 1 спичка':'Разжечь · нет спичек',()=>strikeFire(f),!cnt('matches'));
+    action('Забрать дрова',()=>{
+      const error=receiveError('wood',1);
+      if(error){msg(error,'bad');return;}
+      addPacked('wood',1);
+      S.flags.campfires.splice(S.flags.campfires.indexOf(f),1);
+      WORLD_FIRES.splice(WORLD_FIRES.indexOf(f),1);
+    });
+  }else action('Уложить дрова',()=>{take('wood',1);f.unburnt=true;},!cnt('wood'));
 }
 function fireAction(n){
   if(n.k==='fireCancel'){layingFire=null;return true;}
@@ -16839,21 +16903,19 @@ function fireAction(n){
     const p=fireSpot(),err=fireSiteProblem(p);
     if(err){msg(err,'bad');layingFire=null;return true;}
     take('wood',1);const f={...p,field:true,unburnt:true,flame:0,embers:0};
-    (S.flags.campfires||=[]).push(f);WORLD_FIRES.push(f);strikeFire(f);return true;
+    (S.flags.campfires||=[]).push(f);WORLD_FIRES.push(f);layingFire=null;save(true);return true;
   }
   if(n.k!=='fieldFire')return false;
-  const f=n.f,hot=f.embers>S.min;
-  dialog({n:'Походный костёр',grp:'Привал'},[f.flame>S.min?'Пламени осталось на '+Math.ceil(f.flame-S.min)+' с.':hot?'В золе видны красные угли.':'Ветер стихает у самой земли.'],()=>[
-    {t:hot?'Подбросить дрова':f.unburnt?'Попробовать снова · 1 спичка':'Разжечь · дрова и спичка',d:hot?!cnt('wood'):!cnt('matches')||!f.unburnt&&!cnt('wood'),fn:()=>{
-      closePanel();if(hot){take('wood',1);f.flame=Math.max(f.flame,S.min)+60;f.embers=f.flame+30;}else{if(!f.unburnt){take('wood',1);f.unburnt=true;}strikeFire(f);}save(true);
-    }},...(hot?[{t:'Засыпать снегом',fn:()=>{f.flame=f.embers=0;f.unburnt=false;closePanel();save(true);}}]:[]),{t:'Уйти',close:1}]);
+  openFireActions(n.f);
   return true;
 }
 function fieldFireOverlay(inView){
   for(const f of S.flags.campfires||[]){
     if(!inView(f.x,f.y,70))continue;
     if(f.flame>S.min){if(dE(P,f)<135){
-      ctx.save();ctx.font='10px sans-serif';ctx.textAlign='center';const t=Math.ceil(f.flame-S.min)+' с';ctx.fillStyle='#262720db';ctx.fillRect(f.x-17,f.y-29,34,14);ctx.fillStyle='#f2dbab';ctx.fillText(t,f.x,f.y-19);ctx.restore();
+      const fraction=clamp((f.flame-S.min)/(f.fuelSpan||60),0,1);
+      ctx.save();ctx.fillStyle='#312d28bd';ctx.fillRect(f.x-12,f.y-20,24,2.6);
+      ctx.fillStyle='#c39b61';ctx.fillRect(f.x-11.5,f.y-19.5,23*fraction,1.6);ctx.restore();
     }}else if(f.embers>S.min)shoreEllipse(ctx,f.x,f.y,6,3,'#ae5229bb');
   }
   if(layingFire?.placing){const p=fireSpot();ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle=fireSiteProblem(p)?'#b3877b':'#e5dabc';ctx.beginPath();ctx.ellipse(p.x,p.y,14,10,0,0,7);ctx.stroke();ctx.restore();}
@@ -17056,15 +17118,26 @@ function visibleFinds(inView){
 function drawWinterFind(f){
     const loose=f.type==='loose',id=loose?Object.keys(f.loot)[0]:f.type;
     if(!id)return;
-    const im=district.images[id==='wood'?'firewood':id]||fieldFindImage(id);
+    const im=fieldFindImage(id);
     if(!im)return;
     const w=loose?15:25,h=w*im.height/im.width;
     groundShadow(ctx,f.x,f.y,w*.52,h*.44,0,1.4);ctx.drawImage(im,f.x-w/2,f.y-h/2,w,h);
 }
 const fieldIconCache={};
 function fieldFindImage(id){
-  if(!(id in fieldIconCache)){const node=itemIcon(id);fieldIconCache[id]=node instanceof HTMLImageElement?node:null;}
-  const im=fieldIconCache[id];return im?.complete&&im.naturalWidth?im:null;
+  const key=id==='wood'?'firewood':id;
+  if(district.images[key])return district.images[key];
+  if(!(id in fieldIconCache)){
+    const node=itemIcon(id);
+    fieldIconCache[id]=node instanceof HTMLImageElement?node:null;
+  }
+  const im=fieldIconCache[id];
+  return im?.complete&&im.naturalWidth?im:null;
+}
+async function loadCrateArt(){
+  // Warm the shared inventory pictures before the first frame of the scatter.
+  for(const id of ['bread','bandage','cans','medkit','a9'])fieldFindImage(id);
+  await Promise.all(Object.values(fieldIconCache).filter(Boolean).map(im=>im.decode()));
 }
 function resetWinterCrate(o){
   const choices=district.levels.filter(r=>r.abandoned||r.kind==='stores'||r.kind==='hangar'||r===westStore);
@@ -20732,20 +20805,36 @@ function winterUse(n){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
     dialog({n:n.bed?'Лежанка':'У огня',grp:n.stove?n.stove.room.name:winterFloor(P.x,P.y)?.hamlet?'Хутор':shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
       ...[1,3,8].map(h=>({t:'Отдохнуть · '+h+' ч',fn:()=>{
-        const result=restPreview(h,n.bed?'sleep':'rest');
-        S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
-        if(result.minutes){
-          P.st=100;
-          const room=winterShelter(P);S.flags.warmth=clamp(S.flags.warmth+result.minutes*(winterRoomWarm(room)?1.7:-.07),0,100);
-          ageRemains();
-        }
-        closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
+        sleepWinterHours(h);
+        closePanel();save(true);
       }})),{t:'Встать',close:1}]);
   }else if(n.k==='talk'){
     const lines={warden:'Дверь за собой притвори. Нанесёт снегу — к утру её вдвоём не отворишь.',door:'Проходи. Налево столовая, наверх — по дальней лестнице.',cook:'Чайник ещё горячий. Кружки на полке.',fisher:'От крыльца держись по следам. У лунки лёд скользкий. Замёрзнешь — возвращайся, печь ещё держит тепло.',housekeeper:'К вечеру крыльцо снова заметёт.',anya:'Мы до следа и обратно. Смотри!',mitya:'Вон туда Аня убежала!',shorePost:'К домам проходи по тропе.',shorePatrol:'С берега ветер крепчает.',tenant:'Окна к ночи войлоком закрываем. От стекла так и тянет.'};
     dialog({ent:n.e,n:n.e.name,fac:'loner',grp:'Выживальщики',att:shoreJobs[n.e.sid]?'рыбацкий посёлок':'житель Берёзок'},[n.e.shoreAction==='net'?'Ячею прихвати, пока узел тяну. Ещё пару рядов — и к огню.':lines[n.e.sid]||'Добрый вечер.'],()=>[{t:'До встречи',close:1}],'dialog',n.e);
   }else return false;
   return true;
+}
+function sleepWinterHours(hours){
+  const blocked=restBlock();
+  if(blocked){msg(blocked,'bad');return;}
+  const foodPerHour=3,healthPerHour=2;
+  const slept=Math.min(hours,S.food/foodPerHour);
+  const end=S.min+slept*60;
+  // Advance occupied shelters and outdoor residents through any fronts crossed by sleep.
+  while(S.min<end){
+    const dt=Math.min(1,end-S.min);
+    if(S.flags.blizzard?.stage==='warning'){
+      for(const e of ents){
+        if(!e.alive||!e.stormRefuge||winterShelter(e))continue;
+        for(let i=0;i<5;i++)goTo(e,e.stormRefuge.x,e.stormRefuge.y,105,dt/5);
+      }
+    }
+    S.min+=dt;winterStormTick(dt,true);
+  }
+  S.food=Math.max(0,S.food-slept*foodPerHour);
+  P.hp=Math.min(100,P.hp+slept*healthPerHour);P.st=100;
+  ageRemains();winterWildTick();cleanExpiredCrates();
+  if(S.food<1e-8){S.food=0;msg('Ты проснулся от голода.','bad');}
 }
 let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
@@ -20995,6 +21084,7 @@ async function bootBerezki(){
   await Promise.all([loadArt(),...Object.entries(window.BEREZKI_ART).map(async([id,url])=>{
     const im=new Image();im.src=url;await im.decode();district.images[id]=im;
   })]);
+  await loadCrateArt();
   GRADE.mul='rgb(240,247,251)';
   winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];
@@ -21142,11 +21232,12 @@ function winterFlashlight(g,source){
   const radius=330,half=.42;
   const mask=winterBeamMask ||= winterCanvas(radius,radius);
   const brush=mask.getContext('2d'),left=source.x-radius,top=source.y-radius;
-  if(lastWinterBeam && lastWinterBeam.x===source.x && lastWinterBeam.y===source.y &&
+  const deck=S.flags.onLookout?1:S.flags.stationDeck?2:0;
+  if(lastWinterBeam && lastWinterBeam.deck===deck && lastWinterBeam.x===source.x && lastWinterBeam.y===source.y &&
     lastWinterBeam.angle===source.ang && lastWinterBeam.rev===navRevision && lastWinterBeam.shadows===SHADOWS){
     drawMovingBeam(g,mask,source,radius,half,left,top);return;
   }
-  lastWinterBeam={x:source.x,y:source.y,angle:source.ang,rev:navRevision,shadows:SHADOWS};
+  lastWinterBeam={deck,x:source.x,y:source.y,angle:source.ang,rev:navRevision,shadows:SHADOWS};
   brush.setTransform(.5,0,0,.5,-left*.5,-top*.5);
   brush.clearRect(left,top,radius*2,radius*2);
   castLight(brush,source,source.ang,half,radius,.95);

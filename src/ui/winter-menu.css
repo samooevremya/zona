@@ -85,3 +85,18 @@ html[data-station-view="bridge"] #title.start{--signal-scene:var(--station-bridg
   .berezki #title:has(.death){align-items:center;padding:0}
   .berezki #tcard.death{width:100vw}
 }
+
+/* A short field action list keeps the hearth visible during interaction. */
+#ov.open[data-kind=fieldFire] {
+  align-items:flex-end; justify-content:center; background:transparent;
+  padding:8px 12px max(12px,env(safe-area-inset-bottom));
+}
+#ov[data-kind=fieldFire] .pda {
+  width:min(310px,96vw); height:auto; min-height:0; max-height:95%;
+  padding:5px; border:1px solid #786c50; background:#272923f5;
+}
+#ov[data-kind=fieldFire] .pda-h {min-height:44px;display:flex;align-items:center}
+#ov[data-kind=fieldFire] .screen {flex:initial;min-height:0}
+#ov[data-kind=fieldFire] .body {display:grid;gap:3px;padding:3px;overflow:auto}
+#ov[data-kind=fieldFire] .body button {min-height:44px;text-align:left;padding:5px 12px}
+#ov[data-kind=fieldFire] .body button:disabled {opacity:.65}

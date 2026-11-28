@@ -3,8 +3,9 @@ const beamCache=new WeakMap();
 function lightFootprint(source,angle,half,radius) {
   let slots=beamCache.get(source);
   if(!slots){slots=new Map();beamCache.set(source,slots);}
+  const deck=BEREZKI && source===P && (S.flags.onLookout?'tower':S.flags.stationDeck?'bridge':'');
   const cached=slots.get(radius);
-  if(cached && cached.x===source.x && cached.y===source.y && cached.angle===angle && cached.half===half && cached.rev===navRevision)return cached.path;
+  if(cached && cached.x===source.x && cached.y===source.y && cached.angle===angle && cached.half===half && cached.rev===navRevision && cached.deck===deck)return cached.path;
   const path=new Path2D(),full=half>=Math.PI,steps=full?44:22;
   const reach=a=>npcBarrier(source,Math.cos(a),Math.sin(a),radius,null,'light');
   const point=(a,r)=>path.lineTo(source.x+Math.cos(a)*r,source.y+Math.sin(a)*r);
@@ -22,7 +23,7 @@ function lightFootprint(source,angle,half,radius) {
     const b=angle-half+half*2*i/steps,s=reach(b);
     edge(a,r,b,s,3);a=b;r=s;
   }
-  path.closePath();slots.set(radius,{x:source.x,y:source.y,angle,half,rev:navRevision,path});return path;
+  path.closePath();slots.set(radius,{x:source.x,y:source.y,angle,half,rev:navRevision,deck,path});return path;
 }
 function castLight(g,source,angle,half,radius,strength,tint){
   if(BEREZKI && source.kind && source!==P && winterFloor(source.x,source.y)!==winterFloor(P.x,P.y))return;
