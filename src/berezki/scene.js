@@ -456,14 +456,75 @@ function winterPortrait(e){
 
 // Keep the player's beam on its own light mask. A tree can interrupt that
 // beam without darkening a nearby hearth or casting into the unlit half-plane.
-let winterBeamMask, lastWinterBeam;
+let winterBeamMask, movingBeamMask, lastWinterBeam;
+function paintHumanBeamShadow(g,e,dist,angle){
+  const pose=GAIT.get(e)||motionIdle;
+  const stride=Math.cos(pose.cycle||0)*(pose.drive||0);
+  const low=(e.sit || e.wounded) ? .56 : e.crouch ? .72 : 1;
+  const size=e.shoreChild ? .73 : 1,bodyHeight=low*size*(1-.33*snowAtBoots(e));
+  const reach=Math.min(135,37+1350/Math.max(18,dist))*bodyHeight;
+  // Project the articulated silhouette along the incident ray. Across-ray width
+  // varies with body heading; the feet remain anchored while the gait changes.
+  const facing=e.ang-angle,side=Math.cos(facing),front=Math.sin(facing);
+  const cross=sign=>sign*side*4.8+sign*stride*front*4.5;
+  const contour=new Path2D();
+  function oval(x,y,rx,ry){
+    contour.moveTo(x+rx,y);contour.ellipse(x,y,rx,ry,0,0,Math.PI*2,true);
+  }
+  function limb(ax,ay,bx,by,ra,rb){
+    const len=Math.hypot(bx-ax,by-ay)||1,nx=(ay-by)/len,ny=(bx-ax)/len;
+    contour.moveTo(ax+nx*ra,ay+ny*ra);contour.lineTo(bx+nx*rb,by+ny*rb);
+    contour.lineTo(bx-nx*rb,by-ny*rb);contour.lineTo(ax-nx*ra,ay-ny*ra);contour.closePath();
+    oval(ax,ay,ra,ra);oval(bx,by,rb,rb);
+  }
+  const width=(5+3.1*Math.abs(side))*size;
+  const armed=WP[e.wpn] && !WP[e.wpn].melee;
+  for(const sign of [-1,1]){
+    const foot=cross(sign)*size,knee=sign*(width*.55+stride*1.5);
+    limb(sign*stride*3,foot,reach*.24,knee,2.2*size,3*size);
+    limb(reach*.24,knee,reach*.47,sign*width*.45,3*size,3.5*size);
+    const elbow=sign*(width+2.1*size);
+    limb(reach*.73,sign*width*.70,reach*.58,elbow,3.5*size,2.6*size);
+    limb(reach*.58,elbow,reach*(armed?.66:.46),elbow+front*(armed?6:1),2.6*size,1.9*size);
+  }
+  oval(reach*.55,0,reach*.17,width*.76);
+  oval(reach*.68,0,reach*.16,width);
+  oval(reach*.825,0,reach*.09,width*.47);
+  oval(reach*.935,0,reach*.12,5.4*size);
+  if(armed){
+    const grip=front*6,barrel=WP[e.wpn].len || 13;
+    limb(reach*.64,grip,reach*.64+side*barrel*.65,grip+front*barrel*.82,1.8,1.1);
+  }
+  g.save();g.translate(e.x,e.y);g.rotate(angle);
+  const fall=g.createLinearGradient(0,0,reach*1.12,0);
+  fall.addColorStop(0,'#000b');fall.addColorStop(.60,'#000c');fall.addColorStop(1,'#0008');
+  g.fillStyle=fall;g.fill(contour);g.restore();
+}
+function drawMovingBeam(g,mask,source,radius,half,left,top){
+  let moving=null;
+  if(SHADOWS)for(const e of ents){
+    if(e===source || !e.alive || e.kind!=='human')continue;
+    const dx=e.x-source.x,dy=e.y-source.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);
+    if(dist<1 || dist>=radius || Math.abs(angD(source.ang,angle))>half+Math.atan2(9,dist))continue;
+    if(npcBarrier(source,dx/dist,dy/dist,dist,null,'light')<dist-1)continue;
+    if(!moving){
+      movingBeamMask ||= winterCanvas(mask.width,mask.height);
+      moving=movingBeamMask.getContext('2d');moving.save();
+      moving.resetTransform();moving.globalCompositeOperation='copy';moving.drawImage(mask,0,0);
+      moving.setTransform(.5,0,0,.5,-left*.5,-top*.5);moving.globalCompositeOperation='destination-out';
+    }
+    paintHumanBeamShadow(moving,e,dist,angle);
+  }
+  if(moving)moving.restore();
+  g.drawImage(moving?movingBeamMask:mask,left,top,radius*2,radius*2);
+}
 function winterFlashlight(g,source){
   const radius=330,half=.42;
   const mask=winterBeamMask ||= winterCanvas(radius,radius);
   const brush=mask.getContext('2d'),left=source.x-radius,top=source.y-radius;
   if(lastWinterBeam && lastWinterBeam.x===source.x && lastWinterBeam.y===source.y &&
     lastWinterBeam.angle===source.ang && lastWinterBeam.rev===navRevision && lastWinterBeam.shadows===SHADOWS){
-    g.drawImage(mask,left,top,radius*2,radius*2);return;
+    drawMovingBeam(g,mask,source,radius,half,left,top);return;
   }
   lastWinterBeam={x:source.x,y:source.y,angle:source.ang,rev:navRevision,shadows:SHADOWS};
   brush.setTransform(.5,0,0,.5,-left*.5,-top*.5);
@@ -487,5 +548,5 @@ function winterFlashlight(g,source){
     }
     brush.restore();
   }
-  g.drawImage(mask,left,top,radius*2,radius*2);
+  drawMovingBeam(g,mask,source,radius,half,left,top);
 }

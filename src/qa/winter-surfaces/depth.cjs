@@ -34,17 +34,17 @@ function checks(){
     const [a,b]=route[i-1],[c,d]=route[i],n=Math.ceil(Math.hypot(a-c,b-d));
     for(let j=0;j<=n;j++)assert(forestDepth((a+(c-a)*j/n)*T,(b+(d-b)*j/n)*T)===0,'bank on cleared route');
   }
-  for(const [x,y] of [[335,222],[325,230],[518,362],[370,82],[135,343],[780,16],[491.4,121.4]])
+  for(const [x,y] of [[footbridge.x/T,footbridge.south/T],[260,470],[419,289],lakeShape,marshShape,[780,16],[iceHole.x/T,iceHole.y/T]])
     assert(forestDepth(x*T,y*T)===0,'bank on sheltered or wet ground');
-  const measure=(point)=>{
-    P.x=point.x;P.y=point.y;P.crouch=0;P.jumpT=0;
-    IN.moveX=1;IN.moveY=0;IN.sprint=false;
+  const measure=(point,run=false)=>{
+    P.x=point.x;P.y=point.y;P.crouch=0;P.jumpT=0;P.st=100;
+    IN.moveX=1;IN.moveY=0;IN.sprint=run;
     const start=P.x;
-    for(let i=0;i<5;i++)update(1/120);
-    IN.moveX=0;return (P.x-start)*24;
+    for(let i=0;i<5;i++)updatePlayer(1/120);
+    IN.moveX=0;IN.sprint=false;return (P.x-start)*24;
   };
-  const road=measure(tilePoint(325,234.6)),snow=measure(deep);
-  assert(road>110 && snow<road*.80 && snow>=road*.65,'measured speeds '+[road,snow]);
+  const road=measure(tilePoint(...baseRoad[1])),snow=measure(deep),snowRun=measure(deep,true);
+  assert(road>110 && snow<road*.45 && snow>road*.2 && snowRun<=snow*1.08,'measured speeds '+[road,snow,snowRun]);
   P.x=deep.x;P.y=deep.y;P.step=stepDistance+21;winterTracks(.01,null);
   assert(S.flags.snowMarks.at(-1).depth>.65,'shallow print in deep snow');
   // Walk a cross section of the snowbank mathematically and check that there is no depth step.

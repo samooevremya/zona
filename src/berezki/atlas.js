@@ -418,6 +418,7 @@ function visibleAtlasTrees(){
 }
 function prepareAtlasArt(){
   district.surface=surfacePatterns();
+  indexPackedGround();
   district.roadBeds=atlasRoutes.map(winterRoadBed);
   for(let i=0;i<5;i++)bankArt[i]=makeBankArt(i);
   district.crowns=[6,7].map(id=>Array.from({length:8},(_,turn)=>winterTreeArt(id,turn)));

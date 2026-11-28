@@ -82,6 +82,12 @@ function renderWinterMarks(vx,vy,vw,vh){
     if(swampAt(m.x,m.y))continue;
     const alpha=traceAlpha(m.t);if(alpha<=0)continue;
     const drag=m.type==='drag';
+    if(!drag && m.depth>.48){
+      // In thigh-deep powder the passing shin pushes a furrow beyond each boot.
+      const fill=clamp((m.depth-.48)/.4,0,1),ox=Math.cos(m.a),oy=Math.sin(m.a);
+      shoreEllipse(ctx,m.x-ox*3,m.y-oy*3,7.5+4*fill,3.6+1.9*fill,'rgba(91,111,130,'+(.27*alpha*fill)+')',m.a);
+      shoreEllipse(ctx,m.x-oy*4,m.y+ox*4,5.8,1.7,'rgba(230,235,236,'+(.62*alpha*fill)+')',m.a-.12);
+    }
     if(m.depth>.04){
       shoreEllipse(ctx,m.x+1,m.y+1,5.4,2.8,'rgba(218,230,235,'+(.54*m.depth*alpha)+')',m.a);
       shoreEllipse(ctx,m.x-.5,m.y-.4,4.4,2,'rgba(67,87,107,'+(.43*m.depth*alpha)+')',m.a);
