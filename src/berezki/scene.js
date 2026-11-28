@@ -416,6 +416,7 @@ async function bootBerezki(){
     const im=new Image();im.src=url;await im.decode();district.images[id]=im;
   })]);
   await loadCrateArt();
+  stormMaterials();
   GRADE.mul='rgb(240,247,251)';
   winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];

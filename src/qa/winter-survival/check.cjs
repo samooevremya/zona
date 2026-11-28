@@ -85,6 +85,9 @@ function checks(){
   Object.assign(P,byS('baseChief').home);S.min=s.until;winterStormTick(.02);check(P.alive&&s.stage==='front','пережить фронт в штабе');
   check(herd.length>0&&herd.every(e=>e.alive),'животные переживают фронт');
   save(true,1);const saved=loadSave(1);applyState(saved);check(S.flags.blizzard.stage==='front'&&!serviceStock(byS('flatChief')).some(s=>s.id==='medkit'),'загрузка во время метели');
-  Object.assign(P,outside);winterStormTick(.1);check(!P.alive,'выход под удар');
+  Object.assign(P,outside);winterStormTick(1.4);check(P.alive&&S.flags.blizzard.cover===1,'обледенение до гибели');
+  Object.assign(P,byS('baseChief').home);winterStormTick(.5);check(P.alive&&S.flags.blizzard.exposure===0&&S.flags.blizzard.cover<1,'спасение и оттаивание');
+  Object.assign(P,outside);winterStormTick(1.5);check(P.alive,'новый выход под удар');
+  save(true,1);applyState(loadSave(1));winterStormTick(.5);check(!P.alive,'экспозиция сохраняется и через две секунды герой погибает');
   return passed;
 }

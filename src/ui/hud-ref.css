@@ -26,11 +26,10 @@
 .zh-bar.hp .bar i{background:linear-gradient(#ff6a55,#c22016 60%,#8a140d)}
 .zh-bar.st .bar i{background:linear-gradient(#7cc4ff,#2a7cc8 60%,#1a4f86)}
 .zh-bar.fd .bar i{background:linear-gradient(#f3d27a,#c99620 60%,#866010)}
-.zh-bar.warmth{color:#dbc08f}.zh-bar.warmth.chilled{color:#acd0df}
+.zh-bar.warmth{--heat-tint:100%;color:color-mix(in srgb,#dbc08f var(--heat-tint),#acd0df)}
 .zh-bar.warmth .bar{position:relative}
 .zh-bar.warmth .bar::after{content:"";position:absolute;left:var(--frost-mark);top:0;bottom:0;width:1px;background:#eadab39c}
-.zh-bar.warmth .bar i{background:linear-gradient(#e9c18a,#b2874b 60%,#785631)}
-.zh-bar.warmth.chilled .bar i{background:linear-gradient(#b5d6df,#799bad 60%,#536d7f)}
+.zh-bar.warmth .bar i{background:linear-gradient(color-mix(in srgb,#e9c18a var(--heat-tint),#b5d6df),color-mix(in srgb,#b2874b var(--heat-tint),#799bad) 60%,color-mix(in srgb,#785631 var(--heat-tint),#536d7f))}
 .zh-bar .bar.low i{animation:zhlow 1s infinite}@keyframes zhlow{50%{opacity:.35}}
 .zh-bar b{font:700 12px "Arial Narrow",Arial;min-width:20px;text-align:right;font-variant-numeric:tabular-nums}
 .zh-st{position:absolute;left:138px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
