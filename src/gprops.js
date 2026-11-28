@@ -232,14 +232,15 @@ function cleanExpiredCrates() {
   for (let i = objs.length-1; i >= 0; i--) {
     const o = objs[i];
     if (!o.broken || o.k !== 'crate') continue;
-    if (times[o.stash] <= S.min) {
+    if (times?.[o.stash] <= S.min) {
       delete times[o.stash];
-      clearCrateRemains(i);
+      if(BEREZKI){if(!resetWinterCrate(o)){times[o.stash]=S.min+10;nextCrateCleanup=Math.min(nextCrateCleanup,times[o.stash]);}}
+      else clearCrateRemains(i);
     } else {
       nextCrateCleanup = Math.min(nextCrateCleanup, times[o.stash]);
     }
   }
-  if (!Object.keys(times).length) delete S.flags.crateCleanup;
+  if (times && !Object.keys(times).length) delete S.flags.crateCleanup;
 }
 
 function restoreCrateCleanup() {

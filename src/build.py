@@ -25,7 +25,7 @@ h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
-scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('settlement.js','apartments.js','surfaces.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','west.js','hamlet.js','atlas.js','scene.js')) if WINTER else ''
+scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('survival.js','fieldfire.js','people.js','wildlife.js','supplies.js','settlement.js','apartments.js','surfaces.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','west.js','hamlet.js','atlas.js','scene.js')) if WINTER else ''
 g5=g5[:pos]+bridge+'\n'+scene+'\n'+('bootBerezki();' if WINTER else g5[pos:])
 js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gscript.js','gstory.js','gsaves.js','gprologue.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gmotion.js','gprops.js','gcontrols.js','gheight.js','glandmarks.js','groominteriors.js','genvironment.js','gatmosphere.js','gfieldaudio.js','gzonelife.js','ginhabited.js'])+"\n"+g5+"\n})();\n"
 if not WINTER: open('game.js','w',encoding='utf8').write(js)
@@ -39,7 +39,7 @@ for file in sorted(_os.listdir('art/detectors')):
 audio_files = {f[:-4]: base64.b64encode(open('audio/'+f,'rb').read()).decode() for f in sorted(_os.listdir('audio')) if f.endswith('.mp3') and not f.startswith(('camp0','army0','foe0','ally0'))}
 if WINTER:
     for file in sorted(_os.listdir('berezki/audio')):
-        if file.endswith('.mp3'): audio_files[file[:-4]]=base64.b64encode(open('berezki/audio/'+file,'rb').read()).decode()
+        if file.endswith(('.wav','.mp3')): audio_files[file[:-4]]=base64.b64encode(open('berezki/audio/'+file,'rb').read()).decode()
 art += '\n/*\n' + open('audio/CREDITS.md', encoding='utf-8').read() + '\n*/\n'
 art += '\nwindow.ZONE_AUDIO=' + __import__('json').dumps(audio_files) + ';'
 art += '\nwindow.DETECTOR_IMAGES=' + __import__('json').dumps(detector_images) + ';'
@@ -107,7 +107,7 @@ OUT = 'index_big.html' if BIGF else 'index.html' if MAPFLAG == 'rc1' else 'index
 if WINTER:
     OUT='../berezki.html'
     h='\n'.join(line for line in h.split('\n') if 'href="https://fonts.' not in line)
-    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','groundscan','lakeIce','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit','tankShell','mainPipe','reedStand','winterWindows','remains','wireBay','marshWater','buckle','wire','candle']})+';'
+    art += '\nwindow.ZONA_SCENE="berezki";window.BEREZKI_ART='+__import__('json').dumps({name:'data:image/webp;base64,'+base64.b64encode(open('berezki/'+name+'.webp','rb').read()).decode() for name in ['materials','groundscan','lakeIce','objects','boat','skiff','keel','swing','slide','gate','wood','roundabout','seesaw','survey','netrack','roastspit','tankShell','mainPipe','reedStand','winterWindows','remains','wireBay','marshWater','buckle','wire','candle','wolf','deer','wolfHide','deerHide','antler','firewood','matches','lining','tea','coffee','pack','metal','surgery','tools','counter']})+';'
     b=b.replace('ЗОНА<span class="start-region">КОРДОН','МЕРЗЛОТА<span class="start-region">СОТЫЙ КИЛОМЕТР')
     h=h.replace('<title>'+h.split('<title>')[1].split('</title>')[0]+'</title>','<title>Мерзлота</title>')
 open(OUT,'w',encoding='utf8').write(h+sp+"\n"+icons+"\n"+b+"\n<script>window.ZONA_MAP="+repr(MAPFLAG)+";"+("window.ZONA_BIG=1;" if BIGF else "")+"\n"+art+"\n</script>\n<script>\n"+js+"</script>\n</body>\n</html>\n")

@@ -1,10 +1,10 @@
 // The approach road ends at the existing gate. Keep the whole compound south of it.
 const baseRooms=[
-  {kind:'guard',name:'Караульная',x:247,y:458,w:8,h:6,doors:[[7,2],[7,3]],
+  {kind:'guard',name:'Штаб сопротивления',x:247,y:458,w:8,h:6,doors:[[7,2],[7,3]],
     fittings:[['stove',2,2],['desk',5,1.8],['bench',3.6,4.3],['rack',1.8,4.1]]},
-  {kind:'barracks',name:'Казарма',x:266,y:458,w:13,h:8,doors:[[0,3],[0,4]],
-    fittings:[['bedroll',2.5,1.9,1],['bedroll',5.3,1.9,1],['bedroll',8.1,1.9,1],
-      ['cupboard',10.8,2.2,0,{ar_jacket:1}],['bench',3.3,6],['desk',10.4,5.85],['bedroll',6.7,6,1]]},
+  {kind:'barracks',name:'Дом служб сопротивления',x:266,y:458,w:13,h:8,doors:[[0,3],[0,4]],
+    fittings:[['surgery',2.7,1.95],['cabinet',1.7,5.7],['stool',3.5,2.65],
+      ['tools',9.7,1.9],['rack',11.3,2.5],['counter',8.2,5.4],['files',10.7,6.25]]},
   {kind:'stores',name:'Вещевой склад',x:242,y:473,w:12,h:8,doors:[[11,3],[11,4]],
     fittings:[['rack',2.2,2.2],['rack',5.4,2.2],['pallet',8.7,2.2],['rack',2,5.5],
       ['cabinet',8.6,5.8,0,{cans:2,bandage:1}],['sack',5.4,5.8]]},
@@ -24,9 +24,16 @@ function makeBase(){
     r.n=1;house(r.x,r.y,r.w,r.h,r.doors,CO,0,'conc');
     const h=HOUSES[HOUSES.length-1];h.baseRoom=r;buildEntrances(h);district.levels.push(r);
     for(const [type,u,v,turn=0,loot] of r.fittings){
-      const o=putFurniture(type,(r.x+u)*T,(r.y+v)*T,turn*Math.PI/2,'base-'+r.kind);
+      const special=['surgery','tools','counter'].includes(type);
+      const o=putFurniture(special?'desk':type,(r.x+u)*T,(r.y+v)*T,turn*Math.PI/2,'base-'+r.kind);
+      if(special){o.staffArt=type;o.w=type==='surgery'?49:48;o.h=26;o.x=(r.x+u)*T-o.w/2;o.y=(r.y+v)*T-o.h/2;}
       if(loot)o.loot=loot;
       if(r.kind==='hangar' && type==='desk')o.workbench=true;
+    }
+    if(r.kind==='barracks'){
+      // The west door opens into a shared passage; both service rooms open onto it.
+      partition(r.x+5,r.y+1,.16,2.1,'concrete');partition(r.x+5,r.y+4.9,.16,2.1,'concrete');
+      partition(r.x+5,r.y+3.55,2.7,.16,'concrete');partition(r.x+9.4,r.y+3.55,2.6,.16,'concrete');
     }
     if(r.kind==='hangar')interiorObject('servicePit',(r.x+4.2)*T,(r.y+5)*T,1.25*T,3*T);
   }
@@ -54,7 +61,7 @@ function baseInterior(r){
     for(const u of [6.2,8.75])for(let j=0;j<32;j++)
       beam(g,u*T,j*10,u*T+1,j*10+8,2.2,'#514c4138');
   }
-  if(r!==westStore && r.kind && r.kind!=='guard'){
+  if(r!==westStore && r.kind && !['barracks','guard'].includes(r.kind)){
     const u=r.kind==='stores'?.62:.73,v=r.kind==='barracks'?.64:.42;
     interiorDrift(g,u*w,v*h,72,40,-.33,r.x);
     interiorDrift(g,u*w-14,v*h+12,43,20,-.15,r.y);
@@ -118,7 +125,7 @@ function baseRoof(h){
     g.save();g.globalAlpha=.36;g.drawImage(district.snowStamp,x-l/2,y-l*.19,l,l*.38);g.restore();
   }
   beam(g,0,d*.5,w,d*.5,4,'#666960');beam(g,0,d*.5-1,w,d*.5-1,2,'#dddcd1');
-  if(r!==westStore && r.kind && r.kind!=='guard'){
+  if(r!==westStore && r.kind && !['barracks','guard'].includes(r.kind)){
     // Remove a ragged section of roof so the real floor and broken rafters show through.
     const cx=w*(r.kind==='stores'?.62:.73),cy=d*(r.kind==='barracks'?.64:.42);
     const hole=baseBreach(r,w,d);g.lineWidth=6;g.strokeStyle='#59554a';g.stroke(hole);

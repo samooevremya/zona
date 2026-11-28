@@ -67,6 +67,7 @@ const SND = {
 function play(name, x, y, mul) {
   if (!AC || (!SND[name] && !recordings[name])) return;
   let v = mul || 1;
+  if(BEREZKI&&S?.flags?.blizzard?.stage==="front"&&name!=="winterGust")v*=.27;
   if (x !== undefined && P) { const d = dst(P.x, P.y, x, y); const gun=name==='p'||name==='s'||name==='r';
     const level=gun ? .74*Math.max(0,1-d/800)+.26*Math.max(0,1-d/2700)**1.2 : clamp(1-d/950,0,1);
     v*=level; if (v < 0.03) return; if (inBunker(P.x, P.y) !== inBunker(x, y)) return; }
@@ -127,7 +128,7 @@ const ICON = { knife: 'i-knife', w_pm: 'i-pm', w_obrez: 'i-obrez', w_aksu: 'i-ak
   vodka: 'i-vodka', bread: 'i-bread', sausage: 'i-sausage', cans: 'i-cans', grenade: 'i-grenade', a9: 'i-ammo', a12: 'i-ammo', a545: 'i-ammo', a762: 'i-ammo',
   ar_jacket: 'i-jacket', ar_bandit: 'i-jacket', ar_zarya: 'i-suit', art_medusa: 'i-art', art_bengal: 'i-art', art_blood: 'i-art', tail: 'i-tail', tentacle: 'i-tail', flash: 'i-flash', damaged_pda: 'i-map', restored_pda: 'i-map', post_case: 'i-pack' };
 const ICOL = { art_medusa: '#dc9330', art_bengal: '#7fb0c4', art_blood: '#d64541', medkit: '#9db264', bandage: '#9db264', antirad: '#9db264', flash: '#7fb0c4' };
-function itemIcon(id) { if(BEREZKI && salvageGoods[id])return salvageIcon(id); if(id==='engraved_pm')id='w_pm'; if(id==='energy' && lesserSprites.energy){const im=lesserSprites.energy.cloneNode(false);im.className='b1ic tall';im.alt='';return im;} if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
+function itemIcon(id) { if(BEREZKI&&winterSupplies[id]&&district.images[id==='wood'?'firewood':id])return salvageIcon(id==='wood'?'firewood':id); if(BEREZKI && salvageGoods[id])return salvageIcon(id); if(id==='engraved_pm')id='w_pm'; if(id==='energy' && lesserSprites.energy){const im=lesserSprites.energy.cloneNode(false);im.className='b1ic tall';im.alt='';return im;} if (detectorImages[id]) return detectorImages[id].cloneNode(false); const g = g3Icon(id); if (g) return g; const b = b1Icon(id); if (b) return b; const i = icon(ICON[id] || 'i-pack'); if (ICOL[id]) i.style.color = ICOL[id]; return i; }
 const FCOL = { loner: '#d9c25a', bandit: '#a79cc4', army: '#6fa35c', mutant: '#d64541', trader: '#7fb0c4' };
 /*AVATAR*/
 function person(c) {
@@ -373,7 +374,7 @@ function drawPda() {
     pbody.appendChild(mapLegend());
   } else if (panel.tab === 'tasks') {
     const L = qList();
-    if (!L.length) pbody.appendChild(el('p', 'note', 'Заданий нет. Поговори с Сидоровичем в бункере.'));
+    if (!L.length) pbody.appendChild(el('p', 'note', BEREZKI?'Заказы дают торговцы и главы поселений.':'Заданий нет. Поговори с Сидоровичем в бункере.'));
     L.sort((a, b) => (a.st === 'a' ? 0 : 1) - (b.st === 'a' ? 0 : 1)).forEach(q => {
       const r = el('div', 'row'), g = el('div', 'grow');
       g.appendChild(el('div', 'nm', q.n + (q.st === 'd' ? ' · выполнено' : q.st === 'f' ? ' · провалено' : ''))); g.appendChild(el('div', 'ds', q.d));
@@ -846,6 +847,7 @@ function hud(dt) {
   quickHudT -= dt;
   if (touchRenderer && quickHudT > 0 && hudT > 0) return;
   quickHudT = 1/12;
+  if(BEREZKI)winterStatus();
   H.hp.style.width = clamp(P.hp, 0, 100) + '%'; H.hp.parentNode.classList.toggle('low', P.hp < 30); H.hpv.textContent = Math.max(0, Math.round(P.hp));
   H.fd.style.width = clamp(S.food, 0, 100) + '%'; H.fdv.textContent = Math.round(S.food); H.fd.parentNode.classList.toggle('low', S.food < 20);
   H.sRad.classList.toggle('on', S.rad > 1); H.sRad.classList.toggle('hi', S.rad > 40); H.radv.textContent = S.rad > 1 ? Math.round(S.rad) : '';

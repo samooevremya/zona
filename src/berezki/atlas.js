@@ -174,6 +174,7 @@ function paintPropShadow(g,p){
   g.drawImage(p.shadow,-p.width/2,-p.foot*p.height,p.width,p.height);g.restore();
 }
 function drawAtlasProp(g,p,mapView=false){
+  if(p.find){drawWinterFind(p.find);return;}
   if(yardEquipment.has(p.key)){paintEquipment(g,p,mapView);paintYardFooting(g,p,true);return;}
   if(p.key==='waterTower'){drawWaterTower(g,p,mapView);return;}
   if(p.key==='gate'){drawBaseGate(g,p,mapView);return;}

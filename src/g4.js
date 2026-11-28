@@ -769,6 +769,7 @@ function drawBoar(e) {
   ctx.restore();
 }
 function drawBody(o) {
+  if(BEREZKI&&o.species){wildSprite(o,true);return;}
   if (g3Body(o)) return;
   ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.ang + 1.2);
   if (o.kind === 'dog') { ctx.fillStyle = '#4a3c31'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 6, 0, 0, 6.28); ctx.fill(); ctx.beginPath(); ctx.ellipse(13, 2, 5, 4, 0.4, 0, 6.28); ctx.fill(); }
@@ -1004,8 +1005,13 @@ function render() {
   drawCordonTrail(inView);
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) {
+    if(BEREZKI&&F.field){
+      groundShadow(ctx,F.x,F.y,14,8,.1,2);
+      const wood=district.images.firewood;
+      if(wood){ctx.save();ctx.globalAlpha=F.unburnt?1:.8;ctx.drawImage(wood,F.x-13,F.y-6,26,14);ctx.restore();}
+    }
     if(fireLit(F)){fireGroundLight(F);drawFlames(F);}
-    else{
+    else if(!F.field){
       // Cover the glowing coals in the painted base while its stone ring stays visible.
       ctx.fillStyle='#34302b';ctx.beginPath();ctx.ellipse(F.x,F.y,11,9,.2,0,Math.PI*2);ctx.fill();
       for(let i=0;i<6;i++){
@@ -1046,6 +1052,7 @@ function render() {
     ctx.fillStyle = '#c9c7bd'; ctx.fillRect(x - 2, y - h - 1.5, 4, 3);
   }
   for (const n of nades) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 6.28); ctx.fill(); ctx.fillStyle = '#3d4a30'; ctx.beginPath(); ctx.arc(n.x, n.y - n.z * 0.15, 4, 0, 6.28); ctx.fill(); }
+  if(BEREZKI)fieldFireOverlay(inView);
   const vis = ents.filter(e => e.alive && inView(e.x, e.y, 30) && (!BIG || loftAt(e)===loft)).sort((a, b) => a.y - b.y);
   const plants=!BEREZKI && livingZone && ART && C1 && !shopVisible && !loft ? visiblePlants(vx,vy,vw,vh,vis) : [];
   let plantIndex=0;
@@ -1055,14 +1062,14 @@ function render() {
     drawWinterBridge(ctx);
   }
   const winterProps=BEREZKI?[...(winterFloor(P.x,P.y)?.cutWalls||[]).filter(p=>inView(p.x,p.y,p.radius)),...westRailPanels(vx,vx+vw,vy,vy+vh),...atlasProps.filter(p=>inView(p.x,p.y,Math.max(p.width,p.height)+20)),
-    ...raisedScenery.filter(p=>inView(p.x,p.y,p.radius||80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
+    ...visibleFinds(inView),...raisedScenery.filter(p=>inView(p.x,p.y,p.radius||80) && !(bridgeVisible && p.underDeck))].sort((a,b)=>a.depth-b.depth):[];
   let winterIndex=0;
   for (const e of vis) {
     while(winterIndex<winterProps.length && winterProps[winterIndex].depth<(BEREZKI && e===P && S.flags.onLookout?lookout.y+lookout.half+lookout.run+1:e.y))drawAtlasProp(ctx,winterProps[winterIndex++]);
     while(plantIndex<plants.length && plants[plantIndex].y<e.y)drawPlant(plants[plantIndex++]);
     drawRestingPack(e);
     if (shopVisible && e.sid === 'sid' && deskPoses.complete && deskPoses.naturalWidth) drawDeskTrader(e);
-    else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
+    else if(BEREZKI&&e.species)wildSprite(e,false);else if (e.kind === 'dog') drawDog(e); else if (e.kind === 'boar') drawBoar(e); else if (e.kind === 'sucker') drawSucker(e); else if((e.sid==='shust' && e.captive && loft) || (e.sid==='tolik' && e.wounded)) drawRestingCaptive(e);
     else if(BEREZKI){
       ctx.save();
       if(bridgeVisible && stationUnderpass(e)){
@@ -1093,6 +1100,7 @@ function render() {
     }
   }
   while(winterIndex<winterProps.length)drawAtlasProp(ctx,winterProps[winterIndex++]);
+
   if(bridgeVisible)paintBridgeRails(ctx);
   while(plantIndex<plants.length)drawPlant(plants[plantIndex++]);
   if(BIG && !BEREZKI && P) drawNearPoppies(ctx,P);
@@ -1273,7 +1281,7 @@ function render() {
       ctx.fillRect(0,0,VW,VH);ctx.restore();
     }
   }
-  if (BEREZKI)snowScreen();else drawWeatherScreen();
+  if (BEREZKI){snowScreen();winterScreenEffects();}else drawWeatherScreen();
   // откуда стреляют: красные дуги по краю экрана
   if (P && P.alive) HURTDIR.forEach(h => {
     const cx = VW / 2, cy = VH / 2, R = Math.min(VW, VH) * 0.42, a = h.a;

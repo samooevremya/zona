@@ -232,7 +232,7 @@ function restLabel(verb, minutes, ctx) {
     (!r.healed && r.minutes > 0 && S.food < 30 ? ' (голодным не лечишься)' : '');
 }
 function restBlock(h) {
-  if (S.bleed > 0) return 'Сначала останови кровь: перевяжись или используй аптечку.';
+  if (S.bleed > 0) return BEREZKI?'Сначала останови кровь бинтом.':'Сначала останови кровь: перевяжись или используй аптечку.';
   if (S.food < REST.danger + REST.food) return 'Слишком голоден, чтобы отдыхать: сытость ' + Math.round(S.food) + '. Сначала поешь.';
   if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 520)) return 'Рядом враги, не до отдыха.';
   return '';
@@ -274,7 +274,7 @@ function advanceWorldTime(minutes, ctx) {
 
 /* ---------- костёр ---------- */
 const fireKey=f=>f.x+','+f.y;
-const fireLit=f=>!!f && S.flags.coldHearths?.[fireKey(f)]==null;
+const fireLit=f=>!!f && (!f.field||f.flame>S.min) && S.flags.coldHearths?.[fireKey(f)]==null;
 const fireRain=()=>WX.rain>=.16 || ['rain','storm'].includes(S.wx?.k);
 function relightFire(f,actor){
   if(fireLit(f) || fireRain() || S.blow?.stage || !actor?.alive || dE(actor,f)>80)return false;
@@ -547,7 +547,7 @@ function dynSnapshot() {
   S.dyn.v = DYN_VER;
   S.flags.fieldBodies=objs.filter(o=>o.k==='body'||o.k==='bones').map(o=>({...o}));
   delete S.flags.mutantBodies;
-  S.dyn.npcs = ents.filter(e => e.alive && e !== P && (BEREZKI || e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
+  S.dyn.npcs = ents.filter(e => e.alive && e !== P && !e.wildId && (BEREZKI || e.follow || e.sos || e.sosFoe || e.jobTag || e.traded || e.assisted || e.resident || e.evacuating || (e.inBattle && e.trip) || e.trip?.returnTo || (e.angry && !e.sid))).map(e => ({
     uid: e.uid || (e.uid = dynId()), sid: e.sid || null, kind: e.kind, fac: e.fac, name: e.name, wpn: e.wpn,
     x: e.x, y: e.y, hp: e.hp, maxhp: e.maxhp, mag: e.mag,
     ...(e.evacuating ? { evacuation: { sit: e.sit || 0, seat: e.seat || 0, trip: e.trip, shelterOrigin:e.shelterOrigin, shelterSpot:e.shelterSpot } } : {}),

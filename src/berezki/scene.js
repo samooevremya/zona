@@ -11,6 +11,7 @@ function winterFloor(x,y){
   return district.levels.find(r=>x>=r.x*T && x<(r.x+r.w)*T && y>=r.y*T && y<(r.y+r.h)*T);
 }
 function makeDistrict(){
+  registerSurvival();
   seedAtlasTerrain();
   makeApartments();
   makeFishingShore();
@@ -22,12 +23,17 @@ function makeDistrict(){
   makeAtlasProps();
   supplyBox(410*T,285*T,'berezki-canteen',{bread:1,bandage:2});
   makeWinterSalvage();
+  // These loose packing cases are distributed among abandoned rooms on first entry.
+  for(let i=0;i<5;i++)supplyBox((245+i)*T,477*T,'expedition-'+i,{}).expeditionCrate=true;
+  const office=district.levels.find(r=>r.block==='living'&&r.n===3);
+  putFurniture('desk',(office.x+8.4)*T,(office.y+3.7)*T,0,'chief');
+  putFurniture('stool',(office.x+8.2)*T,(office.y+2.65)*T,0,'chief');
   alignWinterStorage();
   buildGrids();
 }
 const fishingNames=['Илья','Павел','Денис','Макар','Никита','Олег','Тимофей','Юрий','Артём','Борис','Антон','Василий'];
 function winterNew(difficulty){
-  return {v:1,difficulty:difficultyKey(difficulty),...(marshPreview?tilePoint(...marshFork):basePreview?tilePoint(260,454.8):shorePreview?tilePoint(389.2,109.8):district.start),hp:100,min:marshPreview||basePreview?660:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1},
+  return {v:1,difficulty:difficultyKey(difficulty),...(marshPreview?tilePoint(...marshFork):basePreview?tilePoint(260,454.8):shorePreview?tilePoint(389.2,109.8):district.start),hp:100,min:marshPreview||basePreview?660:shorePreview?600:510,money:0,inv:{ar_jacket:1,w_pm:1,a9:16,bandage:2,bread:1,medkit:1,wood:1,matches:5},
     weapon:'hands',armor:'ar_jacket',belt:[],mag:{w_pm:8},q:{},q2:{},stats:{kS:0,kM:0,q:0,art:0},flags:{warmth:100,stationLayout:1,atlasLayout:3,fisherName:fishingNames[ri(0,fishingNames.length-1)]},campaign:{stage:'district',wounds:{}},
     news:[],rep:0,dead:{},fog:'',rad:0};
 }
@@ -52,7 +58,16 @@ function winterRestore(d){
   if(S.fog)for(let i=0;i<Math.min(S.fog.length*6,fog.length);i++){const v=S.fog.charCodeAt(Math.floor(i/6))-48;fog[i]=(v>>(i%6))&1;}
   P=mkPlayer();P.name='Путник';ents=[P];decals=[];parts=[];nades=[];tracers=[];flashes=[];bolts=[];crows=[];
   for(let i=objs.length-1;i>=0;i--)if(!objs[i].static)objs.splice(i,1);
+  for(const o of objs)if(o.k==='crate'){
+    o.winterOrigin||={x:o.x,y:o.y};Object.assign(o,S.flags.winterBoxSites?.[o.stash]||o.winterOrigin);
+    const c=raisedScenery.find(p=>p.item===o);if(c)Object.assign(c,{x:o.x+o.w/2,y:o.y+o.h/2,depth:o.y+o.h*.74});
+    const rolls=S.flags.winterBoxRolls||={};o.initialLoot=rolls[o.stash]||=rollFinds(packFinds);
+  }
+  if(S.inv.energy){S.inv.coffee=(S.inv.coffee||0)+S.inv.energy;delete S.inv.energy;}
+  restoreFieldFires();restoreFinds();winterPeopleRestore();restoreWildlife();
+
   for(const o of objs)if(o.stash)restoreContainer(o);
+  for(const o of objs)if(o.expeditionCrate&&!S.flags.winterBoxSites?.[o.stash])resetWinterCrate(o);
   // Older slots have no resident-name flag. A stable fallback also covers slots
   // opened repeatedly without saving and snapshots taken after the fisher died.
   const oldFisher=S.dyn.npcs.find(n=>n.sid==='fisher');
@@ -72,6 +87,10 @@ function winterRestore(d){
     if(b.name==='Егор' && b.fac==='loner' && S.dead.fisher)b.name=S.flags.fisherName;
     objs.push({...b,loot:{...b.loot}});
   }
+  if(S.flags.blizzard?.stage==='warning')for(const e of ents){
+    if(e.kind==='human'&&e!==P&&!e.service&&!winterShelter(e))e.stormRefuge=stormRoute(e)?.to;
+  }
+  restoreCrateCleanup();
   ageRemains();buildGrids();
   for(const e of ents)if(e===P || shoreJobs[e.sid])restoreShoreFooting(e);
   for(const e of ents){
@@ -86,10 +105,12 @@ function winterRestore(d){
     }
     if(landing)Object.assign(e,landing);
   }
+  P.st=S.flags.savedStamina??100;
   cam.x=P.x;cam.y=P.y;G.near=null;draggedBody=null;fadeTo=null;fadeT=0;
   stepDistance=0;winterFootSide=1;deathT=0;hurtFlash=0;armyAngry=false;MSGS=[];radioQueue.length=0;
 }
 function winterInteractChoices(cand){
+  fireChoices(cand);findChoices(cand);
   for(const s of district.stairs){const d=dE(P,s);if(d<30 && Math.abs(P.x-s.x)<.7*T)cand(d-6,{k:'winterStairs',s,label:s.up?'Подняться на этаж '+(s.room.n+1):'Спуститься на этаж '+(s.room.n-1)});}
   const room=winterFloor(P.x,P.y);
   const stove=stoveIn(room);
@@ -103,9 +124,14 @@ function winterInteractChoices(cand){
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
   const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53 && winterFloor(h.x,h.y)===room && los(P.x,P.y,h.x,h.y));
-  if(f)cand(dE(P,f),{k:'winterRest',label:'Согреться и отдохнуть'});
+  if(f)cand(dE(P,f),{k:'winterRest',label:'Погреться у огня'});
 }
 function winterUse(n){
+  if(fireAction(n))return true;
+  if(n.k==='searchFind'){openLoot(n.f);return true;}
+  if(n.k==='takeFind'){if(collectStock(n.f,n.id,n.f.loot[n.id])){play('pick');save(true);}return true;}
+  if(n.k==='talk'&&n.e.service){winterService(n.e);return true;}
+  if(n.k==='winterRest'&&!n.bed){msg('Ты греешься. Для сна нужна лежанка.');return true;}
   if(n.k==='baseKindle' || n.k==='pumpKindle' || n.k==='hamletKindle'){
     S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. У печи можно согреться.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
@@ -118,7 +144,8 @@ function winterUse(n){
         const result=restPreview(h,n.bed?'sleep':'rest');
         S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
         if(result.minutes){
-          P.st=100;S.flags.warmth=100;
+          P.st=100;
+          const room=winterShelter(P);S.flags.warmth=clamp(S.flags.warmth+result.minutes*(winterRoomWarm(room)?1.7:-.07),0,100);
           ageRemains();
         }
         closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
@@ -135,12 +162,14 @@ function winterWeather(dt){
   if(Math.floor(S.min)!==Math.floor(S.min-dt))ageRemains();
   const r=winterFloor(P.x,P.y),stove=stoveIn(r);
   const warm=(stoveBurning(stove) && dE(P,stove.at)<90 && los(P.x,P.y,stove.at.x,stove.at.y)) || district.heaters.concat(WORLD_FIRES.filter(fireLit)).some(f=>dE(P,f)<90 && winterFloor(f.x,f.y)===r && los(P.x,P.y,f.x,f.y));
-  const cooling=night()?.22:.07;
-  let thermalRate=-cooling-marshDepth(P.x,P.y)*(night()?.95:.55);
-  if(r)thermalRate=stove?-cooling*.4:r.kind || r.abandoned?-cooling*.75:.2;
-  if(warm)thermalRate=1.3;
-  S.flags.warmth=clamp(S.flags.warmth+dt*thermalRate,0,100);
-  if(S.flags.warmth===0 && P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
+  const roof=winterShelter(P),heated=winterRoomWarm(roof);
+  const storm=S.flags.blizzard?.stage;
+  const exposure=roof?(night()?.07:.05):(night()?.22:.07)+marshDepth(P.x,P.y)*.55;
+  const rate=warm||heated?1.75:-exposure*(!roof&&storm==='warning'?2.2:1);
+  S.flags.warmth=clamp(S.flags.warmth+dt*rate,0,100);
+  P.byHeat=!!(warm||heated);
+  if(!P.byHeat&&S.flags.warmth===0&&P.alive){P.hp-=dt*.4;if(P.hp<=0)kill(P,'cold');}
+  tickFieldFire(dt);winterStormTick(dt);winterWildTick();cleanExpiredCrates();
   WX.wind=.36+.15*Math.sin(S.min*.041)+.09*Math.sin(S.min*.15);
   mixRecordedRain();
   if(!r && S.min>=(S.flags.frostSoundAt||0)){
@@ -305,7 +334,7 @@ function winterGround(vx,vy,vw,vh){
   district.levels.forEach((r,i)=>{
     if(r.n===1 && (!upper || (upper.n===1 && r.kind)) || r===upper)ctx.drawImage(district.plans[i],r.x*T,r.y*T);
     if(r.block && (r===upper || !upper && r.n===1) && vx+vw>=r.x*T && vx<=(r.x+r.w)*T && vy+vh>=r.y*T && vy<=(r.y+r.h)*T)stairwellFloor(ctx,r);
-    if(r===upper && r.kind && r!==westStore && r.kind!=='guard')driftingBaseSnow(ctx,r);
+    if(r===upper && r.kind && r!==westStore && !['guard','barracks'].includes(r.kind))driftingBaseSnow(ctx,r);
   });
   renderWinterMarks(vx,vy,vw,vh);
   drawMarshRipples(ctx,vx,vy,vw,vh);
@@ -389,11 +418,11 @@ async function bootBerezki(){
   };
   // Install content providers before the first frame. Main simulation and input handlers are shared.
   drawGround=winterGround;drawMapTo=winterMap;drawMini=winterMini;
-  qList=()=>[];qTargets=()=>[];trackedTarget=()=>null;
+  qList=winterJobs;qTargets=()=>[];trackedTarget=()=>null;
   briefTask=()=>{const r=winterFloor(P.x,P.y),w=Math.round(S.flags.warmth);
     const outside=Math.round(-18-28*darkness()/.8);
-    const stove=stoveIn(r),temp=stove?(stoveBurning(stove)?3:outside+9):r?.abandoned?outside+4:r?.kind?outside+3:r?(r.n===1?2:4):outside;
-    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%';
+    const temp=winterRoomWarm(r)?3:r?outside+(r.abandoned?4:8):outside;
+    const text=(stationPlace() || (r===fishingRoom?'Дом рыбака':r?.name?r.name:r?'Берёзки · этаж '+r.n:atlasPlace(P.x/T,P.y/T)))+' · '+(temp>0?'+':'')+temp+' °C · тепло '+w+'%'+(P.byHeat?' · ♨':'');
     if(H.quest.textContent!==text)H.quest.textContent=text;
   };
   intro=()=>{msg(marshPreview?'Старая водокачка. Тропа по сухой кромке огибает камыши.':basePreview?'Южная дорога. Впереди старые ворота базы.':shorePreview?'Рыбацкий посёлок. Тропа у навеса спускается ко льду.':'Жилой корпус. У входа дежурит смена.','say');save(true);};
