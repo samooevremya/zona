@@ -911,6 +911,7 @@ function kill(e, src,loud=false) {
   }
   e.alive = 0; e.hp = 0;
   if (e === P) { deathT = 1.6; play('hurt'); return; }
+  if(BEREZKI&&e.wildId)fallenWild(e);
   if (e.sid) S.dead[e.sid] = 1;
   if (e.den) clearedDen(e.den);
   const witnesses = src === P && e.fac === 'loner' ? lonerWitnesses(e,loud) : null;
@@ -924,8 +925,8 @@ function kill(e, src,loud=false) {
     if (witnesses) witnessLonerAttack(e, true, witnesses);
     if (e.fac === 'bandit') S.rep += 3;
   } else if (e.fac === 'loner' && (dE(e, P) > 380 || !los(P.x, P.y, e.x, e.y))) {
-    const why = src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
-    bulletin('Погиб сталкер ' + e.name + '. Причина: ' + why + '.');
+    const why = src==='blizzard'?'метель':src === 'blow' ? 'выброс' : src === 'anom' ? 'аномалия' : src && src.fac === 'mutant' ? 'слепые псы' : src && src.fac === 'bandit' ? 'бандиты' : src && src.fac === 'army' ? 'военные' : 'неизвестно';
+    bulletin((BEREZKI?'Погиб житель ':'Погиб сталкер ') + e.name + '. Причина: ' + why + '.');
   } else if (e.fac === 'bandit' && src && src.fac === 'loner' && dE(e, P) > 380) {
     bulletin('Одиночки убили бандита по кличке ' + e.name + '.');
   }
@@ -935,7 +936,8 @@ const MUTANT_TROPHIES = {dog:'tail', boar:'hoof', sucker:'tentacle'};
 function dropBody(e,identified=false) {
   const loot = {};
   const trophy = MUTANT_TROPHIES[e.kind];
-  if (trophy) loot[trophy] = 1;
+  if(BEREZKI&&e.species){loot[e.species==='wolf'?'wolfHide':'deerHide']=1;if(e.species==='deer')loot.antler=1;}
+  else if (trophy) loot[trophy] = 1;
   else {
     if (e.money) loot.money = e.money;
     Object.keys(e.inv || {}).forEach(k => loot[k] = e.inv[k]);
@@ -945,7 +947,7 @@ function dropBody(e,identified=false) {
     if (e.sid === 'boss') { loot.ar_bandit = 1; loot.grenade = 2; }
   }
   if (e.kind === 'human' && (e.fac === 'loner' || e.fac === 'bandit') && chance(0.3)) loot.__tip = 1;
-  const body = { ...(BEREZKI?{sid:e.sid,winterTone:winterCoatTone(e),deathSpot:{x:e.x,y:e.y}}:{}), k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
+  const body = { ...(BEREZKI?{sid:e.sid,species:e.species,winterTone:winterCoatTone(e),deathSpot:{x:e.x,y:e.y}}:{}), k: 'body', x: e.x, y: e.y, ang: e.ang, fac: e.fac, kind: e.kind, name: e.name, seed: e.seed || 1, loot: loot, guns:e.guns, wcond:e.wcond, t: S.min };
   // Младший остаток визуального seed хранит расцветку и после загрузки тела.
   if (e.fac === 'loner' && e.kind === 'human') body.seed += jacketIndex(e) - body.seed % JACKET_COLORS.length;
   body.deathKnown=identified || !e.hitByP;

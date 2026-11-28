@@ -183,6 +183,7 @@ function paintRaisedScenery(g,p,mapView){
     beam(g,x+dx,y+h+dy,x+w+dx,y+h+dy,1.3,'#a29a8491');g.restore();return;
   }
   g.translate(dx,dy);
+  if(o.staffArt){g.drawImage(district.images[o.staffArt],x,y,w,h);g.restore();return;}
   if(o.fitting==='supper' || o.fitting==='desk'){
     const variant=Math.floor(o.x/29+o.y/37)%3;
     if(variant!==0){

@@ -80,6 +80,7 @@ function setWeapon(w) {
   P.reload = 0; P.cool = 0.25; P.jam = 0;
 }
 function useItem(id) {
+  if(BEREZKI){const used=winterConsume(id);if(used!==null)return used;}
   const it = ITEMS[id];
   if (id === 'energy' && has(id)) {
     take(id,1); S.flags.energyUntil = S.min + 60; S.flags.poppySleep = 0; play('eat'); return true;
@@ -295,6 +296,12 @@ function update(dt) {
   }
   for (const e of ents) {
     if (!e.alive || e === P) continue;
+    if(BEREZKI&&e.service){e.tgt=null;continue;}
+    if(BEREZKI&&e.wildId){wildAI(e,dt);continue;}
+    if(BEREZKI&&S.flags.blizzard?.stage!=='calm'&&e.kind==='human'){
+      if(!winterShelter(e)&&e.stormRefuge)goTo(e,e.stormRefuge.x,e.stormRefuge.y,105,dt);
+      continue;
+    }
     if (e.qaHold || (!BEREZKI && blowoutHumanAI(e, dt))) continue;
     if (Math.abs(e.x - P.x) > 1400 && Math.abs(e.y - P.y) > 1400 && !e.trip && !e.tgt && !e.returning) continue;
     if (e.sosPhase && sosFoeAI(e, dt)) continue;
@@ -439,13 +446,16 @@ function updatePlayer(dt) {
   if (ml > 1) { mx /= ml; my /= ml; }
   const kg = weight(), over = kg > carryLimit();
   const powder=BEREZKI?snowAtBoots(P):0;
-  const sprint = powder<.76 && !(BEREZKI && draggedBody) && (IN.sprint || IN.runPointer !== null) && P.st > 5 && !over && ml > 0.1;
+  const wind=BEREZKI?winterWindMove(mx,my):0;
+  const attempt=IN.sprint||IN.runPointer!==null;
+  const sprint = (!BEREZKI||!P.winded&&wind>-.25) && powder<.76 && !(BEREZKI && draggedBody) && (IN.sprint || IN.runPointer !== null) && P.st > (BEREZKI?0:5) && !over && ml > 0.1;
   if (sprint) P.crouch = 0; P.sprinting = sprint;
   const stride=sprint ? 118+72*clamp(1-powder/.76,0,1) : P.crouch ? 62 : 118;
   let sp = stride * (over ? 0.55 : 1) * (BEREZKI ? 1-.55*marshDepth(P.x,P.y) : swampAt(P.x,P.y) ? .55 : 1);
   if(BEREZKI && ml>.08)sp*=(1-.77*powder)*(1-.23*reedDensity(P.x,P.y));
   if(BEREZKI && draggedBody)sp*=.57;
-  if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (BEREZKI?1:1-.12*(S.flags.coatWetness||0)) * dt);
+  if(BEREZKI){winterExert(dt,ml>.08,sprint,attempt,powder);sp*=(1+.30*wind)*(S.flags.warmth<=0?.56:1);if(wind<-.25)P.st=Math.max(0,P.st+dt*wind*14);}
+  else if (sprint) P.st = Math.max(0, P.st - 22 * exertion(kg) * (1 + Math.min(5, S.weapon==='knife' ? 0.3 : (ITEMS[S.weapon]?.w || 0)) * .085) * dt); else P.st = Math.min(100, P.st + 14 * (energyActive() ? 1.5 : 1) * (BEREZKI?1:1-.12*(S.flags.coatWetness||0)) * dt);
   if (BIG && !BEREZKI) {
     const inField=P.x<WEST*T && poppyBed(P.x/T,P.y/T-LESSER_TOP)<1 &&
       ![FL,CF,SW].includes(tAt(Math.floor(P.x/T),Math.floor(P.y/T)));
@@ -525,6 +535,9 @@ function findInteract() {
     if ((o.k==='crate' && o.broken && !o.looted) || o.kind==='sack') {
       nearbyGroundItems(o,cand); continue;
     }
+    if(BEREZKI&&o.k==='body'&&o.species){
+      const id=Object.keys(o.loot)[0];if(id&&dE(P,o)<42&&clearNPCShot(P,o))cand(dE(P,o),{k:'carve',o,label:S.weapon==='knife'?'Снять трофей · '+ITEMS[id].n:'Для разделки нужен нож'});continue;
+    }
     if (o.k === 'body' && MUTANT_TROPHIES[o.kind]) {
       const trophy=MUTANT_TROPHIES[o.kind], d=dE(P,o);
       if (o.loot[trophy] && d<42 && clearNPCShot(P,o))
@@ -551,7 +564,7 @@ function findInteract() {
   return best;
 }
 function carveMutant(o) {
-  const id = MUTANT_TROPHIES[o.kind];
+  const id = BEREZKI&&o.species?Object.keys(o.loot)[0]:MUTANT_TROPHIES[o.kind];
   if (!id || !o.loot[id] || !objs.includes(o) || dE(P,o)>=42 || !clearNPCShot(P,o)) return;
   if (S.weapon !== 'knife') { msg('Возьми нож в руки.', 'say'); return; }
   const error = receiveError(id,1);
@@ -608,6 +621,7 @@ function save(quiet,slot=0) {
   S.x = P.x; S.y = P.y; S.hp = P.hp;
   let f = ''; for (let i = 0; i < fog.length; i += 6) { let v = 0; for (let b = 0; b < 6; b++) v |= (fog[i + b] ? 1 : 0) << b; f += String.fromCharCode(48 + v); }
   S.fog = f;
+  if(BEREZKI){saveWildlife();S.flags.savedStamina=P.st;}
   dynSnapshot();
   try { localStorage.setItem(slotKey(slot), JSON.stringify(S)); } catch (e) { if (!quiet) msg('Сохранить не вышло: браузер не даёт места.'); return false; }
   return true;

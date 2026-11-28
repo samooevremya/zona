@@ -120,6 +120,7 @@ function capacityError(kg,cells,armor=S.armor) {
   return '';
 }
 function receiveError(id,n,gun) {
+  if(BEREZKI&&id==="wood"&&cnt(id)+n>2)return "Можно нести только две стопки дров.";
   const inv={...S.inv,[id]:cnt(id)+n};
   return capacityError(weight()+ITEMS[id].w*n+loadedMass(id,gun),packCells(inv,null,incomingKit([id])));
 }

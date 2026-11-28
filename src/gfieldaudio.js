@@ -72,7 +72,7 @@ function mixRecordedRain(){
     const air=AC.createBufferSource();air.buffer=fieldBuffers.get(windKey);air.loop=true;
     airGain=AC.createGain();airGain.gain.value=0;air.connect(airGain);airGain.connect(master);air.start();
   }
-  const wind=soundPrefs.nature*(.045+.105*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
+  const wind=(BEREZKI&&S.flags.blizzard?.stage==="warning"?3:1)*soundPrefs.nature*(.045+.105*WX.wind)*(.8+.2*Math.sin(S.min*.17))*(1-room.enclosure*.86)*(room.underground?0:1);
   airGain?.gain.setTargetAtTime(wind,now,.45);
   windGain?.gain.setTargetAtTime(airGain?0:.045*soundPrefs.nature*(1-room.enclosure),now,.27);
   const buffer=fieldBuffers.get('rain');if(!buffer)return;

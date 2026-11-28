@@ -293,7 +293,8 @@ function drawInv2() {
       refresh();
     }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
-    if (id==='energy' || it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', id==='energy' ? 'Выпить' : FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
+    if(BEREZKI&&id==='wood')row.appendChild(btn('go','Развести костёр',chooseFireSite));
+    if (id==='energy' || it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', ['energy','coffee','tea'].includes(id) ? 'Выпить' : FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
       if (beltCount(id)) {
         if (packCells(S.inv,id)>PACK_CELLS) panel.hint='Освободи место в рюкзаке.';
@@ -333,6 +334,7 @@ function merchantRisk(){
   return recent.length>=2?1.10:1;
 }
 function tradeStock(e) {
+  if(BEREZKI&&e?.service)return serviceStock(e);
   if (e) return Object.keys(e.inv).filter(id => ITEMS[id] && e.inv[id]>0).map(id => ({
     id,q:1,p:Math.max(purchaseCost((ITEMS[id].price ?? ITEMS[id].sell ?? 1)*gearRetail(id)*(S.rep>=20?1.1:1.3)),sellPrice(id,false)+1),c:e.inv[id],cond:isGun(id)?vendorGun(e,id,0).cond:null
   }));
@@ -345,7 +347,7 @@ function vendorGun(e,id,offset) {
 }
 function tradePrice(id,e,offset=0) {
   const c=isGun(id)?gunCopy(id,Math.max(0,cnt(id)-1-offset)).cond:null;
-  return Math.max(1,Math.floor(sellPrice(id,!!e)*(c==null?1:Math.max(.3,c/100))));
+  return Math.max(1,Math.floor(sellPrice(id,!!e)*(BEREZKI&&e?.sid==="baseMedic"?1.55:1)*(c==null?1:Math.max(.3,c/100))));
 }
 function saleTotal(id,q,e) {
   if (!isGun(id)) return tradePrice(id,e)*q;
@@ -372,6 +374,7 @@ function gearRetail(id){
   return {rookie:1.25,normal:1.65,hard:1.85,master:2.1}[difficultyKey(S.difficulty)];
 }
 function sellable(id, e) {
+  if(BEREZKI&&e?.sid==='baseMedic'&&!['medkit','bandage'].includes(id))return 0;
   const it = ITEMS[id]; if (!it || it.quest || !(S.inv[id] > 0)) return 0;
   if ((e && it.armor) || refusesTrophy(e,id)) return 0;
   return Math.max(0,cnt(id)-wornCount(id)-(id==='guitar' && S.weapon===id?1:0));
@@ -395,6 +398,7 @@ function offerSum(e) {
 }
 function tradeCheck(e) {
   const o = panel.offer, st = tradeStock(e), sm = offerSum(e);
+  if(BEREZKI&&((cnt("wood")-(o.sell.wood||0)+(o.buy.wood||0))>2)&&o.buy.wood)return "Можно нести две стопки дров.";
   if (!Object.keys(o.buy).length && !Object.keys(o.sell).length) return 'Предложение пустое.';
   for (const [id, n] of Object.entries(o.buy)) { const s = st.find(x => x.id === id); if (!s || s.c < n) return 'У торговца нет столько: ' + itemName(id) + '.'; }
   for (const [id, n] of Object.entries(o.sell)) {
@@ -421,7 +425,7 @@ function tradeDo(e) {
     if(isGun(id)) for(let i=0;i<q;i++) {
       putStock(incoming,id,1,vendorGun(e,id,0)); e?.guns?.[id]?.pop();
     } else putStock(incoming,id,q);
-    if(e) { e.inv[id]-=q; if(!e.inv[id]) delete e.inv[id]; }
+    if(e&&(!BEREZKI||!e.service||e.sid==="flatChief")) { e.inv[id]-=q; if(!e.inv[id]) delete e.inv[id]; }
   }
   for(const [id,n] of Object.entries(o.sell)) {
     const q=Math.min(n*(ITEMS[id].ammo?10:1),cnt(id));
@@ -435,6 +439,7 @@ function tradeDo(e) {
     if (isGun(id)) for(const gun of incoming.guns[id]) addPacked(id,1,gun);
     else addPacked(id,q);
   }
+  if(BEREZKI&&e?.sid==='flatChief')S.flags.chiefStock=Object.fromEntries(winterStockIds(e).map(id=>[id,e.inv[id]||0]));
   S.money += sm.net; if (e) e.money -= sm.net; if (e) e.traded = 1; if(e?.sid==='lz_barman')S.flags.barGuitarStock=true;   // инвентарь и деньги этого NPC теперь сохраняются
   panel.offer = { buy: {}, sell: {} }; play('pick');
   panel.hint = 'Сделка закрыта: ' + (sm.net >= 0 ? 'получено ' + sm.net : 'доплачено ' + (-sm.net)) + ' RU.';
@@ -448,12 +453,12 @@ function drawTrade2() {
   const box = el('div', 'trade2' + (panel.side === 'mine' ? ' show-mine' : ' show-their'));
   // шапка: портреты и переключатель для узкого экрана
   const head = el('div', 'tr-head');
-  const me = el('div', 'tr-who'); me.appendChild(portraitFor(meCard())); const mt = el('div'); mt.appendChild(el('div', 'pn', 'Меченый')); mt.appendChild(el('div', 'price', S.money + ' RU')); me.appendChild(mt);
+  const me = el('div', 'tr-who'); me.appendChild(portraitFor(meCard())); const mt = el('div'); mt.appendChild(el('div', 'pn', BEREZKI?'Путник':'Меченый')); mt.appendChild(el('div', 'price', S.money + ' RU')); me.appendChild(mt);
   const sw = el('div', 'tr-switch');
   sw.appendChild(btn('chip' + (panel.side === 'mine' ? ' on' : ''), 'Мои вещи', () => { panel.side = 'mine'; refresh(); }));
   sw.appendChild(btn('chip' + (panel.side === 'their' ? ' on' : ''), 'Торговец', () => { panel.side = 'their'; refresh(); }));
   head.appendChild(sw);
-  const th = el('div', 'tr-who r'); const c = e ? cardOf(e) : SIDCARD(); const tt = el('div'); tt.appendChild(el('div', 'pn', c.n)); tt.appendChild(el('div', 'price', e ? e.money + ' RU' : 'Торговец')); th.appendChild(tt); th.appendChild(portraitFor(c));
+  const th = el('div', 'tr-who r'); const c = e ? cardOf(e) : SIDCARD(); const tt = el('div'); tt.appendChild(el('div', 'pn', c.n)); tt.appendChild(el('div', 'price', e?.service ? (e.sid==='flatChief'?'Запас ограничен':e.service) : e ? e.money + ' RU' : 'Торговец')); th.appendChild(tt); th.appendChild(portraitFor(c));
   box.appendChild(head);
   // мои вещи
   const mine = el('div', 'tr-col mine'); mine.appendChild(me); mine.appendChild(el('h3', 'h3', 'Мой рюкзак · продажа'));
@@ -468,8 +473,9 @@ function drawTrade2() {
   // товар торговца
   const their = el('div', 'tr-col their'); their.appendChild(th); their.appendChild(el('h3', 'h3', 'Товары · покупка'));
   const gt = el('div', 'igrid');
+  if(BEREZKI&&e?.sid==='baseMedic')their.appendChild(el('p','note','Бинт +5 здоровья · аптечка +30 здоровья'));
   if (!st.length) their.appendChild(el('p', 'note', 'Ему нечего продать.'));
-  st.forEach(s => { const left = s.c - (o.buy[s.id] || 0); gt.appendChild(itemCell(s.id, { q: s.q > 1 ? s.q : (e ? s.c : 0), price: s.p, cond: s.cond, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : (o.buy[s.id] ? 'в корз.' : has(s.id) ? 'есть' : 'нет'), fn: () => { o.buy[s.id] = (o.buy[s.id] || 0) + 1; panel.hint = ''; refresh(); } })); });
+  st.forEach(s => { const left = s.c - (o.buy[s.id] || 0); gt.appendChild(itemCell(s.id, { q: s.q > 1 ? s.q : (e && (!e.service || e.sid==='flatChief') ? s.c : 0), price: s.p, cond: s.cond, dim: left <= 0, disabled: left <= 0, why: left > 0 ? null : (o.buy[s.id] ? 'в корз.' : has(s.id) ? 'есть' : 'нет'), fn: () => { o.buy[s.id] = (o.buy[s.id] || 0) + 1; panel.hint = ''; refresh(); } })); });
   their.appendChild(gt);
   // корзина
   const cart = el('div', 'tr-cart');
