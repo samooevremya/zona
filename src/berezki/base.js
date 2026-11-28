@@ -56,11 +56,12 @@ function baseInterior(r){
   }
   if(r!==westStore && r.kind && r.kind!=='guard'){
     const u=r.kind==='stores'?.62:.73,v=r.kind==='barracks'?.64:.42;
-    g.save();g.globalAlpha=.76;g.translate(u*w,v*h);g.rotate(-.33);
-    g.drawImage(district.snowStamp,-55,-31,110,62);g.restore();
+    interiorDrift(g,u*w,v*h,72,40,-.33,r.x);
+    interiorDrift(g,u*w-14,v*h+12,43,20,-.15,r.y);
   }
   for(const d of r.doors){
-    g.save();g.globalAlpha=.5;g.drawImage(district.snowStamp,(d[0]-.23)*T,(d[1]-.16)*T,1.5*T,1.35*T);g.restore();
+    const x=(d[0]+.5)*T,y=(d[1]+.5)*T;
+    interiorDrift(g,x,y,29,18,d[0]===0 || d[0]===r.w-1?0:Math.PI/2,r.x+d[0]+d[1]);
   }
   return c;
 }

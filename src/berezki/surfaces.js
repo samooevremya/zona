@@ -65,18 +65,82 @@ function forestBank(cx,cy){
   }
   forestBanks.set(key,bank);return bank;
 }
-function forestDepth(x,y){
-  if(x>district.width*T || y>district.height*T)return 0;
-  let height=0;
-  for(let j=Math.floor((y-145)/snowCell);j<=Math.floor((y+110)/snowCell);j++)
-    for(let i=Math.floor((x-160)/snowCell);i<=Math.floor((x+110)/snowCell);i++){
-      const b=forestBank(i,j);if(!b)continue;
-      const dx=x-b.x,dy=y-b.y;
-      if(Math.abs(dx)>b.rx+8 || Math.abs(dy)>b.ry*1.38+b.rx*.42)continue;
-      const u=(dx*b.c+dy*b.s)/b.rx,v=(-dx*b.s+dy*b.c)/b.ry;
-      height=Math.max(height,b.depth*windProfile(u,v,b.variant));
+// Index the cleared ground by terrain chunk. Sampling a footstep only visits
+// the nearby shoulders, yards and walls, including the rounded ends of lanes.
+const packedGround=new Map();
+function indexPackedGround(){
+  const fade=96;
+  function add(shape,l,t,r,b){
+    for(let j=Math.floor((t-fade)/atlasChunk);j<=Math.floor((b+fade)/atlasChunk);j++)
+      for(let i=Math.floor((l-fade)/atlasChunk);i<=Math.floor((r+fade)/atlasChunk);i++){
+        const key=j*256+i;
+        if(!packedGround.has(key))packedGround.set(key,[]);
+        packedGround.get(key).push(shape);
+      }
+  }
+  function yard(x,y,w,h){
+    const l=x*T,t=y*T,r=l+w*T,b=t+h*T;
+    add({l,t,r,b},l,t,r,b);
+  }
+  for(const [i,route] of atlasRoutes.entries()){
+    const radius=roadWidth(route,i)*.55;
+    for(let j=1;j<route.length;j++){
+      const [a,b]=route[j-1],[c,d]=route[j],x=a*T,y=b*T,dx=(c-a)*T,dy=(d-b)*T;
+      add({x,y,dx,dy,len2:dx*dx+dy*dy,radius},Math.min(x,c*T)-radius,Math.min(y,d*T)-radius,Math.max(x,c*T)+radius,Math.max(y,d*T)+radius);
     }
-  return height;
+  }
+  for(const r of district.levels)if(r.n===1)yard(r.x-.7,r.y-.7,r.w+1.4,r.h+1.4);
+  // Maintained courtyards and the railway right of way have compacted snow.
+  yard(0,stationY+17,district.width,10);yard(239,456,43,30);
+  yard(406.5,285,23,17);yard(381,100,27,14);
+  yard(156,344,12,6);yard(lookout.x/T-1.5,lookout.y/T-1.5,3,6);
+}
+function forestCover(x,y){
+  if(x<0 || y<0 || x>=district.width*T || y>=district.height*T)return 0;
+  const tx=x/T,ty=y/T;
+  const lake=basinRadius(tx,ty,lakeShape),marsh=basinRadius(tx,ty,marshShape);
+  if(lake<=1 || marsh<=1 || inMarshChannel(tx,ty))return 0;
+  let gap=Math.min(96,(lake-1)*lakeShape[3]*T,(marsh-1)*marshShape[3]*T);
+  if(ty>=296 && ty<353 && tx>113 && tx<173){
+    const [l,r]=channelBanks(ty);gap=Math.min(gap,Math.max(l-tx,tx-r)*T);
+  }
+  const shapes=packedGround.get(Math.floor(y/atlasChunk)*256+Math.floor(x/atlasChunk));
+  if(shapes)for(const s of shapes){
+    if(s.radius!==undefined){
+      const u=x-s.x,v=y-s.y,f=clamp((u*s.dx+v*s.dy)/(s.len2||1),0,1);
+      gap=Math.min(gap,Math.hypot(u-f*s.dx,v-f*s.dy)-s.radius);
+    }else gap=Math.min(gap,Math.hypot(Math.max(s.l-x,0,x-s.r),Math.max(s.t-y,0,y-s.b)));
+    if(gap<=0)return 0;
+  }
+  const footWidth=72+26*vnoise(x+317,y-79,67);
+  const t=clamp(gap/footWidth,0,1);return t*t*(3-2*t);
+}
+function forestDepth(x,y){
+  const cover=forestCover(x,y);if(!cover)return 0;
+  // Wind forms long ridges interrupted by smaller scoured hollows.
+  const bend=55*vnoise(x+51,y,144);
+  const wind=vnoise(x*.45+y*.15,y+x*.26+bend,52);
+  const crust=vnoise(x*.72,y+x*.19,21);
+  // A blunt crest and a broad lee face break up large stretches of powder.
+  const shoulder=(wind-.47)*4.3;
+  const ridge=Math.exp(-shoulder*shoulder*3.4);
+  return cover*(.76+.12*wind+.095*ridge+.025*crust);
+}
+function forestRelief(g,l,t){
+  const step=10,n=Math.ceil(atlasChunk/step)+3,c=winterCanvas(n,n),b=c.getContext('2d');
+  const img=b.createImageData(n,n),z=new Float32Array((n+2)*(n+2));
+  // Anchor samples to world space and draw a one-sample apron across chunk seams.
+  const ox=Math.floor(l/step)*step-step,oy=Math.floor(t/step)*step-step;
+  for(let j=-1;j<=n;j++)for(let i=-1;i<=n;i++)
+    z[(j+1)*(n+2)+i+1]=forestDepth(ox+i*step,oy+j*step);
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){
+    const k=(j+1)*(n+2)+i+1;
+    const grade=(z[k+1]-z[k-1])*.38+(z[k+n+2]-z[k-n-2])*.9;
+    const shade=clamp(grade*(z[k]>.72?5.3:3.5),-.40,.42),p=(j*n+i)*4;
+    img.data[p]=shade>0?250:75;img.data[p+1]=shade>0?248:93;img.data[p+2]=shade>0?240:111;
+    img.data[p+3]=Math.abs(shade)*255;
+  }
+  b.putImageData(img,0,0);g.drawImage(c,ox-step/2,oy-step/2,n*step,n*step);
 }
 function snowAtBoots(actor){
   let sample=bootDepthCache.get(actor);
@@ -88,6 +152,7 @@ function snowAtBoots(actor){
   return sample.depth;
 }
 function drawForestSnow(g,l,t,r,bottom){
+  forestRelief(g,l,t);
   for(let j=Math.floor((t-180)/snowCell);j<=Math.floor((bottom+150)/snowCell);j++)
     for(let i=Math.floor((l-180)/snowCell);i<=Math.floor((r+150)/snowCell);i++){
       const bank=forestBank(i,j);if(!bank)continue;
@@ -145,8 +210,9 @@ function winterRailBed(){
 
 // Vary the width of the packed shoulders and the lateral position of wheel ruts.
 // These paths are built once. Their coordinates continue across terrain chunks.
+function roadWidth(route,index){return index===0?108:index===1?72:route===woodpileTrack?29:44;}
 function winterRoadBed(route,index){
-  const width=index===0?108:index===1?72:route===woodpileTrack?29:44,samples=[];
+  const width=roadWidth(route,index),samples=[];
   let distance=0;
   for(let i=1;i<route.length;i++){
     const [a,b]=route[i-1],[c,d]=route[i],dx=(c-a)*T,dy=(d-b)*T,len=Math.hypot(dx,dy);
@@ -216,4 +282,52 @@ function lakeIceDetail(g,l,t,r,b){
         beam(g,x,y,xx,yy,.7,'#e4efed8a');x=xx;y=yy;
       }
     }
+}
+
+function powderFootwell(g,e,depth){
+  const x=e.x,y=e.y+4,rx=8+6*depth,ry=6+3*depth;
+  g.save();g.translate(x,y);g.scale(rx,ry);
+  const hollow=g.createRadialGradient(0,-.15,.12,0,0,1.28);
+  hollow.addColorStop(0,'rgba(59,74,88,'+(.50*depth)+')');
+  hollow.addColorStop(.72,'rgba(99,119,136,'+(.32*depth)+')');hollow.addColorStop(1,'transparent');
+  g.fillStyle=hollow;g.fillRect(-1.3,-1.3,2.6,2.6);
+  // A low lip catches ambient light around the hollow, behind the figure.
+  g.beginPath();g.ellipse(0,0,1,.94,0,.12,Math.PI*.94);
+  g.lineWidth=.12;g.strokeStyle='rgba(221,231,235,'+(.32*depth)+')';g.stroke();
+  g.restore();
+}
+
+// Bake a handful of wind-scoured profiles from the winter ground scan. The
+// granular edge is partially transparent, so the original boards and joints
+// remain visible where the snow thins.
+const interiorSnowArt=[];
+function interiorDrift(g,x,y,rx,ry,angle,variant){
+  const id=Math.abs(Math.floor(variant))%8;
+  if(!interiorSnowArt[id]){
+    const w=176,h=104,c=winterCanvas(w,h),b=c.getContext('2d');
+    b.fillStyle=district.surface.powder;b.translate(-id*19,-id*13);
+    b.fillRect(id*19,id*13,w,h);b.resetTransform();
+    const img=b.getImageData(0,0,w,h),z=new Float32Array((w+2)*(h+2));
+    for(let j=-1;j<=h;j++)for(let i=-1;i<=w;i++){
+      const u=(i-w*.5)/(w*.46),v=(j-h*.5)/(h*.42);
+      const grain=vnoise(i+id*217,j+id*83,7)-.5;
+      const warp=.26*(vnoise(i+id*49,j,32)-.5)+.085*Math.sin(4*u+id);
+      const across=v+warp,edge=1-u*u-across*across+.19*grain;
+      const crest=.54+.46*Math.exp(-8*(across+.16+warp)**2);
+      z[(j+1)*(w+2)+i+1]=Math.max(0,edge)*crest;
+    }
+    for(let j=0;j<h;j++)for(let i=0;i<w;i++){
+      const k=(j+1)*(w+2)+i+1,o=(j*w+i)*4,v=z[k];
+      const slope=(z[k+1]-z[k-1])*.55+(z[k+w+2]-z[k-w-2]);
+      const grit=hash2(i+id*83,j);
+      const light=clamp(slope*560,-43,34)+(grit-.5)*6;
+      img.data[o]=img.data[o]*.92+light;
+      img.data[o+1]=img.data[o+1]*.94+light*.9;
+      img.data[o+2]=img.data[o+2]*.94+light*.78;
+      img.data[o+3]=255*clamp((v-.025+(grit-.5)*.12)*3.4,0,.98);
+    }
+    b.putImageData(img,0,0);interiorSnowArt[id]=c;
+  }
+  g.save();g.translate(x,y);g.rotate(angle);
+  g.drawImage(interiorSnowArt[id],-rx,-ry,rx*2,ry*2);g.restore();
 }

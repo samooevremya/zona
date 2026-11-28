@@ -76,8 +76,11 @@ figureC.width = figureC.height = 192;   // 96 мировых пикселей п
 const figureCtx = figureC.getContext('2d');
 function drawLitHuman(e) {
   const height = e.campRise ?? (e.sit || e.crouch || e.wounded ? 0 : 1);
-  if(!BEREZKI || !swampAt(e.x,e.y))groundShadow(ctx,e.x,e.y,14+3*height,9,Math.atan2(SUN_DY,SUN_DX),4+4*height);
-  else shoreEllipse(ctx,e.x+1,e.y+2,12,7,'#26343250',.15);
+  if(BEREZKI && swampAt(e.x,e.y))shoreEllipse(ctx,e.x+1,e.y+2,12,7,'#26343250',.15);
+  else{
+    ctx.save();if(BEREZKI)ctx.globalAlpha*=1-snowAtBoots(e);
+    groundShadow(ctx,e.x,e.y,14+3*height,9,Math.atan2(SUN_DY,SUN_DX),4+4*height);ctx.restore();
+  }
   const fire=WORLD_FIRES.find(f=>fireLit(f) && Math.abs(e.x-f.x)<FIRE_REACH && Math.abs(e.y-f.y)<FIRE_REACH);
   const wet=!BEREZKI && e===P ? S.flags.coatWetness||0 : 0;
   if(!fire && wet<.03){drawHuman(e,ctx);return;}
@@ -1068,11 +1071,16 @@ function render() {
         ctx.clip('evenodd');
       }
       const depth=e.jumpT?0:marshDepth(e.x,e.y);
-      const sink=e.jumpT?0:Math.max(snowAtBoots(e)*3,depth*(5+.7*Math.sin(e.step*.18)));
+      const powder=e.jumpT?0:snowAtBoots(e);
+      const sink=Math.max(powder*2.6,depth*(5+.7*Math.sin(e.step*.18)));
+      // In the overhead view the waist is under the torso in every direction.
+      // Bury the legs in the pose and place the disturbed snow underneath it.
+      if(powder>.04)powderFootwell(ctx,e,powder);
       if(e===P && S.flags.onLookout)ctx.translate(...lookoutOffset(e.y));
       else if(e===P && S.flags.stationDeck)ctx.translate(...bridgeOffset(e.y));
       else {const [sx,sy]=winterStairOffset(e);ctx.translate(sx,sink+sy);}
-      drawLitHuman(e);ctx.restore();
+      drawLitHuman(e);
+      ctx.restore();
       if(!e.jumpT)reedsInFront(ctx,e);
       if(e===P && S.flags.onLookout)paintLookout(ctx,false,true);
     }
