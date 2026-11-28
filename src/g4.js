@@ -1072,18 +1072,14 @@ function render() {
       }
       const depth=e.jumpT?0:marshDepth(e.x,e.y);
       const powder=e.jumpT?0:snowAtBoots(e);
-      const sink=Math.max(powder*9,depth*(5+.7*Math.sin(e.step*.18)));
-      const rim=powder>.04?bootRim(e,powder):null;
-      if(rim){
-        powderFootwell(ctx,e,powder);ctx.save();
-        const visible=new Path2D(rim);visible.lineTo(e.x+48,e.y-72);
-        visible.lineTo(e.x-48,e.y-72);visible.closePath();ctx.clip(visible);
-      }
+      const sink=Math.max(powder*2.6,depth*(5+.7*Math.sin(e.step*.18)));
+      // In the overhead view the waist is under the torso in every direction.
+      // Bury the legs in the pose and place the disturbed snow underneath it.
+      if(powder>.04)powderFootwell(ctx,e,powder);
       if(e===P && S.flags.onLookout)ctx.translate(...lookoutOffset(e.y));
       else if(e===P && S.flags.stationDeck)ctx.translate(...bridgeOffset(e.y));
       else {const [sx,sy]=winterStairOffset(e);ctx.translate(sx,sink+sy);}
       drawLitHuman(e);
-      if(rim){ctx.restore();powderCrumbs(ctx,e,rim,powder);}
       ctx.restore();
       if(!e.jumpT)reedsInFront(ctx,e);
       if(e===P && S.flags.onLookout)paintLookout(ctx,false,true);

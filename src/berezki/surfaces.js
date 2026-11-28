@@ -290,7 +290,11 @@ function powderFootwell(g,e,depth){
   const hollow=g.createRadialGradient(0,-.15,.12,0,0,1.28);
   hollow.addColorStop(0,'rgba(59,74,88,'+(.50*depth)+')');
   hollow.addColorStop(.72,'rgba(99,119,136,'+(.32*depth)+')');hollow.addColorStop(1,'transparent');
-  g.fillStyle=hollow;g.fillRect(-1.3,-1.3,2.6,2.6);g.restore();
+  g.fillStyle=hollow;g.fillRect(-1.3,-1.3,2.6,2.6);
+  // A low lip catches ambient light around the hollow, behind the figure.
+  g.beginPath();g.ellipse(0,0,1,.94,0,.12,Math.PI*.94);
+  g.lineWidth=.12;g.strokeStyle='rgba(221,231,235,'+(.32*depth)+')';g.stroke();
+  g.restore();
 }
 
 // Bake a handful of wind-scoured profiles from the winter ground scan. The
@@ -326,25 +330,4 @@ function interiorDrift(g,x,y,rx,ry,angle,variant){
   }
   g.save();g.translate(x,y);g.rotate(angle);
   g.drawImage(interiorSnowArt[id],-rx,-ry,rx*2,ry*2);g.restore();
-}
-
-// The packed lip is anchored to the hollow at the actor's feet. A curved,
-// granular rim lets the same ground texture show through at the coat hem.
-function bootRim(e,depth){
-  const path=new Path2D(),y=e.y+24-18*depth;
-  path.moveTo(e.x-48,y-3);
-  for(let u=-18;u<=18;u++){
-    const bend=1-Math.min(1,(u/17)**2);
-    const grit=vnoise(e.x+u,e.y,3)-.5;
-    path.lineTo(e.x+u,y-3+5*bend+2.4*grit);
-  }
-  path.lineTo(e.x+48,y-3);return path;
-}
-function powderCrumbs(g,e,rim,depth){
-  g.save();
-  // Only the narrow region directly in front of the coat disturbs the surface.
-  g.beginPath();g.ellipse(e.x,e.y+24-18*depth,12*depth,6,0,0,Math.PI*2);g.clip();
-  g.globalAlpha=.36*depth;g.lineWidth=2.6;g.strokeStyle=district.surface.powder;g.stroke(rim);
-  g.globalAlpha=.48*depth;g.lineWidth=.85;g.strokeStyle='#e1e6e8';g.stroke(rim);
-  g.restore();
 }

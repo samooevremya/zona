@@ -5681,18 +5681,14 @@ function render() {
       }
       const depth=e.jumpT?0:marshDepth(e.x,e.y);
       const powder=e.jumpT?0:snowAtBoots(e);
-      const sink=Math.max(powder*9,depth*(5+.7*Math.sin(e.step*.18)));
-      const rim=powder>.04?bootRim(e,powder):null;
-      if(rim){
-        powderFootwell(ctx,e,powder);ctx.save();
-        const visible=new Path2D(rim);visible.lineTo(e.x+48,e.y-72);
-        visible.lineTo(e.x-48,e.y-72);visible.closePath();ctx.clip(visible);
-      }
+      const sink=Math.max(powder*2.6,depth*(5+.7*Math.sin(e.step*.18)));
+      // In the overhead view the waist is under the torso in every direction.
+      // Bury the legs in the pose and place the disturbed snow underneath it.
+      if(powder>.04)powderFootwell(ctx,e,powder);
       if(e===P && S.flags.onLookout)ctx.translate(...lookoutOffset(e.y));
       else if(e===P && S.flags.stationDeck)ctx.translate(...bridgeOffset(e.y));
       else {const [sx,sy]=winterStairOffset(e);ctx.translate(sx,sink+sy);}
       drawLitHuman(e);
-      if(rim){ctx.restore();powderCrumbs(ctx,e,rim,powder);}
       ctx.restore();
       if(!e.jumpT)reedsInFront(ctx,e);
       if(e===P && S.flags.onLookout)paintLookout(ctx,false,true);
@@ -17127,7 +17123,11 @@ function powderFootwell(g,e,depth){
   const hollow=g.createRadialGradient(0,-.15,.12,0,0,1.28);
   hollow.addColorStop(0,'rgba(59,74,88,'+(.50*depth)+')');
   hollow.addColorStop(.72,'rgba(99,119,136,'+(.32*depth)+')');hollow.addColorStop(1,'transparent');
-  g.fillStyle=hollow;g.fillRect(-1.3,-1.3,2.6,2.6);g.restore();
+  g.fillStyle=hollow;g.fillRect(-1.3,-1.3,2.6,2.6);
+  // A low lip catches ambient light around the hollow, behind the figure.
+  g.beginPath();g.ellipse(0,0,1,.94,0,.12,Math.PI*.94);
+  g.lineWidth=.12;g.strokeStyle='rgba(221,231,235,'+(.32*depth)+')';g.stroke();
+  g.restore();
 }
 
 // Bake a handful of wind-scoured profiles from the winter ground scan. The
@@ -17163,27 +17163,6 @@ function interiorDrift(g,x,y,rx,ry,angle,variant){
   }
   g.save();g.translate(x,y);g.rotate(angle);
   g.drawImage(interiorSnowArt[id],-rx,-ry,rx*2,ry*2);g.restore();
-}
-
-// The packed lip is anchored to the hollow at the actor's feet. A curved,
-// granular rim lets the same ground texture show through at the coat hem.
-function bootRim(e,depth){
-  const path=new Path2D(),y=e.y+24-18*depth;
-  path.moveTo(e.x-48,y-3);
-  for(let u=-18;u<=18;u++){
-    const bend=1-Math.min(1,(u/17)**2);
-    const grit=vnoise(e.x+u,e.y,3)-.5;
-    path.lineTo(e.x+u,y-3+5*bend+2.4*grit);
-  }
-  path.lineTo(e.x+48,y-3);return path;
-}
-function powderCrumbs(g,e,rim,depth){
-  g.save();
-  // Only the narrow region directly in front of the coat disturbs the surface.
-  g.beginPath();g.ellipse(e.x,e.y+24-18*depth,12*depth,6,0,0,Math.PI*2);g.clip();
-  g.globalAlpha=.36*depth;g.lineWidth=2.6;g.strokeStyle=district.surface.powder;g.stroke(rim);
-  g.globalAlpha=.48*depth;g.lineWidth=.85;g.strokeStyle='#e1e6e8';g.stroke(rim);
-  g.restore();
 }
 
 const salvageGoods={
