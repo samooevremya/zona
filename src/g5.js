@@ -190,7 +190,7 @@ function refresh() {
   }
   pbody.textContent = '';
   if (panel.hint) pbody.appendChild(el('p', 'hint', panel.hint));
-  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, fieldFire: BEREZKI && drawFireActions, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
+  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, fieldFire: BEREZKI && drawFireActions, fieldAdmin: BEREZKI && drawFieldAdmin, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
   for (const sel of selectors) {
     const node = pbody.querySelector(sel);
     if (node && positions[sel]) node.scrollTop = positions[sel];
@@ -455,6 +455,7 @@ function drawMenu() {
     panel.pausePage='settings'; drawMenu();
     card.querySelector('button').focus();
   }));
+  if(BEREZKI)nav.appendChild(btn('','Админ-меню',()=>{openPanel('fieldAdmin','Админ-меню');refresh();}));
   nav.appendChild(btn('restart','Начать заново',()=>{panel.pausePage='restart';drawMenu();card.querySelector('button').focus();}));
   card.appendChild(message);
   card.appendChild(btn('pause-help','Подсказки',()=>{panel.pausePage='help';drawMenu();card.querySelector('button').focus();}));
@@ -963,6 +964,7 @@ addEventListener('keydown', e => {
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].indexOf(k) >= 0 && !panel) e.preventDefault();
   if (title.open) return;
   if (k === 'Escape') { if (panel?.pausePage==='settings') leavePauseSettings(); else if (panel) closePanel(); else { openPanel('menu', 'Меню'); refresh(); } return; }
+  if(panel?.kind==='fieldAdmin')return;
   if (panel) { if ((k === 'KeyI' && panel.kind === 'inv') || (k === 'KeyM' && panel.kind === 'pda') || k === 'Tab') { e.preventDefault(); closePanel(); } return; }
   KEYS[k] = true;
   if (!P.alive) return;

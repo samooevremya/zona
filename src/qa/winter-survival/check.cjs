@@ -14,7 +14,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 function checks(){
   const passed=[];function check(ok,reason){if(!ok)throw Error(reason);passed.push(reason);}
   for(const e of ents.filter(e=>e.service))check(winterShelter(e)&&clearFooting(e.x,e.y,e.r),'пост '+e.name);
-  for(const species of ['wolf','deer'])check(ents.filter(e=>e.alive&&e.species===species).length===24,'численность '+species);
+  for(const species of ['wolf','deer'])check(ents.filter(e=>e.alive&&e.species===species).length===30,'численность '+species);
   P.hp=55;S.bleed=2;useItem('bandage');check(P.hp===60&&S.bleed===0,'бинт');useItem('medkit');check(P.hp===90,'аптечка');
   S.flags.warmth=10;S.food=20;P.st=10;S.inv.tea=S.inv.coffee=1;useItem('tea');useItem('coffee');
   check(S.flags.warmth===60&&S.food===35&&P.st===40,'напитки');

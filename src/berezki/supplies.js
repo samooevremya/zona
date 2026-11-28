@@ -44,12 +44,30 @@ function visibleFinds(inView){
   return Object.values(S.flags.fieldFinds).filter(f=>inView(f.x,f.y,36))
     .map(f=>({find:f,depth:f.y+(f.type==='loose'?8:3)}));
 }
+// Longest dimension on the ground, in world pixels. Selection still uses the reach of the hand.
+const fieldSizes={wood:20,matches:5.5,buckle:6,wire:9,candle:8,a9:8,bandage:8,medkit:12,
+  bread:12,cans:8,tea:12,coffee:12,money:8,lining:18,antler:16,wolfHide:28,deerHide:33};
+function fieldItemSize(id){return fieldSizes[id] || (isGun(id)?30:12);}
+function drawBrokenWinterCrate(g,o){
+  const seed=Math.floor(o.x/T)+Math.floor(o.y/T)*17;
+  g.rotate((hash2(seed,3)-.5)*1.25);
+  for(const [i,[x,y,len,w,a]] of [[-6,-4,16,3,-.68],[2,-6,19,3.6,-.2],[-1,3,13,3,.57],[5,6,11,2.8,.26],[-7,7,7,1.2,-.37]].entries()){
+    g.save();g.translate(x,y);g.rotate(a);
+    const l=len/2,h=w/2;
+    const edge=new Path2D();
+    edge.moveTo(-l,-h);edge.lineTo(l-1,-h);edge.lineTo(l+1,-h*.5);
+    edge.lineTo(l-2,0);edge.lineTo(l+.5,h*.5);edge.lineTo(l-1,h);edge.lineTo(-l,h);edge.closePath();
+    g.save();g.translate(.6,1);g.fillStyle='#39302865';g.fill(edge);g.restore();
+    g.clip(edge);g.drawImage(lookoutBoard(seed+i,false),-l,-h,len+1,w);
+    g.restore();
+  }
+}
 function drawWinterFind(f){
     const loose=f.type==='loose',id=loose?Object.keys(f.loot)[0]:f.type;
     if(!id)return;
     const im=fieldFindImage(id);
     if(!im)return;
-    const w=loose?15:25,h=w*im.height/im.width;
+    const w=loose?fieldItemSize(id)*im.width/Math.max(im.width,im.height):25,h=w*im.height/im.width;
     groundShadow(ctx,f.x,f.y,w*.52,h*.44,0,1.4);ctx.drawImage(im,f.x-w/2,f.y-h/2,w,h);
 }
 const fieldIconCache={};

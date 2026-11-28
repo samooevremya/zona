@@ -1006,9 +1006,17 @@ function render() {
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) {
     if(BEREZKI&&F.field){
-      groundShadow(ctx,F.x,F.y,14,8,.1,2);
+      if(F.unburnt||F.flame>S.min)groundShadow(ctx,F.x,F.y,14,8,.1,2);
       const wood=district.images.firewood;
-      if(wood){ctx.save();ctx.globalAlpha=F.unburnt?1:.8;ctx.drawImage(wood,F.x-13,F.y-6,26,14);ctx.restore();}
+      if(!F.unburnt && F.flame<=S.min){
+        const fade=F.embers>S.min?1:clamp(1-(S.min-(F.embers||F.extinguishedAt||S.min))/coldAshMinutes,0,1);
+        ctx.save();ctx.globalAlpha=.72*fade;
+        for(let i=0;i<32;i++){
+          const a=hash2(i,51)*6.28,r=Math.sqrt(hash2(i,31));
+          shoreEllipse(ctx,F.x+Math.cos(a)*10*r,F.y+Math.sin(a)*5*r,1+hash2(i,17)*2.5,1,i%3?'#46433e':'#88867d',a);
+        }
+        ctx.restore();
+      }else if(wood){ctx.save();ctx.globalAlpha=F.unburnt?1:.8;ctx.drawImage(wood,F.x-13,F.y-6,26,14);ctx.restore();}
     }
     if(fireLit(F)){fireGroundLight(F);drawFlames(F);}
     else if(!F.field){

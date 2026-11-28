@@ -89,6 +89,29 @@ function prepareYardEquipment(p,source){
   p.yard={w,h,pad,shadowPad:pad,scale,rgba,z,grounded:c,shadow,out,og,pixels:og.createImageData(out.width,out.height)};
   p.foot=1-cfg.front/p.height;p.depth=p.y+cfg.front;
 }
+// Project opaque sprite samples from their measured height. Openings between rails and chains pass light.
+function paintYardBeamShadow(g,p,source,radius,half){
+  const dx=p.x-source.x,dy=p.y-source.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);
+  const margin=Math.hypot(p.width,p.height);
+  if(dist>radius+margin || Math.abs(angD(source.ang,angle))>half+Math.atan2(margin,Math.max(1,dist-margin)))return;
+  const a=p.yard,rise=equipmentProfile[p.key].rise;
+  const bearing=Math.round(angle*24)/24,stretch=Math.round(clamp(1+48/Math.max(30,dist),1,2.5)*8)/8;
+  if(!a.beam || a.bearing!==bearing || a.stretch!==stretch){
+    const pad=Math.ceil(rise*3+4),w=Math.ceil(p.width)+2*pad,h=Math.ceil(p.height)+2*pad;
+    const c=a.beam ||= winterCanvas(w,h),b=c.getContext('2d');
+    b.clearRect(0,0,w,h);
+    const u=Math.cos(bearing)*stretch,v=.52+Math.sin(bearing)*stretch;
+    b.fillStyle='#161c23';
+    for(let y=0;y<a.h;y+=2)for(let x=0;x<a.w;x+=2){
+      const i=y*a.w+x,alpha=a.rgba[i*4+3];if(alpha<35)continue;
+      const z=a.z[i]*rise;
+      b.globalAlpha=alpha/255;b.fillRect(pad+x/a.scale+u*z,pad+y/a.scale+v*z,1.55,1.55);
+    }
+    a.bearing=bearing;a.stretch=stretch;a.beamPad=pad;
+  }
+  g.save();g.globalAlpha=.68;g.filter='blur(.7px)';
+  g.drawImage(a.beam,p.x-p.width/2-a.beamPad,p.y-p.foot*p.height-a.beamPad);g.restore();
+}
 function paintEquipment(g,p,mapView,shadow=false){
   const a=p.yard,cfg=equipmentProfile[p.key];
   const x=p.x-p.width/2,y=p.y-p.foot*p.height;

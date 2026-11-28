@@ -1042,6 +1042,20 @@ html[data-station-view="bridge"] #title.start{--signal-scene:var(--station-bridg
 #ov[data-kind=fieldFire] .body button {min-height:44px;text-align:left;padding:5px 12px}
 #ov[data-kind=fieldFire] .body button:disabled {opacity:.65}
 
+.field-admin{display:grid;gap:10px;max-width:720px;margin:auto}
+.field-admin .admin-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #686457;padding:8px}
+.field-admin legend{padding:0 5px;color:#d9c49b}
+.field-admin .chip,.field-admin input,.field-admin select{min-height:44px;min-width:44px;box-sizing:border-box;font:inherit}
+.field-admin input,.field-admin select{background:#22241f;color:#eee5d2;border:1px solid #746f5e;padding:4px 8px;max-width:100%}
+.field-admin input[type=number]{width:7em}
+.field-admin .admin-status{color:#e7c889;margin:0}
+
+.field-admin .admin-status:empty{display:none}
+@media(min-width:700px){
+  .field-admin{grid-template-columns:auto auto}
+  .field-admin .admin-status,.field-admin form,.field-admin fieldset:nth-of-type(-n+2){grid-column:1/-1}
+}
+
 </style>
 <script>(() => {
   const views = ['window', 'platform', 'bridge'];
@@ -2991,7 +3005,7 @@ function npcBarrier(from,dx,dy,limit,target,vision=false){
       if(Math.abs(lateral)<4.2 && along>=near && along<=far)hit=along-Math.sqrt(4.2**2-lateral**2);
     }
     const solids=walkSolids.get(cell),props=propCells.get(cell);
-    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || (from===P && (S.flags.onLookout&&o.belowLookout || S.flags.stationDeck&&o.underDeck)) || ((from===FIRE || from===shoreFire) && (o.fitting==='bench' || o.k==='spitPost')) || ['yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
+    if(solids)for(const o of solids)if(o.solid && !(BEREZKI && vision==='light' && (o.belowLamp || (from===P && (S.flags.onLookout&&o.belowLookout || S.flags.stationDeck&&o.underDeck)) || ((from===FIRE || from===shoreFire) && (o.fitting==='bench' || o.k==='spitPost')) || ['yardUpright','yardSeat','yardFrame','fishingHole','fireRing','roastingPit'].includes(o.k))) && !(vision && o.k==='fence' && !o.opaque && o.material!=='concreteWire' && o.material!=='stockade'))
       hit=Math.min(hit,rayBox(o,x,y,dx,dy,near,far));
     if(props)for(const p of props){
       if(vision==='light' && p.vaultable)continue;
@@ -5651,9 +5665,17 @@ function render() {
   // костёр
   for (const F of WORLD_FIRES) if (inView(F.x, F.y, FIRE_REACH)) {
     if(BEREZKI&&F.field){
-      groundShadow(ctx,F.x,F.y,14,8,.1,2);
+      if(F.unburnt||F.flame>S.min)groundShadow(ctx,F.x,F.y,14,8,.1,2);
       const wood=district.images.firewood;
-      if(wood){ctx.save();ctx.globalAlpha=F.unburnt?1:.8;ctx.drawImage(wood,F.x-13,F.y-6,26,14);ctx.restore();}
+      if(!F.unburnt && F.flame<=S.min){
+        const fade=F.embers>S.min?1:clamp(1-(S.min-(F.embers||F.extinguishedAt||S.min))/coldAshMinutes,0,1);
+        ctx.save();ctx.globalAlpha=.72*fade;
+        for(let i=0;i<32;i++){
+          const a=hash2(i,51)*6.28,r=Math.sqrt(hash2(i,31));
+          shoreEllipse(ctx,F.x+Math.cos(a)*10*r,F.y+Math.sin(a)*5*r,1+hash2(i,17)*2.5,1,i%3?'#46433e':'#88867d',a);
+        }
+        ctx.restore();
+      }else if(wood){ctx.save();ctx.globalAlpha=F.unburnt?1:.8;ctx.drawImage(wood,F.x-13,F.y-6,26,14);ctx.restore();}
     }
     if(fireLit(F)){fireGroundLight(F);drawFlames(F);}
     else if(!F.field){
@@ -12575,7 +12597,7 @@ function drawGroundItems(o) {
       ctx.stroke();
     }
     if(im?.complete && im.naturalWidth) {
-      const size=id==='energy'?13:id==='money'?15:isGun(id)?30:22;
+      const size=BEREZKI?fieldItemSize(id):id==='energy'?13:id==='money'?15:isGun(id)?30:22;
       const scale=size/Math.max(im.naturalWidth,im.naturalHeight);
       spriteShadow(ctx,1.5,1);
       const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
@@ -12592,7 +12614,9 @@ function containerDraw(o){
   const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
   g.save(); g.translate(x,y);
   const sprite=o.k==='crate'?lesserSprites.splinters:o.k==='safe'?lesserSprites.safe:null;
-  if(sprite){
+  if(BEREZKI && o.k==='crate'){
+    drawBrokenWinterCrate(g,o);
+  }else if(sprite){
     const width=o.k==='crate'?36:26, height=width*sprite.height/sprite.width;
     if(o.k==='crate') g.rotate((hash2(Math.floor(x),Math.floor(y))-.5)*1.8);
     spriteShadow(g,o.k==='crate'?1.5:3,1);
@@ -15482,7 +15506,7 @@ function refresh() {
   }
   pbody.textContent = '';
   if (panel.hint) pbody.appendChild(el('p', 'hint', panel.hint));
-  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, fieldFire: BEREZKI && drawFireActions, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
+  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, fieldFire: BEREZKI && drawFireActions, fieldAdmin: BEREZKI && drawFieldAdmin, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
   for (const sel of selectors) {
     const node = pbody.querySelector(sel);
     if (node && positions[sel]) node.scrollTop = positions[sel];
@@ -15747,6 +15771,7 @@ function drawMenu() {
     panel.pausePage='settings'; drawMenu();
     card.querySelector('button').focus();
   }));
+  if(BEREZKI)nav.appendChild(btn('','Админ-меню',()=>{openPanel('fieldAdmin','Админ-меню');refresh();}));
   nav.appendChild(btn('restart','Начать заново',()=>{panel.pausePage='restart';drawMenu();card.querySelector('button').focus();}));
   card.appendChild(message);
   card.appendChild(btn('pause-help','Подсказки',()=>{panel.pausePage='help';drawMenu();card.querySelector('button').focus();}));
@@ -16255,6 +16280,7 @@ addEventListener('keydown', e => {
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].indexOf(k) >= 0 && !panel) e.preventDefault();
   if (title.open) return;
   if (k === 'Escape') { if (panel?.pausePage==='settings') leavePauseSettings(); else if (panel) closePanel(); else { openPanel('menu', 'Меню'); refresh(); } return; }
+  if(panel?.kind==='fieldAdmin')return;
   if (panel) { if ((k === 'KeyI' && panel.kind === 'inv') || (k === 'KeyM' && panel.kind === 'pda') || k === 'Tab') { e.preventDefault(); closePanel(); } return; }
   KEYS[k] = true;
   if (!P.alive) return;
@@ -17004,9 +17030,24 @@ function winterHeatTick(dt,room){
 }
 
 let layingFire=null;
+const coldAshMinutes=30;
+function clearColdFires(){
+  const fires=S.flags.campfires;
+  if(!fires)return;
+  for(let i=fires.length-1;i>=0;i--){
+    const f=fires[i];
+    if(f.unburnt || f.embers>S.min)continue;
+    const cooled=f.embers || (f.extinguishedAt??=S.min);
+    if(S.min<cooled+coldAshMinutes)continue;
+    fires.splice(i,1);
+    const j=WORLD_FIRES.indexOf(f);
+    if(j>=0)WORLD_FIRES.splice(j,1);
+  }
+}
 function restoreFieldFires(){
   layingFire=null;
   for(let i=WORLD_FIRES.length-1;i>=0;i--)if(WORLD_FIRES[i].field)WORLD_FIRES.splice(i,1);
+  clearColdFires();
   for(const f of S.flags.campfires||[])WORLD_FIRES.push(f);
 }
 function fireSpot(){
@@ -17029,6 +17070,7 @@ function strikeFire(f){
   layingFire={f,x:P.x,y:P.y,t:0,struck:false};P.crouch=1;
 }
 function tickFieldFire(dt){
+  clearColdFires();
   if(!layingFire||layingFire.placing)return;
   const a=layingFire;
   if(!P.alive||Math.hypot(IN.moveX,IN.moveY)>.08||dE(P,a)>2){layingFire=null;msg('Розжиг прерван.');return;}
@@ -17073,7 +17115,7 @@ function drawFireActions(){
       take('wood',1);f.flame=Math.max(S.min,f.flame)+60;
       f.fuelSpan=f.flame-S.min;f.embers=f.flame+30;
     },!cnt('wood'));
-    action('Засыпать снегом',()=>{f.flame=f.embers=0;f.unburnt=false;});
+    action('Засыпать снегом',()=>{f.flame=f.embers=0;f.unburnt=false;f.extinguishedAt=S.min;});
   }else if(f.unburnt){
     action(cnt('matches')?'Разжечь · 1 спичка':'Разжечь · нет спичек',()=>strikeFire(f),!cnt('matches'));
     action('Забрать дрова',()=>{
@@ -17107,6 +17149,100 @@ function fieldFireOverlay(inView){
     }}else if(f.embers>S.min)shoreEllipse(ctx,f.x,f.y,6,3,'#ae5229bb');
   }
   if(layingFire?.placing){const p=fireSpot();ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle=fireSiteProblem(p)?'#b3877b':'#e5dabc';ctx.beginPath();ctx.ellipse(p.x,p.y,14,10,0,0,7);ctx.stroke();ctx.restore();}
+}
+
+// Local playtest controls. Unlock belongs to this open panel, never to the save.
+function changeFieldWeather(mode){
+  const s=S.flags.blizzard ||= {stage:'calm',dir:0,cover:0};
+  if(mode==='warning'||mode==='front'){
+    if(mode==='warning'&&s.stage==='front'){s.until=S.min;winterStormTick(0);}
+    if(s.stage==='calm'){
+      s.until=S.min;winterStormTick(0);
+      if(s.stage==='calm')return 'До укрытия нет маршрута. Перейдите на доступную улицу.';
+    }
+    if(mode==='front' && s.stage==='warning'){s.until=S.min;winterStormTick(0);}
+    return s.stage==='front'?'Фронт метели активен.':'Передано предупреждение о метели.';
+  }
+  if(s.stage!=='calm'){
+    s.stage='front';s.until=S.min;winterStormTick(0);
+  }
+  if(mode==='auto')delete S.flags.testWeather;
+  else S.flags.testWeather={mode,until:S.min+60};
+  s.until=Math.max(s.until||0,S.min+60);
+  return mode==='auto'?'Восстановлен календарь погоды.':mode==='snow'?'Снег на один игровой час.':'Ясно на один игровой час.';
+}
+function summonFieldAnimal(species){
+  if(winterFloor(P.x,P.y)||S.flags.stationDeck||S.flags.onLookout)return 'Выйдите на открытое место.';
+  let pos=null;
+  for(let i=0;i<20&&!pos;i++){
+    const a=P.ang+(i===0?0:rnd(-1.4,1.4)),r=rnd(4.8,7);
+    pos=clearingSpot([P.x/T+Math.cos(a)*r,P.y/T+Math.sin(a)*r],1);
+  }
+  if(!pos)return 'Рядом нет свободного участка суши.';
+  // Use a vacant slot first. At the population limit move the most distant animal.
+  const slots=S.flags.wildlife.filter(s=>s.species===species);
+  const living=ents.filter(e=>e.alive&&e.species===species);
+  const slot=slots.find(s=>!living.some(e=>e.wildId===s.id));
+  if(slot){
+    Object.assign(slot,pos,{homeX:pos.x,homeY:pos.y,hp:species==='wolf'?38:48,again:0});addWild(slot);
+  }else{
+    const far=living.reduce((a,b)=>dE(a,P)>dE(b,P)?a:b);
+    Object.assign(far,pos,{home:{...pos},roam:null,tgt:null,trail:null,path:null});
+    const record=slots.find(s=>s.id===far.wildId);Object.assign(record,pos,{homeX:pos.x,homeY:pos.y});
+  }
+  return species==='wolf'?'Волк появился рядом.':'Олень появился рядом.';
+}
+function drawFieldAdmin(){
+  const host=el('div','field-admin'),status=el('p','admin-status');
+  status.setAttribute('role','status');pbody.append(host);
+  if(!panel.unlocked){
+    const form=el('form','admin-row'),input=document.createElement('input');
+    input.type='password';input.inputMode='numeric';input.autocomplete='off';input.placeholder='Пароль';input.setAttribute('aria-label','Пароль');
+    const submit=el('button','chip','Войти');submit.type='submit';
+    form.append(input,submit);host.append(form,status);
+    form.onsubmit=e=>{
+      e.preventDefault();
+      if(input.value!=='1122'){status.textContent='Неверный пароль.';input.select();return;}
+      panel.unlocked=true;refresh();
+    };return;
+  }
+  function action(parent,label,fn){
+    parent.append(btn('chip',label,()=>{if(!panel?.unlocked)return;status.textContent=fn();save(true);}));
+  }
+  function group(label){
+    const field=el('fieldset','admin-row');field.append(el('legend','',label));host.append(field);return field;
+  }
+  const weather=group('Погода');
+  for(const [value,label] of [['clear','Ясно'],['snow','Снег'],['warning','Подход метели'],['front','Удар фронта'],['auto','По календарю']]){
+    action(weather,label,()=>changeFieldWeather(value));
+  }
+  const kit=group('Рюкзак'),select=document.createElement('select');
+  select.setAttribute('aria-label','Предмет');
+  const ids=new Set([...winterStaples,...Object.keys(salvageGoods),...Object.keys(winterSupplies),'ar_jacket','grenade']);
+  for(const [id,item] of Object.entries(ITEMS))if(item.ammo||id.startsWith('w_'))ids.add(id);
+  for(const id of [...ids].sort((a,b)=>ITEMS[a].n.localeCompare(ITEMS[b].n,'ru'))){
+    select.add(new Option(ITEMS[id].n,id));
+  }
+  select.value='matches';kit.append(select);
+  function quantity(parent,label,value,max){
+    const input=document.createElement('input');input.type='number';input.min=1;input.max=max;input.step=1;
+    input.value=value;input.setAttribute('aria-label',label);parent.append(input);return input;
+  }
+  const amount=quantity(kit,'Количество предметов',1,999);
+  action(kit,'Выдать',()=>{
+    if(!amount.value||!amount.checkValidity())return 'Укажите целое количество от 1 до 999.';
+    const id=select.value,n=Number(amount.value),m=collectStock({loot:{[id]:n}},id);
+    return 'В рюкзаке добавлено: '+m+' из '+n+'.'+(m<n?' '+receiveError(id,1):'');
+  });
+  const wallet=group('Деньги'),cash=quantity(wallet,'Сумма в RU',1000,1000000);
+  action(wallet,'Добавить RU',()=>{
+    if(!cash.value||!cash.checkValidity())return 'Укажите целую сумму от 1 до 1 000 000.';
+    S.money+=Number(cash.value);return 'Баланс: '+S.money+' RU.';
+  });
+  const animals=group('Животные');
+  action(animals,'Вызвать волка',()=>summonFieldAnimal('wolf'));
+  action(animals,'Вызвать оленя',()=>summonFieldAnimal('deer'));
+  host.prepend(status);
 }
 
 const winterPeople=[
@@ -17187,6 +17323,26 @@ function winterService(e){
 }
 
 const wolfTerritories=[[67,94],[87,409],[417,409]];
+// Short traverses cross actual lanes between two forest edges. The first point
+// is also the entry point for a newly arriving pack or herd.
+const wildlifeCrossings={
+  wolf10:[[95.52,435.36],[90,432],[85,430],[81,428]],
+  wolf11:[[257.08,265.8],[261,267],[263,270],[259,271]],
+  deer7:[[341.31,287.8],[344,284],[347,283],[345,290]],
+  deer8:[[119.79,409.22],[123,410],[125,412],[120,413]]
+};
+function wildGround(x,y){
+  return x>4&&y>4&&x<district.width-4&&y<district.height-4&&Math.abs(y-178)>8 &&
+    !winterFloor(x*T,y*T)&&basinRadius(x,y,lakeShape)>1&&!swampAt(x*T,y*T)&&clearFooting(x*T,y*T,13);
+}
+function clearingSpot(anchor,radius){
+  for(let i=0;i<60;i++){
+    const x=anchor[0]+rnd(-radius,radius),y=anchor[1]+rnd(-radius,radius);
+    const spot={x:x*T,y:y*T};
+    if(wildGround(x,y)&&!ents.some(e=>e.alive&&e.wildId&&dE(e,spot)<26))return spot;
+  }
+  return null;
+}
 function forestRangeSpot(anchor,radius){
   for(let i=0;i<160;i++){
     const x=anchor?anchor[0]+rnd(-radius,radius):rnd(12,district.width-12);
@@ -17200,7 +17356,9 @@ function forestRangeSpot(anchor,radius){
 function spawnWild(slot){
   const deer=slot.species==='deer',anchor=slot.territory>=0?wolfTerritories[slot.territory]:null;
   const mate=ents.find(e=>e.wildGroup===slot.group&&e.alive);
-  const p=forestRangeSpot(mate?[mate.x/T,mate.y/T]:anchor,mate?2:20);
+  const route=wildlifeCrossings[slot.group];
+  const nearMate=mate?[mate.x/T,mate.y/T]:null;
+  const p=route?clearingSpot(nearMate||route[0],mate?1.4:1.8):forestRangeSpot(nearMate||anchor,mate?2:20);
   if(!p)return;
   Object.assign(slot,p,{hp:deer?48:38,again:0});return addWild(slot);
 }
@@ -17211,15 +17369,16 @@ function addWild(slot){
   e.home={x:slot.homeX||slot.x,y:slot.homeY||slot.y};slot.homeX=e.home.x;slot.homeY=e.home.y;ents.push(e);return e;
 }
 function restoreWildlife(){
-  if(!S.flags.wildlife){
-    S.flags.wildlife=[];
-    for(const species of ['wolf','deer']){
-      let count=0;
-      const sizes=species==='wolf'?[3,2,3,2,3,2,3,2,2,2]:[4,3,3,4,3,3,4];
-      sizes.forEach((size,group)=>{
-        for(let i=0;i<size;i++,count++)S.flags.wildlife.push({id:species+count,group:species+group,species,territory:species==='wolf'&&group<6?group%3:-1});
-      });
-    }
+  const records=S.flags.wildlife ||= [],ids=new Set(records.map(s=>s.id));
+  for(const species of ['wolf','deer']){
+    let count=0;
+    const sizes=species==='wolf'?[3,2,3,2,3,2,3,2,2,2,3,3]:[4,3,3,4,3,3,4,3,3];
+    sizes.forEach((size,group)=>{
+      for(let i=0;i<size;i++,count++){
+        const id=species+count;
+        if(!ids.has(id))records.push({id,group:species+group,species,territory:species==='wolf'&&group<6?group%3:-1});
+      }
+    });
   }
   for(const s of S.flags.wildlife){if(s.again>S.min)continue;if(s.hp>0)addWild(s);else spawnWild(s);}
 }
@@ -17244,7 +17403,16 @@ function wildAI(e,dt){
     const leader=ents.find(a=>a.alive&&a.wildGroup===e.wildGroup),a=Math.atan2(e.y-P.y,e.x-P.x);
     let anchor=leader&&leader!==e?[leader.x/T,leader.y/T]:[e.home.x/T,e.home.y/T];
     if(danger)anchor=[e.x/T+Math.cos(a)*5,e.y/T+Math.sin(a)*5];
-    e.roam=forestRangeSpot(anchor,danger?2:leader===e?5:1.6);e.roamAt=S.min+(danger?2:ri(4,11));
+    const route=wildlifeCrossings[e.wildGroup];
+    if(route&&!danger){
+      if(leader===e){
+        e.crossingStep=((e.crossingStep??0)+1)%route.length;
+        anchor=route[e.crossingStep];
+      }
+      e.roam=clearingSpot(anchor,leader===e?.65:1.25);
+    }else if(danger)e.roam=clearingSpot(anchor,2);
+    else e.roam=forestRangeSpot(anchor,leader===e?5:1.6);
+    e.roamAt=S.min+(danger?2:route?ri(9,15):ri(4,11));
   }
   if(e.roam){const ang=Math.atan2(e.roam.y-e.y,e.roam.x-e.x);e.ang=ang;goTo(e,e.roam.x,e.roam.y,danger?160:28,dt);}
 }
@@ -17303,12 +17471,30 @@ function visibleFinds(inView){
   return Object.values(S.flags.fieldFinds).filter(f=>inView(f.x,f.y,36))
     .map(f=>({find:f,depth:f.y+(f.type==='loose'?8:3)}));
 }
+// Longest dimension on the ground, in world pixels. Selection still uses the reach of the hand.
+const fieldSizes={wood:20,matches:5.5,buckle:6,wire:9,candle:8,a9:8,bandage:8,medkit:12,
+  bread:12,cans:8,tea:12,coffee:12,money:8,lining:18,antler:16,wolfHide:28,deerHide:33};
+function fieldItemSize(id){return fieldSizes[id] || (isGun(id)?30:12);}
+function drawBrokenWinterCrate(g,o){
+  const seed=Math.floor(o.x/T)+Math.floor(o.y/T)*17;
+  g.rotate((hash2(seed,3)-.5)*1.25);
+  for(const [i,[x,y,len,w,a]] of [[-6,-4,16,3,-.68],[2,-6,19,3.6,-.2],[-1,3,13,3,.57],[5,6,11,2.8,.26],[-7,7,7,1.2,-.37]].entries()){
+    g.save();g.translate(x,y);g.rotate(a);
+    const l=len/2,h=w/2;
+    const edge=new Path2D();
+    edge.moveTo(-l,-h);edge.lineTo(l-1,-h);edge.lineTo(l+1,-h*.5);
+    edge.lineTo(l-2,0);edge.lineTo(l+.5,h*.5);edge.lineTo(l-1,h);edge.lineTo(-l,h);edge.closePath();
+    g.save();g.translate(.6,1);g.fillStyle='#39302865';g.fill(edge);g.restore();
+    g.clip(edge);g.drawImage(lookoutBoard(seed+i,false),-l,-h,len+1,w);
+    g.restore();
+  }
+}
 function drawWinterFind(f){
     const loose=f.type==='loose',id=loose?Object.keys(f.loot)[0]:f.type;
     if(!id)return;
     const im=fieldFindImage(id);
     if(!im)return;
-    const w=loose?15:25,h=w*im.height/im.width;
+    const w=loose?fieldItemSize(id)*im.width/Math.max(im.width,im.height):25,h=w*im.height/im.width;
     groundShadow(ctx,f.x,f.y,w*.52,h*.44,0,1.4);ctx.drawImage(im,f.x-w/2,f.y-h/2,w,h);
 }
 const fieldIconCache={};
@@ -17978,7 +18164,9 @@ function snowDepth(t){
   const block=Math.floor(t/320),storm=snowWindow(block);
   return block+clamp((t-storm.start)/storm.length,0,1);
 }
-function snowing(t){const s=snowWindow(Math.floor(t/320));return t>=s.start && t<s.start+s.length;}
+function snowing(t){
+  if(S.flags.testWeather && t<S.flags.testWeather.until)return S.flags.testWeather.mode==='snow';
+  const s=snowWindow(Math.floor(t/320));return t>=s.start && t<s.start+s.length;}
 function traceAlpha(t){return clamp(1-(snowDepth(S.min)-snowDepth(t))*2.15,0,1);}
 function recordTrace(mark){
   const recent=S.flags.snowMarks||=[];
@@ -18188,6 +18376,29 @@ function prepareYardEquipment(p,source){
   const out=winterCanvas(w+pad*2,h+pad*2),og=out.getContext('2d');
   p.yard={w,h,pad,shadowPad:pad,scale,rgba,z,grounded:c,shadow,out,og,pixels:og.createImageData(out.width,out.height)};
   p.foot=1-cfg.front/p.height;p.depth=p.y+cfg.front;
+}
+// Project opaque sprite samples from their measured height. Openings between rails and chains pass light.
+function paintYardBeamShadow(g,p,source,radius,half){
+  const dx=p.x-source.x,dy=p.y-source.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);
+  const margin=Math.hypot(p.width,p.height);
+  if(dist>radius+margin || Math.abs(angD(source.ang,angle))>half+Math.atan2(margin,Math.max(1,dist-margin)))return;
+  const a=p.yard,rise=equipmentProfile[p.key].rise;
+  const bearing=Math.round(angle*24)/24,stretch=Math.round(clamp(1+48/Math.max(30,dist),1,2.5)*8)/8;
+  if(!a.beam || a.bearing!==bearing || a.stretch!==stretch){
+    const pad=Math.ceil(rise*3+4),w=Math.ceil(p.width)+2*pad,h=Math.ceil(p.height)+2*pad;
+    const c=a.beam ||= winterCanvas(w,h),b=c.getContext('2d');
+    b.clearRect(0,0,w,h);
+    const u=Math.cos(bearing)*stretch,v=.52+Math.sin(bearing)*stretch;
+    b.fillStyle='#161c23';
+    for(let y=0;y<a.h;y+=2)for(let x=0;x<a.w;x+=2){
+      const i=y*a.w+x,alpha=a.rgba[i*4+3];if(alpha<35)continue;
+      const z=a.z[i]*rise;
+      b.globalAlpha=alpha/255;b.fillRect(pad+x/a.scale+u*z,pad+y/a.scale+v*z,1.55,1.55);
+    }
+    a.bearing=bearing;a.stretch=stretch;a.beamPad=pad;
+  }
+  g.save();g.globalAlpha=.68;g.filter='blur(.7px)';
+  g.drawImage(a.beam,p.x-p.width/2-a.beamPad,p.y-p.foot*p.height-a.beamPad);g.restore();
 }
 function paintEquipment(g,p,mapView,shadow=false){
   const a=p.yard,cfg=equipmentProfile[p.key];
@@ -20962,23 +21173,19 @@ function winterInteractChoices(cand){
   const room=winterFloor(P.x,P.y);
   const stove=stoveIn(room);
   if(stove && dE(P,stove.at)<53 && los(P.x,P.y,stove.at.x,stove.at.y)){
-    const lit=stoveBurning(stove);
-    cand(dE(P,stove.at),{k:lit?'winterRest':stove.action,stove,label:lit?'Согреться у печи':'Растопить печь'});
+    if(!stoveBurning(stove))cand(dE(P,stove.at),{k:stove.action,stove,label:'Растопить печь'});
   }
   if(room?.n>1 || room?.heater || shoreHomes.some(home=>home.room===room))for(const o of objs){
     if(o.fitting!=='bedroll')continue;
     const center={x:o.x+o.w/2,y:o.y+o.h/2},d=dE(P,center);
     if(d<52 && winterFloor(center.x,center.y)===room && los(P.x,P.y,center.x,center.y))cand(d-4,{k:'winterRest',bed:true,label:'Отдохнуть на лежанке'});
   }
-  const f=district.heaters.concat(WORLD_FIRES.filter(fireLit)).find(h=>dE(P,h)<53 && winterFloor(h.x,h.y)===room && los(P.x,P.y,h.x,h.y));
-  if(f)cand(dE(P,f),{k:'winterRest',label:'Погреться у огня'});
 }
 function winterUse(n){
   if(fireAction(n))return true;
   if(n.k==='searchFind'){openLoot(n.f);return true;}
   if(n.k==='takeFind'){if(collectStock(n.f,n.id,n.f.loot[n.id])){play('pick');save(true);}return true;}
   if(n.k==='talk'&&n.e.service){winterService(n.e);return true;}
-  if(n.k==='winterRest'&&!n.bed){msg('Ты греешься. Для сна нужна лежанка.');return true;}
   if(n.k==='baseKindle' || n.k==='pumpKindle' || n.k==='hamletKindle'){
     S.flags[n.stove.flag]=S.min+8*60;msg(n.k==='hamletKindle'?'Поленья затрещали. У печи теплеет.':n.stove===pumpHeater?'Дрова занялись. У печи можно согреться.':'Сухие поленья занялись. В караульной теплеет.','say');save(true);
   }else if(n.k==='winterStairs'){
@@ -21017,7 +21224,7 @@ function sleepWinterHours(hours){
   thermalTrackAt('street',S.min);
   S.food=Math.max(0,S.food-slept*foodPerHour);
   P.hp=Math.min(100,P.hp+slept*healthPerHour);P.st=100;
-  ageRemains();winterWildTick();cleanExpiredCrates();
+  clearColdFires();ageRemains();winterWildTick();cleanExpiredCrates();
   if(S.food<1e-8){S.food=0;msg('Ты проснулся от голода.','bad');}
 }
 let stepDistance=0,winterFootSide=1;
@@ -21421,6 +21628,7 @@ function winterFlashlight(g,source){
   castLight(brush,source,source.ang,half,radius,.95);
   if(SHADOWS && !winterFloor(source.x,source.y)){
     brush.save();brush.globalCompositeOperation='destination-out';
+    for(const p of atlasProps)if(p.yard)paintYardBeamShadow(brush,p,source,radius,half);
     for(const tree of treesInRect(left,top,left+2*radius,top+2*radius)){
       const dx=tree.x-source.x,dy=tree.y-source.y,dist=Math.hypot(dx,dy);
       if(dist<1 || dist>=radius)continue;

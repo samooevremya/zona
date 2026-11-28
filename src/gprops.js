@@ -360,7 +360,7 @@ function drawGroundItems(o) {
       ctx.stroke();
     }
     if(im?.complete && im.naturalWidth) {
-      const size=id==='energy'?13:id==='money'?15:isGun(id)?30:22;
+      const size=BEREZKI?fieldItemSize(id):id==='energy'?13:id==='money'?15:isGun(id)?30:22;
       const scale=size/Math.max(im.naturalWidth,im.naturalHeight);
       spriteShadow(ctx,1.5,1);
       const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
@@ -377,7 +377,9 @@ function containerDraw(o){
   const g=ctx,x=o.x+o.w/2,y=o.y+o.h/2;
   g.save(); g.translate(x,y);
   const sprite=o.k==='crate'?lesserSprites.splinters:o.k==='safe'?lesserSprites.safe:null;
-  if(sprite){
+  if(BEREZKI && o.k==='crate'){
+    drawBrokenWinterCrate(g,o);
+  }else if(sprite){
     const width=o.k==='crate'?36:26, height=width*sprite.height/sprite.width;
     if(o.k==='crate') g.rotate((hash2(Math.floor(x),Math.floor(y))-.5)*1.8);
     spriteShadow(g,o.k==='crate'?1.5:3,1);
