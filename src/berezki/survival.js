@@ -34,8 +34,10 @@ function winterShelter(e){
   return room;
 }
 function winterRoomWarm(room){
-  if(stoveIn(room))return !!stoveBurning(stoveIn(room));
-  return !!room&&(room.block==='living'||room.kind==='barracks'||district.heaters.some(h=>winterFloor(h.x,h.y)===room)||stoveBurning(stoveIn(room)));
+  if(!room||room.abandoned)return false;
+  const stove=stoveIn(room);
+  if(stove)return !!stoveBurning(stove);
+  return room.block==='living'||room.kind==='barracks'||district.heaters.some(h=>winterFloor(h.x,h.y)===room);
 }
 const windVectors=[[0,1,'севера'],[-1,0,'востока'],[0,-1,'юга'],[1,0,'запада']];
 // Use the movement graph itself: an entrance can have several usable landing tiles.
@@ -128,12 +130,15 @@ function stormSnowArt(){
   winterSnowArt=c;return c;
 }
 function winterScreenEffects(){
-  const s=S.flags.blizzard,cold=clamp((40-S.flags.warmth)/40,0,1),cover=s?.cover||0;
+  const threshold=thermalBalance.frostStarts;
+  const s=S.flags.blizzard,cold=S.flags.warmth<=threshold?lerp(.06,1,1-S.flags.warmth/threshold):0,cover=s?.cover||0;
   if(cold||cover){
     if(!winterFrostArt){
       const c=winterCanvas(640,360),g=c.getContext('2d'),rand=mulberry32(77301);
+      // Four edge bands of this depth occupy the configured fraction of the screen.
+      const band=(1-Math.sqrt(1-thermalBalance.maxFrostArea))/2;
       for(let i=0;i<3100;i++){
-        const side=i%4,u=rand(),v=rand()**2*.097,x=(side===0?v:side===1?1-v:u)*640,y=(side===2?v:side===3?1-v:u)*360;
+        const side=i%4,u=rand(),v=rand()**2*band,x=(side===0?v:side===1?1-v:u)*640,y=(side===2?v:side===3?1-v:u)*360;
         g.strokeStyle='rgba(222,235,240,'+(.25+.58*rand())+')';g.lineWidth=.4+rand();
         const a=rand()*6.28,l=2+rand()*10;beam(g,x,y,x+l*Math.cos(a),y+l*Math.sin(a),g.lineWidth,g.strokeStyle);
       }
@@ -160,12 +165,16 @@ function winterScreenEffects(){
 let warmthBar;
 function winterStatus(){
   if(!warmthBar){
-    warmthBar=H.fd.closest('.zh-bar').cloneNode(true);warmthBar.classList.remove('fd');warmthBar.title='Тепло';
-    warmthBar.querySelector('svg').innerHTML='<path d="M9 4a3 3 0 0 1 6 0v10a5 5 0 1 1-6 0z"/>';
+    warmthBar=H.fd.closest('.zh-bar').cloneNode(true);warmthBar.classList.replace('fd','warmth');warmthBar.title='Тепло';
+    warmthBar.setAttribute('role','meter');warmthBar.setAttribute('aria-label','Запас тепла');
+    warmthBar.setAttribute('aria-valuemin','0');warmthBar.setAttribute('aria-valuemax','100');
+    warmthBar.style.setProperty('--frost-mark',thermalBalance.frostStarts+'%');
+    warmthBar.querySelector('svg').innerHTML='<path d="M9 4a3 3 0 0 1 6 0v9a5.3 5.3 0 1 1-6 0z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 8h2v7.4a2.8 2.8 0 1 1-2 0z" fill="currentColor"/>';
     warmthBar.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));H.fd.closest('.zh-bar').before(warmthBar);
   }
   const w=S.flags.warmth,bar=warmthBar.querySelector('i');bar.style.width=w+'%';
-  bar.style.background='color-mix(in srgb, #de9049 '+w+'%, #62a6de)';warmthBar.querySelector('b').textContent=Math.round(w);
+  warmthBar.classList.toggle('chilled',w<=thermalBalance.frostStarts);
+  warmthBar.querySelector('b').textContent=Math.round(w);warmthBar.setAttribute('aria-valuenow',Math.round(w));
 }
 function winterExert(dt,moving,sprint,attempt,depth){
   const deep=depth>.35;

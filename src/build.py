@@ -25,7 +25,7 @@ h=h.replace('</style>','</style>\n<style>\n'+css+'\n</style>',1)
 g5=open('g5.js',encoding='utf8').read().replace('/*AVATAR*/',av)
 pos=g5.rfind('boot();')
 assert pos>0
-scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('survival.js','fieldfire.js','people.js','wildlife.js','supplies.js','settlement.js','apartments.js','surfaces.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','west.js','hamlet.js','atlas.js','scene.js')) if WINTER else ''
+scene = '\n'.join(open('berezki/'+f,encoding='utf8').read() for f in ('survival.js','temperature.js','fieldfire.js','people.js','wildlife.js','supplies.js','settlement.js','apartments.js','surfaces.js','winterfield.js','playground.js','residence.js','height.js','shore.js','homes.js','station.js','base.js','pump.js','west.js','hamlet.js','atlas.js','scene.js')) if WINTER else ''
 g5=g5[:pos]+bridge+'\n'+scene+'\n'+('bootBerezki();' if WINTER else g5[pos:])
 js="(function () {\n'use strict';\n"+"\n".join(open(f,encoding='utf8').read() for f in ['g1.js','gloc.js','gpack.js','g2.js','ganomalies.js','g3.js','g4.js','g6.js','g7.js','g8art.js','g9.js','gui.js','gb1.js','gquest.js','gscript.js','gstory.js','gsaves.js','gprologue.js','gmap_rc1.js','gbig.js','glesser.js','ggarbage.js','ggrips.js','gg3.js','gg7.js','gmotion.js','gprops.js','gcontrols.js','gheight.js','glandmarks.js','groominteriors.js','genvironment.js','gatmosphere.js','gfieldaudio.js','gzonelife.js','ginhabited.js'])+"\n"+g5+"\n})();\n"
 if not WINTER: open('game.js','w',encoding='utf8').write(js)
