@@ -293,7 +293,7 @@ function drawInv2() {
       refresh();
     }));
     if (it.armor && S.armor !== id) row.appendChild(btn('go', 'Надеть', () => { if(weight()>carryLimit(id)) panel.hint='Сначала снизь вес до '+carryLimit(id)+' кг.'; else S.armor=id; refresh(); }));
-    if(BEREZKI&&id==='wood')row.appendChild(btn('go','Развести костёр',chooseFireSite));
+    if(BEREZKI&&id==='wood')row.appendChild(btn('go','Уложить дрова',chooseFireSite));
     if (id==='energy' || it.heal !== undefined || it.rad !== undefined || FOOD[id]) row.appendChild(btn('go', ['energy','coffee','tea'].includes(id) ? 'Выпить' : FOOD[id] ? 'Съесть' : 'Применить', () => { useItem(id); refresh(); }));
     if (ARTFX[id]) row.appendChild(btn('go', beltCount(id) ? 'Снять с пояса' : 'На пояс', () => {
       if (beltCount(id)) {

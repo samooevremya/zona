@@ -90,7 +90,7 @@ function stormRoute(e){
   }
   return null;
 }
-function winterStormTick(dt){
+function winterStormTick(dt,sleeping=false){
   const f=S.flags,s=f.blizzard||={stage:'calm',until:S.min+ri(540,1080),dir:0,cover:0};
   if(s.stage==='calm'&&S.min>=s.until){
     const route=winterShelter(P)?{seconds:0}:stormRoute(P);
@@ -104,10 +104,10 @@ function winterStormTick(dt){
     s.stage='calm';s.until=S.min+ri(720,1800);bulletin('Метель стихла. Можно выходить.');
     for(const e of ents)delete e.stormRefuge;
   }
-  if(s.stage==='front')for(const e of ents)if(e.alive&&!winterShelter(e))kill(e,'blizzard');
+  if(s.stage==='front')for(const e of ents)if(e.alive&&!e.wildId&&!winterShelter(e))kill(e,'blizzard');
   const outside=!winterShelter(P);
   s.cover=clamp(s.cover+dt*(outside&&s.stage!=='calm'?.026:winterRoomWarm(winterShelter(P))?-.085:-.055),0,1);
-  if(s.stage!=='calm'&&(!s.soundAt||S.min>=s.soundAt)){play('winterGust',undefined,undefined,s.stage==='front'?1:.65);s.soundAt=S.min+4;}
+  if(!sleeping&&s.stage!=='calm'&&(!s.soundAt||S.min>=s.soundAt)){play('winterGust',undefined,undefined,s.stage==='front'?1:.65);s.soundAt=S.min+4;}
 }
 function winterWindMove(mx,my){
   const s=S.flags.blizzard;

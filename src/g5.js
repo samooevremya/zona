@@ -190,7 +190,7 @@ function refresh() {
   }
   pbody.textContent = '';
   if (panel.hint) pbody.appendChild(el('p', 'hint', panel.hint));
-  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
+  ({ dialog: drawDialog2, trade: drawTrade2, inv: drawInv2, loot: drawLoot, locker: drawLocker, fieldFire: BEREZKI && drawFireActions, pda: drawPda2, menu: drawMenu })[panel.kind === 'trader' ? 'dialog' : panel.kind]();
   for (const sel of selectors) {
     const node = pbody.querySelector(sel);
     if (node && positions[sel]) node.scrollTop = positions[sel];
@@ -1028,6 +1028,11 @@ function enemyUnderFinger(x,y) {
 cv.addEventListener('pointerdown', e => {
   audioInit();
   if (panel || title.open) return;
+  if(BEREZKI && P?.alive && !layingFire && e.button===0){
+    const target=screenToWorld(e.clientX,e.clientY);
+    const fire=(S.flags.campfires||[]).find(f=>dE(f,target)<17 && canReachFire(f));
+    if(fire){e.preventDefault();openFireActions(fire);return;}
+  }
   if (e.pointerType === 'mouse') { setTouch(false); IN.mx = e.clientX; IN.my = e.clientY; if (e.button === 0) IN.fire = true; return; }
   setTouch(true);
   const s = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, a: P.ang };

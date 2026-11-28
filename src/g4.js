@@ -1220,7 +1220,12 @@ function render() {
     lctx.setTransform(unit,0,0,unit,origin[0],origin[1]);
     if(!shopVisible && !loft)clipRoofsFromLight(lctx,vx,vy,vw,vh,inView);
     if(P.alive){
-      if(BEREZKI){if(S.torch!==false)winterFlashlight(lctx,P);}
+      if(BEREZKI){
+        if(S.torch!==false){
+          const [dx,dy]=S.flags.onLookout?lookoutOffset(P.y):S.flags.stationDeck?bridgeOffset(P.y):winterStairOffset(P);
+          lctx.save();lctx.translate(dx,dy);winterFlashlight(lctx,P);lctx.restore();
+        }
+      }
       else if(S.torch===false)castLight(lctx,P,0,Math.PI,60,.45);
       else {castLight(lctx,P,0,Math.PI,95,.75);castLight(lctx,P,P.ang,.42,330,.95);}
     }

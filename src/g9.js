@@ -233,7 +233,8 @@ function restLabel(verb, minutes, ctx) {
 }
 function restBlock(h) {
   if (S.bleed > 0) return BEREZKI?'Сначала останови кровь бинтом.':'Сначала останови кровь: перевяжись или используй аптечку.';
-  if (S.food < REST.danger + REST.food) return 'Слишком голоден, чтобы отдыхать: сытость ' + Math.round(S.food) + '. Сначала поешь.';
+  if(BEREZKI && S.food<20)return 'Чтобы лечь спать, нужна сытость хотя бы 20%.';
+  if (!BEREZKI && S.food < REST.danger + REST.food) return 'Слишком голоден, чтобы отдыхать: сытость ' + Math.round(S.food) + '. Сначала поешь.';
   if (ents.some(e => e.alive && e !== P && hostile(e, P) && dE(e, P) < 520)) return 'Рядом враги, не до отдыха.';
   return '';
 }

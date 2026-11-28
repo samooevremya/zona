@@ -20,6 +20,12 @@ function checks(){
   check(S.flags.warmth===60&&S.food===35&&P.st===40,'напитки');
   const pos=tilePoint(390,109),villageRoute=stormRoute({...pos,r:11});
   check(villageRoute&&villageRoute.seconds<12,'убежище у рыбацкого огня');
+  const crateItems=['bread','bandage','cans','medkit','a9','wood','matches','wire','buckle'];
+  check(crateItems.every(id=>fieldFindImage(id)?.naturalWidth>0),'модели всех предметов таблиц ящиков');
+  const towerPos={x:lookout.x,y:lookout.y+lookout.half+24};Object.assign(P,towerPos);
+  delete S.flags.onLookout;const under=npcBarrier(P,0,-1,100,null,'light');
+  S.flags.onLookout=true;check(under<30&&npcBarrier(P,0,-1,100,null,'light')>90,'фонарь светит над опорами лестницы');
+  delete S.flags.onLookout;
   const woodIcon=itemIcon('wood');
   check(woodIcon.src===district.images.firewood.src&&woodIcon.src!==district.images.wood.src,'дрова и поленница различимы');
   const seeded=Object.entries(S.flags.winterBoxSites||{}).filter(([key])=>key.includes('expedition-'));
@@ -31,12 +37,25 @@ function checks(){
     const origin=tilePoint(...point);
     check(stormRoute({...origin,r:11})?.seconds>0,'доступное убежище '+point.join(','));
   }
+  Object.assign(P,byS('flatChief').home);
+  S.bleed=0;S.food=19.9;const start=S.min;sleepWinterHours(1);
+  check(S.min===start,'сон запрещён при сытости ниже 20');
+  S.food=20;P.hp=80;S.flags.warmth=37;sleepWinterHours(8);
+  check(Math.abs(S.min-start-400)<.001 && S.food===0 && P.hp>80 && P.hp<95 && S.flags.warmth===37,'пробуждение в момент голода, тепло и лечение');
+  const awakeHP=P.hp;survival(.6);check(P.hp<awakeHP,'голод после пробуждения');S.food=100;
   const ground=baseRoad[1];Object.assign(P,tilePoint(...ground));P.st=50;winterExert(1,true,false,false,.9);check(P.st===50,'сугроб без восстановления');
   winterExert(1,false,false,false,.9);check(P.st>60,'остановка');P.st=1;winterExert(1,true,true,true,.9);check(P.st===0&&P.winded,'истощение');
   const outside=tilePoint(260,453);Object.assign(P,outside);S.flags.warmth=10;S.min=840;
   S.inv.matches=5;S.inv.wood=2;P.ang=0;check(!fireSiteProblem(fireSpot()),'выбор площадки');
-  IN.moveX=IN.moveY=0;fireAction({k:'fireSite'});const f=S.flags.campfires.at(-1);
+  IN.moveX=IN.moveY=0;fireAction({k:'fireSite'});let f=S.flags.campfires.at(-1);
+  check(!layingFire&&cnt('matches')===5&&f.unburnt,'укладка без спички');
+  fireAction({k:'fieldFire',f});pbody.querySelector('button').click();
   IN.moveX=1;tickFieldFire(.6);IN.moveX=0;check(cnt('wood')===1&&cnt('matches')===5&&!layingFire,'отмена до чирка');
+  S.inv.matches=0;fireAction({k:'fieldFire',f});
+  check(pbody.querySelector('button').disabled,'меню без спичек');
+  [...pbody.querySelectorAll('button')].find(b=>b.textContent==='Забрать дрова').click();
+  check(cnt('wood')===2&&!WORLD_FIRES.includes(f)&&!S.flags.campfires.includes(f),'возврат дров до розжига');
+  fireAction({k:'fireSite'});f=S.flags.campfires.at(-1);S.inv.matches=5;
   const random=Math.random;
   try{
     Math.random=()=>.95;strikeFire(f);tickFieldFire(3);check(cnt('matches')===4&&!fireLit(f)&&f.unburnt,'неудачный розжиг');
@@ -44,8 +63,8 @@ function checks(){
   }finally{Math.random=random;}
   S.flags.warmth=0;const hp=P.hp;winterWeather(1);check(P.hp===hp&&S.flags.warmth>0,'обогрев без отдыха');
   S.min+=61;check(!fireLit(f)&&f.embers>S.min,'угли');
-  fireAction({k:'fieldFire',f});panel.opts()[0].fn();check(cnt('matches')===3&&cnt('wood')===0&&fireLit(f),'подброс дров');
-  fireAction({k:'fieldFire',f});panel.opts().find(o=>o.t==='Засыпать снегом').fn();check(!fireLit(f)&&f.embers===0,'тушение');
+  fireAction({k:'fieldFire',f});pbody.querySelector('button').click();check(cnt('matches')===3&&cnt('wood')===0&&fireLit(f),'подброс дров');
+  fireAction({k:'fieldFire',f});[...pbody.querySelectorAll('button')].find(b=>b.textContent==='Засыпать снегом').click();check(!fireLit(f)&&f.embers===0,'тушение');
   S.money=2000;const doc=byS('baseMedic'),merchant=byS('baseSeller');P.hp=50;winterService(doc);panel.opts().find(o=>o.t.startsWith('Лечение')).fn();check(P.hp===100&&S.money===1900,'лечение у медика');
   check(tradePrice('medkit',doc)>tradePrice('medkit',merchant),'наценка медика');
   openTrade(merchant);panel.offer={buy:{matches:1},sell:{}};tradeDo(merchant);closePanel();check(cnt('matches')===8,'коробок из пяти спичек');
@@ -62,7 +81,9 @@ function checks(){
   S.flags.blizzard={stage:'calm',until:S.min,dir:0,cover:0};Object.assign(P,outside);winterStormTick(.02);
   check(S.flags.blizzard.stage==='warning'&&S.news.some(m=>m.x.includes('Метель с')),'предупреждение');const s=S.flags.blizzard;
   const route=stormRoute(P);check(route&&s.until-S.min>=route.seconds,'время на укрытие');
+  const herd=ents.filter(e=>e.wildId&&e.alive);
   Object.assign(P,byS('baseChief').home);S.min=s.until;winterStormTick(.02);check(P.alive&&s.stage==='front','пережить фронт в штабе');
+  check(herd.length>0&&herd.every(e=>e.alive),'животные переживают фронт');
   save(true,1);const saved=loadSave(1);applyState(saved);check(S.flags.blizzard.stage==='front'&&!serviceStock(byS('flatChief')).some(s=>s.id==='medkit'),'загрузка во время метели');
   Object.assign(P,outside);winterStormTick(.1);check(!P.alive,'выход под удар');
   return passed;

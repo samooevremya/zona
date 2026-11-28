@@ -8,7 +8,6 @@ function fireSpot(){
   return {x:P.x+Math.cos(P.ang)*35,y:P.y+Math.sin(P.ang)*35};
 }
 function fireSiteProblem(p){
-  if(!cnt('matches'))return 'В рюкзаке нет спичек.';
   if(!cnt('wood'))return 'Нужна стопка сухих дров.';
   if(winterFloor(p.x,p.y)||stationUnderpass(P)||S.flags.stationDeck||S.flags.onLookout)return 'Нужно открытое место на земле.';
   if(forestDepth(p.x,p.y)>.35)return 'Здесь слишком глубокий снег.';
@@ -18,12 +17,11 @@ function fireSiteProblem(p){
 }
 function chooseFireSite(){
   if(layingFire?.placing){layingFire=null;closePanel();msg('Выбор места отменён.');return;}
-  if(!cnt('matches')){msg('Для костра нужны спички.','bad');return;}
   closePanel();layingFire={placing:true};msg('Повернись к ровному месту и подтверди действие.');
 }
 function strikeFire(f){
   if(!cnt('matches')){msg('Спички закончились.','bad');return;}
-  layingFire={f,x:P.x,y:P.y,t:0,struck:false};P.crouch=1;msg('Укладываешь дрова…');
+  layingFire={f,x:P.x,y:P.y,t:0,struck:false};P.crouch=1;
 }
 function tickFieldFire(dt){
   if(!layingFire||layingFire.placing)return;
@@ -35,20 +33,52 @@ function tickFieldFire(dt){
     take('matches',1);a.struck=true;play('click');
   }
   if(a.t>=3){
-    if(Math.random()<.8){a.f.unburnt=false;a.f.flame=S.min+60;a.f.embers=a.f.flame+30;play('pick');msg('Дрова занялись.');}
+    if(Math.random()<.8){a.f.unburnt=false;a.f.flame=S.min+60;a.f.embers=a.f.flame+30;a.f.fuelSpan=60;play('pick');}
     else msg('Спичка погасла. Дрова остались на месте.');
     layingFire=null;save(true);
   }
 }
 function fireChoices(cand){
   if(layingFire?.placing){
-    const problem=fireSiteProblem(fireSpot());cand(-510,{k:'fireSite',label:problem||'Уложить дрова и разжечь'});return;
+    const problem=fireSiteProblem(fireSpot());cand(-510,{k:'fireSite',label:problem||'Уложить дрова'});return;
   }
   if(layingFire){cand(-510,{k:'fireCancel',label:'Прервать розжиг'});return;}
   for(const f of S.flags.campfires||[]){
-    if(dE(P,f)>58||!los(P.x,P.y,f.x,f.y))continue;
-    cand(dE(P,f)-15,{k:'fieldFire',f,label:f.flame>S.min?'Костёр · '+Math.ceil(f.flame-S.min)+' с':f.embers>S.min?'Тлеющие угли':f.unburnt?'Попробовать снова · 1 спичка':'Холодное кострище'});
+    if(!canReachFire(f))continue;
+    cand(dE(P,f)-15,{k:'fieldFire',f,label:f.unburnt?'Дрова · действия':'Костёр · действия'});
   }
+}
+function canReachFire(f){
+  return dE(P,f)<=58 && los(P.x,P.y,f.x,f.y) && !stationUnderpass(P) && !S.flags.stationDeck && !S.flags.onLookout;
+}
+function openFireActions(f){
+  openPanel('fieldFire',f.unburnt?'Стопка дров':'Костёр');
+  panel.fire=f;refresh();
+}
+function drawFireActions(){
+  const f=panel.fire;
+  function action(label,fn,disabled=false){
+    pbody.appendChild(btn('chip',label,()=>{
+      if(!canReachFire(f)||!S.flags.campfires.includes(f)){closePanel();return;}
+      closePanel();fn();save(true);
+    },disabled));
+  }
+  if(f.embers>S.min){
+    action('Подбросить дрова',()=>{
+      take('wood',1);f.flame=Math.max(S.min,f.flame)+60;
+      f.fuelSpan=f.flame-S.min;f.embers=f.flame+30;
+    },!cnt('wood'));
+    action('Засыпать снегом',()=>{f.flame=f.embers=0;f.unburnt=false;});
+  }else if(f.unburnt){
+    action(cnt('matches')?'Разжечь · 1 спичка':'Разжечь · нет спичек',()=>strikeFire(f),!cnt('matches'));
+    action('Забрать дрова',()=>{
+      const error=receiveError('wood',1);
+      if(error){msg(error,'bad');return;}
+      addPacked('wood',1);
+      S.flags.campfires.splice(S.flags.campfires.indexOf(f),1);
+      WORLD_FIRES.splice(WORLD_FIRES.indexOf(f),1);
+    });
+  }else action('Уложить дрова',()=>{take('wood',1);f.unburnt=true;},!cnt('wood'));
 }
 function fireAction(n){
   if(n.k==='fireCancel'){layingFire=null;return true;}
@@ -56,21 +86,19 @@ function fireAction(n){
     const p=fireSpot(),err=fireSiteProblem(p);
     if(err){msg(err,'bad');layingFire=null;return true;}
     take('wood',1);const f={...p,field:true,unburnt:true,flame:0,embers:0};
-    (S.flags.campfires||=[]).push(f);WORLD_FIRES.push(f);strikeFire(f);return true;
+    (S.flags.campfires||=[]).push(f);WORLD_FIRES.push(f);layingFire=null;save(true);return true;
   }
   if(n.k!=='fieldFire')return false;
-  const f=n.f,hot=f.embers>S.min;
-  dialog({n:'Походный костёр',grp:'Привал'},[f.flame>S.min?'Пламени осталось на '+Math.ceil(f.flame-S.min)+' с.':hot?'В золе видны красные угли.':'Ветер стихает у самой земли.'],()=>[
-    {t:hot?'Подбросить дрова':f.unburnt?'Попробовать снова · 1 спичка':'Разжечь · дрова и спичка',d:hot?!cnt('wood'):!cnt('matches')||!f.unburnt&&!cnt('wood'),fn:()=>{
-      closePanel();if(hot){take('wood',1);f.flame=Math.max(f.flame,S.min)+60;f.embers=f.flame+30;}else{if(!f.unburnt){take('wood',1);f.unburnt=true;}strikeFire(f);}save(true);
-    }},...(hot?[{t:'Засыпать снегом',fn:()=>{f.flame=f.embers=0;f.unburnt=false;closePanel();save(true);}}]:[]),{t:'Уйти',close:1}]);
+  openFireActions(n.f);
   return true;
 }
 function fieldFireOverlay(inView){
   for(const f of S.flags.campfires||[]){
     if(!inView(f.x,f.y,70))continue;
     if(f.flame>S.min){if(dE(P,f)<135){
-      ctx.save();ctx.font='10px sans-serif';ctx.textAlign='center';const t=Math.ceil(f.flame-S.min)+' с';ctx.fillStyle='#262720db';ctx.fillRect(f.x-17,f.y-29,34,14);ctx.fillStyle='#f2dbab';ctx.fillText(t,f.x,f.y-19);ctx.restore();
+      const fraction=clamp((f.flame-S.min)/(f.fuelSpan||60),0,1);
+      ctx.save();ctx.fillStyle='#312d28bd';ctx.fillRect(f.x-12,f.y-20,24,2.6);
+      ctx.fillStyle='#c39b61';ctx.fillRect(f.x-11.5,f.y-19.5,23*fraction,1.6);ctx.restore();
     }}else if(f.embers>S.min)shoreEllipse(ctx,f.x,f.y,6,3,'#ae5229bb');
   }
   if(layingFire?.placing){const p=fireSpot();ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle=fireSiteProblem(p)?'#b3877b':'#e5dabc';ctx.beginPath();ctx.ellipse(p.x,p.y,14,10,0,0,7);ctx.stroke();ctx.restore();}

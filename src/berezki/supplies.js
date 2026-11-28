@@ -47,15 +47,26 @@ function visibleFinds(inView){
 function drawWinterFind(f){
     const loose=f.type==='loose',id=loose?Object.keys(f.loot)[0]:f.type;
     if(!id)return;
-    const im=district.images[id==='wood'?'firewood':id]||fieldFindImage(id);
+    const im=fieldFindImage(id);
     if(!im)return;
     const w=loose?15:25,h=w*im.height/im.width;
     groundShadow(ctx,f.x,f.y,w*.52,h*.44,0,1.4);ctx.drawImage(im,f.x-w/2,f.y-h/2,w,h);
 }
 const fieldIconCache={};
 function fieldFindImage(id){
-  if(!(id in fieldIconCache)){const node=itemIcon(id);fieldIconCache[id]=node instanceof HTMLImageElement?node:null;}
-  const im=fieldIconCache[id];return im?.complete&&im.naturalWidth?im:null;
+  const key=id==='wood'?'firewood':id;
+  if(district.images[key])return district.images[key];
+  if(!(id in fieldIconCache)){
+    const node=itemIcon(id);
+    fieldIconCache[id]=node instanceof HTMLImageElement?node:null;
+  }
+  const im=fieldIconCache[id];
+  return im?.complete&&im.naturalWidth?im:null;
+}
+async function loadCrateArt(){
+  // Warm the shared inventory pictures before the first frame of the scatter.
+  for(const id of ['bread','bandage','cans','medkit','a9'])fieldFindImage(id);
+  await Promise.all(Object.values(fieldIconCache).filter(Boolean).map(im=>im.decode()));
 }
 function resetWinterCrate(o){
   const choices=district.levels.filter(r=>r.abandoned||r.kind==='stores'||r.kind==='hangar'||r===westStore);

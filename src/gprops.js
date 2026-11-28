@@ -265,7 +265,7 @@ function containerOnRay(sh,ca,sa,limit){
 }
 // Количество хранится в обычном loot. План запоминает место каждой отдельной вещи.
 const GROUND_REACH = 34;
-const groundBundle = id => id === 'money' || ITEMS[id]?.ammo;
+const groundBundle = id => id === 'money' || ITEMS[id]?.ammo || (BEREZKI && id==='matches');
 function scatterGroundItems(o) {
   const ids=[];
   for (const [id,count] of Object.entries(o.loot)) {
@@ -299,7 +299,13 @@ function scatterGroundItems(o) {
 function groundItems(o) {
   if (o.kind==='sack') return o.groundItems ||= scatterGroundItems(o);
   const layouts=S.flags.groundItems ||= {};
-  return layouts[o.stash] ||= scatterGroundItems(o);
+  const drops=layouts[o.stash] ||= scatterGroundItems(o);
+  // Old winter crates scattered one marker per match. Keep one for the remaining box.
+  if(BEREZKI && drops.some(d=>d.id==='matches')){
+    const first=drops.findIndex(d=>d.id==='matches');
+    for(let i=drops.length-1;i>=first;i--)if(drops[i].id==='matches' && (i!==first||!o.loot.matches))drops.splice(i,1);
+  }
+  return drops;
 }
 function forgetGroundItems(o) {
   const layouts=S.flags.groundItems;
@@ -343,7 +349,8 @@ function drawGroundItems(o) {
   for(const drop of groundItems(o)) {
     const {id,dx,dy}=drop, {x,y}=groundPosition(o,drop);
     const frame=G3.pack?.manifest.items?.[id];
-    const im=detectorImages[id] || lesserSprites[id] || (frame && packImage(frame.file));
+    const winterImage=BEREZKI && fieldFindImage(id);
+    const im=winterImage || detectorImages[id] || lesserSprites[id] || (frame && packImage(frame.file));
     ctx.save(); ctx.translate(x-dx*remaining,y-dy*remaining-5*Math.sin(Math.PI*flight));
     if (G.near?.drop===drop) {
       ctx.strokeStyle='rgba(234,207,143,.85)'; ctx.lineWidth=1.2; ctx.beginPath();

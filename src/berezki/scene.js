@@ -141,20 +141,36 @@ function winterUse(n){
     const blocked=restBlock();if(blocked){msg(blocked,'bad');return true;}
     dialog({n:n.bed?'Лежанка':'У огня',grp:n.stove?n.stove.room.name:winterFloor(P.x,P.y)?.hamlet?'Хутор':shoreHomes.some(h=>h.room===winterFloor(P.x,P.y))?'Рыбацкий посёлок':'Берёзки',record:true},[n.bed?'Под одеялом ещё тепло.':'Можно отогреть руки или остаться у огня подольше.'],()=>[
       ...[1,3,8].map(h=>({t:'Отдохнуть · '+h+' ч',fn:()=>{
-        const result=restPreview(h,n.bed?'sleep':'rest');
-        S.min+=result.minutes;S.food=result.food;P.hp=result.hp;
-        if(result.minutes){
-          P.st=100;
-          const room=winterShelter(P);S.flags.warmth=clamp(S.flags.warmth+result.minutes*(winterRoomWarm(room)?1.7:-.07),0,100);
-          ageRemains();
-        }
-        closePanel();if(result.stop)msg('Проснулся от голода.','say');save(true);
+        sleepWinterHours(h);
+        closePanel();save(true);
       }})),{t:'Встать',close:1}]);
   }else if(n.k==='talk'){
     const lines={warden:'Дверь за собой притвори. Нанесёт снегу — к утру её вдвоём не отворишь.',door:'Проходи. Налево столовая, наверх — по дальней лестнице.',cook:'Чайник ещё горячий. Кружки на полке.',fisher:'От крыльца держись по следам. У лунки лёд скользкий. Замёрзнешь — возвращайся, печь ещё держит тепло.',housekeeper:'К вечеру крыльцо снова заметёт.',anya:'Мы до следа и обратно. Смотри!',mitya:'Вон туда Аня убежала!',shorePost:'К домам проходи по тропе.',shorePatrol:'С берега ветер крепчает.',tenant:'Окна к ночи войлоком закрываем. От стекла так и тянет.'};
     dialog({ent:n.e,n:n.e.name,fac:'loner',grp:'Выживальщики',att:shoreJobs[n.e.sid]?'рыбацкий посёлок':'житель Берёзок'},[n.e.shoreAction==='net'?'Ячею прихвати, пока узел тяну. Ещё пару рядов — и к огню.':lines[n.e.sid]||'Добрый вечер.'],()=>[{t:'До встречи',close:1}],'dialog',n.e);
   }else return false;
   return true;
+}
+function sleepWinterHours(hours){
+  const blocked=restBlock();
+  if(blocked){msg(blocked,'bad');return;}
+  const foodPerHour=3,healthPerHour=2;
+  const slept=Math.min(hours,S.food/foodPerHour);
+  const end=S.min+slept*60;
+  // Advance occupied shelters and outdoor residents through any fronts crossed by sleep.
+  while(S.min<end){
+    const dt=Math.min(1,end-S.min);
+    if(S.flags.blizzard?.stage==='warning'){
+      for(const e of ents){
+        if(!e.alive||!e.stormRefuge||winterShelter(e))continue;
+        for(let i=0;i<5;i++)goTo(e,e.stormRefuge.x,e.stormRefuge.y,105,dt/5);
+      }
+    }
+    S.min+=dt;winterStormTick(dt,true);
+  }
+  S.food=Math.max(0,S.food-slept*foodPerHour);
+  P.hp=Math.min(100,P.hp+slept*healthPerHour);P.st=100;
+  ageRemains();winterWildTick();cleanExpiredCrates();
+  if(S.food<1e-8){S.food=0;msg('Ты проснулся от голода.','bad');}
 }
 let stepDistance=0,winterFootSide=1;
 function winterWeather(dt){
@@ -404,6 +420,7 @@ async function bootBerezki(){
   await Promise.all([loadArt(),...Object.entries(window.BEREZKI_ART).map(async([id,url])=>{
     const im=new Image();im.src=url;await im.decode();district.images[id]=im;
   })]);
+  await loadCrateArt();
   GRADE.mul='rgb(240,247,251)';
   winterLandscape();winterRoofs();
   PDA_TABS2[0]=['map','Карта'];
@@ -551,11 +568,12 @@ function winterFlashlight(g,source){
   const radius=330,half=.42;
   const mask=winterBeamMask ||= winterCanvas(radius,radius);
   const brush=mask.getContext('2d'),left=source.x-radius,top=source.y-radius;
-  if(lastWinterBeam && lastWinterBeam.x===source.x && lastWinterBeam.y===source.y &&
+  const deck=S.flags.onLookout?1:S.flags.stationDeck?2:0;
+  if(lastWinterBeam && lastWinterBeam.deck===deck && lastWinterBeam.x===source.x && lastWinterBeam.y===source.y &&
     lastWinterBeam.angle===source.ang && lastWinterBeam.rev===navRevision && lastWinterBeam.shadows===SHADOWS){
     drawMovingBeam(g,mask,source,radius,half,left,top);return;
   }
-  lastWinterBeam={x:source.x,y:source.y,angle:source.ang,rev:navRevision,shadows:SHADOWS};
+  lastWinterBeam={deck,x:source.x,y:source.y,angle:source.ang,rev:navRevision,shadows:SHADOWS};
   brush.setTransform(.5,0,0,.5,-left*.5,-top*.5);
   brush.clearRect(left,top,radius*2,radius*2);
   castLight(brush,source,source.ang,half,radius,.95);
